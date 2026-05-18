@@ -1,0 +1,13 @@
+# Regeneratable CoDD graph data
+scan/
+
+# Generated reports
+reports/
+
+# Draft extractions before review
+extracted/
+
+# Parser caches
+__pycache__/
+*.pyc
+
