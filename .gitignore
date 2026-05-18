@@ -1,0 +1,11 @@
+# Python and virtual environments
+__pycache__/
+*.pyc
+.venv/
+
+# CoDD generated artifacts
+.codd/scan/
+.codd/reports/
+.codd/extracted/
+.codd/dag.json
+docs/test/verify_report.md
