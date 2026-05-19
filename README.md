@@ -1,41 +1,48 @@
 # Yoriwake
 
-Yoriwake is managed with CoDD (Coherence-Driven Development).
+Yoriwake is a local-first task matrix application. The v1 MVP is a browser
+SPA built with React, TypeScript, Vite, and dnd-kit so the project can validate
+the task creation and drag-and-drop matrix workflow before adding the planned
+Tauri desktop shell.
 
-## CoDD setup
+The repository also uses CoDD (Coherence-Driven Development) to keep
+requirements, design notes, implementation, and tests traceable.
 
-Install project tools with aqua, then install project dependencies with Task:
+## Setup
+
+Use the `Yoriwake-base` release as the standard WSL development environment:
+
+- Release: <https://github.com/ANKM0/Yoriwake/releases/tag/Yoriwake-base>
+- Template archive: `Yoriwake-base.tar`
+
+On Windows, download `Yoriwake-base.tar` from the release page, then import it
+as a WSL2 distribution:
+
+```powershell
+wsl --import Yoriwake C:\WSL\Yoriwake C:\Users\<user>\Downloads\Yoriwake-base.tar --version 2
+wsl -d Yoriwake
+```
+
+Inside the WSL distribution, clone the repository and install project tools and
+dependencies:
 
 ```bash
+git clone git@github.com:ANKM0/Yoriwake.git
+cd Yoriwake
 aqua install
 task setup
-task codd:version
 ```
 
-The local CoDD configuration lives in `.codd/codd.yaml`. It scans:
+If you are using an existing Linux or WSL environment instead of the base
+template, install the tools managed by `aqua.yaml` first, then run the same
+`task setup` command.
 
-- `src/` for implementation files
-- `tests/` for verification files
-- `docs/` for requirements and design documents
-- `aqua.yaml` as project tooling configuration
+## Development
 
-## Common commands
-
-```bash
-task codd:scan
-task codd:dag
-task codd:elicit
-```
-
-Generated graph data and reports are ignored by Git.
-
-## Frontend setup
-
-The v1 Matrix MVP frontend uses pnpm.
+Start the frontend development server:
 
 ```bash
-aqua install
-task setup:frontend
+task frontend:dev
 ```
 
 Common frontend checks:
@@ -47,7 +54,17 @@ task ci:test
 task ci:build
 ```
 
-## CI checks
+Common CoDD commands:
+
+```bash
+task codd:version
+task codd:scan
+task codd:validate
+task codd:dag
+task codd:elicit
+```
+
+## CI Checks
 
 Run the same local checks before opening or updating a pull request:
 
@@ -57,6 +74,17 @@ task setup:frontend:ci
 task ci
 ```
 
-## Commit messages
+## Repository Structure
 
-See `docs/contributing/commit-message-format.md`.
+- `src/`: React application source.
+- `tests/`: repository-level tests.
+- `docs/requirements/`: product and system requirements.
+- `docs/design/`: issue-level design notes.
+- `docs/adr/`: accepted architecture decisions.
+- `.codd/`: local CoDD configuration.
+
+## Contributor Docs
+
+- Branch strategy: `docs/contributing/branch-strategy.md`
+- Commit messages: `docs/contributing/commit-message-format.md`
+- Issue execution: `docs/contributing/issue-execution.md`

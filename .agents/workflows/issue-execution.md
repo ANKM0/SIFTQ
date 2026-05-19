@@ -86,9 +86,9 @@ Run these commands for repository workflow, docs, agents, and CoDD-related
 changes:
 
 ```bash
-uv run codd validate
-uv run codd scan
-uv run codd dag verify
+task codd:validate
+task codd:scan
+task codd:dag
 ```
 
 Run additional tests, linters, or type checks when the changed area has
