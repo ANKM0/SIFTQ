@@ -10,6 +10,10 @@ codd:
     - id: design:branch-strategy-adr
       relation: depends_on
       semantic: decision
+  depended_by:
+    - id: design:issue-execution
+      relation: depends_on
+      semantic: workflow
 ---
 
 # Branch Strategy

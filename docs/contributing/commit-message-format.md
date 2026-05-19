@@ -7,6 +7,10 @@ codd:
     - id: req:yoriwake-system
       relation: depends_on
       semantic: governance
+  depended_by:
+    - id: design:issue-execution
+      relation: depends_on
+      semantic: workflow
 ---
 
 # Commit Message Format
