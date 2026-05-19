@@ -16,3 +16,4 @@ packages:
 - name: cli/cli@v2.74.0
 - name: nodejs/node@v22.16.0
 - name: pnpm/pnpm@v10.12.1
+- name: go-task/task@v3.50.0

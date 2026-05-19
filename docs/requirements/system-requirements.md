@@ -41,6 +41,12 @@ codd:
     - id: design:github-actions-ci-cd-toolchain-adr
       relation: depends_on
       semantic: governance
+    - id: design:taskfile-command-runner-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:issue-10-taskfile
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product
