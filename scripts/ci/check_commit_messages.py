@@ -26,7 +26,7 @@ def commit_range(args: list[str]) -> str:
 
 def main() -> int:
     rev_range = commit_range(sys.argv[1:])
-    output = run_git(["log", "--format=%H%x00%s", rev_range])
+    output = run_git(["log", "--no-merges", "--format=%H%x00%s", rev_range])
     if not output:
         return 0
 
