@@ -11,6 +11,12 @@ codd:
     - id: design:commit-message-format
       relation: depends_on
       semantic: governance
+    - id: design:branch-strategy
+      relation: depends_on
+      semantic: governance
+    - id: design:branch-strategy-adr
+      relation: depends_on
+      semantic: governance
 ---
 
 # Yoriwake System Requirements
