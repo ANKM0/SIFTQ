@@ -1,0 +1,102 @@
+version: "3"
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install all local development dependencies.
+    deps:
+      - setup:python
+      - setup:frontend
+
+  setup:python:
+    desc: Install Python dependencies with uv.
+    cmds:
+      - uv sync --all-groups
+
+  setup:frontend:
+    desc: Install frontend dependencies with pnpm.
+    cmds:
+      - pnpm install
+
+  setup:frontend:ci:
+    desc: Install frontend dependencies from the lockfile.
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  ci:
+    desc: Run the local CI gate.
+    cmds:
+      - task: ci:commit-messages
+      - task: ci:markdown
+      - task: ci:typecheck
+      - task: ci:lint
+      - task: ci:test
+      - task: ci:build
+      - task: codd:version
+      - task: codd:scan
+      - task: codd:validate
+      - task: codd:dag
+
+  ci:commit-messages:
+    desc: Check commit message format for the current branch.
+    cmds:
+      - uv run python scripts/ci/check_commit_messages.py {{.CLI_ARGS}}
+
+  ci:markdown:
+    desc: Check Markdown formatting.
+    cmds:
+      - uv run python scripts/ci/check_markdown.py
+
+  ci:typecheck:
+    desc: Run TypeScript typecheck.
+    cmds:
+      - pnpm typecheck
+
+  ci:lint:
+    desc: Run ESLint.
+    cmds:
+      - pnpm lint
+
+  ci:test:
+    desc: Run Vitest.
+    cmds:
+      - pnpm test
+
+  ci:build:
+    desc: Build the frontend.
+    cmds:
+      - pnpm build
+
+  frontend:dev:
+    desc: Start the Vite development server.
+    cmds:
+      - pnpm dev
+
+  codd:version:
+    desc: Check the required CoDD version.
+    cmds:
+      - uv run codd version --check
+
+  codd:scan:
+    desc: Scan the CoDD graph.
+    cmds:
+      - uv run codd scan
+
+  codd:validate:
+    desc: Validate CoDD documents.
+    cmds:
+      - uv run codd validate
+
+  codd:dag:
+    desc: Verify the CoDD DAG.
+    cmds:
+      - uv run codd dag verify
+
+  codd:elicit:
+    desc: Run CoDD elicitation.
+    cmds:
+      - uv run codd elicit

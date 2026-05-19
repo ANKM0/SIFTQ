@@ -48,7 +48,7 @@ design:<short-kebab-title>-adr
    - `Accepted.` for a decision that is already approved.
    - `Superseded by ADR <number>.` when replacing a prior decision.
 7. Keep the ADR focused on one decision.
-8. Run `uv run codd validate` after editing.
+8. Run `task codd:validate` after editing.
 
 ## Writing Rules
 

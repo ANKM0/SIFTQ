@@ -41,6 +41,12 @@ codd:
     - id: design:github-actions-ci-cd-toolchain-adr
       relation: depends_on
       semantic: governance
+    - id: design:taskfile-command-runner-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:issue-10-taskfile
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product
@@ -70,5 +76,5 @@ This document is the initial CoDD requirements anchor for the repository.
 
 - The repository contains a CoDD configuration at `.codd/codd.yaml`.
 - Regeneratable CoDD artifacts are excluded from Git.
-- Contributors can install `uv` with `aqua install`, install Python dependencies
-  with `uv sync`, and run `uv run codd version --check`.
+- Contributors can install project tools with `aqua install`, install project
+  dependencies with `task setup`, and run `task codd:version`.

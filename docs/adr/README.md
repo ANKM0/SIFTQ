@@ -29,3 +29,4 @@ Yoriwake workflow, governance, and architecture decisions.
 | [0006](./0006-dnd-kit-matrix-drag-and-drop.md) | Matrix Drag and Dropのdnd-kit採用 | Accepted |
 | [0007](./0007-pnpm-frontend-package-manager.md) | Frontend Package Managerのpnpm採用 | Accepted |
 | [0008](./0008-github-actions-ci-cd-toolchain.md) | GitHub Actions CI/CD Toolchain採用 | Accepted |
+| [0009](./0009-taskfile-command-runner.md) | Command RunnerのTaskfile採用 | Accepted |

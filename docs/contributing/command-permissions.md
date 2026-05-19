@@ -7,6 +7,10 @@ codd:
     - id: req:yoriwake-system
       relation: depends_on
       semantic: governance
+  depended_by:
+    - id: design:issue-10-taskfile
+      relation: depends_on
+      semantic: permissions
 ---
 
 # Command Permissions
@@ -30,7 +34,8 @@ work in `.codex/rules/yoriwake.rules`.
 - Normal issue branch creation, commit, and upstream push.
 - GitHub issue, pull request, run, repository, and authentication status
   inspection.
-- Local validation through aqua, uv, and CoDD.
+- Local validation through aqua, uv, pnpm, Taskfile, and CoDD.
+- Repository-defined Taskfile commands listed in `.codex/rules/yoriwake.rules`.
 
 ## Forbidden Areas
 

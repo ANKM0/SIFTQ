@@ -37,37 +37,37 @@ jobs:
           cache: pnpm
 
       - name: Install Python dependencies
-        run: uv sync --all-groups
+        run: task setup:python
 
       - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+        run: task setup:frontend:ci
 
       - name: Check commit messages
-        run: uv run python scripts/ci/check_commit_messages.py "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
+        run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
 
       - name: Check Markdown
-        run: uv run python scripts/ci/check_markdown.py
+        run: task ci:markdown
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: task ci:typecheck
 
       - name: Lint
-        run: pnpm lint
+        run: task ci:lint
 
       - name: Test
-        run: pnpm test
+        run: task ci:test
 
       - name: Build
-        run: pnpm build
+        run: task ci:build
 
       - name: Check CoDD version
-        run: uv run codd version --check
+        run: task codd:version
 
       - name: Scan CoDD graph
-        run: uv run codd scan
+        run: task codd:scan
 
       - name: Validate CoDD documents
-        run: uv run codd validate
+        run: task codd:validate
 
       - name: Verify CoDD DAG
-        run: uv run codd dag verify
+        run: task codd:dag

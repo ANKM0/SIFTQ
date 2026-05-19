@@ -20,6 +20,7 @@ scan:
     - "docs/"
   config_files:
     - "aqua.yaml"
+    - "Taskfile.yml"
   exclude:
     - "**/node_modules/**"
     - "**/__pycache__/**"

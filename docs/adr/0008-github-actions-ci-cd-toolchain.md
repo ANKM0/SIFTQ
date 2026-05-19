@@ -17,6 +17,12 @@ codd:
     - id: design:issue-12-ci-cd
       relation: depends_on
       semantic: ci
+    - id: design:taskfile-command-runner-adr
+      relation: depends_on
+      semantic: ci
+    - id: design:issue-10-taskfile
+      relation: depends_on
+      semantic: ci
     - id: design:adr-index
       relation: depends_on
       semantic: index
