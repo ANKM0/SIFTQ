@@ -3,7 +3,7 @@ const quadrants = ["Do", "Decide", "Delegate", "Delete"] as const;
 export function App() {
   return (
     <main>
-      <h1>Yoriwake</h1>
+      <h1>SIFTQ</h1>
       <section aria-label="Task matrix">
         {quadrants.map((quadrant) => (
           <article key={quadrant}>

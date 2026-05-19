@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:branch-strategy-adr
@@ -18,7 +18,7 @@ codd:
 
 # Branch Strategy
 
-Yoriwake uses short-lived issue branches created from `main`. Completed work is
+SIFTQ uses short-lived issue branches created from `main`. Completed work is
 merged back into `main` through pull requests after review and required checks.
 
 ## Flow

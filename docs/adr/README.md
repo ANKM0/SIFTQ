@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:adr-authoring
@@ -15,7 +15,7 @@ codd:
 # Architecture Decision Records
 
 This directory contains Architecture Decision Records (ADRs) for long-lived
-Yoriwake workflow, governance, and architecture decisions.
+SIFTQ workflow, governance, and architecture decisions.
 
 ## ADRs
 
@@ -30,3 +30,4 @@ Yoriwake workflow, governance, and architecture decisions.
 | [0007](./0007-pnpm-frontend-package-manager.md) | Frontend Package Managerのpnpm採用 | Accepted |
 | [0008](./0008-github-actions-ci-cd-toolchain.md) | GitHub Actions CI/CD Toolchain採用 | Accepted |
 | [0009](./0009-taskfile-command-runner.md) | Command RunnerのTaskfile採用 | Accepted |
+| [0010](./0010-siftq-project-name.md) | SIFTQ Project Name | Accepted |

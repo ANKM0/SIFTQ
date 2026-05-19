@@ -4,7 +4,7 @@ codd:
   type: requirement
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: product
   depended_by:

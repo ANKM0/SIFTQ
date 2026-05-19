@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
   depended_by:
@@ -18,7 +18,7 @@ codd:
 
 # Commit Message Format
 
-Yoriwake commits must include the related GitHub issue number before a
+SIFTQ commits must include the related GitHub issue number before a
 Conventional Commits header.
 
 ## Format

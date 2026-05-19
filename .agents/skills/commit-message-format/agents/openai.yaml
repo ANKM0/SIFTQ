@@ -1,4 +1,4 @@
 interface:
   display_name: "Commit Message Format"
   short_description: "Format commits with issue numbers and Conventional Commits."
-  default_prompt: "Use $commit-message-format to format a Yoriwake commit message with the required issue-number Conventional Commits pattern."
+  default_prompt: "Use $commit-message-format to format a SIFTQ commit message with the required issue-number Conventional Commits pattern."

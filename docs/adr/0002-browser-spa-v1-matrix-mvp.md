@@ -24,7 +24,7 @@ Accepted.
 
 ## Context
 
-Yoriwakeの長期的な方向性には、GUIとCLIのインターフェース、DB-backed
+SIFTQの長期的な方向性には、GUIとCLIのインターフェース、DB-backed
 storage、GitHub integrationを持つローカルアプリケーションが含まれる。
 一方でv1 MVPの目的はより小さく、タスクを作成し、表示し、象限間を
 ドラッグアンドドロップで移動できる2次元マトリックスページを検証する

@@ -1,13 +1,13 @@
 ---
 name: branch-strategy
-description: Follow the Yoriwake branch strategy for GitHub issue work. Use when creating, reviewing, naming, updating, pushing, or merging branches for Yoriwake changes.
+description: Follow the SIFTQ branch strategy for GitHub issue work. Use when creating, reviewing, naming, updating, pushing, or merging branches for SIFTQ changes.
 ---
 
 # Branch Strategy
 
 ## Overview
 
-Use this skill whenever Yoriwake work needs a Git branch. The repository uses
+Use this skill whenever SIFTQ work needs a Git branch. The repository uses
 short-lived issue branches from `main`, reviewed through pull requests, then
 merged back to `main` after checks pass.
 

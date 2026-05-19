@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:agent-roles
@@ -20,7 +20,7 @@ codd:
 
 # Issue Execution
 
-Yoriwake executes issue work through role-based agents. The workflow starts from
+SIFTQ executes issue work through role-based agents. The workflow starts from
 a GitHub issue with AC and DoD, then proceeds through planning, implementation,
 adversarial review, verification, commit, push, and draft pull request creation.
 

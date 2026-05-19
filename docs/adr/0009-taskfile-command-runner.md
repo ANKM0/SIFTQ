@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:github-actions-ci-cd-toolchain-adr
@@ -27,7 +27,7 @@ Accepted.
 
 ## Context
 
-Yoriwakeには、uv、pnpm、CoDD、GitHub Actionsで使う複数のローカルコマンドが
+SIFTQには、uv、pnpm、CoDD、GitHub Actionsで使う複数のローカルコマンドが
 存在する。Issue #10では、それらを`task ...`から実行できるようにし、Codex
 のallowリストにも登録することが求められている。
 
@@ -37,7 +37,7 @@ systemを置き換えるものではなく、開発者とCIが使う入口を統
 
 ## Decision
 
-Yoriwakeのcommand runnerとしてTaskfileを採用し、`go-task/task`をaquaで
+SIFTQのcommand runnerとしてTaskfileを採用し、`go-task/task`をaquaで
 管理する。
 
 `Taskfile.yml`には、setup、frontend、CI、CoDDの主要コマンドを定義する。
@@ -52,7 +52,7 @@ Codex allowリストには、Taskfileで定義したtaskコマンドを個別に
   見据えるとshell差分を吸収しにくい。
 - shell scriptsのみ: 単純な処理には向くが、コマンド一覧、依存関係、説明文を
   一箇所で管理しにくい。
-- just: task runnerとして有力だが、YoriwakeではTaskfileの`desc`、task一覧、
+- just: task runnerとして有力だが、SIFTQではTaskfileの`desc`、task一覧、
   YAMLによる構造化、aquaでの導入しやすさを優先する。
 
 ## Consequences

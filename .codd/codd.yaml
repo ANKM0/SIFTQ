@@ -4,7 +4,7 @@ codd_required_version: ">=2.19.0"
 codd_required_version_strict: false
 
 project:
-  name: "Yoriwake"
+  name: "SIFTQ"
   language: "generic"
   frameworks: []
 

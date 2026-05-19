@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:command-permissions
@@ -22,7 +22,7 @@ codd:
 
 ## Background
 
-Issue #10では、Yoriwakeで`task`コマンドを使用できるようにし、既存の
+Issue #10では、SIFTQで`task`コマンドを使用できるようにし、既存の
 `uv run ...`、frontend setup、CI系コマンドを`task ...`から実行できるように
 することが求められている。あわせて、定義したtaskコマンドをCodexのallow
 リストに登録する必要がある。
@@ -39,7 +39,7 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 - `Taskfile.yml`を追加し、setup、frontend、CI、CoDDのタスクを定義する。
 - GitHub ActionsのCI workflowで、可能な限り`task ...`を使う。
 - READMEのローカル実行手順を`task ...`中心に更新する。
-- `.codex/rules/yoriwake.rules`に定義済みtaskコマンドをallowとして追加する。
+- `.codex/rules/siftq.rules`に定義済みtaskコマンドをallowとして追加する。
 - Taskfile選定のADRを追加する。
 
 ## Out Of Scope
@@ -77,6 +77,6 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 - 既存の主要なsetup、frontend、CI、CoDDコマンドを`task ...`で実行できる
   こと。
 - GitHub Actions CIでtask定義を利用していること。
-- `.codex/rules/yoriwake.rules`にTaskfileで定義したtaskコマンドがallowとして
+- `.codex/rules/siftq.rules`にTaskfileで定義したtaskコマンドがallowとして
   記録されていること。
 - CoDD検証が通ること。
