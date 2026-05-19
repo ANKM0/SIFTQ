@@ -26,6 +26,12 @@ codd:
     - id: design:adr-index
       relation: depends_on
       semantic: governance
+    - id: design:agent-roles
+      relation: depends_on
+      semantic: governance
+    - id: design:issue-execution
+      relation: depends_on
+      semantic: governance
 ---
 
 # Yoriwake System Requirements
