@@ -1,0 +1,4 @@
+interface:
+  display_name: "ADR Authoring"
+  short_description: "Create Yoriwake ADRs from the repository template."
+  default_prompt: "Use $adr-authoring to create or update a Yoriwake ADR."
