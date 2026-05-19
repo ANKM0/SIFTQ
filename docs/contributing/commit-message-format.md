@@ -11,6 +11,9 @@ codd:
     - id: design:issue-execution
       relation: depends_on
       semantic: workflow
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: workflow
 ---
 
 # Commit Message Format

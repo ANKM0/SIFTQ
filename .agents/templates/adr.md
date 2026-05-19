@@ -25,6 +25,10 @@ alternatives.>
 <State the decision clearly. Include the chosen approach and the main reasons
 for choosing it.>
 
+## Rejected Alternatives
+
+- <Document a meaningful option that was not selected and why.>
+
 ## Consequences
 
 - <Document the expected benefits.>
