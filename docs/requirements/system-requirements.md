@@ -17,6 +17,9 @@ codd:
     - id: design:branch-strategy-adr
       relation: depends_on
       semantic: governance
+    - id: design:command-permissions
+      relation: depends_on
+      semantic: governance
 ---
 
 # Yoriwake System Requirements
