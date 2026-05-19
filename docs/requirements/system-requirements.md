@@ -32,6 +32,12 @@ codd:
     - id: design:issue-execution
       relation: depends_on
       semantic: governance
+    - id: req:matrix-mvp-functional
+      relation: depends_on
+      semantic: product
+    - id: req:matrix-mvp-non-functional
+      relation: depends_on
+      semantic: product
 ---
 
 # Yoriwake System Requirements
