@@ -14,6 +14,9 @@ codd:
     - id: design:issue-12-ci-cd
       relation: depends_on
       semantic: tool-selection
+    - id: design:github-actions-ci-cd-toolchain-adr
+      relation: depends_on
+      semantic: package-management
     - id: design:adr-index
       relation: depends_on
       semantic: index

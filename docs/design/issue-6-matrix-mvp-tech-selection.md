@@ -32,6 +32,9 @@ codd:
     - id: design:pnpm-frontend-package-manager-adr
       relation: depends_on
       semantic: tool-selection
+    - id: design:github-actions-ci-cd-toolchain-adr
+      relation: depends_on
+      semantic: tool-selection
 ---
 
 # Issue 6 Matrix MVP Technology Selection

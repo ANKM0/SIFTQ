@@ -19,6 +19,9 @@ codd:
     - id: design:pnpm-frontend-package-manager-adr
       relation: depends_on
       semantic: tool-selection
+    - id: design:github-actions-ci-cd-toolchain-adr
+      relation: depends_on
+      semantic: ci
 ---
 
 # Issue 12 CI/CD Design Proposal

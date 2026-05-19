@@ -38,6 +38,9 @@ codd:
     - id: design:pnpm-frontend-package-manager-adr
       relation: depends_on
       semantic: governance
+    - id: design:github-actions-ci-cd-toolchain-adr
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product
