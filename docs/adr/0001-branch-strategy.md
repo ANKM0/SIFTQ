@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
   depended_by:
@@ -21,7 +21,7 @@ Accepted.
 
 ## Context
 
-Yoriwake needs a consistent branch workflow so issue work remains traceable,
+SIFTQ needs a consistent branch workflow so issue work remains traceable,
 reviewable, and easy to merge. The repository already uses GitHub issues, pull
 requests, and CoDD checks, so the branch strategy should keep those practices
 aligned.

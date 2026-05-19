@@ -1,6 +1,6 @@
-# Yoriwake
+# SIFTQ
 
-Yoriwake is a local-first task matrix application. The v1 MVP is a browser
+SIFTQ is a local-first task matrix application. The v1 MVP is a browser
 SPA built with React, TypeScript, Vite, and dnd-kit so the project can validate
 the task creation and drag-and-drop matrix workflow before adding the planned
 Tauri desktop shell.
@@ -12,23 +12,23 @@ requirements, design notes, implementation, and tests traceable.
 
 Use the `Yoriwake-base` release as the standard WSL development environment:
 
-- Release: <https://github.com/ANKM0/Yoriwake/releases/tag/Yoriwake-base>
-- Template archive: `Yoriwake-base.tar`
+- Release: <https://github.com/ANKM0/SIFTQ/releases/tag/Yoriwake-base>
+- Template archive: `siftq-base.tar`
 
-On Windows, download `Yoriwake-base.tar` from the release page, then import it
+On Windows, download `siftq-base.tar` from the release page, then import it
 as a WSL2 distribution:
 
 ```powershell
-wsl --import Yoriwake C:\WSL\Yoriwake C:\Users\<user>\Downloads\Yoriwake-base.tar --version 2
-wsl -d Yoriwake
+wsl --import SIFTQ C:\WSL\SIFTQ C:\Users\<user>\Downloads\siftq-base.tar --version 2
+wsl -d SIFTQ
 ```
 
 Inside the WSL distribution, clone the repository and install project tools and
 dependencies:
 
 ```bash
-git clone git@github.com:ANKM0/Yoriwake.git
-cd Yoriwake
+git clone git@github.com:ANKM0/SIFTQ.git
+cd SIFTQ
 aqua install
 task setup
 ```

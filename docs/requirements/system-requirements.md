@@ -1,6 +1,6 @@
 ---
 codd:
-  node_id: req:yoriwake-system
+  node_id: req:siftq-system
   type: requirement
   status: draft
   depends_on: []
@@ -44,6 +44,9 @@ codd:
     - id: design:taskfile-command-runner-adr
       relation: depends_on
       semantic: governance
+    - id: design:siftq-project-name-adr
+      relation: depends_on
+      semantic: governance
     - id: design:issue-10-taskfile
       relation: depends_on
       semantic: governance
@@ -55,7 +58,7 @@ codd:
       semantic: product
 ---
 
-# Yoriwake System Requirements
+# SIFTQ System Requirements
 
 This document is the initial CoDD requirements anchor for the repository.
 

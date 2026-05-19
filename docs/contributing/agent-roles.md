@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
   depended_by:
@@ -15,7 +15,7 @@ codd:
 
 # Agent Roles
 
-Yoriwake uses role-based agents for issue execution. Agents define operational
+SIFTQ uses role-based agents for issue execution. Agents define operational
 responsibilities, while CoDD-managed documents define the repository governance
 and workflow expectations.
 

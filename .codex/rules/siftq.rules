@@ -1,11 +1,11 @@
-# Yoriwake command rules
+# SIFTQ command rules
 #
 # Install path:
-#   .codex/rules/yoriwake.rules
+#   .codex/rules/siftq.rules
 #
 # Policy:
 # - allow: safe read, investigation, validation, GitHub issue/PR, and normal
-#   branch publishing commands used by Yoriwake workflows.
+#   branch publishing commands used by SIFTQ workflows.
 # - forbidden: secrets, destructive operations, production operations, and broad
 #   privilege changes.
 # - undefined commands require human approval or case-by-case handling.
@@ -23,7 +23,7 @@ prefix_rule(pattern=["git", "show"], decision="allow")
 prefix_rule(pattern=["git", "branch", "--show-current"], decision="allow")
 prefix_rule(pattern=["git", "remote"], decision="allow")
 
-# Allow: normal Yoriwake Git branch and publish workflow
+# Allow: normal SIFTQ Git branch and publish workflow
 prefix_rule(pattern=["git", "switch", "main"], decision="allow")
 prefix_rule(pattern=["git", "switch", "-c"], decision="allow")
 prefix_rule(pattern=["git", "checkout", "-b"], decision="allow")
@@ -49,7 +49,7 @@ prefix_rule(pattern=["gh", "run", "view"], decision="allow")
 prefix_rule(pattern=["gh", "repo", "view"], decision="allow")
 prefix_rule(pattern=["gh", "auth", "status"], decision="allow")
 
-# Allow: local Yoriwake validation
+# Allow: local SIFTQ validation
 prefix_rule(pattern=["aqua", "install"], decision="allow")
 prefix_rule(pattern=["uv", "sync"], decision="allow")
 prefix_rule(pattern=["uv", "run", "codd", "version"], decision="allow")

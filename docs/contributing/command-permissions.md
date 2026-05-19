@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
   depended_by:
@@ -15,13 +15,13 @@ codd:
 
 # Command Permissions
 
-Yoriwake defines repository-local command permission rules for LLM-assisted
-work in `.codex/rules/yoriwake.rules`.
+SIFTQ defines repository-local command permission rules for LLM-assisted
+work in `.codex/rules/siftq.rules`.
 
 ## Policy
 
 - Allow safe read, investigation, validation, GitHub issue/PR, and normal
-  branch publishing commands used by Yoriwake workflows.
+  branch publishing commands used by SIFTQ workflows.
 - Forbid secret access, destructive file operations, destructive Git commands,
   and broad privilege changes.
 - Require human approval for commands that are not explicitly covered by the
@@ -35,7 +35,7 @@ work in `.codex/rules/yoriwake.rules`.
 - GitHub issue, pull request, run, repository, and authentication status
   inspection.
 - Local validation through aqua, uv, pnpm, Taskfile, and CoDD.
-- Repository-defined Taskfile commands listed in `.codex/rules/yoriwake.rules`.
+- Repository-defined Taskfile commands listed in `.codex/rules/siftq.rules`.
 
 ## Forbidden Areas
 

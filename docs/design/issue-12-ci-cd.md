@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:codd-adoption
@@ -28,7 +28,7 @@ codd:
 
 ## Background
 
-Issue #12では、YoriwakeにCIとCDを定義し、選定したツールをADRに記録することが求められている。現在のリポジトリには、CoDDのみを実行するGitHub
+Issue #12では、SIFTQにCIとCDを定義し、選定したツールをADRに記録することが求められている。現在のリポジトリには、CoDDのみを実行するGitHub
 Actionsワークフロー、uvで管理するPython依存関係、aquaで管理するCLIインストール、コミットメッセージ形式の規約、ADR作成ルールが既に存在する。
 Issue #6では、v1 MVPをReact、TypeScript、Vite、dnd-kitによるBrowser
 SPAとして実装し、v2以降でRustとTauriによるローカルアプリケーションへ進める方針を決定している。

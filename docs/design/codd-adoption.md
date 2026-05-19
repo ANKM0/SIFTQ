@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
   depended_by:
@@ -15,7 +15,7 @@ codd:
 
 # CoDD Adoption Design
 
-Yoriwake uses a project-local `.codd/codd.yaml` file to define the CoDD scan
+SIFTQ uses a project-local `.codd/codd.yaml` file to define the CoDD scan
 surface and verification defaults.
 
 ## Configuration

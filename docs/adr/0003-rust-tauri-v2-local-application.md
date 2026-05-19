@@ -24,7 +24,7 @@ Accepted.
 
 ## Context
 
-v1のマトリックスUI検証後、Yoriwakeはローカルアプリケーションへ発展する
+v1のマトリックスUI検証後、SIFTQはローカルアプリケーションへ発展する
 想定である。後続のアプリケーションでは、GUIとCLIのインターフェース、
 local database storage、GitHub integrationを扱う必要がある。これらの要件は、
 複数のinterfaceから利用でき、browser-only runtimeに依存しないshared core

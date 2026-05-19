@@ -4,7 +4,7 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:yoriwake-system
+    - id: req:siftq-system
       relation: depends_on
       semantic: governance
     - id: design:issue-6-matrix-mvp-tech-selection
@@ -36,7 +36,7 @@ Accepted.
 
 ## Context
 
-Issue #12では、YoriwakeにCI/CDを追加し、選定したツールをADRへ記録する
+Issue #12では、SIFTQにCI/CDを追加し、選定したツールをADRへ記録する
 必要がある。Issue #6では、v1 MVPをReact、TypeScript、Vite、dnd-kitに
 よるBrowser SPAとして実装し、v2以降でRustとTauriへ拡張する方針を決定
 している。

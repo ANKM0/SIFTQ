@@ -1,4 +1,4 @@
 interface:
   display_name: "ADR Authoring"
-  short_description: "Create Yoriwake ADRs from the repository template."
-  default_prompt: "Use $adr-authoring to create or update a Yoriwake ADR."
+  short_description: "Create SIFTQ ADRs from the repository template."
+  default_prompt: "Use $adr-authoring to create or update a SIFTQ ADR."

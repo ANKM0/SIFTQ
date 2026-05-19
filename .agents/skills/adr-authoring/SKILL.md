@@ -1,13 +1,13 @@
 ---
 name: adr-authoring
-description: Create or update Yoriwake Architecture Decision Records using the repository ADR template and numbering conventions.
+description: Create or update SIFTQ Architecture Decision Records using the repository ADR template and numbering conventions.
 ---
 
 # ADR Authoring
 
 ## Overview
 
-Use this skill when creating or updating a Yoriwake Architecture Decision Record
+Use this skill when creating or updating a SIFTQ Architecture Decision Record
 (ADR). ADRs live in `docs/adr/` and capture decisions that affect repository
 workflow, architecture, governance, or long-lived project conventions.
 
@@ -65,6 +65,6 @@ design:<short-kebab-title>-adr
   project documentation.
 - Use `type: design` for ADRs.
 - Keep `depends_on` relationships explicit. Governance decisions usually depend
-  on `req:yoriwake-system` with `semantic: governance`.
+  on `req:siftq-system` with `semantic: governance`.
 - Add `depended_by` only when an existing document already depends on the ADR
   and the reverse link is useful for navigation.

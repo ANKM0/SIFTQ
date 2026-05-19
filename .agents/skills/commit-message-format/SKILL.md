@@ -1,13 +1,13 @@
 ---
 name: commit-message-format
-description: Format Git commit messages for this repository with a GitHub issue number followed by a Conventional Commits header. Use when creating, reviewing, rewriting, or suggesting commit messages for Yoriwake changes.
+description: Format Git commit messages for this repository with a GitHub issue number followed by a Conventional Commits header. Use when creating, reviewing, rewriting, or suggesting commit messages for SIFTQ changes.
 ---
 
 # Commit Message Format
 
 ## Overview
 
-Use this skill whenever a Yoriwake change needs a commit message. The required
+Use this skill whenever a SIFTQ change needs a commit message. The required
 format keeps each commit traceable to a GitHub issue while preserving
 Conventional Commits semantics.
 
