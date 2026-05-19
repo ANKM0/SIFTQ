@@ -8,6 +8,9 @@ codd:
     - id: design:codd-adoption
       relation: depends_on
       semantic: governance
+    - id: design:commit-message-format
+      relation: depends_on
+      semantic: governance
 ---
 
 # Yoriwake System Requirements
@@ -25,6 +28,7 @@ This document is the initial CoDD requirements anchor for the repository.
 - Establish the CoDD configuration baseline.
 - Track future functional requirements under `docs/requirements/`.
 - Track future design decisions under `docs/design/`.
+- Track contributor workflow conventions under `docs/contributing/`.
 
 ## Acceptance Criteria
 
