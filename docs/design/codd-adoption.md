@@ -7,6 +7,10 @@ codd:
     - id: req:yoriwake-system
       relation: depends_on
       semantic: governance
+  depended_by:
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: verification
 ---
 
 # CoDD Adoption Design

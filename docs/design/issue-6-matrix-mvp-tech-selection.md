@@ -25,6 +25,13 @@ codd:
     - id: design:dnd-kit-matrix-drag-and-drop-adr
       relation: depends_on
       semantic: decision
+  depended_by:
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: tool-selection
+    - id: design:pnpm-frontend-package-manager-adr
+      relation: depends_on
+      semantic: tool-selection
 ---
 
 # Issue 6 Matrix MVP Technology Selection

@@ -32,6 +32,12 @@ codd:
     - id: design:issue-execution
       relation: depends_on
       semantic: governance
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: governance
+    - id: design:pnpm-frontend-package-manager-adr
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product

@@ -27,3 +27,4 @@ Yoriwake workflow, governance, and architecture decisions.
 | [0004](./0004-react-typescript-vite-matrix-ui.md) | Matrix UIのReact TypeScript Vite採用 | Accepted |
 | [0005](./0005-frontend-port-adapter-boundary.md) | Frontend Port Adapter Boundary採用 | Accepted |
 | [0006](./0006-dnd-kit-matrix-drag-and-drop.md) | Matrix Drag and Dropのdnd-kit採用 | Accepted |
+| [0007](./0007-pnpm-frontend-package-manager.md) | Frontend Package Managerのpnpm採用 | Accepted |
