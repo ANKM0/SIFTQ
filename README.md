@@ -28,3 +28,7 @@ uv run codd elicit
 ```
 
 Generated graph data and reports are ignored by Git.
+
+## Commit messages
+
+See `docs/contributing/commit-message-format.md`.
