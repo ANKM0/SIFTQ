@@ -1,0 +1,4 @@
+interface:
+  display_name: "Branch Strategy"
+  short_description: "Use the repository branch workflow consistently."
+  default_prompt: "Use $branch-strategy to create or review a Yoriwake branch workflow."
