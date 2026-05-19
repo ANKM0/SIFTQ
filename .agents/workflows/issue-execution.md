@@ -16,20 +16,55 @@ request creation.
 
 1. Coordinator receives a GitHub issue URL or issue number.
 2. Coordinator reads the issue title, body, AC, DoD, labels, and state.
-3. Issue designer clarifies scope, AC, DoD, and expected changed areas.
-4. Coordinator updates `main` and creates an issue branch using the repository
+3. Coordinator follows the label-driven state machine.
+4. Issue designer clarifies scope, AC, DoD, and expected changed areas when the
+   issue has `agent:needs-design`.
+5. Human review moves the issue from `agent:design-ready` to `agent:approved`.
+6. Coordinator updates `main` and creates an issue branch using the repository
    branch strategy.
-5. Coordinator creates a short implementation plan.
-6. Implementation agent implements the approved plan.
-7. Review agent performs adversarial review and classifies findings.
-8. Coordinator repeats the implementation-review-fix loop until no non-low
+7. Coordinator creates a short implementation plan.
+8. Implementation agent implements the approved plan.
+9. Review agent performs adversarial review and classifies findings.
+10. Coordinator repeats the implementation-review-fix loop until no non-low
    findings remain.
-9. Coordinator runs required verification commands.
-10. Coordinator performs a final status check.
-11. Coordinator commits with the repository commit message format.
-12. Coordinator pushes the branch.
-13. Coordinator opens a draft pull request targeting `main`.
-14. Coordinator summarizes the result.
+11. Coordinator runs required verification commands.
+12. Coordinator performs a final status check.
+13. Coordinator commits with the repository commit message format.
+14. Coordinator pushes the branch.
+15. Coordinator opens a draft pull request targeting `main`.
+16. Coordinator summarizes the result.
+
+## Label State Machine
+
+Use labels to trigger and gate agent work:
+
+```text
+agent:needs-design
+  -> issue-designer-agent creates a design proposal
+  -> agent:design-ready
+  -> human review
+  -> agent:approved
+  -> coordinator-agent starts implementation
+  -> agent:running
+  -> draft PR created
+  -> agent:pr-created
+```
+
+Blocked work moves to:
+
+```text
+agent:blocked
+```
+
+The transition from `agent:design-ready` to `agent:approved` is human-owned.
+Agents must not approve their own design proposals.
+
+## Label Triggers
+
+- `agent:needs-design`: run the design phase only.
+- `agent:approved`: run implementation through draft PR creation.
+- `agent:blocked`: stop automated work until a human resolves the blocker.
+- `agent:pr-created`: no further automated work is required by this workflow.
 
 ## Implementation Review Loop
 

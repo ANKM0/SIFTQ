@@ -28,17 +28,52 @@ adversarial review, verification, commit, push, and draft pull request creation.
 
 1. Receive a GitHub issue URL or issue number.
 2. Read the issue title, body, AC, DoD, labels, and state.
-3. Clarify scope, AC, DoD, and split points with `issue-designer-agent`.
-4. Update `main`.
-5. Create a branch using the repository branch strategy.
-6. Produce a short implementation plan.
-7. Implement the approved scope with `implementation-agent`.
-8. Review the implementation with `review-agent`.
-9. Repeat the implementation-review-fix loop until no non-low findings remain.
-10. Run required verification commands.
-11. Commit with the repository commit message format.
-12. Push the branch.
-13. Open a draft pull request targeting `main`.
+3. Follow the label-driven state machine.
+4. Clarify scope, AC, DoD, and split points with `issue-designer-agent`.
+5. Wait for human approval before implementation.
+6. Update `main`.
+7. Create a branch using the repository branch strategy.
+8. Produce a short implementation plan.
+9. Implement the approved scope with `implementation-agent`.
+10. Review the implementation with `review-agent`.
+11. Repeat the implementation-review-fix loop until no non-low findings remain.
+12. Run required verification commands.
+13. Commit with the repository commit message format.
+14. Push the branch.
+15. Open a draft pull request targeting `main`.
+
+## Label State Machine
+
+Use labels to trigger and gate issue execution:
+
+```text
+agent:needs-design
+  -> issue-designer-agent creates a design proposal
+  -> agent:design-ready
+  -> human review
+  -> agent:approved
+  -> coordinator-agent starts implementation
+  -> agent:running
+  -> draft PR created
+  -> agent:pr-created
+```
+
+Use `agent:blocked` when the agent cannot continue because scope is unclear,
+checks fail for unclear reasons, permissions are missing, or repeated non-low
+review findings remain unresolved.
+
+`agent:design-ready` to `agent:approved` is a human review gate. Agents must not
+approve their own design proposals.
+
+Implementation must not start unless `agent:approved` is present.
+
+## Label Triggers
+
+- `agent:needs-design`: run the design phase and post or prepare a design
+  proposal.
+- `agent:approved`: run implementation through draft PR creation.
+- `agent:blocked`: stop automated work until a human resolves the blocker.
+- `agent:pr-created`: mark that a pull request has been created.
 
 ## Implementation Review Loop
 

@@ -33,6 +33,7 @@ Responsibilities:
 - Delegate issue clarification to `issue-designer-agent`.
 - Delegate scoped implementation to `implementation-agent`.
 - Delegate adversarial review to `review-agent`.
+- Enforce label-driven gates before design and implementation.
 - Run the implementation-review-fix loop until no non-low findings remain.
 - Run required verification commands.
 - Commit, push, and open a draft pull request.
@@ -49,6 +50,9 @@ Responsibilities:
 - Identify affected areas such as code, tests, docs, agents, hooks, GitHub
   workflows, or CoDD-managed documents.
 - Create or update GitHub issues when requested.
+- Produce a design proposal when `agent:needs-design` is applied.
+- Mark or request `agent:design-ready` after the design proposal is ready.
+- Never mark its own design as `agent:approved`.
 
 ### implementation-agent
 
@@ -92,8 +96,22 @@ Only the coordinator should create branches, commit, push, open pull requests,
 or close issues by default. Other agents can recommend those actions but should
 not perform them unless the coordinator explicitly delegates the action.
 
+The transition from `agent:design-ready` to `agent:approved` is human-owned.
+Agents can propose designs, but they must not approve their own design proposals.
+
 Issue close should normally happen through pull request merge automation. Use
 `Closes #<issue>` only after review confirms the issue can be closed by merge.
+
+## Labels
+
+Use these labels to trigger and gate agent work:
+
+- `agent:needs-design`: run the design phase.
+- `agent:design-ready`: design proposal is ready for human review.
+- `agent:approved`: human-approved design; implementation may start.
+- `agent:running`: agent work is currently running.
+- `agent:blocked`: agent work is blocked and needs human input.
+- `agent:pr-created`: the agent created a pull request.
 
 ## Agent Files
 

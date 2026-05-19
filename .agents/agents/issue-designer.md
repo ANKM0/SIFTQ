@@ -18,6 +18,27 @@ background, AC, DoD, and split guidance.
 8. Identify expected files or directories when that helps implementation.
 9. Create or update GitHub issues when requested by the coordinator or user.
 
+## Label-Driven Design
+
+When an issue receives `agent:needs-design`, prepare a design proposal instead
+of starting implementation.
+
+The design proposal should include:
+
+- Scope.
+- Out of scope.
+- AC.
+- DoD.
+- Expected files or areas.
+- CoDD impact.
+- Implementation notes.
+- Suggested issue split, if needed.
+
+After posting or preparing the design proposal, mark the issue as
+`agent:design-ready` or ask the coordinator to do so.
+
+Do not mark the issue as `agent:approved`. Approval is human-owned.
+
 ## Output
 
 When designing or refining an issue, report:
