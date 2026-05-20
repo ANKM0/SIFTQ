@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INITIAL_AREAS } from "./area";
+import { INITIAL_AREAS } from "../../src/domain/area";
 import {
   isTaskVisibleInMatrix,
   normalizeTaskTitle,
@@ -8,7 +8,7 @@ import {
   TaskValidationError,
   TASK_TITLE_MAX_LENGTH,
   type Task
-} from "./task";
+} from "../../src/domain/task";
 
 describe("area domain", () => {
   it("defines the four matrix areas and two terminal areas", () => {

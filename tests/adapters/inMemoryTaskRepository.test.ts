@@ -5,9 +5,9 @@ import {
   listTasks,
   moveTask,
   reorderTask
-} from "../application/taskOperations";
-import { isTaskVisibleInMatrix } from "../domain/task";
-import { InMemoryTaskRepository } from "./inMemoryTaskRepository";
+} from "../../src/application/taskOperations";
+import { isTaskVisibleInMatrix } from "../../src/domain/task";
+import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
 
 describe("InMemoryTaskRepository", () => {
   it("creates tasks at the end of the target matrix area", async () => {
