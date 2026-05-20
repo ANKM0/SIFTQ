@@ -1,13 +1,20 @@
-const quadrants = ["Do", "Decide", "Delegate", "Delete"] as const;
+import { MATRIX_AREAS, TERMINAL_AREAS } from "../domain/area";
 
 export function App() {
   return (
     <main>
       <h1>SIFTQ</h1>
       <section aria-label="Task matrix">
-        {quadrants.map((quadrant) => (
-          <article key={quadrant}>
-            <h2>{quadrant}</h2>
+        {MATRIX_AREAS.map((area) => (
+          <article key={area.id}>
+            <h2>{area.label}</h2>
+          </article>
+        ))}
+      </section>
+      <section aria-label="Task status drop areas">
+        {TERMINAL_AREAS.map((area) => (
+          <article key={area.id}>
+            <h2>{area.label}</h2>
           </article>
         ))}
       </section>
