@@ -126,10 +126,18 @@ type AreaPanelProps = {
 };
 
 function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
-  const { setNodeRef } = useDroppable({ id: areaDropId(areaId) });
+  const { isOver, setNodeRef } = useDroppable({ id: areaDropId(areaId) });
+  const panelClassName = [
+    "area-panel",
+    `area-panel--${areaId}`,
+    isOver ? "area-panel--drop-target" : "",
+    tasks.length === 0 ? "area-panel--empty" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <article className={`area-panel area-panel--${areaId}`}>
+    <article className={panelClassName}>
       <header className="area-panel__header">
         <div>
           <h2>{label}</h2>
@@ -145,9 +153,13 @@ function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
         </button>
       </header>
       <ul ref={setNodeRef} aria-label={`${label} tasks`} className="area-panel__tasks">
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
-        ))}
+        {tasks.length === 0 ? (
+          <li aria-hidden="true" className="area-panel__empty">
+            No cards
+          </li>
+        ) : (
+          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+        )}
       </ul>
     </article>
   );
@@ -160,15 +172,21 @@ type TaskCardProps = {
 function TaskCard({ task }: TaskCardProps) {
   const draggable = useDraggable({ id: taskDropId(task.id) });
   const droppable = useDroppable({ id: taskDropId(task.id) });
+  const className = [
+    "task-card",
+    draggable.isDragging ? "task-card--dragging" : "",
+    droppable.isOver ? "task-card--drop-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   const style = {
     cursor: "grab",
-    opacity: draggable.isDragging ? 0.6 : 1,
     transform: CSS.Translate.toString(draggable.transform)
   };
 
   return (
     <li
-      className="task-card"
+      className={className}
       ref={(node) => {
         draggable.setNodeRef(node);
         droppable.setNodeRef(node);

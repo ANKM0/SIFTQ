@@ -41,6 +41,18 @@ describe("App", () => {
     expect(screen.getByRole("list", { name: "Do tasks" }).className).toContain(
       "area-panel__tasks"
     );
+    expect(screen.getByRole("list", { name: "Do tasks" }).textContent).toBe(
+      "No cards"
+    );
+  });
+
+  it("marks empty areas as visible drop regions", () => {
+    render(<App />);
+
+    expect(screen.getByText("Do").closest("article")?.className).toContain(
+      "area-panel--empty"
+    );
+    expect(screen.getAllByText("No cards")).toHaveLength(4);
   });
 
   it("creates task cards in the selected matrix area", async () => {
@@ -121,10 +133,24 @@ describe("App", () => {
     expect(screen.queryByText("Done task")).toBeNull();
     expect(taskTitlesIn("Do tasks")).toEqual([]);
   });
+
+  it("renders maximum length task titles in a wrapping card", async () => {
+    const repository = new InMemoryTaskRepository();
+    const longTitle = "a".repeat(256);
+
+    await createTask(repository, { areaId: "do", title: longTitle });
+
+    render(<App repository={repository} />);
+
+    const card = await screen.findByText(longTitle);
+
+    expect(card.className).toContain("task-card");
+    expect(card.textContent).toHaveLength(256);
+  });
 });
 
 function taskTitlesIn(listName: string): string[] {
   return Array.from(
-    screen.getByRole("list", { name: listName }).querySelectorAll("li")
+    screen.getByRole("list", { name: listName }).querySelectorAll(".task-card")
   ).map((item) => item.textContent ?? "");
 }
