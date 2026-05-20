@@ -92,8 +92,8 @@ The review loop is mandatory before commit and pull request creation.
 `low` findings may be documented as follow-up unless they are trivial and
 clearly in scope.
 
-Escalate to the user when a fix would expand scope, requirements are ambiguous,
-or required checks fail for unclear or environment-specific reasons.
+Escalate to the requester when a fix would expand scope, requirements are
+ambiguous, or required checks fail for unclear or environment-specific reasons.
 
 ## Required Verification
 

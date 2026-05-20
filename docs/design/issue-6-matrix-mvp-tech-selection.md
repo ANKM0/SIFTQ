@@ -116,3 +116,8 @@ ui/
 
 最初のtask repositoryはin-memoryでよい。後続のTauri repositoryは、同じ
 frontend interfaceを維持したままRust commandsを呼び出せる。
+
+MVP実装のfrontend entrypointは `src/main.tsx` とし、React/Vite固有のambient
+typeは `src/vite-env.d.ts` に閉じる。`src/main.tsx` からUI componentへ入り、
+UI componentのimport graphを通じてdomain、application、ports、adapters、
+interaction layer、対応テストへtraceできる構成にする。

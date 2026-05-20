@@ -75,6 +75,27 @@ describe("App", () => {
     expect(screen.getByText("First").className).toContain("task-card");
   });
 
+  it("keeps each area form independent while updating area-specific card lists", async () => {
+    render(<App repository={new InMemoryTaskRepository()} />);
+
+    fireEvent.change(screen.getByLabelText("New task title for Do"), {
+      target: { value: "Do draft" }
+    });
+    fireEvent.change(screen.getByLabelText("New task title for Delegate"), {
+      target: { value: "Delegated" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add task to Delegate" }));
+
+    expect(await screen.findByText("Delegated")).toBeTruthy();
+    expect(taskTitlesIn("Do tasks")).toEqual([]);
+    expect(taskTitlesIn("Delegate tasks")).toEqual(["Delegated"]);
+    expect(screen.getByLabelText("New task title for Do")).toHaveProperty(
+      "value",
+      "Do draft"
+    );
+    expect(screen.getByLabelText("Delegate task count").textContent).toBe("1 cards");
+  });
+
   it("keeps created tasks in the same in-memory repository session", async () => {
     const repository = new InMemoryTaskRepository();
     const firstRender = render(<App repository={repository} />);
