@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
@@ -48,33 +48,80 @@ describe("App", () => {
 
     render(<App repository={repository} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add task to Do" }));
-    expect(await screen.findByText("Task 1")).toBeTruthy();
+    createTaskInArea("Do", "First");
+    expect(await screen.findByText("First")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add task to Schedule" }));
-    expect(await screen.findByText("Task 2")).toBeTruthy();
+    createTaskInArea("Schedule", "Planned");
+    expect(await screen.findByText("Planned")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add task to Do" }));
-    expect(await screen.findByText("Task 3")).toBeTruthy();
+    createTaskInArea("Do", "Second");
+    expect(await screen.findByText("Second")).toBeTruthy();
 
-    expect(taskTitlesIn("Do tasks")).toEqual(["Task 1", "Task 3"]);
-    expect(taskTitlesIn("Schedule tasks")).toEqual(["Task 2"]);
+    expect(taskTitlesIn("Do tasks")).toEqual(["First", "Second"]);
+    expect(taskTitlesIn("Schedule tasks")).toEqual(["Planned"]);
     expect(screen.getByLabelText("Do task count").textContent).toBe("2 cards");
-    expect(screen.getByText("Task 1").className).toContain("task-card");
+    expect(screen.getByText("First").className).toContain("task-card");
   });
 
   it("keeps created tasks in the same in-memory repository session", async () => {
     const repository = new InMemoryTaskRepository();
     const firstRender = render(<App repository={repository} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add task to Do" }));
-    expect(await screen.findByText("Task 1")).toBeTruthy();
+    createTaskInArea("Do", "Session task");
+    expect(await screen.findByText("Session task")).toBeTruthy();
 
     firstRender.unmount();
     render(<App repository={repository} />);
 
-    expect(await screen.findByText("Task 1")).toBeTruthy();
-    expect(taskTitlesIn("Do tasks")).toEqual(["Task 1"]);
+    expect(await screen.findByText("Session task")).toBeTruthy();
+    expect(taskTitlesIn("Do tasks")).toEqual(["Session task"]);
+  });
+
+  it("disables creation while the title is blank or too long without truncating input", () => {
+    render(<App repository={new InMemoryTaskRepository()} />);
+
+    const input = screen.getByLabelText("New task title for Do");
+    const button = screen.getByRole("button", { name: "Add task to Do" });
+
+    expect(button).toHaveProperty("disabled", true);
+
+    fireEvent.change(input, { target: { value: "   " } });
+    expect(button).toHaveProperty("disabled", true);
+
+    fireEvent.change(input, { target: { value: "a".repeat(257) } });
+    expect(button).toHaveProperty("disabled", true);
+    expect(input).toHaveProperty("value", "a".repeat(257));
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Title must be 256 characters or less."
+    );
+  });
+
+  it("shows an error if invalid creation is submitted and does not create a card", async () => {
+    render(<App repository={new InMemoryTaskRepository()} />);
+
+    fireEvent.submit(screen.getByRole("form", { name: "Create task in Do" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Task title must not be empty."
+    );
+    expect(taskTitlesIn("Do tasks")).toEqual([]);
+  });
+
+  it("allows duplicate titles and clears the input after successful creation", async () => {
+    render(<App repository={new InMemoryTaskRepository()} />);
+
+    createTaskInArea("Do", "Duplicate");
+    expect(await screen.findByText("Duplicate")).toBeTruthy();
+
+    createTaskInArea("Do", "Duplicate");
+
+    await waitFor(() =>
+      expect(taskTitlesIn("Do tasks")).toEqual(["Duplicate", "Duplicate"])
+    );
+    expect(screen.getByLabelText("New task title for Do")).toHaveProperty(
+      "value",
+      ""
+    );
   });
 
   it("renders task cards in repository order after reordering", async () => {
@@ -127,4 +174,11 @@ function taskTitlesIn(listName: string): string[] {
   return Array.from(
     screen.getByRole("list", { name: listName }).querySelectorAll("li")
   ).map((item) => item.textContent ?? "");
+}
+
+function createTaskInArea(areaLabel: string, title: string) {
+  fireEvent.change(screen.getByLabelText(`New task title for ${areaLabel}`), {
+    target: { value: title }
+  });
+  fireEvent.click(screen.getByRole("button", { name: `Add task to ${areaLabel}` }));
 }

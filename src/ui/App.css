@@ -79,7 +79,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .area-panel h2,
@@ -111,8 +111,43 @@
   cursor: pointer;
 }
 
+.area-panel__add:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .area-panel__add:hover {
   background: #f1f5f9;
+}
+
+.task-create-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.task-create-form__input {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #c5ccd8;
+  border-radius: 6px;
+  padding: 0 9px;
+  color: #111827;
+  font: inherit;
+}
+
+.task-create-form__input:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgb(37 99 235 / 18%);
+  outline-offset: 0;
+}
+
+.task-create-form__error {
+  margin: -2px 0 10px;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .area-panel__tasks {
