@@ -4,6 +4,7 @@ import { type Task } from "../../src/domain/task";
 import {
   areaDropId,
   resolveTaskDropOperation,
+  restrictDragToWindowEdges,
   taskDropId
 } from "../../src/ui/dragDrop";
 
@@ -74,6 +75,38 @@ describe("dragDrop", () => {
         "task:missing"
       )
     ).toBeNull();
+  });
+
+  it("clamps drag movement to the current window edges", () => {
+    expect(
+      restrictDragToWindowEdges({
+        activatorEvent: null,
+        active: null,
+        activeNodeRect: null,
+        containerNodeRect: null,
+        draggingNodeRect: {
+          bottom: 120,
+          height: 100,
+          left: 20,
+          right: 120,
+          top: 20,
+          width: 100
+        },
+        over: null,
+        overlayNodeRect: null,
+        scrollableAncestors: [],
+        scrollableAncestorRects: [],
+        transform: { x: 1000, y: 1000, scaleX: 1, scaleY: 1 },
+        windowRect: {
+          bottom: 300,
+          height: 300,
+          left: 0,
+          right: 400,
+          top: 0,
+          width: 400
+        }
+      })
+    ).toEqual({ x: 280, y: 180, scaleX: 1, scaleY: 1 });
   });
 });
 

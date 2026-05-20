@@ -19,10 +19,13 @@ import { isTaskVisibleInMatrix, type Task } from "../domain/task";
 import { type TaskRepository } from "../ports/taskRepository";
 import {
   areaDropId,
+  restrictDragToWindowEdges,
   resolveTaskDropOperation,
   taskDropId
 } from "./dragDrop";
 import "./App.css";
+
+const dragModifiers = [restrictDragToWindowEdges];
 
 type AppProps = {
   repository?: TaskRepository;
@@ -67,7 +70,11 @@ export function App({ repository }: AppProps) {
   }
 
   return (
-    <DndContext onDragEnd={(event) => void handleDragEnd(event)}>
+    <DndContext
+      autoScroll={false}
+      modifiers={dragModifiers}
+      onDragEnd={(event) => void handleDragEnd(event)}
+    >
       <MatrixPage tasks={tasks} onCreateTask={handleCreateTask} />
     </DndContext>
   );
