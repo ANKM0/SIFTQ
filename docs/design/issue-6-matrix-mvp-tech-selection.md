@@ -2,7 +2,7 @@
 codd:
   node_id: design:issue-6-matrix-mvp-tech-selection
   type: design
-  status: draft
+  status: implemented
   depends_on:
     - id: req:matrix-mvp-functional
       relation: depends_on
@@ -121,3 +121,25 @@ MVP実装のfrontend entrypointは `src/main.tsx` とし、React/Vite固有のam
 typeは `src/vite-env.d.ts` に閉じる。`src/main.tsx` からUI componentへ入り、
 UI componentのimport graphを通じてdomain、application、ports、adapters、
 interaction layer、対応テストへtraceできる構成にする。
+
+## Completion Traceability
+
+Matrix MVP v1は、browser SPA、React/TypeScript/Vite、dnd-kit、in-memory
+repository port/adapterの構成で実装済みである。完了範囲は次の実装単位に
+対応する。
+
+- Domain model: `src/domain/area.ts`、`src/domain/task.ts`
+- Application operations: `src/application/taskOperations.ts`
+- Port/adapter boundary: `src/ports/taskRepository.ts`、
+  `src/adapters/inMemoryTaskRepository.ts`
+- UI and interaction layer: `src/ui/App.tsx`、`src/ui/App.css`、
+  `src/ui/dragDrop.ts`
+- Entrypoint and Vite types: `src/main.tsx`、`src/vite-env.d.ts`
+- Tests: `tests/domain/task.test.ts`、`tests/application/taskOperations.test.ts`、
+  `tests/adapters/inMemoryTaskRepository.test.ts`、`tests/ui/App.test.tsx`、
+  `tests/ui/dragDrop.test.ts`
+
+v1 scope外の永続化、GitHub連携、Tauri化、CLI、設定ページ、公開URL、
+PR preview URL、キーボードDnD完成対応、モバイル / タッチDnD最適化は
+実装していない。これらはv2以降の判断対象としてrequirements側のfuture scopeに
+残す。
