@@ -2,7 +2,7 @@
 codd:
   node_id: req:matrix-mvp-non-functional
   type: requirement
-  status: draft
+  status: implemented
   depends_on:
     - id: req:siftq-system
       relation: depends_on
@@ -84,3 +84,22 @@ v1 MVPはマトリックスUIに対して高凝集でありつつ、将来のinf
 - 最初のrepository実装はin-memoryのみでよい。
 - 将来のrepository実装は、Rust、SQLite、GitHub同期を背後に持つ
   Tauri commandsを呼び出してよい。
+
+## Verification Traceability
+
+非機能要件の確認方法は次の通り。
+
+- DnD応答性と操作感は、`task frontend:dev` で起動したローカルブラウザ上の
+  Matrix MVP smoke checkで確認する。
+- DnD解決ロジックと画面外への過剰なdrag移動制限は `tests/ui/dragDrop.test.ts`
+  で確認する。
+- UI、application operation、repository port、in-memory adapterの責務分離は
+  `src/ui/App.tsx`、`src/application/taskOperations.ts`、
+  `src/ports/taskRepository.ts`、`src/adapters/inMemoryTaskRepository.ts` の
+  import境界と、それぞれに対応するテストで確認する。
+- v1で永続化、GitHub同期、Tauri commands、設定ページ、公開URL、PR preview
+  URLを実装しないことは、READMEの手動確認範囲とこのrequirementsの
+  v1 / future scope分離で確認する。
+- `task ci:typecheck`、`task ci:lint`、`task ci:test`、`task ci:build`、
+  `task codd:scan`、`task codd:validate`、`task codd:dag` をMVP完了時の
+  自動確認とする。
