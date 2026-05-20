@@ -19,9 +19,13 @@ import { isTaskVisibleInMatrix, type Task } from "../domain/task";
 import { type TaskRepository } from "../ports/taskRepository";
 import {
   areaDropId,
+  restrictDragToWindowEdges,
   resolveTaskDropOperation,
   taskDropId
 } from "./dragDrop";
+import "./App.css";
+
+const dragModifiers = [restrictDragToWindowEdges];
 
 type AppProps = {
   repository?: TaskRepository;
@@ -66,49 +70,81 @@ export function App({ repository }: AppProps) {
   }
 
   return (
-    <DndContext onDragEnd={(event) => void handleDragEnd(event)}>
-      <main>
-        <h1>SIFTQ</h1>
-        <section aria-label="Task matrix">
-          {MATRIX_AREAS.map((area) => (
-            <MatrixArea
-              key={area.id}
-              areaId={area.id}
-              label={area.label}
-              tasks={tasksForArea(tasks, area.id)}
-              onCreateTask={() => void handleCreateTask(area.id)}
-            />
-          ))}
-        </section>
-        <section aria-label="Task status drop areas">
-          {TERMINAL_AREAS.map((area) => (
-            <article key={area.id}>
-              <h2>{area.label}</h2>
-            </article>
-          ))}
-        </section>
-      </main>
+    <DndContext
+      autoScroll={false}
+      modifiers={dragModifiers}
+      onDragEnd={(event) => void handleDragEnd(event)}
+    >
+      <MatrixPage tasks={tasks} onCreateTask={handleCreateTask} />
     </DndContext>
   );
 }
 
-type MatrixAreaProps = {
+type MatrixPageProps = {
+  readonly tasks: readonly Task[];
+  readonly onCreateTask: (areaId: MatrixAreaId) => void;
+};
+
+function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
+  return (
+    <main className="matrix-page">
+      <header className="matrix-page__header">
+        <h1>SIFTQ</h1>
+      </header>
+      <section aria-label="Matrix workspace" className="matrix-workspace">
+        <div className="matrix-workspace__status matrix-workspace__status--skipped">
+          {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
+            <StatusDropArea key={area.id} label={area.label} />
+          ))}
+        </div>
+        <section aria-label="Task matrix" className="matrix-grid">
+          {MATRIX_AREAS.map((area) => (
+            <AreaPanel
+              key={area.id}
+              areaId={area.id}
+              label={area.label}
+              tasks={tasksForArea(tasks, area.id)}
+              onCreateTask={() => onCreateTask(area.id)}
+            />
+          ))}
+        </section>
+        <div className="matrix-workspace__status matrix-workspace__status--done">
+          {TERMINAL_AREAS.filter((area) => area.id === "done").map((area) => (
+            <StatusDropArea key={area.id} label={area.label} />
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+type AreaPanelProps = {
   readonly areaId: MatrixAreaId;
   readonly label: string;
   readonly tasks: readonly Task[];
   readonly onCreateTask: () => void;
 };
 
-function MatrixArea({ areaId, label, tasks, onCreateTask }: MatrixAreaProps) {
+function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
   const { setNodeRef } = useDroppable({ id: areaDropId(areaId) });
 
   return (
-    <article>
-      <h2>{label}</h2>
-      <button aria-label={`Add task to ${label}`} type="button" onClick={onCreateTask}>
-        +
-      </button>
-      <ul ref={setNodeRef} aria-label={`${label} tasks`} style={{ minHeight: 32 }}>
+    <article className={`area-panel area-panel--${areaId}`}>
+      <header className="area-panel__header">
+        <div>
+          <h2>{label}</h2>
+          <p aria-label={`${label} task count`}>{tasks.length} cards</p>
+        </div>
+        <button
+          aria-label={`Add task to ${label}`}
+          className="area-panel__add"
+          type="button"
+          onClick={onCreateTask}
+        >
+          +
+        </button>
+      </header>
+      <ul ref={setNodeRef} aria-label={`${label} tasks`} className="area-panel__tasks">
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} />
         ))}
@@ -132,6 +168,7 @@ function TaskCard({ task }: TaskCardProps) {
 
   return (
     <li
+      className="task-card"
       ref={(node) => {
         draggable.setNodeRef(node);
         droppable.setNodeRef(node);
@@ -142,6 +179,19 @@ function TaskCard({ task }: TaskCardProps) {
     >
       {task.title}
     </li>
+  );
+}
+
+type StatusDropAreaProps = {
+  readonly label: string;
+};
+
+function StatusDropArea({ label }: StatusDropAreaProps) {
+  return (
+    <article className="status-drop-area">
+      <h2>{label}</h2>
+      <p>0 cards</p>
+    </article>
   );
 }
 

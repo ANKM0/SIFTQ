@@ -1,3 +1,5 @@
+import { type Modifier } from "@dnd-kit/core";
+
 import { type MatrixAreaId, isMatrixArea } from "../domain/area";
 import { type Task, type TaskId } from "../domain/task";
 
@@ -21,6 +23,30 @@ export function areaDropId(areaId: MatrixAreaId): string {
 export function taskDropId(taskId: TaskId): string {
   return `task:${taskId}`;
 }
+
+export const restrictDragToWindowEdges: Modifier = ({
+  draggingNodeRect,
+  transform,
+  windowRect
+}) => {
+  if (draggingNodeRect === null || windowRect === null) {
+    return transform;
+  }
+
+  return {
+    ...transform,
+    x: clamp(
+      transform.x,
+      windowRect.left - draggingNodeRect.left,
+      windowRect.right - draggingNodeRect.right
+    ),
+    y: clamp(
+      transform.y,
+      windowRect.top - draggingNodeRect.top,
+      windowRect.bottom - draggingNodeRect.bottom
+    )
+  };
+};
 
 export function resolveTaskDropOperation(
   tasks: readonly Task[],
@@ -101,6 +127,10 @@ function isMatrixAreaId(areaId: string): areaId is MatrixAreaId {
     areaId === "delegate" ||
     areaId === "eliminate"
   );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function taskIdFromDropId(dropId: string): TaskId | null {

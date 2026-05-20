@@ -17,6 +17,7 @@ describe("App", () => {
   it("renders the matrix quadrants", () => {
     render(<App />);
 
+    expect(screen.getByLabelText("Task matrix").className).toContain("matrix-grid");
     expect(screen.getByText("Do")).toBeTruthy();
     expect(screen.getByText("Schedule")).toBeTruthy();
     expect(screen.getByText("Delegate")).toBeTruthy();
@@ -28,6 +29,18 @@ describe("App", () => {
 
     expect(screen.getByText("Skipped")).toBeTruthy();
     expect(screen.getByText("Done")).toBeTruthy();
+  });
+
+  it("renders area panels with card counts and task card regions", () => {
+    render(<App />);
+
+    expect(screen.getByLabelText("Do task count").textContent).toBe("0 cards");
+    expect(screen.getByLabelText("Schedule task count").textContent).toBe("0 cards");
+    expect(screen.getByLabelText("Delegate task count").textContent).toBe("0 cards");
+    expect(screen.getByLabelText("Eliminate task count").textContent).toBe("0 cards");
+    expect(screen.getByRole("list", { name: "Do tasks" }).className).toContain(
+      "area-panel__tasks"
+    );
   });
 
   it("creates task cards in the selected matrix area", async () => {
@@ -46,6 +59,8 @@ describe("App", () => {
 
     expect(taskTitlesIn("Do tasks")).toEqual(["Task 1", "Task 3"]);
     expect(taskTitlesIn("Schedule tasks")).toEqual(["Task 2"]);
+    expect(screen.getByLabelText("Do task count").textContent).toBe("2 cards");
+    expect(screen.getByText("Task 1").className).toContain("task-card");
   });
 
   it("keeps created tasks in the same in-memory repository session", async () => {
