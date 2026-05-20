@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
@@ -109,7 +109,7 @@ describe("App", () => {
 });
 
 function taskTitlesIn(listName: string): string[] {
-  return within(screen.getByRole("list", { name: listName }))
-    .queryAllByRole("listitem")
-    .map((item) => item.textContent ?? "");
+  return Array.from(
+    screen.getByRole("list", { name: listName }).querySelectorAll("li")
+  ).map((item) => item.textContent ?? "");
 }
