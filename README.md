@@ -45,6 +45,22 @@ Start the frontend development server:
 task frontend:dev
 ```
 
+Manual Matrix MVP smoke check:
+
+- Open the local Vite URL printed by `task frontend:dev`.
+- Confirm `Do`, `Schedule`, `Delegate`, `Eliminate`, `Done`, and `Skipped`
+  are visible.
+- Create cards from multiple matrix area forms and confirm each card appears
+  at the bottom of the selected area.
+- Confirm blank titles cannot be submitted, duplicate titles are allowed, and
+  titles over 256 characters are blocked without truncation.
+- Drag cards within an area and between matrix areas, then confirm the visible
+  order stays stable in the current browser session.
+- Drop a card on `Done` and `Skipped`, then confirm it disappears from the
+  matrix display.
+- Confirm a long 256-character title wraps inside the card without overlapping
+  nearby controls or changing the page into an unusable layout.
+
 Common frontend checks:
 
 ```bash
