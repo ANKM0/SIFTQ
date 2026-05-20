@@ -87,6 +87,35 @@ describe("InMemoryTaskRepository", () => {
     ]);
   });
 
+  it("clamps arbitrary insertion positions to the target area bounds", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const firstTask = await createTask(repository, { title: "First", areaId: "do" });
+    const secondTask = await createTask(repository, {
+      title: "Second",
+      areaId: "do"
+    });
+    const thirdTask = await createTask(repository, { title: "Third", areaId: "do" });
+
+    await moveTask(repository, {
+      taskId: thirdTask.id,
+      toAreaId: "schedule",
+      insertAt: -1
+    });
+    await moveTask(repository, {
+      taskId: firstTask.id,
+      toAreaId: "schedule",
+      insertAt: 99
+    });
+
+    expect(await listTasks(repository)).toMatchObject([
+      { id: secondTask.id, areaId: "do", order: 0 },
+      { id: thirdTask.id, areaId: "schedule", order: 0 },
+      { id: firstTask.id, areaId: "schedule", order: 1 }
+    ]);
+  });
+
   it("reorders tasks inside the same matrix area", async () => {
     const repository = new InMemoryTaskRepository({
       generateId: createTestIdGenerator()
