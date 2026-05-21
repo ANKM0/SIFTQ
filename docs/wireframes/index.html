@@ -32,14 +32,11 @@
           </defs>
           <path class="flow-line" d="M180 96 H395" marker-end="url(#arrow)" />
           <path class="flow-line" d="M605 96 H820" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M500 166 V260" marker-end="url(#arrow)" />
           <path class="flow-line" d="M395 334 H180" marker-end="url(#arrow)" />
           <path class="flow-line" d="M605 334 H820" marker-end="url(#arrow)" />
           <path class="flow-line flow-line--return" d="M180 404 C180 486 820 486 820 404" />
           <text class="flow-label" x="250" y="82">+ click</text>
           <text class="flow-label" x="680" y="82">submit</text>
-          <text class="flow-label" x="520" y="222">Edit</text>
-          <text class="flow-label" x="250" y="320">Save / Cancel</text>
           <text class="flow-label" x="680" y="320">drag start</text>
           <text class="flow-label" x="642" y="472">drop on terminal</text>
         </svg>
@@ -54,21 +51,17 @@
         </a>
         <a class="wire-flow-card wire-flow-card--cards" href="./matrix-with-cards.html">
           <strong>3. Cards</strong>
-          <span>作成済み card、count、Edit 入口。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--editing" href="./matrix-editing.html">
-          <strong>4. Editing</strong>
-          <span>title update の保存 / キャンセル。</span>
+          <span>作成済み card、count、title-only 表示。</span>
         </a>
         <a class="wire-flow-card wire-flow-card--dragging" href="./matrix-dragging.html">
-          <strong>5. Dragging</strong>
-          <span>matrix area 間、または terminal area へ移動。</span>
+          <strong>4. Dragging</strong>
+          <span>area 内並び替え、matrix area 間移動、terminal area drop。</span>
         </a>
         <a
           class="wire-flow-card wire-flow-card--terminal"
           href="./matrix-terminal-drop.html"
         >
-          <strong>6. Terminal Drop</strong>
+          <strong>5. Terminal Drop</strong>
           <span>Done / Skipped drop 後は matrix から非表示。</span>
         </a>
       </section>
@@ -96,17 +89,12 @@
             </tr>
             <tr>
               <td><a href="./matrix-with-cards.html">Cards</a></td>
-              <td>card 表示、count、Edit 入口、長い title。</td>
-              <td>Edit click → Editing / drag start → Dragging</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-editing.html">Editing</a></td>
-              <td>title update の入力、保存、キャンセル、validation。</td>
-              <td>Save / Cancel → Cards</td>
+              <td>card 表示、area 内表示順、長い title。</td>
+              <td>drag start → Dragging</td>
             </tr>
             <tr>
               <td><a href="./matrix-dragging.html">Dragging</a></td>
-              <td>drag 中、drop target、viewport 内操作範囲。</td>
+              <td>drag 中、area 内並び替え、matrix area 間移動、drop target。</td>
               <td>Drop on matrix → Cards / Drop on terminal → Terminal Drop</td>
             </tr>
             <tr>

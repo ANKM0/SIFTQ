@@ -13,10 +13,6 @@
           <h1>SIFTQ</h1>
           <p>Matrix MVP wireframe</p>
         </div>
-        <div class="header-actions" aria-label="Global actions">
-          <button type="button">Smoke check</button>
-          <button type="button">Settings later</button>
-        </div>
       </header>
 
       <section class="workspace" aria-label="Matrix workspace">
@@ -37,23 +33,15 @@
               <span class="count">2 cards</span>
             </header>
             <form class="quick-create" aria-label="Create task in Do">
-              <input type="text" value="Fix terminal drop" aria-label="New Do task title" />
+              <input type="text" placeholder="Task title" aria-label="New Do task title" />
               <button type="button" aria-label="Add task to Do">+</button>
             </form>
             <ul class="cards" aria-label="Do tasks">
-              <li class="card card--editing">
-                <div>
-                  <span class="card__title">Fix terminal drop</span>
-                  <span class="card__meta">Editing title</span>
-                </div>
-                <button type="button" aria-label="Edit Fix terminal drop">Edit</button>
+              <li class="card">
+                <span class="card__title">Fix terminal drop</span>
               </li>
               <li class="card">
-                <div>
-                  <span class="card__title">Create UI definition doc</span>
-                  <span class="card__meta">Drag handle: whole card</span>
-                </div>
-                <button type="button" aria-label="Edit Create UI definition doc">Edit</button>
+                <span class="card__title">Create UI definition doc</span>
               </li>
             </ul>
           </article>
@@ -86,11 +74,7 @@
             </form>
             <ul class="cards" aria-label="Delegate tasks">
               <li class="card card--dragging">
-                <div>
-                  <span class="card__title">Ask for UI decision</span>
-                  <span class="card__meta">Dragging state</span>
-                </div>
-                <button type="button" aria-label="Edit Ask for UI decision">Edit</button>
+                <span class="card__title">Ask for UI decision</span>
               </li>
             </ul>
           </article>
@@ -109,11 +93,7 @@
             </form>
             <ul class="cards" aria-label="Eliminate tasks">
               <li class="card">
-                <div>
-                  <span class="card__title">Remove empty-state label</span>
-                  <span class="card__meta">Drop target highlighted</span>
-                </div>
-                <button type="button" aria-label="Edit Remove empty-state label">Edit</button>
+                <span class="card__title">Remove empty-state label</span>
               </li>
             </ul>
           </article>
@@ -130,7 +110,8 @@
       <footer class="wire-notes">
         <span>Wireframe notes:</span>
         <span>Done / Skipped do not show counts.</span>
-        <span>Empty matrix areas show a central add action instead of "No cards".</span>
+        <span>Task cards show title only.</span>
+        <span>Empty matrix areas show a central + action instead of "No cards".</span>
         <span>Workspace fills the viewport below the header.</span>
       </footer>
     </main>

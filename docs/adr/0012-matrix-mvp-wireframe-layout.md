@@ -24,7 +24,7 @@ Accepted.
 
 ## Context
 
-Matrix MVP needs a low-fidelity wireframe so implementers can confirm the
+Matrix MVP needs low-fidelity wireframes so implementers can confirm the
 single-screen area layout, task creation flow, task card display, drag reorder,
 area move, and terminal Done / Skipped behavior without adding interpretation
 outside the functional requirements.
@@ -37,8 +37,11 @@ and restore flows remain out of scope for v1.
 
 ## Decision
 
-The Matrix MVP wireframe uses a single screen with `Skipped` on the left, a
-2x2 matrix in the center, and `Done` on the right.
+The Matrix MVP wireframes are HTML documents under `docs/wireframes/`. The
+combined screen is `docs/wireframes/matrix-mvp.html`, with `Skipped` on the
+left, a 2x2 matrix in the center, and `Done` on the right. Supporting HTML
+states show empty areas, task creation, card display, dragging, and terminal
+drop outcomes.
 
 The center matrix contains the four matrix areas:
 
@@ -79,7 +82,7 @@ storage, and additional task card fields.
 ## Consequences
 
 - Implementers can verify all six areas and terminal drop behavior from a
-  single low-fidelity document.
+  linked low-fidelity HTML wireframe set.
 - The wireframe keeps creation local to matrix areas and avoids adding a
   separate task intake concept for v1.
 - Done and Skipped remain terminal status transitions in v1 rather than visible
