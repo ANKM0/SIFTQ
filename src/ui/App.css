@@ -251,6 +251,12 @@
   text-align: center;
 }
 
+.status-drop-area--drop-target {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 18%);
+}
+
 @media (max-width: 900px) {
   .matrix-workspace {
     grid-template-columns: 1fr;

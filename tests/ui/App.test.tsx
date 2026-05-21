@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
 import {
@@ -7,9 +7,51 @@ import {
   moveTask,
   reorderTask
 } from "../../src/application/taskOperations";
+import { type AreaId } from "../../src/domain/area";
 import { App } from "../../src/ui/App";
+import { areaDropId, taskDropId } from "../../src/ui/dragDrop";
+
+const dndKitMock = vi.hoisted(() => ({
+  droppableIds: [] as string[],
+  onDragEnd: undefined as ((event: unknown) => void) | undefined
+}));
+
+vi.mock("@dnd-kit/core", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  return {
+    DndContext: ({
+      children,
+      onDragEnd
+    }: {
+      children: React.ReactNode;
+      onDragEnd: (event: unknown) => void;
+    }) => {
+      dndKitMock.onDragEnd = onDragEnd;
+
+      return React.createElement(React.Fragment, null, children);
+    },
+    useDraggable: () => ({
+      attributes: {},
+      isDragging: false,
+      listeners: {},
+      setNodeRef: vi.fn(),
+      transform: null
+    }),
+    useDroppable: ({ id }: { id: string }) => {
+      dndKitMock.droppableIds.push(id);
+
+      return {
+        isOver: false,
+        setNodeRef: vi.fn()
+      };
+    }
+  };
+});
 
 afterEach(() => {
+  dndKitMock.droppableIds = [];
+  dndKitMock.onDragEnd = undefined;
   cleanup();
 });
 
@@ -29,6 +71,8 @@ describe("App", () => {
 
     expect(screen.getByText("Skipped")).toBeTruthy();
     expect(screen.getByText("Done")).toBeTruthy();
+    expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
+    expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
   });
 
   it("renders area panels with card counts and task card regions", () => {
@@ -202,6 +246,38 @@ describe("App", () => {
     expect(taskTitlesIn("Do tasks")).toEqual([]);
   });
 
+  it.each([
+    ["Done", "done"],
+    ["Skipped", "skipped"]
+  ] as const)(
+    "hides active tasks from the matrix after dropping them on %s",
+    async (_label, terminalAreaId) => {
+      const repository = new InMemoryTaskRepository();
+      const task = await createTask(repository, {
+        areaId: "do",
+        title: `${terminalAreaId} task`
+      });
+
+      render(<App repository={repository} />);
+
+      expect(await screen.findByText(`${terminalAreaId} task`)).toBeTruthy();
+
+      dragTaskOverArea(task.id, terminalAreaId);
+
+      await waitFor(() =>
+        expect(screen.queryByText(`${terminalAreaId} task`)).toBeNull()
+      );
+
+      const [updatedTask] = await repository.listTasks();
+      expect(updatedTask).toMatchObject({
+        areaId: terminalAreaId,
+        status: terminalAreaId
+      });
+      expect(taskTitlesIn("Do tasks")).toEqual([]);
+      expect(screen.queryByRole("list", { name: `${_label} tasks` })).toBeNull();
+    }
+  );
+
   it("renders maximum length task titles in a wrapping card", async () => {
     const repository = new InMemoryTaskRepository();
     const longTitle = "a".repeat(256);
@@ -228,4 +304,11 @@ function createTaskInArea(areaLabel: string, title: string) {
     target: { value: title }
   });
   fireEvent.click(screen.getByRole("button", { name: `Add task to ${areaLabel}` }));
+}
+
+function dragTaskOverArea(taskId: string, areaId: AreaId) {
+  dndKitMock.onDragEnd?.({
+    active: { id: taskDropId(taskId) },
+    over: { id: areaDropId(areaId) }
+  });
 }
