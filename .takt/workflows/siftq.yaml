@@ -1,0 +1,107 @@
+name: siftq
+description: SIFTQ ticket-driven AI implementation workflow.
+initial_step: plan
+max_steps: 12
+
+personas:
+  planner: ../facets/personas/planner.md
+  implementer: ../facets/personas/implementer.md
+  adversarial_reviewer: ../facets/personas/adversarial-reviewer.md
+
+policies:
+  repository: ../facets/policies/repository.md
+
+knowledge:
+  siftq: ../facets/knowledge/siftq.md
+
+steps:
+  - name: plan
+    persona: planner
+    policy: repository
+    knowledge: siftq
+    edit: false
+    required_permission_mode: readonly
+    instruction: |
+      Read the GitHub Issue task and the SIFTQ repository guidance.
+      Produce a concise implementation plan that maps each AC and DoD item to
+      the files or checks that will satisfy it.
+
+      Do not edit files in this step.
+    rules:
+      - condition: "Plan complete"
+        next: implement
+      - condition: "Blocked"
+        next: ABORT
+        appendix: |
+          Explain the missing information or repository condition that blocks implementation.
+
+  - name: implement
+    persona: implementer
+    policy: repository
+    knowledge: siftq
+    edit: true
+    required_permission_mode: edit
+    instruction: |
+      Implement the planned changes for this issue.
+
+      Keep the change scoped to the issue. Do not modify unrelated files. Use
+      `task ci` as the target validation gate, and preserve the SIFTQ runtime
+      architecture: TAKT belongs to development workflow tooling, not application
+      runtime dependencies.
+
+      When finished, summarize the changed files and validation commands run.
+    rules:
+      - condition: "Implementation complete"
+        next: adversarial_review
+      - condition: "Blocked"
+        next: ABORT
+        appendix: |
+          Explain what prevented implementation and what evidence was gathered.
+
+  - name: adversarial_review
+    parallel:
+      - name: scope_review
+        persona: adversarial_reviewer
+        policy: repository
+        knowledge: siftq
+        edit: false
+        required_permission_mode: readonly
+        instruction: |
+          Review the implementation adversarially for scope creep, unrelated file
+          changes, missing issue AC/DoD coverage, and runtime dependency leakage.
+        rules:
+          - condition: "Approved"
+          - condition: "Needs fix"
+      - name: verification_review
+        persona: adversarial_reviewer
+        policy: repository
+        knowledge: siftq
+        edit: false
+        required_permission_mode: readonly
+        instruction: |
+          Review the validation evidence adversarially. Check whether `task ci`
+          or a clearly justified subset was run, and whether any failing check is
+          explained with a concrete scope boundary.
+        rules:
+          - condition: "Approved"
+          - condition: "Needs fix"
+    rules:
+      - condition: all("Approved")
+        next: final_report
+      - condition: any("Needs fix")
+        next: implement
+
+  - name: final_report
+    persona: implementer
+    policy: repository
+    knowledge: siftq
+    edit: false
+    required_permission_mode: readonly
+    instruction: |
+      Produce the final handoff report for the PR body. Include summary,
+      validation results, known limitations, and the issue reference.
+    rules:
+      - condition: "Ready for PR"
+        next: COMPLETE
+      - condition: "Blocked"
+        next: ABORT

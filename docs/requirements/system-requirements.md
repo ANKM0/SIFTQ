@@ -26,12 +26,6 @@ codd:
     - id: design:adr-index
       relation: depends_on
       semantic: governance
-    - id: design:agent-roles
-      relation: depends_on
-      semantic: governance
-    - id: design:issue-execution
-      relation: depends_on
-      semantic: governance
     - id: design:issue-12-ci-cd
       relation: depends_on
       semantic: governance
@@ -45,6 +39,9 @@ codd:
       relation: depends_on
       semantic: governance
     - id: design:siftq-project-name-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:takt-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
     - id: design:issue-10-taskfile

@@ -14,3 +14,8 @@ coverage/
 .codd/extracted/
 .codd/dag.json
 docs/test/verify_report.md
+
+# TAKT local task state and run logs
+.takt/tasks.yaml
+.takt/tasks/
+.takt/runs/
