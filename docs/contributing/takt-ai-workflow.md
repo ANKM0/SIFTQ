@@ -10,12 +10,22 @@ codd:
     - id: design:taskfile-command-runner-adr
       relation: depends_on
       semantic: automation
+    - id: design:branch-strategy
+      relation: depends_on
+      semantic: workflow
+    - id: design:commit-message-format
+      relation: depends_on
+      semantic: workflow
 ---
 
 # TAKT AI Workflow
 
 SIFTQ uses TAKT as the initial ticket-driven AI development runner. TAKT is
 development workflow tooling and is not part of the application runtime.
+
+TAKT supersedes the previous role-based agent workflow and `agent:*`
+label-driven gates. The canonical initial workflow is manual execution from a
+trusted local environment.
 
 ## Tool Management
 
@@ -52,6 +62,17 @@ Validate the project workflow definition:
 task ai:takt:doctor
 ```
 
+## GitHub Labels and Actions
+
+Do not add a GitHub Actions workflow that starts TAKT from an issue label.
+The initial setup assumes Codex subscription/local session execution, which a
+GitHub-hosted runner cannot safely reproduce. A label-triggered runner requires
+a separately designed self-hosted runner or API-key based execution model and
+is out of scope for the initial TAKT adoption.
+
+Labels can still be used by humans for triage, but labels are not the execution
+trigger for TAKT in this repository.
+
 ## Workflow Expectations
 
 - Use `.takt/workflows/siftq.yaml` for SIFTQ issue implementation.
@@ -64,6 +85,6 @@ task ai:takt:doctor
 ## Parallel Execution
 
 Initial operation uses `concurrency: 1`. If multiple issue execution becomes
-necessary, add an external scheduler that assigns labels, creates one
-`git worktree` per issue, and runs TAKT inside each worktree. Do not make the
-first TAKT adoption responsible for long-running multi-worker orchestration.
+necessary, add an external scheduler that creates one `git worktree` per issue
+and runs TAKT inside each worktree. Do not make the first TAKT adoption
+responsible for long-running multi-worker orchestration.

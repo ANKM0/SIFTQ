@@ -8,10 +8,10 @@ codd:
       relation: depends_on
       semantic: governance
   depended_by:
-    - id: design:issue-execution
+    - id: design:issue-12-ci-cd
       relation: depends_on
       semantic: workflow
-    - id: design:issue-12-ci-cd
+    - id: design:takt-ai-workflow
       relation: depends_on
       semantic: workflow
 ---

@@ -11,7 +11,7 @@ codd:
       relation: depends_on
       semantic: decision
   depended_by:
-    - id: design:issue-execution
+    - id: design:takt-ai-workflow
       relation: depends_on
       semantic: workflow
 ---
