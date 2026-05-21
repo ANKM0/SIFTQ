@@ -16,9 +16,22 @@ def run_git(args: list[str]) -> str:
     return subprocess.check_output(["git", *args], text=True).strip()
 
 
+def commit_exists(revision: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", f"{revision}^{{commit}}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
 def commit_range(args: list[str]) -> str:
     if len(args) == 2 and args[0] and args[1] and args[0] != "0000000000000000000000000000000000000000":
-        return f"{args[0]}..{args[1]}"
+        if commit_exists(args[0]) and commit_exists(args[1]):
+            return f"{args[0]}..{args[1]}"
 
     base = run_git(["merge-base", "origin/main", "HEAD"])
     return f"{base}..HEAD"
