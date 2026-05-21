@@ -29,6 +29,12 @@ codd:
     - id: design:dnd-kit-matrix-drag-and-drop-adr
       relation: depends_on
       semantic: interaction
+    - id: design:matrix-mvp-wireframe
+      relation: depends_on
+      semantic: ui
+    - id: design:matrix-mvp-wireframe-layout-adr
+      relation: depends_on
+      semantic: scope
 ---
 
 # Matrix MVP Functional Requirements

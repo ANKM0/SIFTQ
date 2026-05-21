@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Cards</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>State: Cards created</p></div>
+        <a class="back-link" href="./index.html">Index</a>
+      </header>
+      <section class="workspace">
+        <aside class="terminal-drop terminal-drop--skipped"><h2>Skipped</h2><p>Drop to hide</p></aside>
+        <section class="matrix-board">
+          <article class="area area--do">
+            <header class="area__header"><div><h2>Do</h2><p>Important / urgent</p></div><span class="count">2 cards</span></header>
+            <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
+            <ul class="cards">
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Fix terminal drop</span></a></li>
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Create UI definition</span></a></li>
+            </ul>
+          </article>
+          <article class="area area--schedule">
+            <header class="area__header"><div><h2>Schedule</h2><p>Important / not urgent</p></div><span class="count">1 card</span></header>
+            <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
+            <ul class="cards">
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Discuss browser session state</span></a></li>
+            </ul>
+          </article>
+          <article class="area area--delegate area--empty">
+            <header class="area__header"><div><h2>Delegate</h2><p>Not important / urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--eliminate">
+            <header class="area__header"><div><h2>Eliminate</h2><p>Not important / not urgent</p></div><span class="count">1 card</span></header>
+            <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
+            <ul class="cards">
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Remove 0 cards from terminal areas</span></a></li>
+            </ul>
+          </article>
+        </section>
+        <aside class="terminal-drop terminal-drop--done"><h2>Done</h2><p>Drop to hide</p></aside>
+      </section>
+    </main>
+  </body>
+</html>

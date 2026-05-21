@@ -14,6 +14,9 @@ codd:
     - id: design:issue-6-matrix-mvp-tech-selection
       relation: depends_on
       semantic: decision
+    - id: design:matrix-mvp-wireframe-layout-adr
+      relation: depends_on
+      semantic: interaction
 ---
 
 # ADR 0006: dnd-kit for Matrix Drag and Drop

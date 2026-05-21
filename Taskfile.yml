@@ -115,10 +115,9 @@ tasks:
       - aqua exec -- pnpm dlx takt@{{.TAKT_VERSION}} {{.CLI_ARGS}}
 
   ai:takt:
-    desc: Queue a GitHub Issue in TAKT and immediately run pending tasks, for example task ai:takt -- '#46'.
+    desc: Run a GitHub Issue through TAKT pipeline mode, for example task ai:takt -- '#46'.
     cmds:
-      - task ai:takt:add -- {{.CLI_ARGS}}
-      - task ai:takt:run
+      - task ai:takt:cli -- --pipeline --workflow siftq {{.CLI_ARGS}}
 
   ai:takt:refine:
     desc: Queue a GitHub Issue for TAKT refinement, for example task ai:takt:refine -- '#46'.

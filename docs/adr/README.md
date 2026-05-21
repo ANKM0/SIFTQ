@@ -31,3 +31,5 @@ SIFTQ workflow, governance, and architecture decisions.
 | [0008](./0008-github-actions-ci-cd-toolchain.md) | GitHub Actions CI/CD Toolchain採用 | Accepted |
 | [0009](./0009-taskfile-command-runner.md) | Command RunnerのTaskfile採用 | Accepted |
 | [0010](./0010-siftq-project-name.md) | SIFTQ Project Name | Accepted |
+| [0011](./0011-takt-ticket-driven-ai-runner.md) | TAKT for Ticket-Driven AI Runner | Accepted |
+| [0012](./0012-matrix-mvp-wireframe-layout.md) | Matrix MVP Wireframe Layout | Accepted |

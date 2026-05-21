@@ -100,6 +100,28 @@ describe("TAKT implementation workflow readiness gate", () => {
 });
 
 describe("TAKT Taskfile workflow integration", () => {
+  it("runs implementation issues through pipeline mode so commit messages use the configured template", () => {
+    const givenImplementationTask = extractTaskBlock(taskfile, "ai:takt");
+
+    const whenEntrypoint = {
+      usesPipelineMode: givenImplementationTask.includes("--pipeline"),
+      selectsImplementationWorkflow: givenImplementationTask.includes(
+        "--workflow siftq"
+      ),
+      avoidsQueueAutoCommitPath: !givenImplementationTask.includes(
+        "task ai:takt:add --"
+      ),
+      forwardsIssueArguments: givenImplementationTask.includes("{{.CLI_ARGS}}")
+    };
+
+    expect(whenEntrypoint).toEqual({
+      usesPipelineMode: true,
+      selectsImplementationWorkflow: true,
+      avoidsQueueAutoCommitPath: true,
+      forwardsIssueArguments: true
+    });
+  });
+
   it("validates both implementation and refinement workflows through doctor", () => {
     const givenDoctorTask = extractTaskBlock(taskfile, "ai:takt:doctor");
 
@@ -146,12 +168,15 @@ function extractStepBlock(workflow: string, stepName: string): string {
 }
 
 function extractTaskBlock(source: string, taskName: string): string {
-  const blockStart = source.indexOf(`  ${taskName}:`);
+  const blockMatch = new RegExp(`^  ${escapeRegExp(taskName)}:\\n`, "m").exec(
+    source
+  );
 
-  if (blockStart === -1) {
+  if (blockMatch === null) {
     return "";
   }
 
+  const blockStart = blockMatch.index;
   const nextTaskStart = source
     .slice(blockStart + 1)
     .search(/\n {2}[^\s].*:\n/);
@@ -161,6 +186,10 @@ function extractTaskBlock(source: string, taskName: string): string {
   }
 
   return source.slice(blockStart, blockStart + nextTaskStart + 1);
+}
+
+function escapeRegExp(source: string): string {
+  return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function extractYamlListBlock(source: string, marker: string): string {

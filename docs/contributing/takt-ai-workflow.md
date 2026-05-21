@@ -50,11 +50,17 @@ Refine a GitHub Issue before implementation:
 task ai:takt:refine -- '#46'
 ```
 
-Queue a GitHub Issue and immediately run pending TAKT tasks:
+Run a GitHub Issue through the TAKT implementation pipeline:
 
 ```bash
 task ai:takt -- '#46'
 ```
+
+The implementation entrypoint uses TAKT pipeline mode so the configured
+`pipeline.commit_message_template` is applied. Do not route implementation work
+through `takt add` followed by `takt run`; TAKT 0.42.0's queued-task
+auto-commit path emits `takt: ...` commit subjects, which do not satisfy the
+SIFTQ commit message format.
 
 Validate the project workflow definition:
 

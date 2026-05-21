@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXCLUDED_DIRS = {".git", ".venv", ".codd", "node_modules", "dist"}
+EXCLUDED_DIRS = {".git", ".venv", ".codd", ".takt", "node_modules", "dist"}
 
 
 def markdown_files() -> list[Path]:
