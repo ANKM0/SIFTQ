@@ -1,13 +1,13 @@
 import { type Modifier } from "@dnd-kit/core";
 
-import { type MatrixAreaId, isMatrixArea } from "../domain/area";
+import { INITIAL_AREAS, type AreaId, type MatrixAreaId, isMatrixArea } from "../domain/area";
 import { type Task, type TaskId } from "../domain/task";
 
 export type TaskDropOperation =
   | {
       readonly type: "move";
       readonly taskId: TaskId;
-      readonly toAreaId: MatrixAreaId;
+      readonly toAreaId: AreaId;
       readonly insertAt: number;
     }
   | {
@@ -16,7 +16,7 @@ export type TaskDropOperation =
       readonly toIndex: number;
     };
 
-export function areaDropId(areaId: MatrixAreaId): string {
+export function areaDropId(areaId: AreaId): string {
   return `area:${areaId}`;
 }
 
@@ -90,7 +90,7 @@ export function resolveTaskDropOperation(
 function operationForTarget(
   taskId: TaskId,
   fromAreaId: MatrixAreaId,
-  toAreaId: MatrixAreaId,
+  toAreaId: AreaId,
   insertAt: number
 ): TaskDropOperation | null {
   if (insertAt < 0) {
@@ -104,29 +104,24 @@ function operationForTarget(
   return { type: "move", taskId, toAreaId, insertAt };
 }
 
-function tasksInArea(tasks: readonly Task[], areaId: MatrixAreaId): Task[] {
+function tasksInArea(tasks: readonly Task[], areaId: AreaId): Task[] {
   return tasks
     .filter((task) => task.areaId === areaId)
     .sort((left, right) => left.order - right.order);
 }
 
-function areaIdFromDropId(dropId: string): MatrixAreaId | null {
+function areaIdFromDropId(dropId: string): AreaId | null {
   const areaId = dropId.replace(/^area:/, "");
 
-  if (areaId === dropId || !isMatrixAreaId(areaId)) {
+  if (areaId === dropId || !isAreaId(areaId)) {
     return null;
   }
 
   return areaId;
 }
 
-function isMatrixAreaId(areaId: string): areaId is MatrixAreaId {
-  return (
-    areaId === "do" ||
-    areaId === "schedule" ||
-    areaId === "delegate" ||
-    areaId === "eliminate"
-  );
+function isAreaId(areaId: string): areaId is AreaId {
+  return INITIAL_AREAS.some((area) => area.id === areaId);
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -60,6 +60,23 @@ describe("dragDrop", () => {
     });
   });
 
+  it("resolves drops over terminal areas to move operations", () => {
+    for (const terminalAreaId of ["done", "skipped"] as const) {
+      expect(
+        resolveTaskDropOperation(
+          [task({ id: "moved", areaId: "do", order: 0 })],
+          taskDropId("moved"),
+          areaDropId(terminalAreaId)
+        )
+      ).toEqual({
+        type: "move",
+        taskId: "moved",
+        toAreaId: terminalAreaId,
+        insertAt: 0
+      });
+    }
+  });
+
   it("ignores invalid drops without creating repository operations", () => {
     expect(
       resolveTaskDropOperation(

@@ -14,7 +14,12 @@ import {
   moveTask,
   reorderTask
 } from "../application/taskOperations";
-import { MATRIX_AREAS, TERMINAL_AREAS, type MatrixAreaId } from "../domain/area";
+import {
+  MATRIX_AREAS,
+  TERMINAL_AREAS,
+  type MatrixAreaId,
+  type TerminalAreaId
+} from "../domain/area";
 import {
   isTaskVisibleInMatrix,
   TASK_TITLE_MAX_LENGTH,
@@ -103,7 +108,7 @@ function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
       <section aria-label="Matrix workspace" className="matrix-workspace">
         <div className="matrix-workspace__status matrix-workspace__status--skipped">
           {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
-            <StatusDropArea key={area.id} label={area.label} />
+            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
           ))}
         </div>
         <section aria-label="Task matrix" className="matrix-grid">
@@ -119,7 +124,7 @@ function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
         </section>
         <div className="matrix-workspace__status matrix-workspace__status--done">
           {TERMINAL_AREAS.filter((area) => area.id === "done").map((area) => (
-            <StatusDropArea key={area.id} label={area.label} />
+            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
           ))}
         </div>
       </section>
@@ -262,12 +267,21 @@ function TaskCard({ task }: TaskCardProps) {
 }
 
 type StatusDropAreaProps = {
+  readonly areaId: TerminalAreaId;
   readonly label: string;
 };
 
-function StatusDropArea({ label }: StatusDropAreaProps) {
+function StatusDropArea({ areaId, label }: StatusDropAreaProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: areaDropId(areaId) });
+  const className = [
+    "status-drop-area",
+    isOver ? "status-drop-area--drop-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <article className="status-drop-area">
+    <article ref={setNodeRef} className={className}>
       <h2>{label}</h2>
       <p>0 cards</p>
     </article>
