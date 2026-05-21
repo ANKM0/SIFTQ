@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Terminal Drop</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>State: Dropped to Done / Skipped</p></div>
+        <a class="back-link" href="./index.html">Index</a>
+      </header>
+      <section class="workspace">
+        <a class="terminal-drop terminal-drop--skipped terminal-drop--complete" href="./matrix-empty.html"><h2>Skipped</h2><p>Task hidden from matrix</p></a>
+        <section class="matrix-board">
+          <article class="area area--do area--empty">
+            <header class="area__header"><div><h2>Do</h2><p>Important / urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--schedule">
+            <header class="area__header"><div><h2>Schedule</h2><p>Important / not urgent</p></div><span class="count">1 card</span></header>
+            <ul class="cards">
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Only active tasks remain</span><span class="card__meta">Terminal tasks are hidden</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+            </ul>
+          </article>
+          <article class="area area--delegate area--empty">
+            <header class="area__header"><div><h2>Delegate</h2><p>Not important / urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--eliminate area--empty">
+            <header class="area__header"><div><h2>Eliminate</h2><p>Not important / not urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+        </section>
+        <a class="terminal-drop terminal-drop--done terminal-drop--complete" href="./matrix-empty.html"><h2>Done</h2><p>Task hidden from matrix</p></a>
+      </section>
+      <footer class="wire-notes"><span>Terminal state:</span><span>v1 does not list Done / Skipped tasks.</span><span>Restore is future scope.</span></footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Matrix MVP Wireframe</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="SIFTQ Matrix MVP wireframe">
+      <header class="app-header">
+        <div>
+          <h1>SIFTQ</h1>
+          <p>Matrix MVP wireframe</p>
+        </div>
+        <div class="header-actions" aria-label="Global actions">
+          <button type="button">Smoke check</button>
+          <button type="button">Settings later</button>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="Matrix workspace">
+        <aside class="terminal-drop terminal-drop--skipped" aria-label="Skipped drop area">
+          <div>
+            <h2>Skipped</h2>
+            <p>Drop here to hide from matrix</p>
+          </div>
+        </aside>
+
+        <section class="matrix-board" aria-label="Task matrix">
+          <article class="area area--do" aria-label="Do area">
+            <header class="area__header">
+              <div>
+                <h2>Do</h2>
+                <p>Important / urgent</p>
+              </div>
+              <span class="count">2 cards</span>
+            </header>
+            <form class="quick-create" aria-label="Create task in Do">
+              <input type="text" value="Fix terminal drop" aria-label="New Do task title" />
+              <button type="button" aria-label="Add task to Do">+</button>
+            </form>
+            <ul class="cards" aria-label="Do tasks">
+              <li class="card card--editing">
+                <div>
+                  <span class="card__title">Fix terminal drop</span>
+                  <span class="card__meta">Editing title</span>
+                </div>
+                <button type="button" aria-label="Edit Fix terminal drop">Edit</button>
+              </li>
+              <li class="card">
+                <div>
+                  <span class="card__title">Create UI definition doc</span>
+                  <span class="card__meta">Drag handle: whole card</span>
+                </div>
+                <button type="button" aria-label="Edit Create UI definition doc">Edit</button>
+              </li>
+            </ul>
+          </article>
+
+          <article class="area area--schedule area--empty" aria-label="Schedule area">
+            <header class="area__header">
+              <div>
+                <h2>Schedule</h2>
+                <p>Important / not urgent</p>
+              </div>
+              <span class="count">0 cards</span>
+            </header>
+            <button class="empty-add" type="button" aria-label="Add task to Schedule">
+              <span>+</span>
+              <strong>Add task</strong>
+            </button>
+          </article>
+
+          <article class="area area--delegate" aria-label="Delegate area">
+            <header class="area__header">
+              <div>
+                <h2>Delegate</h2>
+                <p>Not important / urgent</p>
+              </div>
+              <span class="count">1 card</span>
+            </header>
+            <form class="quick-create" aria-label="Create task in Delegate">
+              <input type="text" placeholder="Task title" aria-label="New Delegate task title" />
+              <button type="button" aria-label="Add task to Delegate">+</button>
+            </form>
+            <ul class="cards" aria-label="Delegate tasks">
+              <li class="card card--dragging">
+                <div>
+                  <span class="card__title">Ask for UI decision</span>
+                  <span class="card__meta">Dragging state</span>
+                </div>
+                <button type="button" aria-label="Edit Ask for UI decision">Edit</button>
+              </li>
+            </ul>
+          </article>
+
+          <article class="area area--eliminate area--drop-target" aria-label="Eliminate area">
+            <header class="area__header">
+              <div>
+                <h2>Eliminate</h2>
+                <p>Not important / not urgent</p>
+              </div>
+              <span class="count">1 card</span>
+            </header>
+            <form class="quick-create" aria-label="Create task in Eliminate">
+              <input type="text" placeholder="Task title" aria-label="New Eliminate task title" />
+              <button type="button" aria-label="Add task to Eliminate">+</button>
+            </form>
+            <ul class="cards" aria-label="Eliminate tasks">
+              <li class="card">
+                <div>
+                  <span class="card__title">Remove empty-state label</span>
+                  <span class="card__meta">Drop target highlighted</span>
+                </div>
+                <button type="button" aria-label="Edit Remove empty-state label">Edit</button>
+              </li>
+            </ul>
+          </article>
+        </section>
+
+        <aside class="terminal-drop terminal-drop--done" aria-label="Done drop area">
+          <div>
+            <h2>Done</h2>
+            <p>Drop here to hide from matrix</p>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="wire-notes">
+        <span>Wireframe notes:</span>
+        <span>Done / Skipped do not show counts.</span>
+        <span>Empty matrix areas show a central add action instead of "No cards".</span>
+        <span>Workspace fills the viewport below the header.</span>
+      </footer>
+    </main>
+  </body>
+</html>

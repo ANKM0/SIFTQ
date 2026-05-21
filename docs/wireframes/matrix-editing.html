@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Editing</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>State: Editing a task title</p></div>
+        <a class="back-link" href="./index.html">Index</a>
+      </header>
+      <section class="workspace">
+        <aside class="terminal-drop terminal-drop--skipped"><h2>Skipped</h2></aside>
+        <section class="matrix-board">
+          <article class="area area--do">
+            <header class="area__header"><div><h2>Do</h2><p>Important / urgent</p></div><span class="count">2 cards</span></header>
+            <form class="quick-create"><input placeholder="Task title" /><button type="button">+</button></form>
+            <ul class="cards">
+              <li class="card card--editing card-edit">
+                <label>
+                  <span>Title</span>
+                  <input type="text" value="Fix terminal drop behavior" />
+                </label>
+                <div class="card-edit__actions">
+                  <a class="card-action" href="./matrix-with-cards.html">Save</a>
+                  <a class="card-action" href="./matrix-with-cards.html">Cancel</a>
+                </div>
+              </li>
+              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Create UI definition</span><span class="card__meta">Read-only card</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+            </ul>
+          </article>
+          <article class="area area--schedule area--empty">
+            <header class="area__header"><div><h2>Schedule</h2><p>Important / not urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--delegate area--empty">
+            <header class="area__header"><div><h2>Delegate</h2><p>Not important / urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--eliminate">
+            <header class="area__header"><div><h2>Eliminate</h2><p>Not important / not urgent</p></div><span class="count">1 card</span></header>
+            <ul class="cards">
+              <li class="card card--error"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title"> </span><span class="card__meta">Error: title must not be empty</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+            </ul>
+          </article>
+        </section>
+        <aside class="terminal-drop terminal-drop--done"><h2>Done</h2></aside>
+      </section>
+      <footer class="wire-notes"><span>Editing state:</span><span>Save uses update operation.</span><span>Cancel restores read-only card.</span></footer>
+    </main>
+  </body>
+</html>

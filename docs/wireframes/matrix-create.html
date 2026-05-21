@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Create</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>State: Creating a task</p></div>
+        <a class="back-link" href="./index.html">Index</a>
+      </header>
+      <section class="workspace">
+        <aside class="terminal-drop terminal-drop--skipped"><h2>Skipped</h2></aside>
+        <section class="matrix-board">
+          <article class="area area--do">
+            <header class="area__header"><div><h2>Do</h2><p>Important / urgent</p></div><span class="count">0 cards</span></header>
+            <form class="quick-create quick-create--active">
+              <input type="text" value="Fix drop behavior" />
+              <a href="./matrix-with-cards.html" aria-label="Create task">+</a>
+            </form>
+            <p class="wire-hint">入力中。Enter または + で作成。</p>
+          </article>
+          <article class="area area--schedule area--empty">
+            <header class="area__header"><div><h2>Schedule</h2><p>Important / not urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--delegate area--empty">
+            <header class="area__header"><div><h2>Delegate</h2><p>Not important / urgent</p></div><span class="count">0 cards</span></header>
+            <a class="empty-add" href="./matrix-create.html"><span>+</span><strong>Add task</strong></a>
+          </article>
+          <article class="area area--eliminate">
+            <header class="area__header"><div><h2>Eliminate</h2><p>Not important / not urgent</p></div><span class="count">0 cards</span></header>
+            <form class="quick-create quick-create--error">
+              <input type="text" value="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" />
+              <a href="./matrix-create.html" aria-label="Retry create">+</a>
+            </form>
+            <p class="task-create-form__error">Title must be 256 characters or less.</p>
+          </article>
+        </section>
+        <aside class="terminal-drop terminal-drop--done"><h2>Done</h2></aside>
+      </section>
+      <footer class="wire-notes"><span>Create state:</span><span>Blank is disabled.</span><span>Over 256 chars shows error and does not truncate.</span></footer>
+    </main>
+  </body>
+</html>
