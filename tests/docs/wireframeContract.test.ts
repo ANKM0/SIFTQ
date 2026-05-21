@@ -45,8 +45,8 @@ describe("Matrix MVP wireframes", () => {
 
   it("documents terminal drops as hidden from the normal matrix display", () => {
     expect(terminalDropWireframe).toContain("Task hidden from matrix");
-    expect(terminalDropWireframe).toContain("v1 does not list Done / Skipped tasks");
-    expect(terminalDropWireframe).toContain("Restore is out of scope for v1");
+    expect(terminalDropWireframe).toContain("terminal-drop--complete");
+    expect(terminalDropWireframe).not.toContain("wire-notes");
   });
 
   it("preserves CoDD traceability for the HTML wireframe set", () => {
