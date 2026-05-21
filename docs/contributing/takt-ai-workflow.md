@@ -44,6 +44,12 @@ task setup:takt
 
 ## Single-Issue Flow
 
+Refine a GitHub Issue before implementation:
+
+```bash
+task ai:takt:refine -- '#46'
+```
+
 Queue a GitHub Issue and immediately run pending TAKT tasks:
 
 ```bash
@@ -58,6 +64,11 @@ task ai:takt:doctor
 
 ## GitHub Labels and Actions
 
+Use `ai:impl-ready` to mark a GitHub Issue whose AC, DoD, ADR need, and design
+prerequisites are clear enough for implementation. The implementation workflow
+checks this label before planning and reports Blocked when the label is missing
+or the AC/DoD/design prerequisite state is unclear.
+
 Do not add a GitHub Actions workflow that starts TAKT from an issue label.
 The initial setup assumes Codex subscription/local session execution, which a
 GitHub-hosted runner cannot safely reproduce. A label-triggered runner requires
@@ -69,7 +80,10 @@ trigger for TAKT in this repository.
 
 ## Workflow Expectations
 
+- Use `.takt/workflows/issue-refinement.yaml` when a GitHub Issue needs AC/DoD
+  validation, ADR screening, issue updates, or implementation-readiness labeling.
 - Use `.takt/workflows/siftq.yaml` for SIFTQ issue implementation.
+- Start implementation only after the issue has the `ai:impl-ready` label.
 - Treat `task ci` as the normal completion gate.
 - Include `task codd:validate` evidence for documentation and governance work.
 - Follow branch and commit rules from `docs/contributing/`.

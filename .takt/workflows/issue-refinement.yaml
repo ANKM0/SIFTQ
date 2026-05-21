@@ -1,0 +1,101 @@
+name: issue-refinement
+description: SIFTQ GitHub Issue refinement workflow for implementation readiness.
+initial_step: refine_issue
+max_steps: 8
+
+personas:
+  planner: ../facets/personas/planner.md
+  implementer: ../facets/personas/implementer.md
+
+policies:
+  repository: ../facets/policies/repository.md
+
+knowledge:
+  siftq: ../facets/knowledge/siftq.md
+
+steps:
+  - name: refine_issue
+    persona: planner
+    policy: repository
+    knowledge: siftq
+    edit: false
+    required_permission_mode: readonly
+    instruction: |
+      Read the target GitHub Issue and the SIFTQ repository guidance.
+      Check whether the AC and DoD are concrete, testable, and complete enough
+      to support implementation without interpretation.
+
+      Check whether an ADR is required before implementation. If the issue
+      changes architecture, governance, runtime boundaries, toolchain policy, or
+      other durable design decisions, require the ADR or design prerequisite to
+      be resolved before implementation.
+
+      Do not implement product changes in this workflow. If AC, DoD, ADR, or
+      design prerequisite information is unclear, output concrete ヒアリング項目
+      and mark the result Blocked.
+    rules:
+      - condition: "Issue needs AC/DoD update"
+        next: update_issue
+      - condition: "Implementation ready"
+        next: assign_impl_ready_label
+      - condition: "Blocked"
+        next: final_refinement_report
+        appendix: |
+          Record unresolved questions or open questions that must be answered
+          before implementation can start.
+
+  - name: update_issue
+    persona: implementer
+    policy: repository
+    knowledge: siftq
+    edit: true
+    required_permission_mode: edit
+    instruction: |
+      Update the GitHub Issue so its AC/DoD and any resolved design
+      prerequisites match the confirmed refinement result.
+
+      Do not implement product changes. Preserve explicit evidence of the
+      updated issue in the handoff notes.
+    rules:
+      - condition: "Updated issue is implementation ready"
+        next: assign_impl_ready_label
+      - condition: "Blocked"
+        next: final_refinement_report
+        appendix: |
+          Record remaining ヒアリング項目 or design prerequisite gaps.
+
+  - name: assign_impl_ready_label
+    persona: implementer
+    policy: repository
+    knowledge: siftq
+    edit: true
+    required_permission_mode: edit
+    instruction: |
+      Add the ai:impl-ready label to the GitHub Issue only after AC, DoD, ADR,
+      and design prerequisite checks are complete.
+
+      Keep label evidence in the workflow output so the implementation workflow
+      can verify readiness before planning.
+    rules:
+      - condition: "ai:impl-ready label assigned"
+        next: final_refinement_report
+      - condition: "Blocked"
+        next: final_refinement_report
+        appendix: |
+          Explain why ラベル付与 could not be completed.
+
+  - name: final_refinement_report
+    persona: planner
+    policy: repository
+    knowledge: siftq
+    edit: false
+    required_permission_mode: readonly
+    instruction: |
+      Produce the refinement handoff. The output must clearly include one or
+      more of: updated issue evidence, unresolved questions, or ai:impl-ready
+      label evidence.
+    rules:
+      - condition: "Refinement complete"
+        next: COMPLETE
+      - condition: "Blocked"
+        next: ABORT
