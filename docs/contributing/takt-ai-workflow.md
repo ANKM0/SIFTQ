@@ -33,7 +33,7 @@ TAKT is distributed as an npm package. SIFTQ does not add it to `package.json`.
 Instead, Taskfile runs the pinned TAKT version through aqua-managed `pnpm`:
 
 ```bash
-task ai:takt -- --version
+task ai:takt:cli -- --version
 ```
 
 Warm the package cache when setting up an environment:
@@ -44,16 +44,10 @@ task setup:takt
 
 ## Single-Issue Flow
 
-Queue a GitHub Issue:
+Queue a GitHub Issue and immediately run pending TAKT tasks:
 
 ```bash
-task ai:takt:add -- '#46'
-```
-
-Run queued TAKT tasks:
-
-```bash
-task ai:takt:run
+task ai:takt -- '#46'
 ```
 
 Validate the project workflow definition:

@@ -109,22 +109,28 @@ tasks:
     cmds:
       - aqua exec -- pnpm dlx takt@{{.TAKT_VERSION}} --version
 
-  ai:takt:
+  ai:takt:cli:
     desc: Run the pinned TAKT CLI through aqua-managed pnpm.
     cmds:
       - aqua exec -- pnpm dlx takt@{{.TAKT_VERSION}} {{.CLI_ARGS}}
 
+  ai:takt:
+    desc: Queue a GitHub Issue in TAKT and immediately run pending tasks, for example task ai:takt -- '#46'.
+    cmds:
+      - task ai:takt:add -- {{.CLI_ARGS}}
+      - task ai:takt:run
+
   ai:takt:add:
     desc: Queue a GitHub Issue in TAKT, for example task ai:takt:add -- '#46'.
     cmds:
-      - task ai:takt -- add {{.CLI_ARGS}}
+      - task ai:takt:cli -- add {{.CLI_ARGS}}
 
   ai:takt:run:
     desc: Run pending TAKT tasks.
     cmds:
-      - task ai:takt -- run {{.CLI_ARGS}}
+      - task ai:takt:cli -- run {{.CLI_ARGS}}
 
   ai:takt:doctor:
     desc: Validate the SIFTQ TAKT workflow definition.
     cmds:
-      - task ai:takt -- workflow doctor siftq
+      - task ai:takt:cli -- workflow doctor siftq
