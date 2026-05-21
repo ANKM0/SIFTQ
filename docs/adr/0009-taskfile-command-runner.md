@@ -17,6 +17,12 @@ codd:
     - id: design:adr-index
       relation: depends_on
       semantic: index
+    - id: design:takt-ticket-driven-ai-runner-adr
+      relation: depends_on
+      semantic: automation
+    - id: design:takt-ai-workflow
+      relation: depends_on
+      semantic: automation
 ---
 
 # ADR 0009: Taskfile for Command Runner

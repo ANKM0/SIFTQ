@@ -1,0 +1,15 @@
+provider: codex
+language: ja
+concurrency: 1
+base_branch: main
+vcs_provider: github
+auto_pr: false
+pipeline:
+  default_branch_prefix: issue-
+  commit_message_template: "#{issue} feat(ai): implement ticket-driven workflow task"
+  pr_body_template: |
+    ## Summary
+
+    {issue_body}
+
+    Closes #{issue}

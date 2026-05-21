@@ -47,6 +47,9 @@ codd:
     - id: design:siftq-project-name-adr
       relation: depends_on
       semantic: governance
+    - id: design:takt-ticket-driven-ai-runner-adr
+      relation: depends_on
+      semantic: governance
     - id: design:issue-10-taskfile
       relation: depends_on
       semantic: governance

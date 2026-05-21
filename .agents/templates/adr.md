@@ -27,7 +27,7 @@ for choosing it.>
 
 ## Rejected Alternatives
 
-- <Document a meaningful option that was not selected and why.>
+- <Document a meaningful option that was not selected and the concrete reason it was rejected.>
 
 ## Consequences
 
