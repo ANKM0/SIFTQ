@@ -23,6 +23,11 @@ steps:
     required_permission_mode: readonly
     instruction: |
       Read the GitHub Issue task and the SIFTQ repository guidance.
+      Before planning, verify that the GitHub Issue has the ai:impl-ready label.
+      If the label is missing, or if AC, DoD, ADR, or 設計前提 / design
+      prerequisite information is unclear, do not proceed to implementation.
+      Report Blocked while this step still has edit: false.
+
       Produce a concise implementation plan that maps each AC and DoD item to
       the files or checks that will satisfy it.
 

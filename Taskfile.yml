@@ -120,6 +120,12 @@ tasks:
       - task ai:takt:add -- {{.CLI_ARGS}}
       - task ai:takt:run
 
+  ai:takt:refine:
+    desc: Queue a GitHub Issue for TAKT refinement, for example task ai:takt:refine -- '#46'.
+    cmds:
+      - task ai:takt:cli -- --workflow issue-refinement add {{.CLI_ARGS}}
+      - task ai:takt:run
+
   ai:takt:add:
     desc: Queue a GitHub Issue in TAKT, for example task ai:takt:add -- '#46'.
     cmds:
@@ -131,6 +137,7 @@ tasks:
       - task ai:takt:cli -- run {{.CLI_ARGS}}
 
   ai:takt:doctor:
-    desc: Validate the SIFTQ TAKT workflow definition.
+    desc: Validate the SIFTQ TAKT workflow definitions.
     cmds:
       - task ai:takt:cli -- workflow doctor siftq
+      - task ai:takt:cli -- workflow doctor issue-refinement
