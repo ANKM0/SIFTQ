@@ -57,3 +57,12 @@ git push -u origin "$(git branch --show-current)"
 - Rebase or merge from `main` only when needed to resolve drift before review.
 - Keep branch names lowercase and hyphenated.
 - Use the commit message format in `.agents/skills/commit-message-format/`.
+
+## Pull Request Language
+
+- Write PR descriptions in Japanese.
+- Keep semantically meaningful tokens such as section headings, status labels,
+  command names, file paths, and closing keywords like `Closes #<issue>` in
+  their conventional form when that preserves GitHub behavior or scanability.
+- Write explanatory prose, bullet details, validation notes, risk notes, and
+  reviewer-facing context in Japanese.
