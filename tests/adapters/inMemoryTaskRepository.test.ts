@@ -4,7 +4,8 @@ import {
   createTask,
   listTasks,
   moveTask,
-  reorderTask
+  reorderTask,
+  updateTaskTitle
 } from "../../src/application/taskOperations";
 import { isTaskVisibleInMatrix } from "../../src/domain/task";
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
@@ -134,6 +135,60 @@ describe("InMemoryTaskRepository", () => {
       { id: firstTask.id, areaId: "do", order: 1 },
       { id: secondTask.id, areaId: "do", order: 2 }
     ]);
+  });
+
+  it("updates task titles without changing id, area, status, or order", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const firstTask = await createTask(repository, { title: "First", areaId: "do" });
+    const task = await createTask(repository, { title: "Original", areaId: "do" });
+
+    const updatedTask = await updateTaskTitle(repository, {
+      taskId: task.id,
+      title: "  Updated  "
+    });
+
+    expect(updatedTask).toEqual({ ...task, title: "Updated" });
+    expect(await listTasks(repository)).toEqual([firstTask, updatedTask]);
+  });
+
+  it("allows duplicate titles during update because tasks are identified by id", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const firstTask = await createTask(repository, { title: "Duplicate", areaId: "do" });
+    const secondTask = await createTask(repository, {
+      title: "Different",
+      areaId: "schedule"
+    });
+
+    await updateTaskTitle(repository, {
+      taskId: secondTask.id,
+      title: "Duplicate"
+    });
+
+    expect((await listTasks(repository)).map((task) => task.title)).toEqual([
+      "Duplicate",
+      "Duplicate"
+    ]);
+    expect(firstTask.id).not.toBe(secondTask.id);
+  });
+
+  it("rejects invalid title updates before mutating a task", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const task = await createTask(repository, { title: "Original", areaId: "do" });
+
+    await expect(
+      updateTaskTitle(repository, { taskId: task.id, title: "   " })
+    ).rejects.toThrow("Task title must not be empty.");
+    await expect(
+      updateTaskTitle(repository, { taskId: task.id, title: "a".repeat(257) })
+    ).rejects.toThrow("Task title must be 256 characters or less.");
+
+    expect(await listTasks(repository)).toEqual([task]);
   });
 
   it("updates status and hides tasks moved to Done or Skipped", async () => {

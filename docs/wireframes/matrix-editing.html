@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIFTQ Wireframe - Cards</title>
+    <title>SIFTQ Wireframe - Editing</title>
     <link rel="stylesheet" href="./matrix-mvp.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <div><h1>SIFTQ</h1><p>State: Cards created</p></div>
+        <div><h1>SIFTQ</h1><p>State: Editing task title</p></div>
         <a class="back-link" href="./index.html">Index</a>
       </header>
       <section class="workspace">
@@ -19,15 +19,24 @@
             <header class="area__header"><div><h2>Do</h2><p>Important / urgent</p></div><span class="count">2 cards</span></header>
             <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
             <ul class="cards">
-              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Fix terminal drop</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
-              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Create UI definition</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+              <li class="card card--selected">
+                <a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Fix terminal drop</span></a>
+                <button class="card-action">Edit</button>
+              </li>
+              <li class="card">
+                <a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Create UI definition</span></a>
+                <button class="card-action">Edit</button>
+              </li>
             </ul>
           </article>
           <article class="area area--schedule">
             <header class="area__header"><div><h2>Schedule</h2><p>Important / not urgent</p></div><span class="count">1 card</span></header>
             <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
             <ul class="cards">
-              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Discuss browser session state</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+              <li class="card">
+                <a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Discuss browser session state</span></a>
+                <button class="card-action">Edit</button>
+              </li>
             </ul>
           </article>
           <article class="area area--delegate area--empty">
@@ -38,12 +47,26 @@
             <header class="area__header"><div><h2>Eliminate</h2><p>Not important / not urgent</p></div><span class="count">1 card</span></header>
             <form class="quick-create"><input placeholder="Task title" /><a href="./matrix-create.html">+</a></form>
             <ul class="cards">
-              <li class="card"><a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Remove 0 cards from terminal areas</span></a><a class="card-action" href="./matrix-editing.html">Edit</a></li>
+              <li class="card">
+                <a class="card__drag-link" href="./matrix-dragging.html"><span class="card__title">Remove 0 cards from terminal areas</span></a>
+                <button class="card-action">Edit</button>
+              </li>
             </ul>
           </article>
         </section>
         <aside class="terminal-drop terminal-drop--done"><h2>Done</h2><p>Drop to hide</p></aside>
       </section>
     </main>
+    <div class="modal-backdrop">
+      <section class="modal" role="dialog" aria-labelledby="edit-title">
+        <h2 id="edit-title">Edit task title</h2>
+        <label>Title <input value="Fix terminal drop" /></label>
+        <p class="form-error">Save is disabled when the trimmed title is empty or over 256 characters.</p>
+        <div class="modal__actions">
+          <button>Cancel</button>
+          <button class="button-primary">Save</button>
+        </div>
+      </section>
+    </div>
   </body>
 </html>

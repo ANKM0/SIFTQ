@@ -3,7 +3,8 @@ import {
   type CreateTaskInput,
   type MoveTaskInput,
   type ReorderTaskInput,
-  type TaskRepository
+  type TaskRepository,
+  type UpdateTaskTitleInput
 } from "../ports/taskRepository";
 
 export async function createTask(
@@ -29,4 +30,11 @@ export async function reorderTask(
   input: ReorderTaskInput
 ): Promise<Task> {
   return repository.reorderTask(input);
+}
+
+export async function updateTaskTitle(
+  repository: TaskRepository,
+  input: UpdateTaskTitleInput
+): Promise<Task> {
+  return repository.updateTaskTitle(input);
 }

@@ -12,7 +12,8 @@ import {
   createTask,
   listTasks,
   moveTask,
-  reorderTask
+  reorderTask,
+  updateTaskTitle
 } from "../application/taskOperations";
 import {
   MATRIX_AREAS,
@@ -63,6 +64,20 @@ export function App({ repository }: AppProps) {
     }
   }
 
+  async function handleUpdateTaskTitle(
+    taskId: Task["id"],
+    title: string
+  ): Promise<string | null> {
+    try {
+      await updateTaskTitle(activeRepository, { taskId, title });
+      await refreshTasks(activeRepository, setTasks);
+
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : "Task could not be updated.";
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const operation = resolveTaskDropOperation(
       tasks,
@@ -89,7 +104,11 @@ export function App({ repository }: AppProps) {
       modifiers={dragModifiers}
       onDragEnd={(event) => void handleDragEnd(event)}
     >
-      <MatrixPage tasks={tasks} onCreateTask={handleCreateTask} />
+      <MatrixPage
+        tasks={tasks}
+        onCreateTask={handleCreateTask}
+        onUpdateTaskTitle={handleUpdateTaskTitle}
+      />
     </DndContext>
   );
 }
@@ -97,9 +116,29 @@ export function App({ repository }: AppProps) {
 type MatrixPageProps = {
   readonly tasks: readonly Task[];
   readonly onCreateTask: (areaId: MatrixAreaId, title: string) => Promise<string | null>;
+  readonly onUpdateTaskTitle: (
+    taskId: Task["id"],
+    title: string
+  ) => Promise<string | null>;
 };
 
-function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
+function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps) {
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  async function handleSaveTitle(title: string): Promise<string | null> {
+    if (editingTask === null) {
+      return "Task could not be updated.";
+    }
+
+    const updateError = await onUpdateTaskTitle(editingTask.id, title);
+
+    if (updateError === null) {
+      setEditingTask(null);
+    }
+
+    return updateError;
+  }
+
   return (
     <main className="matrix-page">
       <header className="matrix-page__header">
@@ -119,6 +158,7 @@ function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
               label={area.label}
               tasks={tasksForArea(tasks, area.id)}
               onCreateTask={(title) => onCreateTask(area.id, title)}
+              onEditTask={setEditingTask}
             />
           ))}
         </section>
@@ -128,6 +168,13 @@ function MatrixPage({ tasks, onCreateTask }: MatrixPageProps) {
           ))}
         </div>
       </section>
+      {editingTask !== null ? (
+        <TaskTitleEditModal
+          task={editingTask}
+          onCancel={() => setEditingTask(null)}
+          onSave={handleSaveTitle}
+        />
+      ) : null}
     </main>
   );
 }
@@ -137,9 +184,10 @@ type AreaPanelProps = {
   readonly label: string;
   readonly tasks: readonly Task[];
   readonly onCreateTask: (title: string) => Promise<string | null>;
+  readonly onEditTask: (task: Task) => void;
 };
 
-function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
+function AreaPanel({ areaId, label, tasks, onCreateTask, onEditTask }: AreaPanelProps) {
   const { isOver, setNodeRef } = useDroppable({ id: areaDropId(areaId) });
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -224,7 +272,9 @@ function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
             No cards
           </li>
         ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onEditTask={onEditTask} />
+          ))
         )}
       </ul>
     </article>
@@ -233,9 +283,10 @@ function AreaPanel({ areaId, label, tasks, onCreateTask }: AreaPanelProps) {
 
 type TaskCardProps = {
   readonly task: Task;
+  readonly onEditTask: (task: Task) => void;
 };
 
-function TaskCard({ task }: TaskCardProps) {
+function TaskCard({ task, onEditTask }: TaskCardProps) {
   const draggable = useDraggable({ id: taskDropId(task.id) });
   const droppable = useDroppable({ id: taskDropId(task.id) });
   const className = [
@@ -261,8 +312,93 @@ function TaskCard({ task }: TaskCardProps) {
       {...draggable.listeners}
       {...draggable.attributes}
     >
-      {task.title}
+      <span className="task-card__title">{task.title}</span>
+      <button
+        className="task-card__edit"
+        type="button"
+        onClick={() => onEditTask(task)}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        Edit
+      </button>
     </li>
+  );
+}
+
+type TaskTitleEditModalProps = {
+  readonly task: Task;
+  readonly onCancel: () => void;
+  readonly onSave: (title: string) => Promise<string | null>;
+};
+
+function TaskTitleEditModal({ task, onCancel, onSave }: TaskTitleEditModalProps) {
+  const [title, setTitle] = useState(task.title);
+  const [error, setError] = useState<string | null>(null);
+  const trimmedTitle = title.trim();
+  const isBlank = trimmedTitle.length === 0;
+  const isTitleTooLong = title.length > TASK_TITLE_MAX_LENGTH;
+  const validationError = isBlank
+    ? "Task title must not be empty."
+    : isTitleTooLong
+      ? `Title must be ${TASK_TITLE_MAX_LENGTH} characters or less.`
+      : null;
+  const canSave = validationError === null;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSave) {
+      setError(validationError);
+      return;
+    }
+
+    setError(await onSave(title));
+  }
+
+  return (
+    <div className="task-edit-modal" role="presentation">
+      <section
+        aria-labelledby="task-edit-modal-title"
+        aria-modal="true"
+        className="task-edit-modal__dialog"
+        role="dialog"
+      >
+        <h2 id="task-edit-modal-title">Edit task title</h2>
+        <form className="task-edit-form" onSubmit={(event) => void handleSubmit(event)}>
+          <label className="task-edit-form__label">
+            Title
+            <input
+              aria-label="Task title"
+              className="task-edit-form__input"
+              type="text"
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setError(null);
+              }}
+            />
+          </label>
+          {validationError !== null ? (
+            <p className="task-edit-form__error" role="alert">
+              {validationError}
+            </p>
+          ) : null}
+          {error !== null ? (
+            <p className="task-edit-form__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="task-edit-form__actions">
+            <button type="button" onClick={onCancel}>
+              Cancel
+            </button>
+            <button disabled={!canSave} type="submit">
+              Save
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 

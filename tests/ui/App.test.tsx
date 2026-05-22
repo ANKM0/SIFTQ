@@ -116,7 +116,10 @@ describe("App", () => {
     expect(taskTitlesIn("Do tasks")).toEqual(["First", "Second"]);
     expect(taskTitlesIn("Schedule tasks")).toEqual(["Planned"]);
     expect(screen.getByLabelText("Do task count").textContent).toBe("2 cards");
-    expect(screen.getByText("First").className).toContain("task-card");
+    expect(screen.getByText("First").closest(".task-card")).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: "Edit" })[0]?.closest(".task-card")
+    ).toBeTruthy();
   });
 
   it("keeps each area form independent while updating area-specific card lists", async () => {
@@ -198,6 +201,107 @@ describe("App", () => {
     expect(screen.getByLabelText("New task title for Do")).toHaveProperty(
       "value",
       ""
+    );
+  });
+
+  it("opens the title edit modal from a task card and saves an updated title", async () => {
+    const repository = new InMemoryTaskRepository();
+
+    await createTask(repository, { areaId: "do", title: "Original title" });
+
+    render(<App repository={repository} />);
+
+    expect(await screen.findByText("Original title")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByRole("dialog", { name: "Edit task title" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Task title"), {
+      target: { value: "  Updated title  " }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Updated title")).toBeTruthy();
+    expect(screen.queryByText("Original title")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Edit task title" })).toBeNull();
+    expect((await repository.listTasks())[0]).toMatchObject({
+      title: "Updated title",
+      areaId: "do",
+      status: "active",
+      order: 0
+    });
+  });
+
+  it("closes the title edit modal on cancel without changing the task", async () => {
+    const repository = new InMemoryTaskRepository();
+
+    await createTask(repository, { areaId: "do", title: "Original title" });
+
+    render(<App repository={repository} />);
+
+    expect(await screen.findByText("Original title")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Task title"), {
+      target: { value: "Draft title" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Edit task title" })).toBeNull();
+    expect(screen.getByText("Original title")).toBeTruthy();
+    expect((await repository.listTasks())[0]?.title).toBe("Original title");
+  });
+
+  it("disables title update save while the title is blank or too long", async () => {
+    const repository = new InMemoryTaskRepository();
+
+    await createTask(repository, { areaId: "do", title: "Original title" });
+
+    render(<App repository={repository} />);
+
+    expect(await screen.findByText("Original title")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const input = screen.getByLabelText("Task title");
+    const saveButton = screen.getByRole("button", { name: "Save" });
+
+    fireEvent.change(input, { target: { value: "   " } });
+
+    expect(saveButton).toHaveProperty("disabled", true);
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Task title must not be empty."
+    );
+
+    fireEvent.change(input, { target: { value: "a".repeat(257) } });
+
+    expect(saveButton).toHaveProperty("disabled", true);
+    expect(input).toHaveProperty("value", "a".repeat(257));
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Title must be 256 characters or less."
+    );
+    expect((await repository.listTasks())[0]?.title).toBe("Original title");
+  });
+
+  it("allows duplicate titles when editing a task", async () => {
+    const repository = new InMemoryTaskRepository();
+
+    await createTask(repository, { areaId: "do", title: "Duplicate" });
+    await createTask(repository, { areaId: "do", title: "Unique" });
+
+    render(<App repository={repository} />);
+
+    expect(await screen.findByText("Unique")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[1]!);
+    fireEvent.change(screen.getByLabelText("Task title"), {
+      target: { value: "Duplicate" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(taskTitlesIn("Do tasks")).toEqual(["Duplicate", "Duplicate"])
     );
   });
 
@@ -295,7 +399,7 @@ describe("App", () => {
 
 function taskTitlesIn(listName: string): string[] {
   return Array.from(
-    screen.getByRole("list", { name: listName }).querySelectorAll(".task-card")
+    screen.getByRole("list", { name: listName }).querySelectorAll(".task-card__title")
   ).map((item) => item.textContent ?? "");
 }
 

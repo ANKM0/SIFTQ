@@ -4,7 +4,8 @@ import {
   createTask,
   listTasks,
   moveTask,
-  reorderTask
+  reorderTask,
+  updateTaskTitle
 } from "../../src/application/taskOperations";
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
 
@@ -55,6 +56,43 @@ describe("task operations", () => {
 
     expect(firstTask.title).toBe(secondTask.title);
     expect(firstTask.id).not.toBe(secondTask.id);
+  });
+
+  it("updates only the task title through the repository port", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const task = await createTask(repository, {
+      areaId: "schedule",
+      title: "Original"
+    });
+
+    const updatedTask = await updateTaskTitle(repository, {
+      taskId: task.id,
+      title: "  Revised  "
+    });
+
+    expect(updatedTask).toEqual({
+      ...task,
+      title: "Revised"
+    });
+    expect(await listTasks(repository)).toEqual([updatedTask]);
+  });
+
+  it("rejects invalid updated titles and keeps the original task", async () => {
+    const repository = new InMemoryTaskRepository({
+      generateId: createTestIdGenerator()
+    });
+    const task = await createTask(repository, { areaId: "do", title: "Original" });
+
+    await expect(
+      updateTaskTitle(repository, { taskId: task.id, title: "   " })
+    ).rejects.toThrow("Task title must not be empty.");
+    await expect(
+      updateTaskTitle(repository, { taskId: task.id, title: "a".repeat(257) })
+    ).rejects.toThrow("Task title must be 256 characters or less.");
+
+    expect(await listTasks(repository)).toEqual([task]);
   });
 
   it("moves tasks between areas and reorders tasks inside an area", async () => {

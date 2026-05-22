@@ -9,7 +9,8 @@ import {
   type CreateTaskInput,
   type MoveTaskInput,
   type ReorderTaskInput,
-  type TaskRepository
+  type TaskRepository,
+  type UpdateTaskTitleInput
 } from "../ports/taskRepository";
 
 type IdGenerator = () => TaskId;
@@ -83,6 +84,18 @@ export class InMemoryTaskRepository implements TaskRepository {
     this.tasks = insertTaskAt(remainingTasks, task, task.areaId, input.toIndex);
 
     return this.findTask(input.taskId);
+  }
+
+  async updateTaskTitle(input: UpdateTaskTitleInput): Promise<Task> {
+    const task = this.findTask(input.taskId);
+    const title = normalizeTaskTitle(input.title);
+    const updatedTask: Task = { ...task, title };
+
+    this.tasks = this.tasks.map((candidate) =>
+      candidate.id === input.taskId ? updatedTask : candidate
+    );
+
+    return updatedTask;
   }
 
   private findTask(taskId: TaskId): Task {

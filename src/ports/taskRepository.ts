@@ -17,9 +17,15 @@ export type ReorderTaskInput = {
   readonly toIndex: number;
 };
 
+export type UpdateTaskTitleInput = {
+  readonly taskId: TaskId;
+  readonly title: string;
+};
+
 export type TaskRepository = {
   createTask(input: CreateTaskInput): Promise<Task>;
   listTasks(): Promise<Task[]>;
   moveTask(input: MoveTaskInput): Promise<Task>;
   reorderTask(input: ReorderTaskInput): Promise<Task>;
+  updateTaskTitle(input: UpdateTaskTitleInput): Promise<Task>;
 };
