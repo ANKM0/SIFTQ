@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import wireframeIndex from "../../docs/wireframes/index.html?raw";
 import wireframeReadme from "../../docs/wireframes/README.md?raw";
 import draggingWireframe from "../../docs/wireframes/matrix-dragging.html?raw";
+import editingWireframe from "../../docs/wireframes/matrix-editing.html?raw";
 import matrixWireframe from "../../docs/wireframes/matrix-mvp.html?raw";
 import terminalDropWireframe from "../../docs/wireframes/matrix-terminal-drop.html?raw";
 import cardsWireframe from "../../docs/wireframes/matrix-with-cards.html?raw";
@@ -27,20 +28,26 @@ describe("Matrix MVP wireframes", () => {
     expect(matrixWireframe).toContain('class="matrix-board"');
   });
 
-  it("keeps task cards title-only and excludes editing UI from v1 wireframes", () => {
+  it("keeps task cards title-only while including explicit title editing UI", () => {
     const wireframeCorpus = [
       wireframeIndex,
       matrixWireframe,
       cardsWireframe,
+      editingWireframe,
       draggingWireframe,
       terminalDropWireframe
     ].join("\n");
 
     expect(wireframeCorpus).toContain("card__title");
     expect(wireframeCorpus).not.toContain("card__meta");
-    expect(wireframeCorpus).not.toContain("card-action");
-    expect(wireframeCorpus).not.toContain("matrix-editing.html");
-    expect(wireframeCorpus).not.toContain(">Edit<");
+    expect(wireframeIndex).toContain("matrix-editing.html");
+    expect(editingWireframe).toContain("card-action");
+    expect(editingWireframe).toContain(">Edit<");
+    expect(editingWireframe).toContain('role="dialog"');
+    expect(editingWireframe).toContain("Edit task title");
+    expect(editingWireframe).toContain(">Save<");
+    expect(editingWireframe).toContain(">Cancel<");
+    expect(editingWireframe).not.toContain("Description");
   });
 
   it("documents terminal drops as hidden from the normal matrix display", () => {
@@ -52,6 +59,7 @@ describe("Matrix MVP wireframes", () => {
   it("preserves CoDD traceability for the HTML wireframe set", () => {
     expect(wireframeReadme).toContain("node_id: design:matrix-mvp-wireframe");
     expect(wireframeReadme).toContain("matrix-mvp.html");
+    expect(wireframeReadme).toContain("matrix-editing.html");
     expect(wireframeReadme).toContain("title-only task cards");
   });
 });
