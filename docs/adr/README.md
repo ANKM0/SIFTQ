@@ -17,6 +17,8 @@ codd:
 This directory contains Architecture Decision Records (ADRs) for long-lived
 SIFTQ workflow, governance, and architecture decisions.
 
+The ADR index contract is covered by `tests/docs/adrIndex.test.ts`.
+
 ## ADRs
 
 | ADR | Title | Status |

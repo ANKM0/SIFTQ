@@ -93,8 +93,11 @@ trigger for TAKT in this repository.
 - Treat `task ci` as the normal completion gate.
 - Include `task codd:validate` evidence for documentation and governance work.
 - Follow branch and commit rules from `docs/contributing/`.
-- Leave unrelated files and untracked user work untouched.
+- Leave unrelated files and untracked local work untouched.
 - Keep TAKT and future schedulers outside SIFTQ runtime dependencies.
+
+The TAKT workflow contract is covered by
+`tests/takt/taktWorkflowContracts.test.ts`.
 
 ## Parallel Execution
 

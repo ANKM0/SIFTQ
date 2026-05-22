@@ -36,3 +36,5 @@ The wireframes intentionally do not define Done / Skipped list views, restore
 flows, settings, persistence beyond the current browser session, GitHub
 integration, CLI behavior, Rust backend commands, Tauri packaging, SQLite
 storage, or additional task card fields.
+
+The HTML wireframe contract is covered by `tests/docs/wireframeContract.test.ts`.
