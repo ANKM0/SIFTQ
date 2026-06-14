@@ -178,8 +178,19 @@ def _sections(text: str) -> dict[str, list[str]]:
     sections: dict[str, list[str]] = {}
     current_heading: str | None = None
     current_lines: list[str] = []
+    in_fence = False
 
     for raw_line in text.splitlines():
+        if raw_line.strip().startswith("```"):
+            in_fence = not in_fence
+            if current_heading is not None:
+                current_lines.append(raw_line)
+            continue
+        if in_fence:
+            if current_heading is not None:
+                current_lines.append(raw_line)
+            continue
+
         heading = _heading(raw_line)
         if heading is not None:
             if current_heading is not None:
@@ -213,7 +224,9 @@ def _first_section_items(sections: Mapping[str, list[str]], names: Iterable[str]
     aliases = tuple(names)
     for heading, lines in sections.items():
         if any(alias in heading for alias in aliases):
-            return _checklist_items(lines)
+            items = _checklist_items(lines)
+            if items:
+                return items
     return []
 
 
