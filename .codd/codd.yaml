@@ -34,7 +34,7 @@ graph:
 dag:
   common_node_patterns:
     - "tests/docs/*.test.ts"
-    - "tests/takt/*.test.ts"
+    - "tests/sympohy/*.test.ts"
 
 bands:
   green:

@@ -1,8 +1,5 @@
 version: "3"
 
-vars:
-  TAKT_VERSION: "0.42.0"
-
 tasks:
   default:
     desc: List available tasks.
@@ -14,6 +11,7 @@ tasks:
     deps:
       - setup:python
       - setup:frontend
+      - setup:sympohy
 
   setup:python:
     desc: Install Python dependencies with uv.
@@ -29,6 +27,11 @@ tasks:
     desc: Install frontend dependencies from the lockfile.
     cmds:
       - pnpm install --frozen-lockfile
+
+  setup:sympohy:
+    desc: Validate local prerequisites for the repo-local sympohy issue runner.
+    cmds:
+      - uv run python -m scripts.sympohy setup
 
   ci:
     desc: Run the local CI gate.
@@ -68,6 +71,7 @@ tasks:
     desc: Run Vitest.
     cmds:
       - pnpm test
+      - uv run python -m unittest discover tests/sympohy -p "*_test.py"
 
   ci:build:
     desc: Build the frontend.
@@ -104,39 +108,37 @@ tasks:
     cmds:
       - uv run codd elicit
 
-  setup:takt:
-    desc: Warm the pinned TAKT package through aqua-managed pnpm.
+  ai:sympohy:
+    desc: Run a single GitHub Issue through the sympohy automation, for example task ai:sympohy -- '#74'.
     cmds:
-      - aqua exec -- pnpm dlx takt@{{.TAKT_VERSION}} --version
+      - uv run python -m scripts.sympohy run {{.CLI_ARGS}}
 
-  ai:takt:cli:
-    desc: Run the pinned TAKT CLI through aqua-managed pnpm.
+  ai:sympohy:refine:
+    desc: Inspect a GitHub Issue for the latest complete AC/DoD set, for example task ai:sympohy:refine -- '#74'.
     cmds:
-      - aqua exec -- pnpm dlx takt@{{.TAKT_VERSION}} {{.CLI_ARGS}}
+      - uv run python -m scripts.sympohy refine {{.CLI_ARGS}}
 
-  ai:takt:
-    desc: Run a GitHub Issue through TAKT pipeline mode, for example task ai:takt -- '#46'.
+  ai:sympohy:doctor:
+    desc: Validate sympohy config, labels, systemd templates, Codex, hooks, and GitHub prerequisites.
     cmds:
-      - task ai:takt:cli -- --pipeline --workflow siftq {{.CLI_ARGS}}
+      - uv run python -m scripts.sympohy doctor
 
-  ai:takt:refine:
-    desc: Queue a GitHub Issue for TAKT refinement, for example task ai:takt:refine -- '#46'.
+  ai:sympohy:labels:sync:
+    desc: Create/update sympohy labels and delete legacy ai:* labels.
     cmds:
-      - task ai:takt:cli -- --workflow issue-refinement add {{.CLI_ARGS}}
-      - task ai:takt:run
+      - uv run python -m scripts.sympohy labels-sync
 
-  ai:takt:add:
-    desc: Queue a GitHub Issue in TAKT, for example task ai:takt:add -- '#46'.
+  ai:sympohy:watch:
+    desc: Watch open GitHub issues and start up to 10 independent sympohy workers.
     cmds:
-      - task ai:takt:cli -- add {{.CLI_ARGS}}
+      - uv run python -m scripts.sympohy watch
 
-  ai:takt:run:
-    desc: Run pending TAKT tasks.
+  ai:sympohy:systemd:install:
+    desc: Install and start the systemd --user timer that runs sympohy every minute.
     cmds:
-      - task ai:takt:cli -- run {{.CLI_ARGS}}
+      - uv run python -m scripts.sympohy systemd-install
 
-  ai:takt:doctor:
-    desc: Validate the SIFTQ TAKT workflow definitions.
+  ai:sympohy:systemd:status:
+    desc: Show sympohy systemd --user timer/service status and recent logs.
     cmds:
-      - task ai:takt:cli -- workflow doctor siftq
-      - task ai:takt:cli -- workflow doctor issue-refinement
+      - uv run python -m scripts.sympohy systemd-status

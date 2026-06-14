@@ -15,7 +15,9 @@ coverage/
 .codd/dag.json
 docs/test/verify_report.md
 
-# TAKT local task state and run logs
-.takt/tasks.yaml
-.takt/tasks/
-.takt/runs/
+# sympohy local worktrees and run logs
+.sympohy/worktrees/
+.sympohy/runs/
+
+# Legacy local TAKT state retained only to keep old generated files untracked
+.takt/

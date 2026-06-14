@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-const fixtureDirectory = ".takt/markdown-ci-contract";
+const fixtureDirectory = ".sympohy/runs/markdown-ci-contract";
 const fixturePath = `${fixtureDirectory}/bad.md`;
 
 describe("Markdown CI contract", () => {
@@ -11,7 +11,7 @@ describe("Markdown CI contract", () => {
     rmSync(fixtureDirectory, { recursive: true, force: true });
   });
 
-  it("excludes generated TAKT run artifacts from Markdown checks", () => {
+  it("excludes generated sympohy run artifacts from Markdown checks", () => {
     mkdirSync(fixtureDirectory, { recursive: true });
     writeFileSync(fixturePath, "# Generated\n\ntrailing whitespace  ", "utf8");
 

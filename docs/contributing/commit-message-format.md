@@ -11,7 +11,7 @@ codd:
     - id: design:issue-12-ci-cd
       relation: depends_on
       semantic: workflow
-    - id: design:takt-ai-workflow
+    - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: workflow
 ---
