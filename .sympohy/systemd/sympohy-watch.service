@@ -1,0 +1,7 @@
+[Unit]
+Description=SIFTQ sympohy issue watcher
+
+[Service]
+Type=oneshot
+WorkingDirectory=@@REPO_ROOT@@
+ExecStart=/usr/bin/env bash -lc 'cd @@REPO_ROOT@@ && exec task ai:sympohy:watch'

@@ -11,7 +11,7 @@ codd:
       relation: depends_on
       semantic: decision
   depended_by:
-    - id: design:takt-ai-workflow
+    - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: workflow
 ---

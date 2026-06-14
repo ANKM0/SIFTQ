@@ -20,7 +20,10 @@ codd:
     - id: design:takt-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: automation
-    - id: design:takt-ai-workflow
+    - id: design:sympohy-ticket-driven-ai-runner-adr
+      relation: depends_on
+      semantic: automation
+    - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: automation
 ---
