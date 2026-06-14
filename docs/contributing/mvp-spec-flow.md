@@ -16,6 +16,12 @@ SIFTQ の MVP 開発では、LLM に実装を依頼する前に、要件、設�
 実装へ直接飛ばず、外部から観測できる振る舞いと UI 契約を先に
 固定することで、実装イメージのぶれを減らす。
 
+## CoDD Traceability
+
+この文書の CoDD node は `design:mvp-spec-flow` とする。
+SIFTQ の system requirement anchor である `req:siftq-system` に依存し、
+依存関係の semantic は `governance` とする。
+
 ## 最小フロー
 
 基本フローは次の順序とする。
