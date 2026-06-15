@@ -27,7 +27,7 @@ SIFTQ の system requirement anchor である `req:siftq-system` に依存し、
 基本フローは次の順序とする。
 
 ```text
-Requirements -> Design -> Wireframe（UI 変更時） -> ADR Decision -> Implementation Request
+Requirements -> Design -> Tests + Implementation
 ```
 
 必須文書は原則として次の 2 つにする。
