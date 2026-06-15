@@ -23,8 +23,7 @@ import {
 } from "../application/taskOperations";
 import {
   INITIAL_AREAS,
-  MATRIX_AREAS,
-  TERMINAL_AREAS,
+  type Area,
   type MatrixAreaId,
   type TerminalAreaId
 } from "../domain/area";
@@ -172,6 +171,8 @@ export function App({ repository, settingsRepository }: AppProps) {
     }
   }
 
+  const areas = areasWithLabels(areaLabels);
+
   return (
     <DndContext
       autoScroll={false}
@@ -180,7 +181,7 @@ export function App({ repository, settingsRepository }: AppProps) {
     >
       {page === "matrix" ? (
         <MatrixPage
-          areaLabels={areaLabels}
+          areas={areas}
           tasks={tasks}
           onCreateTask={handleCreateTask}
           onOpenSettings={() => setPage("settings")}
@@ -199,7 +200,7 @@ export function App({ repository, settingsRepository }: AppProps) {
 }
 
 type MatrixPageProps = {
-  readonly areaLabels: AreaLabelSettings;
+  readonly areas: readonly Area[];
   readonly tasks: readonly Task[];
   readonly onCreateTask: (areaId: MatrixAreaId, title: string) => Promise<string | null>;
   readonly onOpenSettings: () => void;
@@ -210,13 +211,16 @@ type MatrixPageProps = {
 };
 
 function MatrixPage({
-  areaLabels,
+  areas,
   tasks,
   onCreateTask,
   onOpenSettings,
   onUpdateTaskTitle
 }: MatrixPageProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const matrixAreas = areas.filter(isMatrixAreaModel);
+  const skippedArea = areas.find((area) => area.id === "skipped");
+  const doneArea = areas.find((area) => area.id === "done");
 
   async function handleSaveTitle(title: string): Promise<string | null> {
     if (editingTask === null) {
@@ -246,20 +250,19 @@ function MatrixPage({
       </header>
       <section aria-label="Matrix workspace" className="matrix-workspace">
         <div className="matrix-workspace__status matrix-workspace__status--skipped">
-          {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
+          {skippedArea === undefined ? null : (
             <StatusDropArea
-              key={area.id}
-              areaId={area.id}
-              label={areaLabels[area.id]}
+              areaId="skipped"
+              label={skippedArea.label}
             />
-          ))}
+          )}
         </div>
         <section aria-label="Task matrix" className="matrix-grid">
-          {MATRIX_AREAS.map((area) => (
+          {matrixAreas.map((area) => (
             <AreaPanel
               key={area.id}
               areaId={area.id}
-              label={areaLabels[area.id]}
+              label={area.label}
               tasks={tasksForArea(tasks, area.id)}
               onCreateTask={(title) => onCreateTask(area.id, title)}
               onEditTask={setEditingTask}
@@ -267,13 +270,12 @@ function MatrixPage({
           ))}
         </section>
         <div className="matrix-workspace__status matrix-workspace__status--done">
-          {TERMINAL_AREAS.filter((area) => area.id === "done").map((area) => (
+          {doneArea === undefined ? null : (
             <StatusDropArea
-              key={area.id}
-              areaId={area.id}
-              label={areaLabels[area.id]}
+              areaId="done"
+              label={doneArea.label}
             />
-          ))}
+          )}
         </div>
       </section>
       {editingTask !== null ? (
@@ -654,4 +656,8 @@ function tasksForArea(tasks: readonly Task[], areaId: MatrixAreaId): Task[] {
   return tasks
     .filter((task) => task.areaId === areaId && isTaskVisibleInMatrix(task))
     .sort((left, right) => left.order - right.order);
+}
+
+function isMatrixAreaModel(area: Area): area is Area & { id: MatrixAreaId } {
+  return area.kind === "matrix";
 }
