@@ -92,6 +92,29 @@ Matrix areaは次の4つとし、2x2マトリックスとして表示する。
 - `task frontend:dev` でローカルブラウザからMVPを確認できる。
 - `task ci:build` で静的SPAとしてビルドできる。
 
+## v7 Settings Page Scope
+
+v7では、area labelを変更するための設定ページを追加する。対象は既存の
+area構成に限定し、タスクカードの項目追加、area数の変更、Done / Skippedの
+一覧表示や復元操作は含めない。
+
+設定ページは次のlabelを編集対象にする。
+
+- 4つのmatrix area label: Do、Schedule、Delegate、Eliminate。
+- Done label。
+- Skipped label。
+
+設定ページは次を満たす。
+
+- ユーザーが変更したarea labelを永続化する。
+- 永続化されたarea labelは、アプリケーション再起動後もマトリックスページに
+  反映する。
+- trim後に空になるlabelは保存できない。
+- 空labelの保存を試みた場合は、既存の保存済みlabelを壊さない。
+- デフォルト復元操作を提供し、4つのmatrix area label、Done label、
+  Skipped labelを初期値へ戻せる。
+- デフォルト復元後のlabelも永続化対象とする。
+
 ## Task Card Requirements
 
 v1 MVPのタスクカードは、次の必須情報を持つ。
