@@ -14,6 +14,9 @@ codd:
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: decision
+    - id: design:issue-82-stale-running-inspection
+      relation: depends_on
+      semantic: decision
 ---
 
 # ADR 0013: sympohy for Ticket-Driven AI Runner

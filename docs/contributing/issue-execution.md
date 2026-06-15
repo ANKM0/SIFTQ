@@ -16,6 +16,10 @@ codd:
     - id: design:commit-message-format
       relation: depends_on
       semantic: workflow
+  depended_by:
+    - id: design:issue-82-stale-running-inspection
+      relation: depends_on
+      semantic: automation
 ---
 
 # sympohy Issue Execution

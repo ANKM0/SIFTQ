@@ -58,6 +58,18 @@ class SympohyCoreTest(unittest.TestCase):
             )
         )
 
+    def test_running_issue_with_phase_is_currently_not_candidate(self) -> None:
+        issue = {
+            "state": "OPEN",
+            "labels": [
+                {"name": "enhancement"},
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:implement"},
+            ],
+        }
+
+        self.assertFalse(is_candidate_issue(issue))
+
     def test_label_transition_keeps_one_status_and_one_phase(self) -> None:
         labels = transition_labels(
             ["bug", "sympohy:pending", "sympohy:phase:triage"],
@@ -69,6 +81,21 @@ class SympohyCoreTest(unittest.TestCase):
             labels,
             ("bug", "sympohy:phase:implement", "sympohy:running"),
         )
+
+    def test_label_transition_removes_stale_status_and_phase_labels(self) -> None:
+        labels = transition_labels(
+            [
+                "bug",
+                "sympohy:pending",
+                "sympohy:running",
+                "sympohy:phase:triage",
+                "sympohy:phase:implement",
+            ],
+            status="sympohy:blocked",
+            phase="fix",
+        )
+
+        self.assertEqual(labels, ("bug", "sympohy:blocked", "sympohy:phase:fix"))
 
     def test_review_json_blocks_critical_high_and_medium_findings(self) -> None:
         result = parse_review_json(
