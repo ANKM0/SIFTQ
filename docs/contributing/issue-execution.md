@@ -20,6 +20,9 @@ codd:
     - id: design:issue-82-stale-running-inspection
       relation: depends_on
       semantic: automation
+    - id: design:issue-73-taqt-takt-inventory
+      relation: depends_on
+      semantic: active-workflow
 ---
 
 # sympohy Issue Execution

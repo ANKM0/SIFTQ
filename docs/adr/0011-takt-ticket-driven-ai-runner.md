@@ -10,6 +10,10 @@ codd:
     - id: design:taskfile-command-runner-adr
       relation: depends_on
       semantic: automation
+  depended_by:
+    - id: design:issue-73-taqt-takt-inventory
+      relation: depends_on
+      semantic: historical-context
 ---
 
 # ADR 0011: TAKT for Ticket-Driven AI Runner

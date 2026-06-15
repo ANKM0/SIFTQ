@@ -26,6 +26,9 @@ codd:
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: automation
+    - id: design:issue-73-taqt-takt-inventory
+      relation: depends_on
+      semantic: command-entrypoint
 ---
 
 # ADR 0009: Taskfile for Command Runner
