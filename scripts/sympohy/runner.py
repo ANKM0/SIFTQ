@@ -354,7 +354,10 @@ def watch(config: SympohyConfig) -> int:
         run_log_root=config.run_log_root,
         stale_status_after_minutes=config.stale_status_after_minutes,
     )
-    selected = candidates[: config.max_workers]
+    selected = sorted(
+        candidates,
+        key=_watch_candidate_priority,
+    )[: config.max_workers]
     processes: list[subprocess.Popen[bytes]] = []
 
     for issue in selected:
@@ -400,6 +403,15 @@ def watch(config: SympohyConfig) -> int:
         )
 
     return 0 if all(process.poll() in {None, 0} for process in processes) else 1
+
+
+def _watch_candidate_priority(issue: Mapping[str, object]) -> int:
+    labels = set(_label_names(issue.get("labels", [])))
+    if "sympohy:running" in labels:
+        return 0
+    if "sympohy:pending" in labels:
+        return 1
+    return 2
 
 
 def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
@@ -1539,11 +1551,11 @@ def _run_hooks(
     logical_step: int | None = None,
     total_logical_steps: int | None = None,
 ) -> int:
-    for command in hooks:
+    for hook_index, command in enumerate(hooks, start=1):
         attempts = 0
         while True:
             attempts += 1
-            log_path = log_dir / f"hook-{attempts}.log"
+            log_path = log_dir / f"hook-{hook_index}-{attempts}.log"
             if state is not None:
                 progress: dict[str, object] = {
                     "message": "running verification hook",
@@ -1576,7 +1588,7 @@ def _run_hooks(
                     f"Inspect {log_path} and fix the cause, then stop.",
                 ],
                 cwd=cwd,
-                log_path=log_dir / f"hook-fix-{attempts}.log",
+                log_path=log_dir / f"hook-fix-{hook_index}-{attempts}.log",
                 heartbeat=state.heartbeat if state is not None else None,
             )
     return 0
@@ -2302,6 +2314,8 @@ def _existing_run_refusal_reason(
     branch = f"issue-{issue.number}-sympohy"
     if _branch_exists(branch):
         return f"existing branch found at {branch}; use resume"
+    if _remote_branch_exists(branch):
+        return f"existing remote branch found at origin/{branch}; use resume"
     return None
 
 

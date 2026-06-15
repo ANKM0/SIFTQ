@@ -23,6 +23,7 @@ from scripts.sympohy.runner import (
     _pull_request_exists,
     _resume_fix_phase,
     _run_final_verifier_and_merge,
+    _run_hooks,
     ensure_worktree,
     resume_issue,
     run_issue,
@@ -107,6 +108,50 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch(
                     "scripts.sympohy.runner.list_candidate_issues",
                     return_value=[issue],
+                ),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.subprocess.Popen") as popen,
+            ):
+                popen.return_value.poll.return_value = None
+
+                result = watch(config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        command = popen.call_args.args[0]
+        self.assertEqual(command[-2:], ["resume", "#82"])
+
+    def test_watch_prioritizes_stale_running_before_new_candidates(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=5,
+                retry_max_attempts=3,
+            )
+            new_issue = {
+                "number": 81,
+                "state": "OPEN",
+                "labels": [{"name": "enhancement"}],
+            }
+            stale_running = {
+                "number": 82,
+                "state": "OPEN",
+                "labels": [
+                    {"name": "sympohy:running"},
+                    {"name": "sympohy:phase:implement"},
+                ],
+            }
+
+            with (
+                patch(
+                    "scripts.sympohy.runner.list_candidate_issues",
+                    return_value=[new_issue, stale_running],
                 ),
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
@@ -1358,6 +1403,49 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["status"], "blocked")
         self.assertIn("use resume", state["last_known_progress"]["cause"])
 
+    def test_direct_run_refuses_existing_remote_issue_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            log_dir = config.run_log_root / "issue-82"
+            issue = Issue(
+                number=82,
+                title="Existing remote branch",
+                body="""
+## AC
+- [ ] avoid duplicate remote branch
+
+## DoD
+- [ ] operator is directed to resume
+""",
+                labels=(),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner._branch_exists", return_value=False),
+                patch("scripts.sympohy.runner._remote_branch_exists", return_value=True),
+                patch("scripts.sympohy.runner.ensure_worktree") as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = run_issue("#82", config)
+
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:triage"),
+            status="sympohy:blocked",
+            phase="triage",
+            cwd=None,
+        )
+        self.assertIn("origin/issue-82-sympohy", comment.call_args.args[1])
+        self.assertEqual(state["status"], "blocked")
+        self.assertIn("origin/issue-82-sympohy", state["last_known_progress"]["cause"])
+
     def test_ensure_worktree_recovers_existing_issue_branch(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -1514,6 +1602,34 @@ class SympohyRunnerTest(unittest.TestCase):
                 ["git", "commit", "--allow-empty", "-m", subject],
             ],
         )
+
+    def test_run_hooks_uses_distinct_log_paths_per_hook(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                return_value=0,
+            ) as run_command:
+                result = _run_hooks(
+                    ("echo first", "echo second"),
+                    retry_max_attempts=1,
+                    cwd=cwd,
+                    log_dir=log_dir,
+                )
+
+            self.assertEqual(result, 0)
+            self.assertTrue((log_dir / "hook-1-1.log").exists())
+            self.assertTrue((log_dir / "hook-2-1.log").exists())
+            stdout_names = [
+                Path(call.kwargs["stdout"].name).name
+                for call in run_command.call_args_list
+            ]
+            self.assertEqual(stdout_names, ["hook-1-1.log", "hook-2-1.log"])
 
     def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
         with (

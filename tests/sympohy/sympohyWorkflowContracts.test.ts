@@ -76,7 +76,8 @@ describe("sympohy watcher contract", () => {
 
   it("limits parallel issue starts to ten and uses independent worktrees", () => {
     expect(config).toContain("max_workers: 10");
-    expect(runner).toContain("candidates[: config.max_workers]");
+    expect(runner).toContain("_watch_candidate_priority");
+    expect(runner).toContain("[: config.max_workers]");
     expect(runner).toContain("git\", \"worktree\", \"add");
   });
 });
