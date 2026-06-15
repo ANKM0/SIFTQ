@@ -260,8 +260,25 @@ Review results are posted to the PR so blocking findings and fix status are
 traceable.
 
 Before merge, a final verifier Codex pass must return JSON confirming AC/DoD
-satisfaction and recommending merge. `sympohy` then marks the PR ready, waits
-for GitHub checks, and squash merges through the PR with branch deletion.
+satisfaction and recommending `merge` or `block`. `merge` responses must include
+an empty `findings[]` array. `block` responses must include a non-empty
+`findings[]` array whose entries provide `kind`, `summary`, `evidence`, and
+`suggested_fix` fields so the runner can feed the result into automated fixing.
+Each verifier attempt is persisted as `final-verifier-<attempt>.json`; the
+runner also refreshes `final-verifier.json` with the latest attempt for
+compatibility with existing tooling.
+`kind` is one of `acceptance_criteria`, `definition_of_done`, `verification`,
+`reviewability`, or `other`. Valid non-empty verifier findings move the issue
+to `sympohy:phase:fix` with `fix_source=final_verifier`, up to
+`final_verifier_fix_max_attempts` configured in `.sympohy/config.yaml` (default
+`2`). After hooks pass for a final-verifier fix, `sympohy` commits and pushes
+the fix, reruns adversarial review, and only then reruns the final verifier.
+Missing, empty, or schema-invalid block findings add `sympohy:blocked` instead
+of starting a fix. If the final verifier still reports blocking findings after
+the configured fix attempts, `sympohy` blocks the issue instead of starting
+another fix.
+`sympohy` then marks the PR ready, waits for GitHub checks, and squash merges
+through the PR with branch deletion when the final gate allows merge.
 
 Successful merge adds `sympohy:done`, closes the issue, removes the issue
 worktree, and keeps `.sympohy/runs/*` logs. Blocked runs keep both the worktree

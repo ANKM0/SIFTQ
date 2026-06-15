@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
-from scripts.sympohy.core import parse_review_json
+from scripts.sympohy.core import parse_final_verifier_block_findings, parse_review_json
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
@@ -25,6 +25,7 @@ from scripts.sympohy.runner import (
     _pull_request_exists,
     _resume_fix_phase,
     _resume_late_phase,
+    _run_final_verifier_fix_round,
     _run_final_verifier_and_merge,
     _run_command_with_heartbeat,
     _run_hooks,
@@ -170,6 +171,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 hooks=("task ci",),
                 review_max_rounds=5,
                 retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
             )
             new_issue = {
                 "number": 81,
@@ -820,7 +822,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -940,7 +942,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -1350,7 +1352,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -2038,7 +2040,7 @@ class SympohyRunnerTest(unittest.TestCase):
                         "definition_of_done_satisfied": True,
                         "merge_recommendation": "merge",
                     },
-                ),
+                ) as codex_json,
                 patch(
                     "scripts.sympohy.runner._run_command_with_heartbeat",
                     return_value=0,
@@ -2050,6 +2052,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 result = _run_final_verifier_and_merge(
                     "#82",
                     issue,
+                    self._config(root),
                     worktree,
                     log_dir,
                     state,
@@ -2057,6 +2060,22 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
 
         self.assertEqual(result, 0)
+        final_verifier_prompt = codex_json.call_args.args[0][0]
+        self.assertIn("findings as an array", final_verifier_prompt)
+        self.assertIn('When merge_recommendation is "merge"', final_verifier_prompt)
+        self.assertIn("findings must be an empty array", final_verifier_prompt)
+        self.assertIn('When merge_recommendation is "block"', final_verifier_prompt)
+        self.assertIn("findings must be a non-empty array", final_verifier_prompt)
+        for field in ("kind", "summary", "evidence", "suggested_fix"):
+            self.assertIn(field, final_verifier_prompt)
+        for kind in (
+            "acceptance_criteria",
+            "definition_of_done",
+            "verification",
+            "reviewability",
+            "other",
+        ):
+            self.assertIn(kind, final_verifier_prompt)
         heartbeat_commands = [call.args[0] for call in run_command.call_args_list]
         self.assertEqual(
             heartbeat_commands,
@@ -2074,6 +2093,670 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
         check_call.assert_any_call(["gh", "issue", "close", "#82"])
+
+    def test_final_verifier_block_routes_valid_findings_to_fix(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Fix final verifier findings",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+            (log_dir / "review-1.json").write_text(
+                '{"findings":[]}\n',
+                encoding="utf-8",
+            )
+            events: list[str] = []
+            verifier_responses = [
+                {
+                    "acceptance_criteria_satisfied": False,
+                    "definition_of_done_satisfied": True,
+                    "merge_recommendation": "block",
+                    "findings": [
+                        {
+                            "kind": "acceptance_criteria",
+                            "summary": "resume state is not validated",
+                            "evidence": "state.json accepts missing fix_source",
+                            "suggested_fix": "persist fix_source for verifier fixes",
+                        }
+                    ],
+                },
+                {
+                    "acceptance_criteria_satisfied": True,
+                    "definition_of_done_satisfied": True,
+                    "merge_recommendation": "merge",
+                },
+            ]
+
+            def codex_json(
+                _prompts: list[str],
+                *,
+                log_path: Path,
+                **_kwargs: object,
+            ) -> dict[str, object]:
+                events.append(log_path.name)
+                response = verifier_responses.pop(0)
+                log_path.write_text(
+                    json.dumps(response, ensure_ascii=False, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                return response
+
+            def check_call_with_heartbeat(
+                command: list[str],
+                **_kwargs: object,
+            ) -> None:
+                events.append(" ".join(command))
+
+            def review_fix_loop(*_args: object, **kwargs: object) -> int:
+                events.append(f"review:{kwargs['start_round']}")
+                return 0
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    side_effect=codex_json,
+                ) as codex_json_mock,
+                patch(
+                    "scripts.sympohy.runner._worktree_has_changes",
+                    side_effect=[False, True],
+                ),
+                patch("scripts.sympohy.runner._commit_subject_exists", return_value=False),
+                patch("scripts.sympohy.runner._codex_text", return_value="") as codex_text,
+                patch("scripts.sympohy.runner._run_hooks", return_value=0) as run_hooks,
+                patch(
+                    "scripts.sympohy.runner._commit_all_if_new",
+                    return_value=True,
+                ) as commit_all_if_new,
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    side_effect=review_fix_loop,
+                ) as review_fix_loop_mock,
+                patch("scripts.sympohy.runner.subprocess.check_call"),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            first_attempt = json.loads(
+                (log_dir / "final-verifier-1.json").read_text(encoding="utf-8")
+            )
+            second_attempt = json.loads(
+                (log_dir / "final-verifier-2.json").read_text(encoding="utf-8")
+            )
+            latest_attempt = json.loads(
+                (log_dir / "final-verifier.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            [
+                call.kwargs["log_path"].name
+                for call in codex_json_mock.call_args_list
+            ],
+            ["final-verifier-1.json", "final-verifier-2.json"],
+        )
+        self.assertEqual(first_attempt["merge_recommendation"], "block")
+        self.assertEqual(second_attempt["merge_recommendation"], "merge")
+        self.assertEqual(latest_attempt, second_attempt)
+        self.assertEqual(
+            events,
+            [
+                "final-verifier-1.json",
+                "git push",
+                "review:2",
+                "final-verifier-2.json",
+                "gh pr ready",
+                "gh pr checks --watch",
+                "gh pr merge --squash --delete-branch",
+            ],
+        )
+        review_fix_loop_mock.assert_called_once()
+        self.assertEqual(review_fix_loop_mock.call_args.kwargs["start_round"], 2)
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=(),
+            status="sympohy:running",
+            phase="fix",
+            cwd=worktree,
+        )
+        codex_text.assert_called_once()
+        self.assertIn(
+            "resume state is not validated",
+            codex_text.call_args.args[0][1],
+        )
+        run_hooks.assert_called_once()
+        commit_all_if_new.assert_called_once_with(
+            "#82 fix(sympohy): resolve final verifier finding 1",
+            cwd=worktree,
+            base_branch="main",
+            existing_subjects=None,
+        )
+        self.assertEqual(final_state["status"], "done")
+        self.assertEqual(
+            final_state["last_known_progress"]["message"],
+            "merged pull request and removed worktree",
+        )
+
+    def test_final_verifier_blocks_after_configured_fix_limit(self) -> None:
+        def block_response(summary: str) -> dict[str, object]:
+            return {
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [
+                    {
+                        "kind": "acceptance_criteria",
+                        "summary": summary,
+                        "evidence": "final verifier still finds a blocker",
+                        "suggested_fix": "fix the remaining blocker",
+                    }
+                ],
+            }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Stop final verifier fix loop",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    side_effect=[
+                        block_response("first blocker"),
+                        block_response("second blocker"),
+                        block_response("third blocker"),
+                    ],
+                ) as codex_json,
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        self.assertEqual(codex_json.call_count, 3)
+        self.assertEqual(run_final_verifier_fix_round.call_count, 2)
+        self.assertEqual(review_fix_loop.call_count, 2)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            status="sympohy:blocked",
+            phase="finalize",
+            cwd=worktree,
+        )
+        self.assertIn(
+            "after 2 fix attempts",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(final_state["last_known_progress"]["attempts"], 2)
+
+    def test_final_verifier_block_with_invalid_findings_blocks_issue(self) -> None:
+        invalid_responses = (
+            {
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+            },
+            {
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [],
+            },
+            {
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [{"kind": "verification", "summary": "missing fields"}],
+            },
+        )
+
+        for response in invalid_responses:
+            with self.subTest(response=response), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                worktree = root / "worktrees" / "issue-82"
+                log_dir = root / "runs" / "issue-82"
+                worktree.mkdir(parents=True)
+                log_dir.mkdir(parents=True)
+                issue = Issue(
+                    number=82,
+                    title="Block invalid final verifier findings",
+                    body="",
+                    labels=("sympohy:running", "sympohy:phase:finalize"),
+                    comments=(),
+                )
+                state = _RunStateWriter(
+                    issue_number=82,
+                    log_dir=log_dir,
+                    base_branch="main",
+                    worktree=worktree,
+                    branch="issue-82-sympohy",
+                )
+
+                with (
+                    patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                    patch("scripts.sympohy.runner._codex_json", return_value=response),
+                    patch("scripts.sympohy.runner._codex_text") as codex_text,
+                    patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                    patch("scripts.sympohy.runner.comment") as comment,
+                ):
+                    result = _run_final_verifier_and_merge(
+                        "#82",
+                        issue,
+                        self._config(root),
+                        worktree,
+                        log_dir,
+                        state,
+                        total_steps=3,
+                    )
+
+                final_state = json.loads(
+                    (log_dir / "state.json").read_text(encoding="utf-8")
+                )
+
+            self.assertEqual(result, 2)
+            codex_text.assert_not_called()
+            set_issue_state.assert_called_once_with(
+                "#82",
+                current_labels=("sympohy:running", "sympohy:phase:finalize"),
+                status="sympohy:blocked",
+                phase="finalize",
+                cwd=worktree,
+            )
+            self.assertIn("invalid findings", comment.call_args.args[1])
+            self.assertEqual(final_state["status"], "blocked")
+
+    def test_final_verifier_fix_blocks_when_codex_makes_no_changes(self) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "verification",
+                    "summary": "missing regression test",
+                    "evidence": "no test covers final verifier resume",
+                    "suggested_fix": "add the missing test",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="No-op final verifier fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._worktree_has_changes",
+                    side_effect=[False, False],
+                ),
+                patch("scripts.sympohy.runner._commit_subject_exists", return_value=False),
+                patch("scripts.sympohy.runner._codex_text", return_value="") as codex_text,
+                patch("scripts.sympohy.runner._run_hooks") as run_hooks,
+                patch("scripts.sympohy.runner._commit_all_if_new") as commit_all_if_new,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_fix_round(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    findings=parse_final_verifier_block_findings(verifier_response),
+                    fix_attempt=1,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        codex_text.assert_called_once()
+        run_hooks.assert_not_called()
+        commit_all_if_new.assert_not_called()
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:fix"),
+            status="sympohy:blocked",
+            phase="fix",
+            cwd=cwd,
+        )
+        self.assertIn("produced no changes", comment.call_args.args[1])
+        self.assertIn(
+            "#82 fix(sympohy): resolve final verifier finding 1",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+
+    def test_final_verifier_existing_fix_commit_blocks_when_hooks_fail(self) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "verification",
+                    "summary": "existing fix must be verified before push",
+                    "evidence": "final verifier fix commit already exists",
+                    "suggested_fix": "run hooks before pushing the existing fix",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Verify existing final verifier fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._worktree_has_changes", return_value=False),
+                patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
+                patch("scripts.sympohy.runner._run_hooks", return_value=7) as run_hooks,
+                patch("scripts.sympohy.runner._check_call_with_heartbeat") as check_call,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_fix_round(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    findings=parse_final_verifier_block_findings(verifier_response),
+                    fix_attempt=1,
+                    total_steps=3,
+                    from_resume=True,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        run_hooks.assert_called_once_with(
+            ("task ci",),
+            3,
+            cwd,
+            log_dir,
+            state=state,
+        )
+        check_call.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:hooks"),
+            status="sympohy:blocked",
+            phase="hooks",
+            cwd=cwd,
+        )
+        self.assertIn(
+            "verification hooks still failed after final verifier fix",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["phase"], "hooks")
+        self.assertEqual(final_state["status"], "blocked")
+
+    def test_final_verifier_fix_resume_reruns_review_before_finalize(self) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "acceptance_criteria",
+                    "summary": "resume must re-review verifier fixes",
+                    "evidence": "final verifier fix resume has pushed a new commit",
+                    "suggested_fix": "rerun adversarial review before final verifier",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "final-verifier-1.json").write_text(
+                json.dumps(verifier_response),
+                encoding="utf-8",
+            )
+            (log_dir / "review-1.json").write_text(
+                '{"findings":[]}\n',
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Resume verifier fix through review",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
+            ):
+                result = _resume_fix_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    previous_state={
+                        "last_known_progress": {
+                            "fix_source": "final_verifier",
+                            "final_verifier_fix_attempt": 1,
+                            "total_logical_steps": 3,
+                        }
+                    },
+                )
+
+        self.assertEqual(result, 0)
+        run_final_verifier_fix_round.assert_called_once()
+        self.assertTrue(run_final_verifier_fix_round.call_args.kwargs["from_resume"])
+        self.assertEqual(run_final_verifier_fix_round.call_args.kwargs["total_steps"], 3)
+        review_fix_loop.assert_called_once()
+        self.assertEqual(review_fix_loop.call_args.kwargs["start_round"], 2)
+
+    def test_final_verifier_fix_resume_blocks_dirty_worktree_before_rerun(
+        self,
+    ) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "acceptance_criteria",
+                    "summary": "state is incomplete",
+                    "evidence": "resume progress is missing fix source handling",
+                    "suggested_fix": "resume the verifier fix attempt",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "final-verifier-1.json").write_text(
+                json.dumps(verifier_response),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Resume final verifier fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._worktree_has_changes", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._worktree_status",
+                    return_value=" M scripts/sympohy/runner.py\n",
+                ),
+                patch(
+                    "scripts.sympohy.runner._commit_subject_exists",
+                    return_value=False,
+                ) as commit_subject_exists,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _resume_fix_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    previous_state={
+                        "last_known_progress": {
+                            "fix_source": "final_verifier",
+                            "final_verifier_fix_attempt": 1,
+                            "total_logical_steps": 3,
+                        }
+                    },
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        commit_subject_exists.assert_not_called()
+        codex_text.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:fix"),
+            status="sympohy:blocked",
+            phase="fix",
+            cwd=cwd,
+        )
+        self.assertIn(
+            "final verifier fix phase worktree has uncommitted changes during resume",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(final_state["last_recovery"]["event"], "unsafe_recovery_blocked")
 
     def test_merge_resume_reconciles_already_merged_pull_request(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -2106,6 +2789,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 result = _run_final_verifier_and_merge(
                     "#82",
                     issue,
+                    self._config(root),
                     worktree,
                     log_dir,
                     state,
@@ -2730,6 +3414,7 @@ class SympohyRunnerTest(unittest.TestCase):
             hooks=("task ci",),
             review_max_rounds=5,
             retry_max_attempts=3,
+            final_verifier_fix_max_attempts=2,
         )
 
 

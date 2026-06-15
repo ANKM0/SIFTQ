@@ -5,5 +5,6 @@ run_log_root: .sympohy/runs
 stale_status_after_minutes: 30
 review_max_rounds: 5
 retry_max_attempts: 3
+final_verifier_fix_max_attempts: 2
 hooks:
   - task ci

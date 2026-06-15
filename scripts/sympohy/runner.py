@@ -14,12 +14,14 @@ from typing import Callable, Iterable, Mapping, Sequence
 
 from .config import SympohyConfig
 from .core import (
+    FinalVerifierFinding,
     PHASE_ALIASES,
     extract_acceptance_set,
     inspect_running_issue,
     merge_gate_allows_merge,
     next_retry_action,
     phase_from_state,
+    parse_final_verifier_block_findings,
     parse_review_json,
     read_run_state,
     resolve_resume_point,
@@ -31,6 +33,18 @@ from .github import Issue, comment, fetch_issue, list_candidate_issues, set_issu
 HEARTBEAT_INTERVAL_SECONDS = 30
 LOGICAL_STEP_COMMIT_RE = re.compile(
     r"^#(?P<issue>\d+) feat\(sympohy\): implement logical step (?P<step>\d+)$"
+)
+FINAL_VERIFIER_PROMPT = (
+    "Act as final verifier. Return a single JSON object with boolean "
+    "acceptance_criteria_satisfied, boolean definition_of_done_satisfied, "
+    'merge_recommendation set to "merge" or "block", and findings as an array. '
+    'When merge_recommendation is "merge", findings must be an empty array. '
+    'When merge_recommendation is "block", findings must be a non-empty array '
+    "of objects for automated fixing. Each finding must include string fields "
+    "kind, summary, evidence, and suggested_fix. kind must be one of "
+    "acceptance_criteria, definition_of_done, verification, reviewability, "
+    "other. summary names the unmet requirement, evidence cites the observed "
+    "failure, and suggested_fix gives concrete implementation guidance."
 )
 
 
@@ -1150,6 +1164,7 @@ def _run_issue_locked(
     return _run_final_verifier_and_merge(
         issue_ref,
         issue,
+        config,
         worktree,
         log_dir,
         state,
@@ -1257,6 +1272,7 @@ def _resume_late_phase(
         return _run_final_verifier_and_merge(
             issue_ref,
             issue,
+            config,
             worktree,
             log_dir,
             state,
@@ -1320,6 +1336,7 @@ def _resume_late_phase(
     return _run_final_verifier_and_merge(
         issue_ref,
         issue,
+        config,
         worktree,
         log_dir,
         state,
@@ -1467,6 +1484,17 @@ def _resume_fix_phase(
     *,
     previous_state: Mapping[str, object] | None,
 ) -> int:
+    if _last_progress(previous_state).get("fix_source") == "final_verifier":
+        return _resume_final_verifier_fix_phase(
+            issue_ref,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            previous_state=previous_state,
+        )
+
     round_index = _progress_int(previous_state, "review_round")
     if round_index is None:
         _block(
@@ -1529,6 +1557,80 @@ def _resume_fix_phase(
     return review_result
 
 
+def _resume_final_verifier_fix_phase(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    previous_state: Mapping[str, object] | None,
+) -> int:
+    fix_attempt = _progress_int(previous_state, "final_verifier_fix_attempt")
+    if fix_attempt is None or fix_attempt < 1:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause="saved final verifier fix phase is missing final_verifier_fix_attempt",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    final_verifier_log_path = _final_verifier_log_path(log_dir, fix_attempt)
+    try:
+        final_verifier = json.loads(
+            final_verifier_log_path.read_text(encoding="utf-8")
+        )
+        findings = parse_final_verifier_block_findings(final_verifier)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=(
+                "could not load final verifier findings from "
+                f"{final_verifier_log_path}: {exc}"
+            ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    fix_result = _run_final_verifier_fix_round(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        findings=findings,
+        fix_attempt=fix_attempt,
+        total_steps=_progress_int(previous_state, "total_logical_steps"),
+        from_resume=True,
+    )
+    if fix_result == 1:
+        return _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            start_round=_next_review_rerun_round(
+                log_dir,
+                max_review_rounds=config.review_max_rounds,
+            ),
+        )
+    return fix_result
+
+
 def _block_dirty_late_phase_resume(
     issue_ref: str,
     *,
@@ -1572,6 +1674,7 @@ def _block_dirty_late_phase_resume(
 def _run_final_verifier_and_merge(
     issue_ref: str,
     issue: Issue,
+    config: SympohyConfig,
     worktree: Path,
     log_dir: Path,
     state: _RunStateWriter,
@@ -1587,37 +1690,112 @@ def _run_final_verifier_and_merge(
             message="reconciled already-merged pull request",
         )
 
-    final_verifier_path = log_dir / "final-verifier.json"
-    progress: dict[str, object] = {
-        "message": "running final verifier",
-        "log_path": str(final_verifier_path),
-    }
-    if total_steps is not None:
-        progress["completed_logical_steps"] = total_steps
-        progress["total_logical_steps"] = total_steps
-    state.write(phase="finalize", progress=progress)
-    final = _codex_json(
-        [
-            "Act as final verifier. Return JSON with boolean "
-            "acceptance_criteria_satisfied, boolean definition_of_done_satisfied, "
-            "and merge_recommendation set to merge or block.",
-            f"Issue #{issue.number}",
-        ],
-        cwd=worktree,
-        log_path=final_verifier_path,
-        heartbeat=state.heartbeat,
-    )
     empty_review = parse_review_json('{"findings":[]}')
-    if not merge_gate_allows_merge(
-        final_verifier=final,
-        github_checks_status="success",
-        review_result=empty_review,
-    ):
+    for verifier_attempt in range(1, config.final_verifier_fix_max_attempts + 2):
+        final_verifier_path = _final_verifier_log_path(log_dir, verifier_attempt)
+        progress: dict[str, object] = {
+            "message": "running final verifier",
+            "log_path": str(final_verifier_path),
+            "final_verifier_attempt": verifier_attempt,
+            "max_final_verifier_fix_attempts": config.final_verifier_fix_max_attempts,
+        }
+        if total_steps is not None:
+            progress["completed_logical_steps"] = total_steps
+            progress["total_logical_steps"] = total_steps
+        state.write(phase="finalize", progress=progress)
+        final = _codex_json(
+            [
+                FINAL_VERIFIER_PROMPT,
+                f"Issue #{issue.number}",
+            ],
+            cwd=worktree,
+            log_path=final_verifier_path,
+            heartbeat=state.heartbeat,
+        )
+        _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
+        if merge_gate_allows_merge(
+            final_verifier=final,
+            github_checks_status="success",
+            review_result=empty_review,
+        ):
+            break
+
+        recommendation = str(final.get("merge_recommendation", "")).lower()
+        if recommendation != "block":
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=verifier_attempt,
+                cause="final verifier did not recommend merge or block",
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
+        try:
+            findings = parse_final_verifier_block_findings(final)
+        except ValueError as exc:
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=verifier_attempt,
+                cause=f"final verifier block response has invalid findings: {exc}",
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
+        fix_attempt = verifier_attempt
+        if fix_attempt > config.final_verifier_fix_max_attempts:
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=config.final_verifier_fix_max_attempts,
+                cause=(
+                    "final verifier still reported blocking findings after "
+                    f"{config.final_verifier_fix_max_attempts} fix attempts"
+                ),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
+        fix_result = _run_final_verifier_fix_round(
+            issue_ref,
+            issue,
+            config,
+            worktree,
+            log_dir,
+            state,
+            findings=findings,
+            fix_attempt=fix_attempt,
+            total_steps=total_steps,
+        )
+        if fix_result != 1:
+            return fix_result
+        review_result = _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            worktree,
+            log_dir,
+            state,
+            start_round=_next_review_rerun_round(
+                log_dir,
+                max_review_rounds=config.review_max_rounds,
+            ),
+        )
+        if review_result != 0:
+            return review_result
+    else:
         _block(
             issue_ref,
             phase="finalize",
             failed_command="final verifier",
-            attempts=1,
+            attempts=config.final_verifier_fix_max_attempts,
             cause="final verifier did not recommend merge",
             run_log_path=log_dir,
             cwd=worktree,
@@ -1652,6 +1830,215 @@ def _run_final_verifier_and_merge(
         total_steps=total_steps,
         message="merged pull request and removed worktree",
     )
+
+
+def _final_verifier_log_path(log_dir: Path, attempt: int) -> Path:
+    return log_dir / f"final-verifier-{attempt}.json"
+
+
+def _persist_final_verifier_artifacts(
+    log_dir: Path,
+    attempt_path: Path,
+    payload: Mapping[str, object],
+) -> None:
+    latest_path = log_dir / "final-verifier.json"
+    if attempt_path.exists():
+        content = attempt_path.read_bytes()
+    else:
+        content = (
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        attempt_path.write_bytes(content)
+    latest_path.write_bytes(content)
+
+
+def _run_final_verifier_fix_round(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    findings: Sequence[FinalVerifierFinding],
+    fix_attempt: int,
+    total_steps: int | None,
+    existing_fix_subjects: set[str] | None = None,
+    from_resume: bool = False,
+) -> int:
+    subject = _final_verifier_fix_subject(issue.number, fix_attempt)
+    if _worktree_has_changes(cwd):
+        cause = (
+            "final verifier fix phase worktree has uncommitted changes"
+            f"{' during resume' if from_resume else ''}: "
+            f"{_summarize_status(_worktree_status(cwd))}"
+        )
+        if from_resume:
+            state.record_recovery(
+                "unsafe_recovery_blocked",
+                {
+                    "cause": cause,
+                    "resume_point": "fix",
+                    "fix_source": "final_verifier",
+                    "final_verifier_fix_attempt": fix_attempt,
+                },
+            )
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="final verifier fix safety check",
+            attempts=fix_attempt,
+            cause=cause,
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    if _commit_subject_exists(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
+    ):
+        if _run_hooks(
+            config.hooks,
+            config.retry_max_attempts,
+            cwd,
+            log_dir,
+            state=state,
+        ) != 0:
+            _block(
+                issue_ref,
+                phase="hooks",
+                failed_command="; ".join(config.hooks),
+                attempts=config.retry_max_attempts,
+                cause="verification hooks still failed after final verifier fix",
+                run_log_path=log_dir,
+                cwd=cwd,
+                state=state,
+            )
+            return 2
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        state.write(
+            phase="finalize",
+            progress={
+                "message": "final verifier fix commit already exists",
+                "fix_source": "final_verifier",
+                "final_verifier_fix_attempt": fix_attempt,
+                "commit_subject": subject,
+            },
+        )
+        return 1
+
+    set_issue_state(
+        issue_ref,
+        current_labels=(),
+        status="sympohy:running",
+        phase="fix",
+        cwd=cwd,
+    )
+    fix_log_path = log_dir / f"final-verifier-fix-{fix_attempt}.log"
+    findings_payload = [
+        {
+            "kind": finding.kind,
+            "summary": finding.summary,
+            "evidence": finding.evidence,
+            "suggested_fix": finding.suggested_fix,
+        }
+        for finding in findings
+    ]
+    progress: dict[str, object] = {
+        "message": "fixing final verifier findings",
+        "fix_source": "final_verifier",
+        "final_verifier_fix_attempt": fix_attempt,
+        "max_final_verifier_fix_attempts": config.final_verifier_fix_max_attempts,
+        "blocking_findings": len(findings),
+        "log_path": str(fix_log_path),
+    }
+    if total_steps is not None:
+        progress["completed_logical_steps"] = total_steps
+        progress["total_logical_steps"] = total_steps
+    state.write(phase="fix", progress=progress)
+    _codex_text(
+        [
+            "Fix these final verifier findings and stop after edits.",
+            json.dumps({"findings": findings_payload}, ensure_ascii=False),
+        ],
+        cwd=cwd,
+        log_path=fix_log_path,
+        heartbeat=state.heartbeat,
+    )
+
+    if not _worktree_has_changes(cwd):
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="final verifier fix",
+            attempts=fix_attempt,
+            cause=(
+                "final verifier fix produced no changes for commit subject: "
+                f"{subject}"
+            ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    if _run_hooks(
+        config.hooks,
+        config.retry_max_attempts,
+        cwd,
+        log_dir,
+        state=state,
+    ) != 0:
+        _block(
+            issue_ref,
+            phase="hooks",
+            failed_command="; ".join(config.hooks),
+            attempts=config.retry_max_attempts,
+            cause="verification hooks still failed after final verifier fix",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    committed = _commit_all_if_new(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
+    )
+    if committed:
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+        )
+    state.write(
+        phase="finalize",
+        progress={
+            "message": "pushed final verifier fix"
+            if committed
+            else "final verifier fix commit already exists",
+            "fix_source": "final_verifier",
+            "final_verifier_fix_attempt": fix_attempt,
+            "commit_subject": subject,
+        },
+    )
+    return 1
+
+
+def _final_verifier_fix_subject(issue_number: int, fix_attempt: int) -> str:
+    subject = (
+        f"#{issue_number} fix(sympohy): "
+        f"resolve final verifier finding {fix_attempt}"
+    )
+    if not validate_commit_subject(subject):
+        raise ValueError(f"invalid generated commit subject: {subject}")
+    return subject
 
 
 def _finish_merged_issue(
@@ -2379,6 +2766,18 @@ def _review_start_round(state: Mapping[str, object] | None) -> int:
     if message in {"pushed review fix", "review fix commit already exists"}:
         return round_index + 1
     return round_index
+
+
+def _next_review_rerun_round(log_dir: Path, *, max_review_rounds: int) -> int:
+    review_rounds: list[int] = []
+    for path in log_dir.glob("review-*.json"):
+        try:
+            review_rounds.append(int(path.stem.removeprefix("review-")))
+        except ValueError:
+            continue
+    if not review_rounds:
+        return 1
+    return min(max(review_rounds) + 1, max_review_rounds)
 
 
 def _bootstrap_run_state(
