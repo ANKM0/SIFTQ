@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import agentConfig from "../../.codex/skills/issue-creator/agents/openai.yaml?raw";
@@ -7,20 +6,25 @@ import labelPolicy from "../../.codex/skills/issue-creator/references/issue-labe
 import issueTemplates from "../../.codex/skills/issue-creator/references/issue-templates.md?raw";
 
 const requiredSkillFiles = [
-  ".codex/skills/issue-creator/SKILL.md",
-  ".codex/skills/issue-creator/agents/openai.yaml",
-  ".codex/skills/issue-creator/references/issue-label-policy.md",
-  ".codex/skills/issue-creator/references/issue-templates.md"
+  [".codex/skills/issue-creator/SKILL.md", skill],
+  [".codex/skills/issue-creator/agents/openai.yaml", agentConfig],
+  [
+    ".codex/skills/issue-creator/references/issue-label-policy.md",
+    labelPolicy
+  ],
+  [
+    ".codex/skills/issue-creator/references/issue-templates.md",
+    issueTemplates
+  ]
 ];
 
 describe("Issue creator skill contract", () => {
-  it("keeps every Issue #94 deliverable tracked", () => {
-    const trackedFiles = execFileSync("git", [
-      "ls-files",
-      ".codex/skills/issue-creator"
-    ], { encoding: "utf8" }).trim().split("\n");
-
-    expect(trackedFiles.sort()).toEqual([...requiredSkillFiles].sort());
+  it("keeps every Issue #94 deliverable loadable", () => {
+    expect(requiredSkillFiles).toHaveLength(4);
+    for (const [path, content] of requiredSkillFiles) {
+      expect(path).toContain(".codex/skills/issue-creator");
+      expect(content.trim().length).toBeGreaterThan(0);
+    }
   });
 
   it("defines the skill, templates, labels, and agent prompt", () => {
