@@ -84,6 +84,50 @@ class SympohyRunnerTest(unittest.TestCase):
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["resume", "#82"])
 
+    def test_watch_routes_dead_pid_running_candidate_to_resume(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "hooks",
+                        "status": "running",
+                        "pid": 98765,
+                        "heartbeat": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            issue = {
+                "number": 82,
+                "state": "OPEN",
+                "labels": [
+                    {"name": "sympohy:running"},
+                    {"name": "sympohy:phase:hooks"},
+                ],
+            }
+
+            with (
+                patch(
+                    "scripts.sympohy.runner.list_candidate_issues",
+                    return_value=[issue],
+                ),
+                patch("scripts.sympohy.core._process_alive", return_value=False),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.subprocess.Popen") as popen,
+            ):
+                popen.return_value.poll.return_value = None
+
+                result = watch(config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        command = popen.call_args.args[0]
+        self.assertEqual(command[-2:], ["resume", "#82"])
+
     def test_resume_issue_blocks_when_required_run_state_is_missing(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -128,6 +172,87 @@ class SympohyRunnerTest(unittest.TestCase):
             "resume safety check",
         )
         self.assertIn("missing state", state["last_known_progress"]["cause"])
+
+    def test_resume_issue_selects_recovery_mode_from_phase_label(self) -> None:
+        for phase in ("triage", "implement", "hooks", "review", "fix", "merge"):
+            with self.subTest(phase=phase), TemporaryDirectory() as tmp:
+                config = self._config(Path(tmp))
+                issue = Issue(
+                    number=82,
+                    title=f"Recover stale {phase}",
+                    body="",
+                    labels=("sympohy:running", f"sympohy:phase:{phase}"),
+                    comments=(),
+                )
+                state_dir = config.run_log_root / "issue-82"
+                state_dir.mkdir(parents=True)
+                stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+                (state_dir / "state.json").write_text(
+                    json.dumps(
+                        {
+                            "issue": 82,
+                            "phase": phase,
+                            "status": "running",
+                            "pid": os.getpid(),
+                            "heartbeat": stale_heartbeat.isoformat(),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                with (
+                    patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                    patch(
+                        "scripts.sympohy.runner.run_issue",
+                        return_value=0,
+                    ) as run_issue,
+                ):
+                    result = resume_issue("#82", config)
+
+                self.assertEqual(result, 0)
+                run_issue.assert_called_once_with(
+                    "#82",
+                    config,
+                    recover=phase != "triage",
+                )
+
+    def test_resume_issue_ignores_active_running_state_for_double_resume_safety(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Already being resumed",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            original_state = {
+                "issue": 82,
+                "phase": "implement",
+                "status": "running",
+                "pid": os.getpid(),
+                "heartbeat": datetime.now(timezone.utc).isoformat(),
+            }
+            (state_dir / "state.json").write_text(
+                json.dumps(original_state),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        self.assertEqual(state, original_state)
 
     def test_resume_issue_restarts_stale_triage_without_recovery_mode(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -260,7 +385,7 @@ class SympohyRunnerTest(unittest.TestCase):
         prompts = codex_text.call_args.args[0]
         self.assertIn("Implement logical step 3", prompts[0])
 
-    def test_resume_issue_reuses_partial_commits_from_stale_running_implement(
+    def test_resume_issue_continues_clean_worktree_from_next_uncommitted_step(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -537,6 +662,107 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertIn(
             "missing or invalid saved implementation plan",
             comment.call_args.args[1],
+        )
+
+    def test_resume_issue_blocks_dirty_worktree_during_implementation_recovery(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "plan.json").write_text(
+                json.dumps(
+                    {
+                        "logical_steps": [
+                            {"name": "one"},
+                            {"name": "two"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (log_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "worktree": {
+                            "path": str(worktree),
+                            "branch": "issue-82-sympohy",
+                            "base_branch": "main",
+                        },
+                        "plan_reference": str(log_dir / "plan.json"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Recover dirty implementation",
+                body="""
+## AC
+- [ ] recover implementation safely
+
+## DoD
+- [ ] block dirty worktrees
+""",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return "#82 feat(sympohy): implement logical step 1\n"
+                if args == ["git", "status", "--porcelain"]:
+                    return " M scripts/sympohy/runner.py\n"
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+                patch("scripts.sympohy.runner._run_hooks") as run_hooks,
+                patch("scripts.sympohy.runner._codex_json") as codex_json,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        codex_json.assert_not_called()
+        codex_text.assert_not_called()
+        run_hooks.assert_not_called()
+        check_call.assert_not_called()
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+            status="sympohy:blocked",
+            phase="implement",
+            cwd=worktree,
+        )
+        self.assertIn("worktree has uncommitted changes", comment.call_args.args[1])
+        self.assertEqual(state["phase"], "implement")
+        self.assertEqual(state["status"], "blocked")
+        self.assertIn(
+            "worktree has uncommitted changes",
+            state["last_known_progress"]["cause"],
         )
 
     def test_implementation_recovery_continues_from_clean_next_step(self) -> None:
