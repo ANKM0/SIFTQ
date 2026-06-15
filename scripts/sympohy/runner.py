@@ -836,11 +836,18 @@ def _isoformat_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _logical_steps(plan: Mapping[str, object]) -> list[Mapping[str, object]]:
+def _logical_steps(plan: Mapping[str, object]) -> list[object]:
     steps = plan.get("logical_steps", [])
     if not isinstance(steps, list) or not steps:
         raise ValueError("plan JSON must contain non-empty logical_steps")
-    return [step for step in steps if isinstance(step, Mapping)]
+    logical_steps = [
+        step
+        for step in steps
+        if isinstance(step, Mapping) or (isinstance(step, str) and step.strip())
+    ]
+    if not logical_steps:
+        raise ValueError("plan JSON must contain non-empty logical_steps")
+    return logical_steps
 
 
 def _load_existing_plan(plan_path: Path) -> Mapping[str, object] | None:
