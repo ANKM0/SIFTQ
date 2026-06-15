@@ -27,7 +27,7 @@ SIFTQ の system requirement anchor である `req:siftq-system` に依存し、
 基本フローは次の順序とする。
 
 ```text
-Requirements -> Design -> Wireframe（UI 変更時） -> ADR Decision -> Implementation Request
+Requirements -> Design -> Tests + Implementation
 ```
 
 必須文書は原則として次の 2 つにする。
@@ -40,6 +40,11 @@ UI 変更がある場合は、追加で次の wireframe 文書と wireframe HTML
 
 - `docs/wireframes/<feature>.md`
 - `docs/wireframes/<feature>.html` または既存 wireframe HTML
+
+テスト観点は design doc の `Test Viewpoints（テスト観点）` に明記し、
+実装時はテスト追加または既存テスト更新と実装を同じ最小フロー内で扱う。
+ADR は必須の順序には含めず、後述の条件に該当する durable decision が
+ある場合だけ作成または更新する。
 
 Refinement は独立した文書にしない。未決事項、対象範囲、受け入れ
 条件の整理は requirements 作成プロセスの一部として扱う。
