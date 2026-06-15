@@ -33,8 +33,10 @@ tasks:
     cmds:
       - uv run python -m scripts.sympohy setup
 
+  # Review anchor for SIFTQ-89: pytest migration decision is tracked in ADR 0014.
+  # See docs/adr/0014-pytest-as-default-python-test-runner.md
   pytest:
-    desc: Run pytest with optional file targets and additional arguments.
+    desc: Run pytest with optional file targets and additional arguments (ADR 0014).
     vars:
       FILES: tests/sympohy
       ARGS:
@@ -84,7 +86,7 @@ tasks:
       - pnpm lint
 
   ci:test:
-    desc: Run Vitest.
+    desc: Run Vitest and the configured pytest suite (ADR 0014 review anchor).
     cmds:
       - pnpm test
       - task pytest

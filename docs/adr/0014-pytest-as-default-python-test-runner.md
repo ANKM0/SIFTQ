@@ -56,3 +56,19 @@ that would significantly increase risk or scope.
   until existing `unittest` tests are gradually converted.
 - The repo direction is explicit: default contributions migrate toward `pytest`, while
   legacy `unittest` tests are tolerated only as a migration bridge.
+
+## Reviewability (SIFTQ-89 logical step 7)
+
+### Why this migration is happening
+
+- This ADR is the source of record for the pytest migration rationale and scope.
+- The Taskfile wiring is the implementation anchor used for PR review:
+  - `Taskfile.yml` task `pytest` runs `uv run python -m pytest`.
+  - `Taskfile.yml` task `ci:test` executes `task pytest`.
+
+### AC/DoD mapping for step 7 review
+
+- Step 7 request: "Use ADR decision + explicit Taskfile diff as review anchor."
+  - Evidence: `docs/adr/0014-pytest-as-default-python-test-runner.md` and the `pytest` + `ci:test` task definitions in `Taskfile.yml`.
+- Step 7 request: "Ensure PR review can verify each AC/DoD item by mapping to ADR and changed task commands."
+  - Evidence: This section now links each AC/DoD intent to the exact Taskfile commands reviewers should inspect.
