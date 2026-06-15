@@ -1490,6 +1490,62 @@ class SympohyRunnerTest(unittest.TestCase):
             "implementation_recovery_inspected",
         )
 
+    def test_run_state_writer_refuses_write_after_lock_takeover(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            old_lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="old-run",
+                stale_status_after_minutes=30,
+            )
+            old_lock.acquire()
+            old_writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="old-run",
+                lock_path=old_lock.path,
+                refresh_lock=True,
+            )
+            old_writer.write(phase="implement", progress={"message": "old"})
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
+            lock_payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
+            lock_payload["heartbeat"] = stale.isoformat()
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            state_payload = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            state_payload["heartbeat"] = stale.isoformat()
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+
+            new_lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=30,
+            )
+            new_lock.acquire()
+            new_writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                lock_path=new_lock.path,
+                refresh_lock=True,
+            )
+            new_writer.write(phase="review", progress={"message": "new"})
+
+            with self.assertRaises(_RunLockedError):
+                old_writer.write(phase="hooks", progress={"message": "old woke up"})
+
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(state["run_id"], "new-run")
+        self.assertEqual(state["last_known_progress"]["message"], "new")
+
     def test_pull_request_exists_blocks_duplicate_head_prs(self) -> None:
         result = subprocess.CompletedProcess(
             [],

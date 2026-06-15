@@ -76,8 +76,8 @@ for resume handling.
 exists. GitHub phase labels are treated as fallback bootstrap input only when
 state is missing or corrupt, and resume corrects stale phase labels from the
 resolved state phase before continuing. `triage` maps to `planning`,
-`implement` and `hooks` map to `implement`, and `review`, `fix`, and `merge`
-map to `push_pr`.
+`implement` and `hooks` map to implementation recovery, while `review`, `fix`,
+and `merge` resume through phase-specific late-phase handlers.
 
 Terminal status labels are not restarted. `sympohy:blocked` resolves to the
 `blocked` terminal point, and `sympohy:done` resolves to the `completed`

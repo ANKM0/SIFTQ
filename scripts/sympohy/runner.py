@@ -134,6 +134,11 @@ class _RunStateWriter:
         if progress is not None:
             self.last_known_progress = progress
 
+        if self.refresh_lock and not _lock_owned_by_run(self.lock_path, self.run_id):
+            raise _RunLockedError(
+                f"run {self.run_id} no longer owns issue #{self.issue_number} lock"
+            )
+
         self.log_dir.mkdir(parents=True, exist_ok=True)
         heartbeat = _isoformat_utc(self._clock())
         payload = {
@@ -1861,6 +1866,11 @@ def _refresh_lock_metadata(
         encoding="utf-8",
     )
     tmp_path.replace(lock_path)
+
+
+def _lock_owned_by_run(lock_path: Path, run_id: str) -> bool:
+    payload = read_run_state(lock_path)
+    return payload is not None and payload.get("run_id") == run_id
 
 
 def _lock_takeover_allowed(
