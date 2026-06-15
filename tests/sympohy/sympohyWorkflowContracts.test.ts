@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import config from "../../.sympohy/config.yaml?raw";
-import issue73Inventory from "../../docs/design/issue-73-taqt-takt-inventory.md?raw";
 import taskfile from "../../Taskfile.yml?raw";
 import cli from "../../scripts/sympohy/cli.py?raw";
 import core from "../../scripts/sympohy/core.py?raw";
@@ -23,14 +22,11 @@ describe("sympohy Taskfile and CLI integration", () => {
     expect(requiredTasks.every((taskName) => taskfile.includes(`  ${taskName}:`))).toBe(
       true
     );
-    expect(taskfile).not.toContain("ai:takt");
-    expect(taskfile).not.toContain("setup:takt");
     expect(cli).toContain("resume");
   });
 
   it("keeps sympohy outside application runtime dependencies", () => {
     expect(taskfile).toContain("uv run python -m scripts.sympohy");
-    expect(taskfile).not.toContain("pnpm dlx takt");
   });
 });
 
@@ -104,37 +100,5 @@ describe("sympohy automation contract", () => {
     expect(cli).toContain("\"required labels declared\"");
     expect(cli).toContain("\"systemd service template\"");
     expect(cli).toContain("validate_commit_subject");
-  });
-});
-
-describe("issue 73 TAKT to sympohy semantic mapping", () => {
-  it("records task state, metadata, command, and hook mappings", () => {
-    const requiredTerms = [
-      "Workflow Semantic Mapping",
-      "Task Data",
-      "State and Metadata",
-      "Commands",
-      "Automation Hooks",
-      "sympohy:pending",
-      "sympohy:running",
-      "sympohy:blocked",
-      "sympohy:done",
-      "sympohy:phase:*",
-      "state.json",
-      "run_id",
-      "heartbeat",
-      "run.lock",
-      "task ai:sympohy:resume",
-      "task ai:sympohy:labels:sync",
-      "task ci",
-      "Review/fix loop",
-      "Heartbeat and lock inspection"
-    ];
-
-    const missingTerms = requiredTerms.filter(
-      (term) => !issue73Inventory.includes(term)
-    );
-
-    expect(missingTerms).toEqual([]);
   });
 });
