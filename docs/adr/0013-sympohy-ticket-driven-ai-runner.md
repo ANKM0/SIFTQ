@@ -53,7 +53,7 @@ local.
 
 GitHub state is represented by `sympohy:*` labels. Status labels are
 `pending`, `running`, `blocked`, and `done`. Phase labels are `triage`,
-`implement`, `hooks`, `review`, `fix`, and `merge`, and `sympohy` keeps them
+`implement`, `hooks`, `review`, `fix`, and `finalize`, and `sympohy` keeps them
 exclusive per issue.
 
 The watcher polls open issues once per minute and selects issues that do not

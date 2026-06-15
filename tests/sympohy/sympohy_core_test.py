@@ -401,6 +401,18 @@ class SympohyCoreTest(unittest.TestCase):
             ("bug", "sympohy:phase:implement", "sympohy:running"),
         )
 
+    def test_label_transition_normalizes_legacy_merge_phase(self) -> None:
+        labels = transition_labels(
+            ["sympohy:running", "sympohy:phase:merge"],
+            status="sympohy:done",
+            phase="merge",
+        )
+
+        self.assertEqual(
+            labels,
+            ("sympohy:done", "sympohy:phase:finalize"),
+        )
+
     def test_label_transition_removes_stale_status_and_phase_labels(self) -> None:
         labels = transition_labels(
             [

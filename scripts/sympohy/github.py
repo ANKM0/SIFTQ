@@ -27,7 +27,7 @@ REQUIRED_LABELS = {
     "sympohy:phase:hooks": "Sympohy is running verification hooks.",
     "sympohy:phase:review": "Sympohy is running adversarial review.",
     "sympohy:phase:fix": "Sympohy is fixing review or hook findings.",
-    "sympohy:phase:merge": "Sympohy is verifying and merging the PR.",
+    "sympohy:phase:finalize": "Sympohy is verifying and finalizing PR merge results.",
 }
 
 

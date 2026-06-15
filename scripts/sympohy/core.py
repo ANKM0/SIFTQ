@@ -16,8 +16,16 @@ STATUS_LABELS = (
     "sympohy:done",
 )
 
-PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
+PHASES = ("triage", "implement", "hooks", "review", "fix", "finalize")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
+PHASE_ALIASES = {"merge": "finalize"}
+LEGACY_PHASE_LABELS = ("sympohy:phase:merge",)
+
+
+def _normalize_phase_label(phase: str) -> str:
+    normalized = phase.removeprefix("sympohy:phase:")
+    normalized = PHASE_ALIASES.get(normalized, normalized)
+    return f"sympohy:phase:{normalized}"
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
 DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
 # Legacy task label prefixes are intentionally supported to migrate historical issues
@@ -252,7 +260,9 @@ def transition_labels(
     labels = {
         label
         for label in current_labels
-        if label not in STATUS_LABELS and label not in PHASE_LABELS
+        if label not in STATUS_LABELS
+        and label not in PHASE_LABELS
+        and label not in LEGACY_PHASE_LABELS
     }
 
     if status is not None:
@@ -261,7 +271,7 @@ def transition_labels(
         labels.add(status)
 
     if phase is not None:
-        phase_label = phase if phase.startswith("sympohy:phase:") else f"sympohy:phase:{phase}"
+        phase_label = _normalize_phase_label(phase)
         if phase_label not in PHASE_LABELS:
             raise ValueError(f"unknown sympohy phase label: {phase_label}")
         labels.add(phase_label)
