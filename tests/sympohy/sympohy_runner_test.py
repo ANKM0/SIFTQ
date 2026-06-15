@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -80,7 +81,7 @@ class SympohyRunnerTest(unittest.TestCase):
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["resume", "#82"])
 
-    def test_resume_issue_records_stale_reason_before_restarting_run(self) -> None:
+    def test_resume_issue_blocks_when_required_run_state_is_missing(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
             issue = Issue(
@@ -94,6 +95,8 @@ class SympohyRunnerTest(unittest.TestCase):
             with (
                 patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
                 patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
             ):
                 result = resume_issue("#82", config)
 
@@ -103,11 +106,60 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(result, 0)
-        run_issue.assert_called_once_with("#82", config, recover=True)
+        self.assertEqual(result, 2)
+        run_issue.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+            status="sympohy:blocked",
+            phase="implement",
+            cwd=None,
+        )
+        body = comment.call_args.args[1]
+        self.assertIn("missing required run state", body)
+        self.assertIn("missing state", body)
         self.assertEqual(state["phase"], "implement")
-        self.assertEqual(state["last_known_progress"]["resume_point"], "implement")
-        self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(
+            state["last_known_progress"]["failed_command"],
+            "resume safety check",
+        )
+        self.assertIn("missing state", state["last_known_progress"]["cause"])
+
+    def test_resume_issue_restarts_stale_triage_without_recovery_mode(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale triage",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:triage"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "triage",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        run_issue.assert_called_once_with("#82", config, recover=False)
 
     def test_recovered_run_loads_existing_plan_and_skips_committed_steps(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -195,7 +247,7 @@ class SympohyRunnerTest(unittest.TestCase):
         prompts = codex_text.call_args.args[0]
         self.assertIn("Implement logical step 3", prompts[0])
 
-    def test_implementation_recovery_reuses_dirty_worktree_for_next_step(self) -> None:
+    def test_implementation_recovery_blocks_dirty_worktree(self) -> None:
         def check_output(args: list[str], **_kwargs: object) -> str:
             if args == ["git", "log", "--format=%s", "main..HEAD"]:
                 return "#82 feat(sympohy): implement logical step 1\n"
@@ -215,11 +267,136 @@ class SympohyRunnerTest(unittest.TestCase):
             )
 
         self.assertEqual(recovery.committed_logical_steps, 1)
-        self.assertEqual(recovery.worktree_logical_step, 2)
+        self.assertIsNone(recovery.worktree_logical_step)
         self.assertFalse(recovery.worktree_clean)
-        self.assertTrue(recovery.should_reuse_worktree(2))
-        self.assertEqual(recovery.next_logical_step(3), 2)
-        self.assertEqual(recovery.resume_action(3), "reuse_worktree_changes")
+        self.assertIsNotNone(recovery.unsafe_reason)
+        assert recovery.unsafe_reason is not None
+        self.assertIn("worktree has uncommitted changes", recovery.unsafe_reason)
+        self.assertIn("scripts/sympohy/runner.py", recovery.unsafe_reason)
+        self.assertFalse(recovery.should_reuse_worktree(2))
+        self.assertEqual(recovery.resume_action(3), "block_unsafe_resume")
+
+    def test_implementation_recovery_blocks_inconsistent_step_commits(self) -> None:
+        def check_output(args: list[str], **_kwargs: object) -> str:
+            if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                return (
+                    "#82 feat(sympohy): implement logical step 3\n"
+                    "#82 feat(sympohy): implement logical step 1\n"
+                )
+            if args == ["git", "status", "--porcelain"]:
+                return ""
+            raise AssertionError(f"unexpected check_output: {args}")
+
+        with patch(
+            "scripts.sympohy.runner.subprocess.check_output",
+            side_effect=check_output,
+        ):
+            recovery = _infer_implementation_recovery(
+                82,
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+                total_steps=3,
+            )
+
+        self.assertEqual(recovery.committed_logical_steps, 1)
+        self.assertIsNotNone(recovery.unsafe_reason)
+        assert recovery.unsafe_reason is not None
+        self.assertIn("logical step commits are inconsistent", recovery.unsafe_reason)
+        self.assertIn("[3]", recovery.unsafe_reason)
+
+    def test_implementation_recovery_blocks_when_base_branch_cannot_be_inspected(
+        self,
+    ) -> None:
+        with patch(
+            "scripts.sympohy.runner.subprocess.check_output",
+            side_effect=subprocess.CalledProcessError(128, ["git", "log"]),
+        ):
+            recovery = _infer_implementation_recovery(
+                82,
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+                total_steps=3,
+            )
+
+        self.assertEqual(recovery.committed_logical_steps, 0)
+        self.assertIsNotNone(recovery.unsafe_reason)
+        assert recovery.unsafe_reason is not None
+        self.assertIn("could not inspect logical step commits", recovery.unsafe_reason)
+
+    def test_implementation_recovery_blocks_when_worktree_status_cannot_be_inspected(
+        self,
+    ) -> None:
+        def check_output(args: list[str], **_kwargs: object) -> str:
+            if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                return "#82 feat(sympohy): implement logical step 1\n"
+            if args == ["git", "status", "--porcelain"]:
+                raise subprocess.CalledProcessError(128, args)
+            raise AssertionError(f"unexpected check_output: {args}")
+
+        with patch(
+            "scripts.sympohy.runner.subprocess.check_output",
+            side_effect=check_output,
+        ):
+            recovery = _infer_implementation_recovery(
+                82,
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+                total_steps=3,
+            )
+
+        self.assertEqual(recovery.committed_logical_steps, 1)
+        self.assertIsNotNone(recovery.unsafe_reason)
+        assert recovery.unsafe_reason is not None
+        self.assertIn("could not inspect worktree status", recovery.unsafe_reason)
+
+    def test_recovered_run_blocks_when_saved_plan_is_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            issue = Issue(
+                number=82,
+                title="Recover stale run",
+                body="""
+## AC
+- [ ] recover implementation
+
+## DoD
+- [ ] avoid unsafe resume
+""",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+                patch("scripts.sympohy.runner._codex_json") as codex_json,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    return_value="issue-82-sympohy\n",
+                ),
+            ):
+                result = run_issue("#82", config, recover=True)
+
+        self.assertEqual(result, 2)
+        codex_json.assert_not_called()
+        codex_text.assert_not_called()
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+            status="sympohy:blocked",
+            phase="implement",
+            cwd=worktree,
+        )
+        self.assertIn(
+            "missing or invalid saved implementation plan",
+            comment.call_args.args[1],
+        )
 
     def test_implementation_recovery_continues_from_clean_next_step(self) -> None:
         def check_output(args: list[str], **_kwargs: object) -> str:

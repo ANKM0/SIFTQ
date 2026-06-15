@@ -35,6 +35,7 @@ class _ImplementationRecovery:
     committed_logical_steps: int
     worktree_logical_step: int | None = None
     worktree_clean: bool = True
+    unsafe_reason: str | None = None
 
     def next_logical_step(self, total_steps: int) -> int | None:
         if self.committed_logical_steps >= total_steps:
@@ -45,6 +46,8 @@ class _ImplementationRecovery:
         return self.next_logical_step(total_steps) is None
 
     def resume_action(self, total_steps: int) -> str:
+        if self.unsafe_reason is not None:
+            return "block_unsafe_resume"
         if self.implementation_complete(total_steps):
             return "push_pr"
         if self.worktree_logical_step is not None:
@@ -238,7 +241,31 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             else None,
         },
     )
-    return run_issue(issue_ref, config, recover=True)
+
+    if inspection.reason in {
+        "missing phase label",
+        "missing state",
+        "missing pid",
+        "missing heartbeat",
+    }:
+        _block(
+            issue_ref,
+            phase=inspection.phase or resume_point.phase or "triage",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=_unsafe_resume_reason(
+                "missing required run state",
+                inspection.reason,
+                inspection.state_path,
+            ),
+            run_log_path=log_dir,
+            cwd=None,
+            state=state,
+            current_labels=issue.labels,
+        )
+        return 2
+
+    return run_issue(issue_ref, config, recover=resume_point.name != "planning")
 
 
 def refine_issue(issue_ref: str) -> tuple[int, str]:
@@ -303,7 +330,28 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
 
     worktree = ensure_worktree(issue, config)
     log_dir.mkdir(parents=True, exist_ok=True)
-    branch = _current_branch(worktree)
+    try:
+        branch = _current_branch(worktree)
+    except subprocess.CalledProcessError:
+        if not recover:
+            raise
+        state.write(
+            phase="implement",
+            worktree=worktree,
+            progress={"message": "unsafe resume blocked"},
+        )
+        _block(
+            issue_ref,
+            phase="implement",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=f"could not inspect current branch for worktree {worktree}",
+            run_log_path=log_dir,
+            cwd=None,
+            state=state,
+            current_labels=issue.labels,
+        )
+        return 2
     plan_path = log_dir / "plan.json"
     state.write(
         phase="implement",
@@ -322,6 +370,19 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
 
     plan = _load_existing_plan(plan_path) if recover else None
     loaded_existing_plan = plan is not None
+    if recover and plan is None:
+        _block(
+            issue_ref,
+            phase="implement",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=f"missing or invalid saved implementation plan at {plan_path}",
+            run_log_path=log_dir,
+            cwd=worktree,
+            state=state,
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+        )
+        return 2
     if plan is None:
         plan = _codex_json(
             [
@@ -353,6 +414,30 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
         if recover
         else _ImplementationRecovery(committed_logical_steps=0)
     )
+    if recovery.unsafe_reason is not None:
+        state.write(
+            phase="implement",
+            status="blocked",
+            progress={
+                "message": "unsafe resume blocked",
+                "cause": recovery.unsafe_reason,
+                "plan_log_path": str(plan_path),
+                "recovered_existing_plan": loaded_existing_plan,
+                "worktree_clean": recovery.worktree_clean,
+            },
+        )
+        _block(
+            issue_ref,
+            phase="implement",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=recovery.unsafe_reason,
+            run_log_path=log_dir,
+            cwd=worktree,
+            state=state,
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+        )
+        return 2
     next_logical_step = recovery.next_logical_step(total_steps)
     state.write(
         phase="implement",
@@ -718,6 +803,7 @@ def _block(
     run_log_path: Path,
     cwd: Path | None,
     state: _RunStateWriter | None = None,
+    current_labels: Sequence[str] | None = None,
 ) -> None:
     if state is not None:
         state.write(
@@ -733,7 +819,7 @@ def _block(
         )
     set_issue_state(
         issue_ref,
-        current_labels=("sympohy:running", f"sympohy:phase:{phase}"),
+        current_labels=current_labels or ("sympohy:running", f"sympohy:phase:{phase}"),
         status="sympohy:blocked",
         phase=phase,
         cwd=cwd,
@@ -873,17 +959,54 @@ def _infer_implementation_recovery(
     base_branch: str,
     total_steps: int,
 ) -> _ImplementationRecovery:
-    completed = _completed_logical_steps_from_commits(
-        issue_number,
-        cwd=cwd,
-        base_branch=base_branch,
-        total_steps=total_steps,
-    )
-    worktree_clean = not _worktree_has_changes(cwd)
-    worktree_step = completed + 1 if not worktree_clean and completed < total_steps else None
+    try:
+        subjects = _commit_subjects(
+            cwd=cwd,
+            base_branch=base_branch,
+            allow_fallback=False,
+        )
+    except subprocess.CalledProcessError:
+        return _ImplementationRecovery(
+            committed_logical_steps=0,
+            unsafe_reason=(
+                "could not inspect logical step commits relative to "
+                f"base branch {base_branch}"
+            ),
+        )
+
+    committed_steps = _logical_step_numbers_from_commits(issue_number, subjects)
+    completed = _contiguous_logical_step_prefix(committed_steps, total_steps)
+    inconsistent_steps = sorted(step for step in committed_steps if step > completed)
+    if inconsistent_steps:
+        return _ImplementationRecovery(
+            committed_logical_steps=completed,
+            unsafe_reason=(
+                "logical step commits are inconsistent; "
+                f"completed contiguous prefix is {completed}, "
+                f"but found later step commits {inconsistent_steps}"
+            ),
+        )
+
+    try:
+        status = _worktree_status(cwd)
+    except subprocess.CalledProcessError:
+        return _ImplementationRecovery(
+            committed_logical_steps=completed,
+            unsafe_reason=f"could not inspect worktree status for {cwd}",
+        )
+    worktree_clean = not status.strip()
+    if not worktree_clean:
+        return _ImplementationRecovery(
+            committed_logical_steps=completed,
+            worktree_clean=False,
+            unsafe_reason=(
+                "worktree has uncommitted changes during resume: "
+                f"{_summarize_status(status)}"
+            ),
+        )
+
     return _ImplementationRecovery(
         committed_logical_steps=completed,
-        worktree_logical_step=worktree_step,
         worktree_clean=worktree_clean,
     )
 
@@ -896,20 +1019,36 @@ def _completed_logical_steps_from_commits(
     total_steps: int,
 ) -> int:
     subjects = _commit_subjects(cwd=cwd, base_branch=base_branch)
+    committed_steps = _logical_step_numbers_from_commits(issue_number, subjects)
+    return _contiguous_logical_step_prefix(committed_steps, total_steps)
+
+
+def _logical_step_numbers_from_commits(
+    issue_number: int,
+    subjects: Iterable[str],
+) -> set[int]:
     committed_steps: set[int] = set()
     for subject in subjects:
         match = LOGICAL_STEP_COMMIT_RE.match(subject)
         if match is None or int(match.group("issue")) != issue_number:
             continue
         committed_steps.add(int(match.group("step")))
+    return committed_steps
 
+
+def _contiguous_logical_step_prefix(committed_steps: set[int], total_steps: int) -> int:
     completed = 0
     while completed + 1 in committed_steps and completed < total_steps:
         completed += 1
     return completed
 
 
-def _commit_subjects(*, cwd: Path, base_branch: str) -> list[str]:
+def _commit_subjects(
+    *,
+    cwd: Path,
+    base_branch: str,
+    allow_fallback: bool = True,
+) -> list[str]:
     try:
         output = subprocess.check_output(
             ["git", "log", "--format=%s", f"{base_branch}..HEAD"],
@@ -917,6 +1056,8 @@ def _commit_subjects(*, cwd: Path, base_branch: str) -> list[str]:
             text=True,
         )
     except subprocess.CalledProcessError:
+        if not allow_fallback:
+            raise
         output = subprocess.check_output(
             ["git", "log", "--format=%s"],
             cwd=cwd,
@@ -926,12 +1067,39 @@ def _commit_subjects(*, cwd: Path, base_branch: str) -> list[str]:
 
 
 def _worktree_has_changes(cwd: Path) -> bool:
+    return bool(_worktree_status(cwd).strip())
+
+
+def _worktree_status(cwd: Path) -> str:
     output = subprocess.check_output(
         ["git", "status", "--porcelain"],
         cwd=cwd,
         text=True,
     )
-    return bool(output.strip())
+    return output
+
+
+def _summarize_status(status: str, *, limit: int = 5) -> str:
+    lines = [line.strip() for line in status.splitlines() if line.strip()]
+    if not lines:
+        return "no changes reported"
+    summary = "; ".join(lines[:limit])
+    if len(lines) > limit:
+        summary += f"; and {len(lines) - limit} more"
+    return summary
+
+
+def _unsafe_resume_reason(
+    category: str,
+    reason: str | None,
+    state_path: Path | None,
+) -> str:
+    parts = [category]
+    if reason:
+        parts.append(reason)
+    if state_path is not None:
+        parts.append(f"state path: {state_path}")
+    return "; ".join(parts)
 
 
 def _ensure_draft_pull_request(*, cwd: Path) -> None:
