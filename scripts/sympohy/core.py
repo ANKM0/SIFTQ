@@ -143,6 +143,16 @@ def inspect_running_issue(
         )
 
     phase = phase_from_state(state) or label_phase
+    state_error = _state_identity_error(state, number)
+    if state_error is not None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason=state_error,
+            state_path=state_path,
+            state=state,
+        )
+
     if phase is None:
         return RunningIssueInspection(
             phase=None,
@@ -434,6 +444,27 @@ def _state_pid(state: Mapping[str, object]) -> int | None:
     else:
         return None
     return pid if pid > 0 else None
+
+
+def _state_identity_error(state: Mapping[str, object], issue_number: int) -> str | None:
+    state_issue = state.get("issue")
+    try:
+        if int(state_issue) != issue_number:
+            return "invalid state"
+    except (TypeError, ValueError):
+        return "invalid state"
+
+    run_id = state.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        return "invalid state"
+
+    state_lock = state.get("lock")
+    if isinstance(state_lock, Mapping):
+        lock_run_id = state_lock.get("run_id")
+        if lock_run_id not in {None, run_id}:
+            return "invalid state"
+
+    return None
 
 
 def _state_heartbeat(state: Mapping[str, object]) -> datetime | None:

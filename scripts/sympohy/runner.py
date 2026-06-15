@@ -380,12 +380,6 @@ def watch(config: SympohyConfig) -> int:
             )
             continue
 
-        set_issue_state(
-            f"#{number}",
-            current_labels=labels,
-            status="sympohy:pending",
-            phase="triage",
-        )
         processes.append(
             subprocess.Popen(
                 [
@@ -701,6 +695,12 @@ def _run_issue_locked(
                 current_labels=issue.labels,
             )
             return 2
+        set_issue_state(
+            issue_ref,
+            current_labels=issue.labels,
+            status="sympohy:pending",
+            phase="triage",
+        )
 
     if from_resume and resume_from in {"review", "fix", "merge"}:
         return _resume_late_phase(
@@ -1975,8 +1975,6 @@ def _lock_takeover_allowed(
 
     state_payload = read_run_state(state_path)
     if state_payload is None:
-        if state_path.exists():
-            return False
         return (not _payload_process_alive(lock_payload)) or (
             not _payload_has_fresh_heartbeat(
                 lock_payload,

@@ -156,6 +156,44 @@ class SympohyCoreTest(unittest.TestCase):
             self.assertEqual(inspection.phase, "hooks")
             self.assertFalse(inspection.stale)
 
+    def test_running_issue_with_wrong_state_identity_is_stale(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:implement"},
+            ],
+        }
+
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "issue-82"
+            state_dir.mkdir(parents=True)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 79,
+                        "run_id": "run-79",
+                        "phase": "implement",
+                        "pid": 123,
+                        "heartbeat": now.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 123,
+            )
+
+        self.assertTrue(inspection.stale)
+        self.assertEqual(inspection.reason, "invalid state")
+
     def test_running_issue_without_state_is_stale_candidate(self) -> None:
         issue = {
             "number": 82,
@@ -437,7 +475,11 @@ class SympohyCoreTest(unittest.TestCase):
     ) -> None:
         state_dir = root / f"issue-{issue_number}"
         state_dir.mkdir(parents=True, exist_ok=True)
-        payload: dict[str, object] = {}
+        payload: dict[str, object] = {
+            "issue": issue_number,
+            "run_id": f"run-{issue_number}",
+            "lock": {"run_id": f"run-{issue_number}"},
+        }
         if phase is not None:
             payload["phase"] = phase
         if pid is not None:

@@ -57,12 +57,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 result = watch(config)
 
         self.assertEqual(result, 0)
-        set_issue_state.assert_called_once_with(
-            "#82",
-            current_labels=["enhancement"],
-            status="sympohy:pending",
-            phase="triage",
-        )
+        set_issue_state.assert_not_called()
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["run", "#82"])
 
@@ -364,10 +359,12 @@ class SympohyRunnerTest(unittest.TestCase):
             state_dir.mkdir(parents=True)
             original_state = {
                 "issue": 82,
+                "run_id": "active-run",
                 "phase": "implement",
                 "status": "running",
                 "pid": os.getpid(),
                 "heartbeat": datetime.now(timezone.utc).isoformat(),
+                "lock": {"run_id": "active-run"},
             }
             (state_dir / "state.json").write_text(
                 json.dumps(original_state),
@@ -2439,7 +2436,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
             self.assertFalse((log_dir / "run.lock").exists())
 
-    def test_issue_run_lock_refuses_stale_lock_with_corrupt_state(
+    def test_issue_run_lock_takes_over_stale_lock_with_corrupt_state(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -2465,13 +2462,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 run_id="new-run",
                 stale_status_after_minutes=30,
             )
-            with (
-                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
-                self.assertRaises(_RunLockedError),
-            ):
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
                 lock.acquire()
+                lock.release()
 
-            self.assertTrue((log_dir / "run.lock").exists())
+            self.assertFalse((log_dir / "run.lock").exists())
 
     def test_issue_run_lock_refuses_takeover_when_guard_exists(self) -> None:
         with TemporaryDirectory() as tmp:
