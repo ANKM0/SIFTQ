@@ -44,13 +44,15 @@ UI 変更がある場合は、追加で次の wireframe 文書と wireframe HTML
 Refinement は独立した文書にしない。未決事項、対象範囲、受け入れ
 条件の整理は requirements 作成プロセスの一部として扱う。
 
-## Requirements
+## Requirements Template
 
 Requirements は「何を満たすべきか」を記録する。機能の目的、対象範囲、
 対象外、機能要件、受け入れ条件を先に明確にし、設計や実装の判断を
 要求として混ぜない。
 
-最小テンプレート:
+`docs/requirements/<feature>.md` は次の最小テンプレートで作成する。
+各節は空のまま残さず、未確定の内容は `Open Questions（未決事項）` に
+集約する。
 
 ```md
 # <Feature> Requirements
