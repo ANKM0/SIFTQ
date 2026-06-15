@@ -260,8 +260,14 @@ Review results are posted to the PR so blocking findings and fix status are
 traceable.
 
 Before merge, a final verifier Codex pass must return JSON confirming AC/DoD
-satisfaction and recommending merge. `sympohy` then marks the PR ready, waits
-for GitHub checks, and squash merges through the PR with branch deletion.
+satisfaction and recommending `merge` or `block`. `merge` responses must include
+an empty `findings[]` array. `block` responses must include a non-empty
+`findings[]` array whose entries provide `kind`, `summary`, `evidence`, and
+`suggested_fix` fields so the runner can feed the result into automated fixing.
+`kind` is one of `acceptance_criteria`, `definition_of_done`, `verification`,
+`reviewability`, or `other`. `sympohy` then marks the PR ready, waits for GitHub
+checks, and squash merges through the PR with branch deletion when the final
+gate allows merge.
 
 Successful merge adds `sympohy:done`, closes the issue, removes the issue
 worktree, and keeps `.sympohy/runs/*` logs. Blocked runs keep both the worktree

@@ -32,6 +32,18 @@ HEARTBEAT_INTERVAL_SECONDS = 30
 LOGICAL_STEP_COMMIT_RE = re.compile(
     r"^#(?P<issue>\d+) feat\(sympohy\): implement logical step (?P<step>\d+)$"
 )
+FINAL_VERIFIER_PROMPT = (
+    "Act as final verifier. Return a single JSON object with boolean "
+    "acceptance_criteria_satisfied, boolean definition_of_done_satisfied, "
+    'merge_recommendation set to "merge" or "block", and findings as an array. '
+    'When merge_recommendation is "merge", findings must be an empty array. '
+    'When merge_recommendation is "block", findings must be a non-empty array '
+    "of objects for automated fixing. Each finding must include string fields "
+    "kind, summary, evidence, and suggested_fix. kind must be one of "
+    "acceptance_criteria, definition_of_done, verification, reviewability, "
+    "other. summary names the unmet requirement, evidence cites the observed "
+    "failure, and suggested_fix gives concrete implementation guidance."
+)
 
 
 class _RunLockedError(RuntimeError):
@@ -1598,9 +1610,7 @@ def _run_final_verifier_and_merge(
     state.write(phase="finalize", progress=progress)
     final = _codex_json(
         [
-            "Act as final verifier. Return JSON with boolean "
-            "acceptance_criteria_satisfied, boolean definition_of_done_satisfied, "
-            "and merge_recommendation set to merge or block.",
+            FINAL_VERIFIER_PROMPT,
             f"Issue #{issue.number}",
         ],
         cwd=worktree,

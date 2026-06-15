@@ -2039,7 +2039,7 @@ class SympohyRunnerTest(unittest.TestCase):
                         "definition_of_done_satisfied": True,
                         "merge_recommendation": "merge",
                     },
-                ),
+                ) as codex_json,
                 patch(
                     "scripts.sympohy.runner._run_command_with_heartbeat",
                     return_value=0,
@@ -2058,6 +2058,22 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
 
         self.assertEqual(result, 0)
+        final_verifier_prompt = codex_json.call_args.args[0][0]
+        self.assertIn("findings as an array", final_verifier_prompt)
+        self.assertIn('When merge_recommendation is "merge"', final_verifier_prompt)
+        self.assertIn("findings must be an empty array", final_verifier_prompt)
+        self.assertIn('When merge_recommendation is "block"', final_verifier_prompt)
+        self.assertIn("findings must be a non-empty array", final_verifier_prompt)
+        for field in ("kind", "summary", "evidence", "suggested_fix"):
+            self.assertIn(field, final_verifier_prompt)
+        for kind in (
+            "acceptance_criteria",
+            "definition_of_done",
+            "verification",
+            "reviewability",
+            "other",
+        ):
+            self.assertIn(kind, final_verifier_prompt)
         heartbeat_commands = [call.args[0] for call in run_command.call_args_list]
         self.assertEqual(
             heartbeat_commands,
