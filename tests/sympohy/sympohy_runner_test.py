@@ -1324,7 +1324,7 @@ class SympohyRunnerTest(unittest.TestCase):
             },
         )
 
-    def test_issue_run_lock_refuses_consistent_stale_heartbeat_with_live_pid(
+    def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -1344,6 +1344,52 @@ class SympohyRunnerTest(unittest.TestCase):
                 "status": "running",
                 "pid": os.getpid(),
                 "heartbeat": stale.isoformat(),
+                "lock": {
+                    "path": str(log_dir / "run.lock"),
+                    "run_id": "old-run",
+                },
+            }
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+
+            lock.acquire()
+            lock.release()
+
+            self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_refuses_fresh_heartbeat_with_live_pid(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            fresh = datetime.now(timezone.utc)
+            lock_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "pid": os.getpid(),
+                "heartbeat": fresh.isoformat(),
+            }
+            state_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "phase": "implement",
+                "status": "running",
+                "pid": os.getpid(),
+                "heartbeat": fresh.isoformat(),
                 "lock": {
                     "path": str(log_dir / "run.lock"),
                     "run_id": "old-run",

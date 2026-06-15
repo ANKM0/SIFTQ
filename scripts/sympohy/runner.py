@@ -1551,12 +1551,11 @@ def _lock_takeover_allowed(
         if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
             return False
 
-    if _lock_process_alive(lock_path):
-        return False
-
     heartbeat = _heartbeat_from_payload(state_payload)
+    if not _lock_process_alive(lock_path):
+        return True
     if heartbeat is None:
-        return False
+        return True
     stale_after_seconds = stale_status_after_minutes * 60
     age_seconds = (datetime.now(timezone.utc) - heartbeat).total_seconds()
     return age_seconds > stale_after_seconds
