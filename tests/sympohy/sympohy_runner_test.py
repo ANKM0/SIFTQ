@@ -304,7 +304,7 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertIn("invalid run state", state["last_known_progress"]["cause"])
 
     def test_resume_issue_selects_recovery_mode_from_phase_label(self) -> None:
-        for phase in ("triage", "implement", "hooks", "review", "fix", "merge"):
+        for phase in ("triage", "implement", "hooks", "review", "fix", "finalize"):
             with self.subTest(phase=phase), TemporaryDirectory() as tmp:
                 config = self._config(Path(tmp))
                 issue = Issue(
@@ -1402,7 +1402,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 number=82,
                 title="Already completed",
                 body="",
-                labels=("sympohy:done", "sympohy:phase:merge"),
+                labels=("sympohy:done", "sympohy:phase:finalize"),
                 comments=(),
             )
 
@@ -1420,7 +1420,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         run_issue.assert_not_called()
-        self.assertEqual(state["phase"], "merge")
+        self.assertEqual(state["phase"], "finalize")
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
 
@@ -1980,7 +1980,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 number=82,
                 title="Merge stale-safe PR",
                 body="",
-                labels=("sympohy:running", "sympohy:phase:merge"),
+                labels=("sympohy:running", "sympohy:phase:finalize"),
                 comments=(),
             )
             state = _RunStateWriter(
@@ -2047,7 +2047,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 number=82,
                 title="Merge stale-safe PR",
                 body="",
-                labels=("sympohy:running", "sympohy:phase:merge"),
+                labels=("sympohy:running", "sympohy:phase:finalize"),
                 comments=(),
             )
             state = _RunStateWriter(
@@ -2081,9 +2081,9 @@ class SympohyRunnerTest(unittest.TestCase):
         check_call.assert_any_call(["gh", "issue", "close", "#82"])
         set_issue_state.assert_called_once_with(
             "#82",
-            current_labels=("sympohy:running", "sympohy:phase:merge"),
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
             status="sympohy:done",
-            phase="merge",
+            phase="finalize",
         )
         self.assertEqual(final_state["status"], "done")
         self.assertEqual(
@@ -2092,7 +2092,7 @@ class SympohyRunnerTest(unittest.TestCase):
         )
 
     def test_late_phase_resume_blocks_dirty_review_and_merge_worktrees(self) -> None:
-        for phase in ("review", "merge"):
+        for phase in ("review", "finalize"):
             with self.subTest(phase=phase), TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 worktree = root / "worktrees" / "issue-82"
@@ -2189,6 +2189,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
             with (
                 patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
+                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
                 patch("scripts.sympohy.runner._worktree_has_changes", return_value=True),
                 patch(
                     "scripts.sympohy.runner._worktree_status",
@@ -2253,6 +2254,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._commit_subject_exists",
                     return_value=False,
                 ) as commit_subject_exists,
+                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
                 patch("scripts.sympohy.runner._worktree_has_changes", return_value=True),
                 patch(
                     "scripts.sympohy.runner._worktree_status",

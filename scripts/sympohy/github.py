@@ -227,15 +227,25 @@ def set_issue_state(
     status: str,
     phase: str,
     cwd: Path | None = None,
-) -> None:
-    latest_labels = fetch_issue_labels(issue_ref, cwd=cwd)
-    remove, add = _label_transition_diff(latest_labels, status=status, phase=phase)
+) -> tuple[str, ...]:
+    latest_labels = tuple(current_labels)
+    if len(latest_labels) == 0:
+        latest_labels = fetch_issue_labels(issue_ref, cwd=cwd)
+    desired_labels = set(transition_labels(latest_labels, status=status, phase=phase))
+    current_set = set(latest_labels)
+    remove = {
+        label
+        for label in current_set.intersection((*STATUS_LABELS, *PHASE_LABELS))
+        if label not in desired_labels
+    }
+    add = desired_labels - current_set
     if not remove and not add:
-        return
+        return transition_labels(latest_labels, status=status, phase=phase)
     if remove:
         gh_run(["issue", "edit", issue_ref, "--remove-label", ",".join(sorted(remove))], cwd=cwd)
     if add:
         gh_run(["issue", "edit", issue_ref, "--add-label", ",".join(sorted(add))], cwd=cwd)
+    return transition_labels(latest_labels, status=status, phase=phase)
 
 
 def comment(issue_or_pr_ref: str, body: str, *, cwd: Path | None = None) -> None:

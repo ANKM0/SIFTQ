@@ -29,15 +29,12 @@ class SympohyGithubTest(unittest.TestCase):
         ):
             set_issue_state(
                 "#82",
-                current_labels=("sympohy:running", "sympohy:phase:implement"),
+                current_labels=("sympohy:blocked", "sympohy:phase:implement"),
                 status="sympohy:blocked",
                 phase="implement",
             )
 
-        gh_json.assert_called_once_with(
-            ["issue", "view", "#82", "--json", "labels"],
-            cwd=None,
-        )
+        gh_json.assert_not_called()
         gh_run.assert_not_called()
 
     def test_comment_skips_existing_body(self) -> None:

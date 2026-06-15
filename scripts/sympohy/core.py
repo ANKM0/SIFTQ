@@ -322,7 +322,7 @@ def resolve_resume_point(
 
     if phase in {None, "triage"}:
         return ResumePoint(name="planning", phase=phase)
-    if phase in {"implement", "hooks", "review", "fix", "merge"}:
+    if phase in {"implement", "hooks", "review", "fix", "finalize"}:
         return ResumePoint(name=phase, phase=phase)
 
     return ResumePoint(name="planning", phase=phase)
@@ -477,9 +477,9 @@ def _checklist_items(lines: Iterable[str]) -> list[str]:
 
 def _phase_from_labels(labels: Iterable[str]) -> str | None:
     phases = [
-        label.removeprefix("sympohy:phase:")
+        PHASE_ALIASES.get(label.removeprefix("sympohy:phase:"), label.removeprefix("sympohy:phase:"))
         for label in labels
-        if label in PHASE_LABELS
+        if label.startswith("sympohy:phase:")
     ]
     if len(phases) != 1:
         return None
@@ -516,7 +516,7 @@ def _legacy_status(labels: set[str], issue_state: str) -> str:
 def _legacy_phase(labels: set[str], status: str) -> str:
     normalized = {label.lower() for label in labels}
     if status == "sympohy:done":
-        return "merge"
+        return "finalize"
     if normalized.intersection(LEGACY_FIX_LABELS):
         return "fix"
     if normalized.intersection(LEGACY_REVIEW_LABELS):
@@ -546,6 +546,8 @@ def phase_from_state(state: Mapping[str, object] | None) -> str | None:
     phase = state.get("phase")
     if isinstance(phase, str) and phase in PHASES:
         return phase
+    if isinstance(phase, str):
+        return PHASE_ALIASES.get(phase)
     return None
 
 
