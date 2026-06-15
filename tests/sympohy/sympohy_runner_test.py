@@ -84,6 +84,35 @@ class SympohyRunnerTest(unittest.TestCase):
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["resume", "#82"])
 
+    def test_watch_routes_stale_pending_candidate_to_resume(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = {
+                "number": 82,
+                "state": "OPEN",
+                "labels": [
+                    {"name": "sympohy:pending"},
+                    {"name": "sympohy:phase:triage"},
+                ],
+            }
+
+            with (
+                patch(
+                    "scripts.sympohy.runner.list_candidate_issues",
+                    return_value=[issue],
+                ),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.subprocess.Popen") as popen,
+            ):
+                popen.return_value.poll.return_value = None
+
+                result = watch(config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        command = popen.call_args.args[0]
+        self.assertEqual(command[-2:], ["resume", "#82"])
+
     def test_watch_routes_dead_pid_running_candidate_to_resume(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -288,6 +317,33 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         run_issue.assert_called_once_with("#82", config, recover=False)
+
+    def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale pending",
+                body="",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        run_issue.assert_called_once_with("#82", config, recover=False)
+        set_issue_state.assert_not_called()
+        comment.assert_not_called()
 
     def test_recovered_run_loads_existing_plan_and_skips_committed_steps(self) -> None:
         with TemporaryDirectory() as tmp:

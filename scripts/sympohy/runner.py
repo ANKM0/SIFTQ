@@ -159,7 +159,7 @@ def watch(config: SympohyConfig) -> int:
     for issue in selected:
         number = int(issue["number"])
         labels = _label_names(issue.get("labels", []))
-        if "sympohy:running" in labels:
+        if "sympohy:pending" in labels or "sympohy:running" in labels:
             inspection = inspect_running_issue(issue, run_log_root=config.run_log_root)
             if not inspection.stale:
                 continue
@@ -227,6 +227,9 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     inspection = inspect_running_issue(payload, run_log_root=config.run_log_root)
     if not inspection.stale:
         return 0
+
+    if "sympohy:pending" in issue.labels and "sympohy:running" not in issue.labels:
+        return run_issue(issue_ref, config, recover=False)
 
     state = _RunStateWriter(
         issue_number=issue.number,

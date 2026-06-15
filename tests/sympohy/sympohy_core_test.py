@@ -57,11 +57,44 @@ class SympohyCoreTest(unittest.TestCase):
         issue = {"state": "OPEN", "labels": [{"name": "bug"}]}
 
         self.assertTrue(is_candidate_issue(issue))
-        self.assertFalse(
-            is_candidate_issue(
-                {"state": "OPEN", "labels": [{"name": "sympohy:pending"}]}
+
+    def test_terminal_status_labels_are_not_candidates(self) -> None:
+        for status in ("sympohy:blocked", "sympohy:done"):
+            with self.subTest(status=status):
+                self.assertFalse(
+                    is_candidate_issue(
+                        {
+                            "state": "OPEN",
+                            "labels": [
+                                {"name": status},
+                                {"name": "sympohy:phase:implement"},
+                            ],
+                        }
+                    )
+                )
+
+    def test_pending_issue_without_state_is_stale_candidate(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:pending"},
+                {"name": "sympohy:phase:triage"},
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc),
+                process_alive=lambda _pid: True,
             )
-        )
+
+            self.assertTrue(inspection.stale)
+            self.assertEqual(inspection.reason, "missing state")
+            self.assertTrue(is_candidate_issue(issue, run_log_root=root))
 
     def test_fresh_running_issue_with_live_pid_is_not_candidate(self) -> None:
         issue = {

@@ -97,7 +97,7 @@ def is_candidate_issue(
     names = set(_label_names(issue.get("labels", [])))
     if not names.intersection(STATUS_LABELS):
         return True
-    if "sympohy:running" not in names:
+    if not names.intersection({"sympohy:pending", "sympohy:running"}):
         return False
     return inspect_running_issue(
         issue,
