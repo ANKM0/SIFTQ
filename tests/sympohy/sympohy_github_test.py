@@ -92,6 +92,37 @@ class SympohyGithubTest(unittest.TestCase):
         )
         self.assertEqual(migrate.call_count, 1)
 
+    def test_sync_labels_aborts_when_legacy_migration_is_incomplete(self) -> None:
+        issue = {
+            "number": 82,
+            "title": "incomplete",
+            "state": "OPEN",
+            "labels": [{"name": "taqt:running"}],
+        }
+
+        with (
+            patch(
+                "scripts.sympohy.github.gh_json",
+                return_value=[
+                    {"name": "sympohy:pending"},
+                    {"name": "taqt:running"},
+                ],
+            ),
+            patch(
+                "scripts.sympohy.github.list_legacy_task_issues",
+                side_effect=[[issue], [issue]],
+            ),
+            patch("scripts.sympohy.github.migrate_legacy_tasks") as migrate,
+            patch("scripts.sympohy.github.gh_run") as gh_run,
+        ):
+            migrate.return_value = None
+            with self.assertRaises(RuntimeError) as context:
+                sync_labels()
+
+        self.assertIn("legacy migration incomplete", str(context.exception))
+        self.assertEqual(migrate.call_count, 1)
+        gh_run.assert_not_called()
+
     def test_migrate_issue_labels_replaces_only_managed_labels(self) -> None:
         with (
             patch(

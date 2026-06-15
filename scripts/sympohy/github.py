@@ -108,6 +108,26 @@ def list_candidate_issues(
 
 
 def sync_labels(*, cwd: Path | None = None) -> None:
+    legacy_issues = list_legacy_task_issues(cwd=cwd)
+    if legacy_issues:
+        _validate_legacy_migration_plan(legacy_issues)
+
+    migrate_legacy_tasks(cwd=cwd)
+
+    if legacy_issues:
+        remaining = list_legacy_task_issues(cwd=cwd)
+        if remaining:
+            remaining_numbers = [
+                int(issue["number"])
+                for issue in remaining
+                if isinstance(issue.get("number"), int)
+                or (isinstance(issue.get("number"), str) and issue["number"].isdigit())
+            ]
+            raise RuntimeError(
+                "legacy migration incomplete; rerun task ai:sympohy:migrate -- --all "
+                f"first: issues {remaining_numbers[:10]}"
+            )
+
     payload = gh_json(["label", "list", "--limit", "500", "--json", "name"], cwd=cwd)
     if not isinstance(payload, list):
         raise ValueError("gh label list returned non-list JSON")
@@ -118,8 +138,6 @@ def sync_labels(*, cwd: Path | None = None) -> None:
             gh_run(["label", "edit", name, "--description", description], cwd=cwd)
         else:
             gh_run(["label", "create", name, "--description", description], cwd=cwd)
-
-    migrate_legacy_tasks(cwd=cwd)
 
     for name in sorted(existing):
         if _is_legacy_task_label(name):
@@ -300,3 +318,29 @@ def _comments(comments: object) -> list[Mapping[str, object]]:
     if not isinstance(comments, list):
         return []
     return [comment for comment in comments if isinstance(comment, Mapping)]
+
+
+def _validate_legacy_migration_plan(
+    issues: Sequence[Mapping[str, object]],
+) -> None:
+    invalid_issues: list[int] = []
+    for issue in issues:
+        issue_labels = _label_names(issue.get("labels", []))
+        issue_state = str(issue.get("state", "OPEN"))
+        expected = migrate_task_labels(issue_labels, issue_state=issue_state)
+        if not _labels_include_single_status_and_phase(expected):
+            issue_number = issue.get("number")
+            if isinstance(issue_number, int):
+                invalid_issues.append(issue_number)
+            elif isinstance(issue_number, str) and issue_number.isdigit():
+                invalid_issues.append(int(issue_number))
+    if invalid_issues:
+        raise RuntimeError(
+            f"legacy migration plan is incomplete for issues: {invalid_issues}"
+        )
+
+
+def _labels_include_single_status_and_phase(labels: Sequence[str]) -> bool:
+    status_count = len([label for label in labels if label in STATUS_LABELS])
+    phase_count = len([label for label in labels if label in PHASE_LABELS])
+    return status_count == 1 and phase_count == 1
