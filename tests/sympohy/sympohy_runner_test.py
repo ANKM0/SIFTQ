@@ -401,11 +401,58 @@ class SympohyRunnerTest(unittest.TestCase):
             "#82",
             config,
             recover=False,
-            from_resume=True,
+            from_resume=False,
             resume_point="planning",
         )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
+
+    def test_resume_issue_blocks_stale_pending_with_existing_worktree(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            (config.worktree_root / "issue-82").mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Recover stale pending",
+                body="""
+## AC
+- [ ] avoid unsafe pending resume
+
+## DoD
+- [ ] existing worktree blocks
+""",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree") as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:pending", "sympohy:phase:triage"),
+            status="sympohy:blocked",
+            phase="triage",
+            cwd=None,
+        )
+        self.assertIn("existing worktree", comment.call_args.args[1])
+        self.assertEqual(state["status"], "blocked")
+        self.assertIn("existing worktree", state["last_known_progress"]["cause"])
 
     def test_resume_issue_recovers_stale_pending_with_saved_implementation_state(
         self,

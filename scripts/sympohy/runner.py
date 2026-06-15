@@ -371,7 +371,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             issue_ref,
             config,
             recover=False,
-            from_resume=True,
+            from_resume=False,
             resume_point=resume_point.name,
         )
 
