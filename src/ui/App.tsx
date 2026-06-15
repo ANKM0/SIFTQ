@@ -625,9 +625,13 @@ function StatusDropArea({ areaId, label }: StatusDropAreaProps) {
     .join(" ");
 
   return (
-    <article ref={setNodeRef} className={className}>
+    <article
+      ref={setNodeRef}
+      aria-label={`${label} drop area`}
+      className={className}
+    >
       <h2>{label}</h2>
-      <p>0 cards</p>
+      <p aria-label={`${label} task count`}>0 cards</p>
     </article>
   );
 }

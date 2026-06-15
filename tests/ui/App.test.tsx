@@ -72,6 +72,8 @@ describe("App", () => {
 
     expect(screen.getByText("Skipped")).toBeTruthy();
     expect(screen.getByText("Done")).toBeTruthy();
+    expect(screen.getByLabelText("Skipped drop area")).toBeTruthy();
+    expect(screen.getByLabelText("Done drop area")).toBeTruthy();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
   });
@@ -96,6 +98,10 @@ describe("App", () => {
     expect(screen.getByText("Drop")).toBeTruthy();
     expect(screen.getByText("Dismissed")).toBeTruthy();
     expect(screen.getByText("Finished")).toBeTruthy();
+    expect(screen.getByLabelText("Dismissed drop area")).toBeTruthy();
+    expect(screen.getByLabelText("Finished drop area")).toBeTruthy();
+    expect(screen.queryByLabelText("Skipped drop area")).toBeNull();
+    expect(screen.queryByLabelText("Done drop area")).toBeNull();
     expect(screen.getByLabelText("New task title for Now")).toBeTruthy();
   });
 
@@ -145,6 +151,8 @@ describe("App", () => {
     expect(screen.getByText("Later")).toBeTruthy();
     expect(screen.getByText("Dismissed")).toBeTruthy();
     expect(screen.getByText("Finished")).toBeTruthy();
+    expect(screen.getByLabelText("Dismissed drop area")).toBeTruthy();
+    expect(screen.getByLabelText("Finished drop area")).toBeTruthy();
     expect(screen.getByRole("list", { name: "Now tasks" })).toBeTruthy();
   });
 
