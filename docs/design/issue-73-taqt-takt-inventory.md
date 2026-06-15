@@ -87,6 +87,61 @@ The current Taskfile workflow is already `sympohy`-first:
 - No `ai:takt`, `setup:takt`, or `pnpm dlx takt` command remains in
   `Taskfile.yml`.
 
+## Workflow Semantic Mapping
+
+This step maps the old TAKT task concepts to the current `sympohy` execution
+model. There is no active `.takt/` task store in this worktree, so this mapping
+is a semantic compatibility record rather than a data migration script.
+
+### Task Data
+
+Current issue state is represented by one status label from `sympohy:pending`,
+`sympohy:running`, `sympohy:blocked`, or `sympohy:done`, plus at most one
+`sympohy:phase:*` label.
+
+| Legacy TAKT / taqt concept | Current `sympohy` owner | Mapping |
+| --- | --- | --- |
+| Queued GitHub Issue task from `takt add` | GitHub Issue plus `sympohy:*` labels | Open issues without a `sympohy` status label are fresh candidates. |
+| `ai:impl-ready` readiness label | AC/DoD extraction during triage | `sympohy refine` and `sympohy run` require the latest complete AC/DoD set from the issue body or comments; missing readiness becomes `sympohy:blocked` in `triage`. |
+| TAKT workflow step name | `sympohy:phase:*` label and `state.json.phase` | `refine_issue`, `plan`, and readiness checks map to `triage`; `implement` maps to `implement`; validation maps to `hooks`; adversarial review maps to `review` and `fix`; PR handoff and merge map to `merge`. |
+| TAKT `COMPLETE` | `sympohy:done` plus closed issue | Successful merge marks the issue done, closes it, removes the worktree, and retains run logs. |
+| TAKT `ABORT` / blocked result | `sympohy:blocked` | Blocked runs keep the issue worktree and `.sympohy/runs/issue-<number>` logs for inspection. |
+
+### State and Metadata
+
+| Legacy TAKT / taqt concept | Current `sympohy` metadata | Mapping |
+| --- | --- | --- |
+| `.takt/config.yaml` provider, language, VCS, and branch fields | `.sympohy/config.yaml` plus normal local Codex and GitHub CLI config | `sympohy` is repository-local Python and uses the operator's normal `codex`, `gh`, `git`, and Taskfile environment. |
+| TAKT `concurrency: 1` | `max_workers: 10` | Watch mode can start up to ten independent issue workers. |
+| TAKT default branch prefix | `worktree_root`, issue branch, and `base_branch` | Each issue uses `.sympohy/worktrees/issue-<number>` on `issue-<number>-sympohy` from `main`. |
+| TAKT commit message template | Logical-step commit convention | Implementation recovery counts commits with `#<issue> feat(sympohy): implement logical step <n>`. |
+| TAKT queue-local task state | `.sympohy/runs/issue-<number>/state.json` | Run state records `run_id`, issue, status, phase, pid, heartbeat, lock, branch, worktree, plan reference, progress, and recovery metadata. |
+| TAKT workflow-local artifacts | `.sympohy/runs/issue-<number>/` | Run logs, `plan.json`, `state.json`, `run.lock`, and `recovery.log` are retained outside application runtime paths. |
+
+### Commands
+
+| Legacy TAKT command | Current command | Mapping |
+| --- | --- | --- |
+| `task setup:takt` | `task setup:sympohy` | Validates local prerequisites for the repo-local runner. |
+| `task ai:takt -- '#<issue>'` | `task ai:sympohy -- '#<issue>'` | Runs a single issue through triage, implementation, hooks, review, PR, and merge handling. |
+| `task ai:takt:refine -- '#<issue>'` | `task ai:sympohy:refine -- '#<issue>'` | Checks whether the issue has a complete AC/DoD set and blocks triage when it does not. |
+| `task ai:takt:add` and `task ai:takt:run` | `task ai:sympohy:watch` | Queueing is label-driven; the watcher selects fresh or stale open issues and spawns workers. |
+| `task ai:takt:doctor` | `task ai:sympohy:doctor` | Validates config, labels, systemd templates, hooks, Codex command shape, and commit subjects. |
+| None in TAKT | `task ai:sympohy:resume` | Resumes stale or interrupted `pending` and `running` issues from saved state. |
+| None in TAKT | `task ai:sympohy:labels:sync` | Creates or updates `sympohy:*` labels and removes legacy `ai:*` repository labels. |
+| None in TAKT | `task ai:sympohy:systemd:install` and `task ai:sympohy:systemd:status` | Installs and inspects the local systemd user timer for watch mode. |
+
+### Automation Hooks
+
+| Legacy TAKT / taqt concept | Current `sympohy` hook | Mapping |
+| --- | --- | --- |
+| Workflow `rules.next` transitions | Python runner phase transitions | `sympohy` owns transitions in `scripts/sympohy/runner.py` and enforces one active status and one active phase label. |
+| TAKT `required_permission_mode` and `edit` flags | Normal Codex user config and repository rules | `codex exec` is invoked without flags that ignore user config or repo rules. |
+| TAKT validation instruction to use `task ci` | `.sympohy/config.yaml` `hooks` | The configured final hook is `task ci`, with retry and block behavior on repeated failure. |
+| TAKT parallel adversarial review step | Review/fix loop | `sympohy` parses review JSON and repeats fixes while critical, high, or medium findings remain. |
+| TAKT final report / PR handoff | Draft PR, final verifier, GitHub checks, squash merge | `sympohy` creates the draft PR, records review output, requires verifier JSON and passing checks, then merges and closes the issue. |
+| No stale-run recovery in TAKT | Heartbeat and lock inspection | The watcher reselects stale `pending` or `running` issues when state is missing, pid is dead, heartbeat expires, or lock/state metadata allow takeover. |
+
 ## CI Status
 
 GitHub Actions CI installs aqua-managed tools, installs Python and frontend
