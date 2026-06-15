@@ -60,6 +60,11 @@ Manual Matrix MVP smoke check:
   matrix display.
 - Confirm a long 256-character title wraps inside the card without overlapping
   nearby controls or changing the page into an unusable layout.
+- Open `Settings`, change all matrix area labels plus `Done` and `Skipped`,
+  save them, return to the matrix, and confirm the updated labels are shown.
+- Reopen `Settings`, confirm blank labels cannot be saved, then use
+  `Restore defaults` and confirm the labels return to `Do`, `Schedule`,
+  `Delegate`, `Eliminate`, `Done`, and `Skipped`.
 
 Common frontend checks:
 
