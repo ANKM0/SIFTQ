@@ -142,9 +142,12 @@ def ensure_worktree(issue: Issue, config: SympohyConfig) -> Path:
         return worktree
 
     worktree.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.check_call(
-        ["git", "worktree", "add", "-b", branch, str(worktree), config.base_branch]
-    )
+    if _branch_exists(branch):
+        subprocess.check_call(["git", "worktree", "add", str(worktree), branch])
+    else:
+        subprocess.check_call(
+            ["git", "worktree", "add", "-b", branch, str(worktree), config.base_branch]
+        )
     return worktree
 
 
@@ -472,6 +475,24 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
         for index, step in enumerate(logical_steps, start=1):
             if index < next_logical_step:
                 continue
+            subject = f"#{issue.number} feat(sympohy): implement logical step {index}"
+            if not validate_commit_subject(subject):
+                raise ValueError(f"invalid generated commit subject: {subject}")
+            if _commit_subject_exists(
+                subject,
+                cwd=worktree,
+                base_branch=config.base_branch,
+            ):
+                state.write(
+                    phase="implement",
+                    progress={
+                        "message": "logical step commit already exists",
+                        "completed_logical_steps": index,
+                        "total_logical_steps": total_steps,
+                        "commit_subject": subject,
+                    },
+                )
+                continue
             set_issue_state(
                 issue_ref,
                 current_labels=("sympohy:running", "sympohy:phase:implement"),
@@ -536,15 +557,17 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
                     state=state,
                 )
                 return 2
-            subject = f"#{issue.number} feat(sympohy): implement logical step {index}"
-            if not validate_commit_subject(subject):
-                raise ValueError(f"invalid generated commit subject: {subject}")
-            subprocess.check_call(["git", "add", "-A"], cwd=worktree)
-            subprocess.check_call(["git", "commit", "-m", subject], cwd=worktree)
+            committed = _commit_all_if_new(
+                subject,
+                cwd=worktree,
+                base_branch=config.base_branch,
+            )
             state.write(
                 phase="implement",
                 progress={
-                    "message": "committed logical step",
+                    "message": "committed logical step"
+                    if committed
+                    else "logical step commit already exists",
                     "completed_logical_steps": index,
                     "total_logical_steps": total_steps,
                     "commit_subject": subject,
@@ -779,13 +802,19 @@ def _review_fix_loop(
             heartbeat=state.heartbeat,
         )
         subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
-        subprocess.check_call(["git", "add", "-A"], cwd=cwd)
-        subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
-        subprocess.check_call(["git", "push"], cwd=cwd)
+        committed = _commit_all_if_new(
+            subject,
+            cwd=cwd,
+            base_branch=config.base_branch,
+        )
+        if committed:
+            subprocess.check_call(["git", "push"], cwd=cwd)
         state.write(
             phase="review",
             progress={
-                "message": "pushed review fix",
+                "message": "pushed review fix"
+                if committed
+                else "review fix commit already exists",
                 "review_round": round_index,
                 "commit_subject": subject,
             },
@@ -1066,6 +1095,24 @@ def _commit_subjects(
     return output.splitlines()
 
 
+def _commit_subject_exists(subject: str, *, cwd: Path, base_branch: str) -> bool:
+    return subject in _commit_subjects(cwd=cwd, base_branch=base_branch)
+
+
+def _commit_all_if_new(subject: str, *, cwd: Path, base_branch: str) -> bool:
+    if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
+        return False
+
+    subprocess.check_call(["git", "add", "-A"], cwd=cwd)
+    if not _worktree_has_changes(cwd):
+        if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
+            return False
+        raise RuntimeError(f"no changes to commit for subject: {subject}")
+
+    subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
+    return True
+
+
 def _worktree_has_changes(cwd: Path) -> bool:
     return bool(_worktree_status(cwd).strip())
 
@@ -1103,6 +1150,13 @@ def _unsafe_resume_reason(
 
 
 def _ensure_draft_pull_request(*, cwd: Path) -> None:
+    branch = _current_branch(cwd)
+    if _pull_request_exists(branch=branch, cwd=cwd):
+        return
+    subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=cwd)
+
+
+def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
     result = subprocess.run(
         ["gh", "pr", "view", "--json", "number"],
         cwd=cwd,
@@ -1112,8 +1166,39 @@ def _ensure_draft_pull_request(*, cwd: Path) -> None:
         check=False,
     )
     if result.returncode == 0:
-        return
-    subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=cwd)
+        return True
+
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--head",
+            branch,
+            "--state",
+            "open",
+            "--json",
+            "number",
+            "--jq",
+            ".[0].number",
+        ],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def _branch_exists(branch: str) -> bool:
+    result = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _label_names(labels: object) -> list[str]:

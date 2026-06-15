@@ -117,9 +117,10 @@ def set_issue_state(
     phase: str,
     cwd: Path | None = None,
 ) -> None:
-    desired = set(transition_labels(current_labels, status=status, phase=phase))
-    remove = set(current_labels).intersection((*STATUS_LABELS, *PHASE_LABELS)) - desired
-    add = desired - set(current_labels)
+    latest_labels = fetch_issue_labels(issue_ref, cwd=cwd)
+    remove, add = _label_transition_diff(latest_labels, status=status, phase=phase)
+    if not remove and not add:
+        return
     if remove:
         gh_run(["issue", "edit", issue_ref, "--remove-label", ",".join(sorted(remove))], cwd=cwd)
     if add:
@@ -127,7 +128,39 @@ def set_issue_state(
 
 
 def comment(issue_or_pr_ref: str, body: str, *, cwd: Path | None = None) -> None:
+    if comment_exists(issue_or_pr_ref, body, cwd=cwd):
+        return
     gh_run(["issue", "comment", issue_or_pr_ref, "--body", body], cwd=cwd)
+
+
+def fetch_issue_labels(issue_ref: str, *, cwd: Path | None = None) -> tuple[str, ...]:
+    payload = gh_json(["issue", "view", issue_ref, "--json", "labels"], cwd=cwd)
+    if not isinstance(payload, Mapping):
+        raise ValueError("gh issue view returned non-object JSON")
+    return tuple(_label_names(payload.get("labels", [])))
+
+
+def comment_exists(issue_or_pr_ref: str, body: str, *, cwd: Path | None = None) -> bool:
+    payload = gh_json(["issue", "view", issue_or_pr_ref, "--json", "comments"], cwd=cwd)
+    if not isinstance(payload, Mapping):
+        raise ValueError("gh issue view returned non-object JSON")
+    return any(
+        isinstance(comment.get("body"), str) and comment["body"] == body
+        for comment in _comments(payload.get("comments", []))
+    )
+
+
+def _label_transition_diff(
+    current_labels: Sequence[str],
+    *,
+    status: str,
+    phase: str,
+) -> tuple[set[str], set[str]]:
+    desired = set(transition_labels(current_labels, status=status, phase=phase))
+    current = set(current_labels)
+    remove = current.intersection((*STATUS_LABELS, *PHASE_LABELS)) - desired
+    add = desired - current
+    return remove, add
 
 
 def _label_names(labels: object) -> list[str]:

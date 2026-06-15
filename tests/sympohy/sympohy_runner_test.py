@@ -13,7 +13,10 @@ from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
 from scripts.sympohy.runner import (
     _RunStateWriter,
+    _commit_all_if_new,
+    _ensure_draft_pull_request,
     _infer_implementation_recovery,
+    ensure_worktree,
     resume_issue,
     run_issue,
     watch,
@@ -195,14 +198,18 @@ class SympohyRunnerTest(unittest.TestCase):
                 comments=(),
             )
 
+            status_calls = 0
+
             def check_output(args: list[str], **_kwargs: object) -> str:
+                nonlocal status_calls
                 if args == ["git", "log", "--format=%s", "main..HEAD"]:
                     return (
                         "#82 feat(sympohy): implement logical step 2\n"
                         "#82 feat(sympohy): implement logical step 1\n"
                     )
                 if args == ["git", "status", "--porcelain"]:
-                    return ""
+                    status_calls += 1
+                    return "" if status_calls == 1 else " M scripts/sympohy/runner.py\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -237,6 +244,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch(
                     "scripts.sympohy.runner.subprocess.check_output",
                     side_effect=check_output,
+                ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0),
                 ),
                 patch("scripts.sympohy.runner.subprocess.check_call"),
             ):
@@ -526,6 +537,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.check_output",
                     side_effect=check_output,
                 ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 1, stdout=""),
+                ),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
                 result = run_issue("#82", config, recover=True)
@@ -603,6 +618,61 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["phase"], "merge")
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
+
+    def test_ensure_worktree_reuses_existing_issue_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale run",
+                body="",
+                labels=(),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=True),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                worktree = ensure_worktree(issue, config)
+
+        self.assertEqual(worktree, Path(tmp) / "worktrees" / "issue-82")
+        check_call.assert_called_once_with(
+            [
+                "git",
+                "worktree",
+                "add",
+                str(Path(tmp) / "worktrees" / "issue-82"),
+                "issue-82-sympohy",
+            ]
+        )
+
+    def test_commit_all_if_new_skips_existing_subject(self) -> None:
+        with (
+            patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
+            patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+        ):
+            committed = _commit_all_if_new(
+                "#82 feat(sympohy): implement logical step 9",
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+            )
+
+        self.assertFalse(committed)
+        check_call.assert_not_called()
+
+    def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
+        with (
+            patch(
+                "scripts.sympohy.runner._current_branch",
+                return_value="issue-82-sympohy",
+            ),
+            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+            patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+        ):
+            _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+
+        check_call.assert_not_called()
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
