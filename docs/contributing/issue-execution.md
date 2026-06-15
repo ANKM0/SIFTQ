@@ -102,6 +102,12 @@ are routed through resume handling so they are not excluded permanently.
 The watcher starts at most ten workers, and each worker uses an independent
 `.sympohy/worktrees/issue-<number>` worktree and issue branch.
 
+During stale-run recovery, `sympohy` reloads the saved implementation plan when
+available and compares it with logical-step commits already present in the issue
+worktree. A clean recovered worktree continues from the next missing logical
+step. If all logical steps are already committed, recovery skips implementation
+and proceeds to branch push and draft PR creation.
+
 ## Hooks, Review, and Merge
 
 Hooks are configured in `.sympohy/config.yaml`. The initial final hook is:

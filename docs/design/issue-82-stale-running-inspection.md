@@ -93,6 +93,12 @@ the worktree still has uncommitted changes after those commits, recovery treats
 those changes as the next logical step and resumes with hooks and commit instead
 of invoking Codex for that same step again.
 
+If the recovered worktree is clean, the same contiguous commit prefix determines
+the next action. A clean worktree with incomplete implementation resumes Codex
+at the next missing logical step. A clean worktree whose implementation commits
+already cover the saved plan skips implementation and proceeds directly to
+branch push and draft PR creation.
+
 ## Existing Tests
 
 `tests/sympohy/sympohy_core_test.py` covers stale-running inspection and
@@ -100,7 +106,8 @@ candidate selection for `sympohy:running` issues, plus status/phase replacement
 through `transition_labels`.
 
 `tests/sympohy/sympohy_runner_test.py` covers watcher dispatch for both fresh
-issues and stale `sympohy:running` issues.
+issues and stale `sympohy:running` issues, plus dirty and clean implementation
+resume decisions.
 
 `tests/sympohy/sympohyWorkflowContracts.test.ts` contains string-level
 watcher contracts for stale-running inspection, run state persistence, and the

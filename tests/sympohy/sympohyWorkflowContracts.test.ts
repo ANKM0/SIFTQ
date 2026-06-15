@@ -63,6 +63,10 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("_infer_implementation_recovery");
     expect(runner).toContain("recovered_existing_plan");
     expect(runner).toContain("reused_worktree_changes");
+    expect(runner).toContain("next_logical_step");
+    expect(runner).toContain("resume_action");
+    expect(runner).toContain("implement_next_step");
+    expect(runner).toContain("push_pr");
     expect(runner).toContain("git\", \"log\", \"--format=%s\"");
     expect(runner).toContain("git\", \"status\", \"--porcelain\"");
   });

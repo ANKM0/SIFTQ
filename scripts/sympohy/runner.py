@@ -34,6 +34,22 @@ LOGICAL_STEP_COMMIT_RE = re.compile(
 class _ImplementationRecovery:
     committed_logical_steps: int
     worktree_logical_step: int | None = None
+    worktree_clean: bool = True
+
+    def next_logical_step(self, total_steps: int) -> int | None:
+        if self.committed_logical_steps >= total_steps:
+            return None
+        return self.committed_logical_steps + 1
+
+    def implementation_complete(self, total_steps: int) -> bool:
+        return self.next_logical_step(total_steps) is None
+
+    def resume_action(self, total_steps: int) -> str:
+        if self.implementation_complete(total_steps):
+            return "push_pr"
+        if self.worktree_logical_step is not None:
+            return "reuse_worktree_changes"
+        return "implement_next_step"
 
     def should_reuse_worktree(self, index: int) -> bool:
         return self.worktree_logical_step == index
@@ -337,6 +353,7 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
         if recover
         else _ImplementationRecovery(committed_logical_steps=0)
     )
+    next_logical_step = recovery.next_logical_step(total_steps)
     state.write(
         phase="implement",
         progress={
@@ -348,88 +365,106 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
             "plan_log_path": str(plan_path),
             "recovered_existing_plan": loaded_existing_plan,
             "worktree_logical_step": recovery.worktree_logical_step,
+            "next_logical_step": next_logical_step,
+            "resume_action": recovery.resume_action(total_steps),
+            "worktree_clean": recovery.worktree_clean,
+            "implementation_complete": recovery.implementation_complete(total_steps),
         },
     )
 
-    for index, step in enumerate(logical_steps, start=1):
-        if index <= recovery.committed_logical_steps:
-            continue
-        set_issue_state(
-            issue_ref,
-            current_labels=("sympohy:running", "sympohy:phase:implement"),
-            status="sympohy:running",
-            phase="implement",
-            cwd=worktree,
-        )
-        implement_log_path = log_dir / f"implement-{index}.log"
-        reuse_worktree = recovery.should_reuse_worktree(index)
+    if next_logical_step is None:
         state.write(
             phase="implement",
             progress={
-                "message": "resuming logical step from existing worktree changes"
-                if reuse_worktree
-                else "implementing logical step",
-                "current_logical_step": index,
-                "completed_logical_steps": index - 1,
+                "message": "implementation already complete; proceeding to push and pull request",
+                "completed_logical_steps": total_steps,
                 "total_logical_steps": total_steps,
-                "log_path": str(implement_log_path),
-                "reused_worktree_changes": reuse_worktree,
+                "resume_action": "push_pr",
+                "worktree_clean": recovery.worktree_clean,
             },
         )
-        if not reuse_worktree:
-            _codex_text(
-                [
-                    f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
-                    json.dumps(step, ensure_ascii=False),
-                    "Use normal Codex user config and repository rules.",
-                ],
-                cwd=worktree,
-                log_path=implement_log_path,
-                heartbeat=state.heartbeat,
-            )
-        state.write(
-            phase="hooks",
-            progress={
-                "message": "running verification hooks",
-                "current_logical_step": index,
-                "completed_logical_steps": index,
-                "total_logical_steps": total_steps,
-            },
-        )
-        if _run_hooks(
-            config.hooks,
-            config.retry_max_attempts,
-            worktree,
-            log_dir,
-            state=state,
-            logical_step=index,
-            total_logical_steps=total_steps,
-        ) != 0:
-            _block(
+    else:
+        for index, step in enumerate(logical_steps, start=1):
+            if index < next_logical_step:
+                continue
+            set_issue_state(
                 issue_ref,
-                phase="hooks",
-                failed_command="; ".join(config.hooks),
-                attempts=config.retry_max_attempts,
-                cause="verification hooks still failed after retries",
-                run_log_path=log_dir,
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+                status="sympohy:running",
+                phase="implement",
                 cwd=worktree,
-                state=state,
             )
-            return 2
-        subject = f"#{issue.number} feat(sympohy): implement logical step {index}"
-        if not validate_commit_subject(subject):
-            raise ValueError(f"invalid generated commit subject: {subject}")
-        subprocess.check_call(["git", "add", "-A"], cwd=worktree)
-        subprocess.check_call(["git", "commit", "-m", subject], cwd=worktree)
-        state.write(
-            phase="implement",
-            progress={
-                "message": "committed logical step",
-                "completed_logical_steps": index,
-                "total_logical_steps": total_steps,
-                "commit_subject": subject,
-            },
-        )
+            implement_log_path = log_dir / f"implement-{index}.log"
+            reuse_worktree = recovery.should_reuse_worktree(index)
+            state.write(
+                phase="implement",
+                progress={
+                    "message": "resuming logical step from existing worktree changes"
+                    if reuse_worktree
+                    else "implementing logical step",
+                    "current_logical_step": index,
+                    "completed_logical_steps": index - 1,
+                    "total_logical_steps": total_steps,
+                    "log_path": str(implement_log_path),
+                    "reused_worktree_changes": reuse_worktree,
+                    "resume_action": recovery.resume_action(total_steps),
+                    "worktree_clean": recovery.worktree_clean,
+                },
+            )
+            if not reuse_worktree:
+                _codex_text(
+                    [
+                        f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
+                        json.dumps(step, ensure_ascii=False),
+                        "Use normal Codex user config and repository rules.",
+                    ],
+                    cwd=worktree,
+                    log_path=implement_log_path,
+                    heartbeat=state.heartbeat,
+                )
+            state.write(
+                phase="hooks",
+                progress={
+                    "message": "running verification hooks",
+                    "current_logical_step": index,
+                    "completed_logical_steps": index,
+                    "total_logical_steps": total_steps,
+                },
+            )
+            if _run_hooks(
+                config.hooks,
+                config.retry_max_attempts,
+                worktree,
+                log_dir,
+                state=state,
+                logical_step=index,
+                total_logical_steps=total_steps,
+            ) != 0:
+                _block(
+                    issue_ref,
+                    phase="hooks",
+                    failed_command="; ".join(config.hooks),
+                    attempts=config.retry_max_attempts,
+                    cause="verification hooks still failed after retries",
+                    run_log_path=log_dir,
+                    cwd=worktree,
+                    state=state,
+                )
+                return 2
+            subject = f"#{issue.number} feat(sympohy): implement logical step {index}"
+            if not validate_commit_subject(subject):
+                raise ValueError(f"invalid generated commit subject: {subject}")
+            subprocess.check_call(["git", "add", "-A"], cwd=worktree)
+            subprocess.check_call(["git", "commit", "-m", subject], cwd=worktree)
+            state.write(
+                phase="implement",
+                progress={
+                    "message": "committed logical step",
+                    "completed_logical_steps": index,
+                    "total_logical_steps": total_steps,
+                    "commit_subject": subject,
+                },
+            )
 
     branch = subprocess.check_output(
         ["git", "branch", "--show-current"],
@@ -837,12 +872,12 @@ def _infer_implementation_recovery(
         base_branch=base_branch,
         total_steps=total_steps,
     )
-    worktree_step = (
-        completed + 1 if _worktree_has_changes(cwd) and completed < total_steps else None
-    )
+    worktree_clean = not _worktree_has_changes(cwd)
+    worktree_step = completed + 1 if not worktree_clean and completed < total_steps else None
     return _ImplementationRecovery(
         committed_logical_steps=completed,
         worktree_logical_step=worktree_step,
+        worktree_clean=worktree_clean,
     )
 
 
