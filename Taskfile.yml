@@ -140,6 +140,11 @@ tasks:
     cmds:
       - uv run python -m scripts.sympohy labels-sync
 
+  ai:sympohy:migrate:
+    desc: Migrate legacy task labels to sympohy labels, for example task ai:sympohy:migrate -- '#73' or --all.
+    cmds:
+      - uv run python -m scripts.sympohy migrate {{.CLI_ARGS}}
+
   ai:sympohy:watch:
     desc: Watch open GitHub issues and start up to 10 independent sympohy workers.
     cmds:

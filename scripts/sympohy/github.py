@@ -8,9 +8,11 @@ from typing import Mapping, Sequence
 
 from .core import (
     DEFAULT_STALE_STATUS_AFTER_MINUTES,
+    LEGACY_TASK_LABEL_PREFIXES,
     PHASE_LABELS,
     STATUS_LABELS,
     is_candidate_issue,
+    migrate_task_labels,
     transition_labels,
 )
 
@@ -117,9 +119,87 @@ def sync_labels(*, cwd: Path | None = None) -> None:
         else:
             gh_run(["label", "create", name, "--description", description], cwd=cwd)
 
+    migrate_legacy_tasks(cwd=cwd)
+
     for name in sorted(existing):
         if name.startswith("ai:"):
             gh_run(["label", "delete", name, "--yes"], cwd=cwd)
+
+
+def list_legacy_task_issues(
+    *,
+    limit: int = 500,
+    cwd: Path | None = None,
+) -> list[Mapping[str, object]]:
+    payload = gh_json(
+        [
+            "issue",
+            "list",
+            "--state",
+            "all",
+            "--limit",
+            str(limit),
+            "--json",
+            "number,title,state,labels,assignees,milestone",
+        ],
+        cwd=cwd,
+    )
+    if not isinstance(payload, list):
+        raise ValueError("gh issue list returned non-list JSON")
+    return [
+        issue
+        for issue in payload
+        if isinstance(issue, Mapping)
+        and _has_legacy_task_label(_label_names(issue.get("labels", [])))
+    ]
+
+
+def migrate_issue_labels(
+    issue_ref: str,
+    *,
+    dry_run: bool = False,
+    cwd: Path | None = None,
+) -> Mapping[str, object]:
+    issue = fetch_issue(issue_ref, cwd=cwd)
+    desired = migrate_task_labels(issue.labels, issue_state=issue.state)
+    remove, add = _migration_label_diff(issue.labels, desired)
+    if not dry_run:
+        if remove:
+            gh_run(
+                ["issue", "edit", issue_ref, "--remove-label", ",".join(sorted(remove))],
+                cwd=cwd,
+            )
+        if add:
+            gh_run(
+                ["issue", "edit", issue_ref, "--add-label", ",".join(sorted(add))],
+                cwd=cwd,
+            )
+    return {
+        "issue": issue.number,
+        "title": issue.title,
+        "state": issue.state,
+        "old_labels": list(issue.labels),
+        "labels": list(desired),
+        "remove_labels": sorted(remove),
+        "add_labels": sorted(add),
+        "changed": bool(remove or add),
+        "dry_run": dry_run,
+    }
+
+
+def migrate_legacy_tasks(
+    issue_ref: str | None = None,
+    *,
+    dry_run: bool = False,
+    limit: int = 500,
+    cwd: Path | None = None,
+) -> list[Mapping[str, object]]:
+    if issue_ref is not None:
+        return [migrate_issue_labels(issue_ref, dry_run=dry_run, cwd=cwd)]
+    return [
+        migrate_issue_labels(str(issue["number"]), dry_run=dry_run, cwd=cwd)
+        for issue in list_legacy_task_issues(limit=limit, cwd=cwd)
+    ]
 
 
 def set_issue_state(
@@ -174,6 +254,32 @@ def _label_transition_diff(
     remove = current.intersection((*STATUS_LABELS, *PHASE_LABELS)) - desired
     add = desired - current
     return remove, add
+
+
+def _migration_label_diff(
+    current_labels: Sequence[str],
+    desired_labels: Sequence[str],
+) -> tuple[set[str], set[str]]:
+    current = set(current_labels)
+    desired = set(desired_labels)
+    managed = set(STATUS_LABELS).union(PHASE_LABELS)
+    remove = {
+        label
+        for label in current
+        if label not in desired
+        and (label in managed or _is_legacy_task_label(label))
+    }
+    add = desired - current
+    return remove, add
+
+
+def _has_legacy_task_label(labels: Sequence[str]) -> bool:
+    return any(_is_legacy_task_label(label) for label in labels)
+
+
+def _is_legacy_task_label(label: str) -> bool:
+    normalized = label.lower()
+    return any(normalized.startswith(prefix) for prefix in LEGACY_TASK_LABEL_PREFIXES)
 
 
 def _label_names(labels: object) -> list[str]:

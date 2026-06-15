@@ -12,6 +12,7 @@ from scripts.sympohy import (
     inspect_running_issue,
     is_candidate_issue,
     merge_gate_allows_merge,
+    migrate_task_labels,
     next_retry_action,
     resolve_resume_point,
     transition_labels,
@@ -92,6 +93,69 @@ class SympohyCoreTest(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.acceptance_criteria, ("real AC",))
         self.assertEqual(result.definition_of_done, ("real DoD",))
+
+    def test_migrates_ready_legacy_task_labels_to_pending_triage(self) -> None:
+        labels = migrate_task_labels(
+            ("bug", "ai:impl-ready", "area:frontend"),
+            issue_state="OPEN",
+        )
+
+        self.assertEqual(
+            labels,
+            (
+                "area:frontend",
+                "bug",
+                "sympohy:pending",
+                "sympohy:phase:triage",
+            ),
+        )
+
+    def test_migrates_legacy_workflow_intent_to_supported_phase(self) -> None:
+        labels = migrate_task_labels(
+            ("priority:high", "ai:review", "takt:running"),
+            issue_state="OPEN",
+        )
+
+        self.assertEqual(
+            labels,
+            (
+                "priority:high",
+                "sympohy:phase:review",
+                "sympohy:running",
+            ),
+        )
+
+    def test_migrates_closed_legacy_task_to_done_merge(self) -> None:
+        labels = migrate_task_labels(("ai:done", "release:next"), issue_state="CLOSED")
+
+        self.assertEqual(
+            labels,
+            (
+                "release:next",
+                "sympohy:done",
+                "sympohy:phase:merge",
+            ),
+        )
+
+    def test_preserves_existing_sympohy_state_when_removing_legacy_labels(self) -> None:
+        labels = migrate_task_labels(
+            (
+                "ai:impl-ready",
+                "sympohy:running",
+                "sympohy:phase:hooks",
+                "kind:bug",
+            ),
+            issue_state="OPEN",
+        )
+
+        self.assertEqual(
+            labels,
+            (
+                "kind:bug",
+                "sympohy:phase:hooks",
+                "sympohy:running",
+            ),
+        )
 
     def test_open_issue_without_sympohy_status_is_candidate(self) -> None:
         issue = {"state": "OPEN", "labels": [{"name": "bug"}]}

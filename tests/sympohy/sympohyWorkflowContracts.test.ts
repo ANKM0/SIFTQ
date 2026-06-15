@@ -16,6 +16,7 @@ describe("sympohy Taskfile and CLI integration", () => {
       "ai:sympohy:refine",
       "ai:sympohy:doctor",
       "ai:sympohy:labels:sync",
+      "ai:sympohy:migrate",
       "ai:sympohy:watch",
       "ai:sympohy:systemd:install",
       "ai:sympohy:systemd:status"
@@ -25,6 +26,7 @@ describe("sympohy Taskfile and CLI integration", () => {
       true
     );
     expect(cli).toContain("resume");
+    expect(cli).toContain("migrate");
   });
 
   it("keeps sympohy outside application runtime dependencies", () => {
@@ -110,5 +112,12 @@ describe("sympohy automation contract", () => {
     expect(cli).toContain("\"required labels declared\"");
     expect(cli).toContain("\"systemd service template\"");
     expect(cli).toContain("validate_commit_subject");
+  });
+
+  it("migrates legacy task labels without taking over preserved issue metadata", () => {
+    expect(core).toContain("migrate_task_labels");
+    expect(core).toContain("LEGACY_TASK_LABEL_PREFIXES");
+    expect(cli).toContain("migrate_legacy_tasks");
+    expect(taskfile).toContain("ai:sympohy:migrate");
   });
 });

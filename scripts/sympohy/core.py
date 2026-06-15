@@ -20,6 +20,36 @@ PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
 DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
+LEGACY_TASK_LABEL_PREFIXES = ("ai:", "takt:", "taqt:")
+LEGACY_DONE_LABELS = {
+    "ai:done",
+    "ai:complete",
+    "ai:completed",
+    "ai:merged",
+    "takt:done",
+    "takt:complete",
+    "taqt:done",
+    "taqt:complete",
+}
+LEGACY_BLOCKED_LABELS = {
+    "ai:blocked",
+    "ai:needs-human",
+    "ai:needs-input",
+    "takt:blocked",
+    "taqt:blocked",
+}
+LEGACY_REVIEW_LABELS = {"ai:review", "ai:needs-review", "takt:review", "taqt:review"}
+LEGACY_FIX_LABELS = {"ai:fix", "ai:needs-fix", "takt:fix", "taqt:fix"}
+LEGACY_HOOK_LABELS = {"ai:hooks", "ai:ci", "ai:test", "takt:hooks", "taqt:hooks"}
+LEGACY_RUNNING_LABELS = {
+    "ai:running",
+    "ai:implementing",
+    "ai:in-progress",
+    "takt:running",
+    "takt:in-progress",
+    "taqt:running",
+    "taqt:in-progress",
+}
 
 COMMIT_SUBJECT_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
@@ -236,6 +266,25 @@ def transition_labels(
     return tuple(sorted(labels))
 
 
+def migrate_task_labels(
+    current_labels: Iterable[str],
+    *,
+    issue_state: str = "OPEN",
+) -> tuple[str, ...]:
+    labels = tuple(current_labels)
+    names = set(labels)
+    preserved = [
+        label
+        for label in labels
+        if label not in STATUS_LABELS
+        and label not in PHASE_LABELS
+        and not _is_legacy_task_label(label)
+    ]
+    status = _single_label(names, STATUS_LABELS) or _legacy_status(names, issue_state)
+    phase = _single_label(names, PHASE_LABELS) or _legacy_phase(names, status)
+    return transition_labels(preserved, status=status, phase=phase)
+
+
 def resolve_resume_point(
     labels: object,
     *,
@@ -422,6 +471,50 @@ def _phase_from_labels(labels: Iterable[str]) -> str | None:
     if len(phases) != 1:
         return None
     return phases[0]
+
+
+def _is_legacy_task_label(label: str) -> bool:
+    normalized = label.lower()
+    return any(normalized.startswith(prefix) for prefix in LEGACY_TASK_LABEL_PREFIXES)
+
+
+def _single_label(labels: set[str], candidates: Sequence[str]) -> str | None:
+    matches = [label for label in candidates if label in labels]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def _legacy_status(labels: set[str], issue_state: str) -> str:
+    normalized = {label.lower() for label in labels}
+    if issue_state.upper() in {"CLOSED", "CLOSE"} or normalized.intersection(
+        LEGACY_DONE_LABELS
+    ):
+        return "sympohy:done"
+    if normalized.intersection(LEGACY_BLOCKED_LABELS):
+        return "sympohy:blocked"
+    if normalized.intersection(
+        LEGACY_REVIEW_LABELS | LEGACY_FIX_LABELS | LEGACY_HOOK_LABELS | LEGACY_RUNNING_LABELS
+    ):
+        return "sympohy:running"
+    return "sympohy:pending"
+
+
+def _legacy_phase(labels: set[str], status: str) -> str:
+    normalized = {label.lower() for label in labels}
+    if status == "sympohy:done":
+        return "merge"
+    if normalized.intersection(LEGACY_FIX_LABELS):
+        return "fix"
+    if normalized.intersection(LEGACY_REVIEW_LABELS):
+        return "review"
+    if normalized.intersection(LEGACY_HOOK_LABELS):
+        return "hooks"
+    if normalized.intersection(LEGACY_RUNNING_LABELS):
+        return "implement"
+    if status == "sympohy:blocked":
+        return "triage"
+    return "triage"
 
 
 def read_run_state(path: Path) -> Mapping[str, object] | None:

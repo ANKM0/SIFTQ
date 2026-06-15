@@ -35,6 +35,7 @@ task setup:sympohy
 task ai:sympohy:doctor
 task ai:sympohy -- '#74'
 task ai:sympohy:refine -- '#74'
+task ai:sympohy:migrate -- '#74'
 ```
 
 ## Labels
@@ -62,8 +63,41 @@ task ai:sympohy:labels:sync
 ```
 
 The sync command creates or updates `sympohy:*` labels and removes legacy
-`ai:*` labels from the repository label definitions. New issue execution state
-must use `sympohy:*` labels only.
+`ai:*` labels from the repository label definitions. Before deleting legacy
+label definitions, it migrates any issues that still carry `ai:*`, `takt:*`, or
+`taqt:*` task labels so issue-level workflow state is not lost. New issue
+execution state must use `sympohy:*` labels only.
+
+## Migration
+
+Migrate a single legacy task issue with:
+
+```bash
+task ai:sympohy:migrate -- '#74'
+```
+
+Inspect the label changes without writing them:
+
+```bash
+task ai:sympohy:migrate -- --dry-run '#74'
+```
+
+Migrate every issue that still has legacy `ai:*`, `takt:*`, or `taqt:*` task
+labels with:
+
+```bash
+task ai:sympohy:migrate -- --all
+```
+
+Migration preserves the issue title, body, comments, assignees, milestone, and
+link relationships because it only removes legacy task labels and applies the
+equivalent `sympohy:*` status and phase labels. Existing non-workflow labels are
+kept. Closed legacy tasks become `sympohy:done` and `sympohy:phase:merge`;
+blocked tasks become `sympohy:blocked` and `sympohy:phase:triage`; in-progress
+workflow labels map to the matching `implement`, `hooks`, `review`, or `fix`
+phase where that intent is represented by sympohy. Ready or queued legacy tasks
+start as `sympohy:pending` in `triage` so sympohy can re-check the latest AC/DoD
+before implementation.
 
 ## Refinement
 
