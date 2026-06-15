@@ -2466,6 +2466,88 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertEqual(final_state["status"], "blocked")
 
+    def test_final_verifier_existing_fix_commit_blocks_when_hooks_fail(self) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "verification",
+                    "summary": "existing fix must be verified before push",
+                    "evidence": "final verifier fix commit already exists",
+                    "suggested_fix": "run hooks before pushing the existing fix",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Verify existing final verifier fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._worktree_has_changes", return_value=False),
+                patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
+                patch("scripts.sympohy.runner._run_hooks", return_value=7) as run_hooks,
+                patch("scripts.sympohy.runner._check_call_with_heartbeat") as check_call,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_fix_round(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    findings=parse_final_verifier_block_findings(verifier_response),
+                    fix_attempt=1,
+                    total_steps=3,
+                    from_resume=True,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        run_hooks.assert_called_once_with(
+            ("task ci",),
+            3,
+            cwd,
+            log_dir,
+            state=state,
+        )
+        check_call.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:hooks"),
+            status="sympohy:blocked",
+            phase="hooks",
+            cwd=cwd,
+        )
+        self.assertIn(
+            "verification hooks still failed after final verifier fix",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["phase"], "hooks")
+        self.assertEqual(final_state["status"], "blocked")
+
     def test_final_verifier_fix_resume_blocks_dirty_worktree_before_rerun(
         self,
     ) -> None:

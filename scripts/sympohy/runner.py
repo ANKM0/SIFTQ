@@ -1876,6 +1876,24 @@ def _run_final_verifier_fix_round(
         base_branch=config.base_branch,
         existing_subjects=existing_fix_subjects,
     ):
+        if _run_hooks(
+            config.hooks,
+            config.retry_max_attempts,
+            cwd,
+            log_dir,
+            state=state,
+        ) != 0:
+            _block(
+                issue_ref,
+                phase="hooks",
+                failed_command="; ".join(config.hooks),
+                attempts=config.retry_max_attempts,
+                cause="verification hooks still failed after final verifier fix",
+                run_log_path=log_dir,
+                cwd=cwd,
+                state=state,
+            )
+            return 2
         _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
         state.write(
             phase="finalize",
