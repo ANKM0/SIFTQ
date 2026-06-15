@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from .core import PHASE_LABELS, STATUS_LABELS, is_candidate_issue, transition_labels
+from .core import (
+    DEFAULT_STALE_STATUS_AFTER_MINUTES,
+    PHASE_LABELS,
+    STATUS_LABELS,
+    is_candidate_issue,
+    transition_labels,
+)
 
 
 REQUIRED_LABELS = {
@@ -30,6 +36,7 @@ class Issue:
     body: str
     labels: tuple[str, ...]
     comments: tuple[Mapping[str, object], ...]
+    state: str = "UNKNOWN"
 
 
 def gh_json(args: Sequence[str], *, cwd: Path | None = None) -> object:
@@ -48,7 +55,7 @@ def fetch_issue(issue_ref: str, *, cwd: Path | None = None) -> Issue:
             "view",
             issue_ref,
             "--json",
-            "number,title,body,labels,comments",
+            "number,title,body,labels,comments,state",
         ],
         cwd=cwd,
     )
@@ -60,10 +67,17 @@ def fetch_issue(issue_ref: str, *, cwd: Path | None = None) -> Issue:
         body=str(payload.get("body", "")),
         labels=tuple(_label_names(payload.get("labels", []))),
         comments=tuple(_comments(payload.get("comments", []))),
+        state=str(payload.get("state", "UNKNOWN")),
     )
 
 
-def list_candidate_issues(*, limit: int, cwd: Path | None = None) -> list[Mapping[str, object]]:
+def list_candidate_issues(
+    *,
+    limit: int,
+    run_log_root: Path = Path(".sympohy/runs"),
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
+    cwd: Path | None = None,
+) -> list[Mapping[str, object]]:
     payload = gh_json(
         [
             "issue",
@@ -79,7 +93,16 @@ def list_candidate_issues(*, limit: int, cwd: Path | None = None) -> list[Mappin
     )
     if not isinstance(payload, list):
         raise ValueError("gh issue list returned non-list JSON")
-    return [issue for issue in payload if isinstance(issue, Mapping) and is_candidate_issue(issue)]
+    return [
+        issue
+        for issue in payload
+        if isinstance(issue, Mapping)
+        and is_candidate_issue(
+            issue,
+            run_log_root=run_log_root,
+            stale_status_after_minutes=stale_status_after_minutes,
+        )
+    ]
 
 
 def sync_labels(*, cwd: Path | None = None) -> None:
@@ -107,9 +130,10 @@ def set_issue_state(
     phase: str,
     cwd: Path | None = None,
 ) -> None:
-    desired = set(transition_labels(current_labels, status=status, phase=phase))
-    remove = set(current_labels).intersection((*STATUS_LABELS, *PHASE_LABELS)) - desired
-    add = desired - set(current_labels)
+    latest_labels = fetch_issue_labels(issue_ref, cwd=cwd)
+    remove, add = _label_transition_diff(latest_labels, status=status, phase=phase)
+    if not remove and not add:
+        return
     if remove:
         gh_run(["issue", "edit", issue_ref, "--remove-label", ",".join(sorted(remove))], cwd=cwd)
     if add:
@@ -117,7 +141,39 @@ def set_issue_state(
 
 
 def comment(issue_or_pr_ref: str, body: str, *, cwd: Path | None = None) -> None:
+    if comment_exists(issue_or_pr_ref, body, cwd=cwd):
+        return
     gh_run(["issue", "comment", issue_or_pr_ref, "--body", body], cwd=cwd)
+
+
+def fetch_issue_labels(issue_ref: str, *, cwd: Path | None = None) -> tuple[str, ...]:
+    payload = gh_json(["issue", "view", issue_ref, "--json", "labels"], cwd=cwd)
+    if not isinstance(payload, Mapping):
+        raise ValueError("gh issue view returned non-object JSON")
+    return tuple(_label_names(payload.get("labels", [])))
+
+
+def comment_exists(issue_or_pr_ref: str, body: str, *, cwd: Path | None = None) -> bool:
+    payload = gh_json(["issue", "view", issue_or_pr_ref, "--json", "comments"], cwd=cwd)
+    if not isinstance(payload, Mapping):
+        raise ValueError("gh issue view returned non-object JSON")
+    return any(
+        isinstance(comment.get("body"), str) and comment["body"] == body
+        for comment in _comments(payload.get("comments", []))
+    )
+
+
+def _label_transition_diff(
+    current_labels: Sequence[str],
+    *,
+    status: str,
+    phase: str,
+) -> tuple[set[str], set[str]]:
+    desired = set(transition_labels(current_labels, status=status, phase=phase))
+    current = set(current_labels)
+    remove = current.intersection((*STATUS_LABELS, *PHASE_LABELS)) - desired
+    add = desired - current
+    return remove, add
 
 
 def _label_names(labels: object) -> list[str]:

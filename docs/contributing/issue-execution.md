@@ -16,6 +16,10 @@ codd:
     - id: design:commit-message-format
       relation: depends_on
       semantic: workflow
+  depended_by:
+    - id: design:issue-82-stale-running-inspection
+      relation: depends_on
+      semantic: automation
 ---
 
 # sympohy Issue Execution
@@ -90,8 +94,19 @@ task ai:sympohy:systemd:status
 
 The timer runs once per minute. It selects open issues that do not have any of
 `sympohy:pending`, `sympohy:running`, `sympohy:blocked`, or `sympohy:done`.
-It starts at most ten workers, and each worker uses an independent
+It also reselects `sympohy:running` issues whose run state is stale because the
+worker pid is missing or dead, the state file is missing, or the heartbeat has
+expired. Fresh issues start through normal triage, while stale running issues
+are routed through resume handling so they are not excluded permanently.
+
+The watcher starts at most ten workers, and each worker uses an independent
 `.sympohy/worktrees/issue-<number>` worktree and issue branch.
+
+During stale-run recovery, `sympohy` reloads the saved implementation plan when
+available and compares it with logical-step commits already present in the issue
+worktree. A clean recovered worktree continues from the next missing logical
+step. If all logical steps are already committed, recovery skips implementation
+and proceeds to branch push and draft PR creation.
 
 ## Hooks, Review, and Merge
 

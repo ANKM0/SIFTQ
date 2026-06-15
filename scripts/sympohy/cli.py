@@ -17,7 +17,7 @@ from .core import (
     validate_commit_subject,
 )
 from .github import REQUIRED_LABELS, sync_labels
-from .runner import refine_issue, run_issue, watch
+from .runner import refine_issue, resume_issue, run_issue, watch
 from .systemd import install_systemd_units, print_systemd_status
 
 
@@ -41,6 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser = subcommands.add_parser("run")
     run_parser.add_argument("issue")
 
+    resume_parser = subcommands.add_parser("resume")
+    resume_parser.add_argument("issue")
+
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
     contract_parser.add_argument("payload")
@@ -61,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         return code
     if args.command == "run":
         return run_issue(args.issue, config)
+    if args.command == "resume":
+        return resume_issue(args.issue, config)
     if args.command == "watch":
         return watch(config)
     if args.command == "systemd-install":
@@ -93,6 +98,7 @@ def doctor(*, config_path: Path) -> int:
     checks = {
         ".sympohy/config.yaml": config_path.exists(),
         "max_workers <= 10": config.max_workers <= 10,
+        "stale_status_after_minutes > 0": config.stale_status_after_minutes > 0,
         "default hook task ci": "task ci" in config.hooks,
         "systemd service template": (ROOT / ".sympohy/systemd/sympohy-watch.service").exists(),
         "systemd timer template": (ROOT / ".sympohy/systemd/sympohy-watch.timer").exists(),

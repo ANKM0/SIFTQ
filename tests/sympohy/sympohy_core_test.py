@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from scripts.sympohy import (
     extract_acceptance_set,
+    inspect_running_issue,
     is_candidate_issue,
     merge_gate_allows_merge,
     next_retry_action,
+    resolve_resume_point,
     transition_labels,
     validate_commit_subject,
 )
@@ -93,11 +97,233 @@ class SympohyCoreTest(unittest.TestCase):
         issue = {"state": "OPEN", "labels": [{"name": "bug"}]}
 
         self.assertTrue(is_candidate_issue(issue))
-        self.assertFalse(
-            is_candidate_issue(
-                {"state": "OPEN", "labels": [{"name": "sympohy:running"}]}
+
+    def test_terminal_status_labels_are_not_candidates(self) -> None:
+        for status in ("sympohy:blocked", "sympohy:done"):
+            with self.subTest(status=status):
+                self.assertFalse(
+                    is_candidate_issue(
+                        {
+                            "state": "OPEN",
+                            "labels": [
+                                {"name": status},
+                                {"name": "sympohy:phase:implement"},
+                            ],
+                        }
+                    )
+                )
+
+    def test_pending_issue_without_state_is_stale_candidate(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:pending"},
+                {"name": "sympohy:phase:triage"},
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc),
+                process_alive=lambda _pid: True,
             )
-        )
+
+            self.assertTrue(inspection.stale)
+            self.assertEqual(inspection.reason, "missing state")
+            self.assertTrue(is_candidate_issue(issue, run_log_root=root))
+
+    def test_fresh_running_issue_with_live_pid_is_not_candidate(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "enhancement"},
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:implement"},
+            ],
+        }
+
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run_state(root, 82, pid=123, heartbeat=now)
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 123,
+            )
+
+            self.assertEqual(inspection.phase, "implement")
+            self.assertFalse(inspection.stale)
+            self.assertIsNone(inspection.reason)
+            self.assertFalse(
+                is_candidate_issue(
+                    issue,
+                    run_log_root=root,
+                    now=now,
+                    process_alive=lambda pid: pid == 123,
+                )
+            )
+
+    def test_running_issue_uses_state_phase_before_label_phase(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:triage"},
+            ],
+        }
+
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run_state(root, 82, pid=123, heartbeat=now, phase="hooks")
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 123,
+            )
+
+            self.assertEqual(inspection.phase, "hooks")
+            self.assertFalse(inspection.stale)
+
+    def test_running_issue_with_wrong_state_identity_is_stale(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:implement"},
+            ],
+        }
+
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "issue-82"
+            state_dir.mkdir(parents=True)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 79,
+                        "run_id": "run-79",
+                        "phase": "implement",
+                        "pid": 123,
+                        "heartbeat": now.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 123,
+            )
+
+        self.assertTrue(inspection.stale)
+        self.assertEqual(inspection.reason, "invalid state")
+
+    def test_running_issue_without_state_is_stale_candidate(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:implement"},
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc),
+                process_alive=lambda _pid: True,
+            )
+
+            self.assertTrue(inspection.stale)
+            self.assertEqual(inspection.reason, "missing state")
+            self.assertTrue(is_candidate_issue(issue, run_log_root=root))
+
+    def test_running_issue_with_missing_or_dead_pid_is_stale(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:hooks"},
+            ],
+        }
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run_state(root, 82, heartbeat=now)
+            missing_pid = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda _pid: True,
+            )
+            self.assertTrue(missing_pid.stale)
+            self.assertEqual(missing_pid.reason, "missing pid")
+
+            self._write_run_state(root, 82, pid=456, heartbeat=now)
+            dead_pid = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda _pid: False,
+            )
+            self.assertTrue(dead_pid.stale)
+            self.assertEqual(dead_pid.reason, "dead pid")
+
+    def test_running_issue_with_old_heartbeat_is_stale(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:review"},
+            ],
+        }
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run_state(root, 82, pid=789, heartbeat=now - timedelta(minutes=31))
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 789,
+            )
+
+            self.assertTrue(inspection.stale)
+            self.assertEqual(inspection.phase, "review")
+            self.assertEqual(inspection.reason, "stale heartbeat")
+
+            custom_ttl = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 789,
+                stale_status_after_minutes=40,
+            )
+            self.assertFalse(custom_ttl.stale)
 
     def test_label_transition_keeps_one_status_and_one_phase(self) -> None:
         labels = transition_labels(
@@ -110,6 +336,100 @@ class SympohyCoreTest(unittest.TestCase):
             labels,
             ("bug", "sympohy:phase:implement", "sympohy:running"),
         )
+
+    def test_label_transition_removes_stale_status_and_phase_labels(self) -> None:
+        labels = transition_labels(
+            [
+                "bug",
+                "sympohy:pending",
+                "sympohy:running",
+                "sympohy:phase:triage",
+                "sympohy:phase:implement",
+            ],
+            status="sympohy:blocked",
+            phase="fix",
+        )
+
+        self.assertEqual(labels, ("bug", "sympohy:blocked", "sympohy:phase:fix"))
+
+    def test_resume_point_resolution_maps_phase_labels_to_resume_categories(self) -> None:
+        planning = resolve_resume_point(
+            [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:triage"},
+            ]
+        )
+        self.assertEqual(planning.name, "planning")
+        self.assertEqual(planning.phase, "triage")
+        self.assertFalse(planning.terminal)
+
+        for phase in ("implement", "hooks"):
+            with self.subTest(phase=phase):
+                resume_point = resolve_resume_point(
+                    [
+                        {"name": "sympohy:running"},
+                        {"name": f"sympohy:phase:{phase}"},
+                    ]
+                )
+                self.assertEqual(resume_point.name, phase)
+                self.assertEqual(resume_point.phase, phase)
+                self.assertFalse(resume_point.terminal)
+
+        for phase in ("review", "fix", "merge"):
+            with self.subTest(phase=phase):
+                resume_point = resolve_resume_point(
+                    [
+                        {"name": "sympohy:running"},
+                        {"name": f"sympohy:phase:{phase}"},
+                    ]
+                )
+                self.assertEqual(resume_point.name, phase)
+                self.assertEqual(resume_point.phase, phase)
+                self.assertFalse(resume_point.terminal)
+
+    def test_resume_point_resolution_handles_terminal_status_labels(self) -> None:
+        blocked = resolve_resume_point(
+            [
+                "sympohy:blocked",
+                "sympohy:phase:implement",
+            ]
+        )
+        self.assertEqual(blocked.name, "blocked")
+        self.assertEqual(blocked.phase, "implement")
+        self.assertTrue(blocked.terminal)
+
+        completed = resolve_resume_point(
+            [
+                "sympohy:done",
+                "sympohy:phase:merge",
+            ]
+        )
+        self.assertEqual(completed.name, "completed")
+        self.assertEqual(completed.phase, "merge")
+        self.assertTrue(completed.terminal)
+
+    def test_resume_point_resolution_prefers_state_over_terminal_labels(self) -> None:
+        blocked_label = resolve_resume_point(
+            [
+                "sympohy:blocked",
+                "sympohy:phase:implement",
+            ],
+            state={"status": "running", "phase": "review"},
+        )
+        self.assertEqual(blocked_label.name, "review")
+        self.assertEqual(blocked_label.phase, "review")
+        self.assertFalse(blocked_label.terminal)
+
+        done_label = resolve_resume_point(
+            [
+                "sympohy:done",
+                "sympohy:phase:merge",
+            ],
+            state={"status": "running", "phase": "implement"},
+        )
+        self.assertEqual(done_label.name, "implement")
+        self.assertEqual(done_label.phase, "implement")
+        self.assertFalse(done_label.terminal)
 
     def test_review_json_blocks_critical_high_and_medium_findings(self) -> None:
         result = parse_review_json(
@@ -130,6 +450,22 @@ class SympohyCoreTest(unittest.TestCase):
 
         self.assertFalse(result.approved)
         self.assertEqual(len(result.blocking_findings), 1)
+
+    def test_review_json_accepts_top_level_findings_list(self) -> None:
+        result = parse_review_json(
+            json.dumps(
+                [
+                    {
+                        "severity": "high",
+                        "summary": "missing resume guard",
+                        "status": "open",
+                    }
+                ]
+            )
+        )
+
+        self.assertFalse(result.approved)
+        self.assertEqual(result.blocking_findings[0].summary, "missing resume guard")
 
     def test_retry_blocks_after_third_failed_attempt(self) -> None:
         self.assertEqual(next_retry_action(1), "retry")
@@ -181,6 +517,7 @@ class SympohyCoreTest(unittest.TestCase):
             base_branch="main",
             worktree_root=Path(".sympohy/worktrees"),
             run_log_root=Path(".sympohy/runs"),
+            stale_status_after_minutes=30,
             hooks=("task ci",),
             review_max_rounds=5,
             retry_max_attempts=3,
@@ -198,17 +535,39 @@ class SympohyCoreTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         self.assertTrue(process.wait_called)
-        set_issue_state.assert_called_once_with(
-            "#79",
-            current_labels=[],
-            status="sympohy:pending",
-            phase="triage",
-        )
+        set_issue_state.assert_not_called()
 
     def test_logical_steps_accepts_string_and_object_planner_output(self) -> None:
         self.assertEqual(
             _logical_steps({"logical_steps": ["write docs", {"description": "run tests"}]}),
             [{"description": "write docs"}, {"description": "run tests"}],
+        )
+
+    def _write_run_state(
+        self,
+        root: Path,
+        issue_number: int,
+        *,
+        pid: int | None = None,
+        heartbeat: datetime | None = None,
+        phase: str | None = None,
+    ) -> None:
+        state_dir = root / f"issue-{issue_number}"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, object] = {
+            "issue": issue_number,
+            "run_id": f"run-{issue_number}",
+            "lock": {"run_id": f"run-{issue_number}"},
+        }
+        if phase is not None:
+            payload["phase"] = phase
+        if pid is not None:
+            payload["pid"] = pid
+        if heartbeat is not None:
+            payload["heartbeat"] = heartbeat.isoformat()
+        (state_dir / "state.json").write_text(
+            json.dumps(payload),
+            encoding="utf-8",
         )
 
 

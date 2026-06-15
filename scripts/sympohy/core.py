@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
+import os
+from pathlib import Path
 import re
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 
 STATUS_LABELS = (
@@ -16,6 +19,7 @@ STATUS_LABELS = (
 PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
+DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
 
 COMMIT_SUBJECT_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
@@ -32,6 +36,22 @@ class AcceptanceSet:
     @property
     def complete(self) -> bool:
         return bool(self.acceptance_criteria and self.definition_of_done)
+
+
+@dataclass(frozen=True)
+class RunningIssueInspection:
+    phase: str | None
+    stale: bool
+    reason: str | None
+    state_path: Path | None
+    state: Mapping[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class ResumePoint:
+    name: str
+    phase: str | None
+    terminal: bool = False
 
 
 @dataclass(frozen=True)
@@ -66,11 +86,128 @@ def validate_commit_subject(subject: str) -> bool:
     return COMMIT_SUBJECT_RE.match(subject) is not None
 
 
-def is_candidate_issue(issue: Mapping[str, object]) -> bool:
+def is_candidate_issue(
+    issue: Mapping[str, object],
+    *,
+    run_log_root: Path | None = None,
+    now: datetime | None = None,
+    process_alive: Callable[[int], bool] | None = None,
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
+) -> bool:
     if issue.get("state", "OPEN") not in {"OPEN", "open"}:
         return False
     names = set(_label_names(issue.get("labels", [])))
-    return not names.intersection(STATUS_LABELS)
+    if not names.intersection(STATUS_LABELS):
+        return True
+    if not names.intersection({"sympohy:pending", "sympohy:running"}):
+        return False
+    return inspect_running_issue(
+        issue,
+        run_log_root=run_log_root or Path(".sympohy/runs"),
+        now=now,
+        process_alive=process_alive,
+        stale_status_after_minutes=stale_status_after_minutes,
+    ).stale
+
+
+def inspect_running_issue(
+    issue: Mapping[str, object],
+    *,
+    run_log_root: Path,
+    now: datetime | None = None,
+    process_alive: Callable[[int], bool] | None = None,
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
+) -> RunningIssueInspection:
+    names = set(_label_names(issue.get("labels", [])))
+    label_phase = _phase_from_labels(names)
+    try:
+        number = int(issue["number"])
+    except (KeyError, TypeError, ValueError):
+        return RunningIssueInspection(
+            phase=label_phase,
+            stale=True,
+            reason="missing issue number",
+            state_path=None,
+        )
+
+    state_path = run_log_root / f"issue-{number}" / "state.json"
+    state = read_run_state(state_path)
+    if state is None:
+        reason = "corrupt state" if state_path.exists() else "missing state"
+        return RunningIssueInspection(
+            phase=label_phase,
+            stale=True,
+            reason=reason,
+            state_path=state_path,
+            state=None,
+        )
+
+    phase = phase_from_state(state) or label_phase
+    state_error = _state_identity_error(state, number)
+    if state_error is not None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason=state_error,
+            state_path=state_path,
+            state=state,
+        )
+
+    if phase is None:
+        return RunningIssueInspection(
+            phase=None,
+            stale=True,
+            reason="missing phase",
+            state_path=state_path,
+            state=state,
+        )
+
+    pid = _state_pid(state)
+    if pid is None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing pid",
+            state_path=state_path,
+            state=state,
+        )
+    alive = process_alive or _process_alive
+    if not alive(pid):
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="dead pid",
+            state_path=state_path,
+            state=state,
+        )
+
+    heartbeat = _state_heartbeat(state)
+    if heartbeat is None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing heartbeat",
+            state_path=state_path,
+            state=state,
+        )
+    current_time = _normalize_datetime(now or datetime.now(timezone.utc))
+    stale_after_seconds = stale_status_after_minutes * 60
+    if (current_time - heartbeat).total_seconds() > stale_after_seconds:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="stale heartbeat",
+            state_path=state_path,
+            state=state,
+        )
+
+    return RunningIssueInspection(
+        phase=phase,
+        stale=False,
+        reason=None,
+        state_path=state_path,
+        state=state,
+    )
 
 
 def transition_labels(
@@ -99,6 +236,36 @@ def transition_labels(
     return tuple(sorted(labels))
 
 
+def resolve_resume_point(
+    labels: object,
+    *,
+    state: Mapping[str, object] | None = None,
+) -> ResumePoint:
+    names = set(_label_names(labels))
+    phase = phase_from_state(state) if state is not None else None
+    if phase is None:
+        phase = _phase_from_labels(names)
+    status = state.get("status") if state is not None else None
+
+    if state is not None:
+        if status == "done":
+            return ResumePoint(name="completed", phase=phase, terminal=True)
+        if status == "blocked":
+            return ResumePoint(name="blocked", phase=phase, terminal=True)
+    else:
+        if "sympohy:done" in names:
+            return ResumePoint(name="completed", phase=phase, terminal=True)
+        if "sympohy:blocked" in names:
+            return ResumePoint(name="blocked", phase=phase, terminal=True)
+
+    if phase in {None, "triage"}:
+        return ResumePoint(name="planning", phase=phase)
+    if phase in {"implement", "hooks", "review", "fix", "merge"}:
+        return ResumePoint(name=phase, phase=phase)
+
+    return ResumePoint(name="planning", phase=phase)
+
+
 def extract_acceptance_set(body: str, comments: Sequence[Mapping[str, object]]) -> AcceptanceSet | None:
     latest: AcceptanceSet | None = _extract_from_text(body, "issue body")
     if latest is not None and not latest.complete:
@@ -115,7 +282,12 @@ def extract_acceptance_set(body: str, comments: Sequence[Mapping[str, object]]) 
 
 def parse_review_json(source: str) -> ReviewResult:
     payload = json.loads(source)
-    findings_payload = payload.get("findings", [])
+    if isinstance(payload, list):
+        findings_payload = payload
+    elif isinstance(payload, Mapping):
+        findings_payload = payload.get("findings", [])
+    else:
+        raise ValueError("review JSON must be an object or findings list")
     if not isinstance(findings_payload, list):
         raise ValueError("review JSON must contain findings as a list")
 
@@ -241,8 +413,102 @@ def _checklist_items(lines: Iterable[str]) -> list[str]:
     return items
 
 
+def _phase_from_labels(labels: Iterable[str]) -> str | None:
+    phases = [
+        label.removeprefix("sympohy:phase:")
+        for label in labels
+        if label in PHASE_LABELS
+    ]
+    if len(phases) != 1:
+        return None
+    return phases[0]
+
+
+def read_run_state(path: Path) -> Mapping[str, object] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    return payload
+
+
+def phase_from_state(state: Mapping[str, object] | None) -> str | None:
+    if state is None:
+        return None
+    phase = state.get("phase")
+    if isinstance(phase, str) and phase in PHASES:
+        return phase
+    return None
+
+
+def _state_pid(state: Mapping[str, object]) -> int | None:
+    value = state.get("pid")
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        pid = value
+    elif isinstance(value, str):
+        try:
+            pid = int(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    return pid if pid > 0 else None
+
+
+def _state_identity_error(state: Mapping[str, object], issue_number: int) -> str | None:
+    state_issue = state.get("issue")
+    try:
+        if int(state_issue) != issue_number:
+            return "invalid state"
+    except (TypeError, ValueError):
+        return "invalid state"
+
+    run_id = state.get("run_id")
+    if not isinstance(run_id, str) or not run_id.strip():
+        return "invalid state"
+
+    state_lock = state.get("lock")
+    if isinstance(state_lock, Mapping):
+        lock_run_id = state_lock.get("run_id")
+        if lock_run_id not in {None, run_id}:
+            return "invalid state"
+
+    return None
+
+
+def _state_heartbeat(state: Mapping[str, object]) -> datetime | None:
+    value = state.get("heartbeat")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        heartbeat = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _normalize_datetime(heartbeat)
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _label_names(labels: object) -> list[str]:
-    if not isinstance(labels, list):
+    if not isinstance(labels, (list, tuple)):
         return []
     names: list[str] = []
     for label in labels:
