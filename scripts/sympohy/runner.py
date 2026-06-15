@@ -303,6 +303,18 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
             raise _ExistingRunError(
                 f"worktree already exists for issue #{issue.number}: {worktree}; use resume"
             )
+        try:
+            current_branch = _current_branch(worktree)
+        except subprocess.CalledProcessError as exc:
+            raise _UnsafeRecoveryError(
+                f"cannot recover issue #{issue.number}: could not inspect current branch "
+                f"for worktree {worktree}"
+            ) from exc
+        if current_branch != branch:
+            raise _UnsafeRecoveryError(
+                f"cannot recover issue #{issue.number}: worktree {worktree} is on "
+                f"branch {current_branch}, expected {branch}"
+            )
         return worktree
 
     worktree.parent.mkdir(parents=True, exist_ok=True)
@@ -464,6 +476,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         "sympohy:pending" in issue.labels
         and "sympohy:running" not in issue.labels
         and resume_point.name == "planning"
+        and inspection.state is None
     ):
         return run_issue(
             issue_ref,

@@ -16,6 +16,7 @@ from scripts.sympohy.runner import (
     _AmbiguousPullRequestError,
     _RunLockedError,
     _RunStateWriter,
+    _UnsafeRecoveryError,
     _commit_all_if_new,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
@@ -467,6 +468,52 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
+
+    def test_resume_issue_resumes_stale_pending_with_existing_run_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale pending",
+                body="",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "triage",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=False,
+            from_resume=True,
+            resume_point="planning",
+        )
 
     def test_resume_issue_blocks_stale_pending_with_existing_worktree(
         self,
@@ -1410,6 +1457,26 @@ class SympohyRunnerTest(unittest.TestCase):
                 ensure_worktree(issue, config, recover=True)
 
         check_call.assert_not_called()
+
+    def test_ensure_worktree_blocks_recovery_from_wrong_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            worktree = config.worktree_root / "issue-82"
+            worktree.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Recover wrong worktree",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with patch("scripts.sympohy.runner._current_branch", return_value="main"):
+                with self.assertRaisesRegex(
+                    _UnsafeRecoveryError,
+                    "expected issue-82-sympohy",
+                ):
+                    ensure_worktree(issue, config, recover=True)
 
     def test_commit_all_if_new_skips_existing_subject(self) -> None:
         with (
