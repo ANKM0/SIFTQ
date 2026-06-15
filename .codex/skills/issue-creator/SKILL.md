@@ -28,7 +28,11 @@ for human review or `sympohy` execution.
    items. `sympohy` requires a complete AC/DoD set before implementation.
 7. Add links to relevant files, docs, PRs, or prior issues when they materially
    constrain the work.
-8. If creating the issue through GitHub, apply only the manual queue labels from
+8. Apply manual queue labels only when the issue body includes a complete
+   `## AC` and `## DoD` set and is ready for `sympohy` triage. Normal Research
+   and Bug drafts are unqueued unless you convert them to a Feature Change-style
+   issue with complete AC/DoD.
+9. If creating the issue through GitHub, apply only the manual queue labels from
    the label policy. Do not apply automation-owned status labels.
 
 ## Output Format
@@ -37,7 +41,7 @@ When the user asks for a draft, return:
 
 ```text
 Title: <issue title>
-Labels: sympohy:pending, sympohy:phase:triage
+Labels: <sympohy:pending, sympohy:phase:triage only when the issue has complete AC/DoD and is ready for sympohy triage; otherwise omit queue labels>
 
 <issue body>
 ```
