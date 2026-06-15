@@ -178,6 +178,22 @@ UI 変更 PR では、文言修正や小さいスタイル調整でも wireframe
 ADR は、なぜこの基盤、方針、技術を選ぶかを記録する。複数機能に
 影響する判断、または後から変更コストが高い durable decision に使う。
 
+### ADR / Design Doc Boundary
+
+ADR と design doc の境界は、判断の寿命と適用範囲で分ける。
+
+- ADR は durable decision を記録する。採用した基盤、方針、技術、
+  architecture boundary、repository workflow と、その判断理由を残す。
+- Design doc は feature-specific application を記録する。既存 ADR の
+  判断を対象機能へどう適用するか、外部設計、内部設計、テスト観点、
+  UI 状態を残す。
+- Design doc は ADR を再決定しない。ADR と異なる判断が必要になった
+  場合は、design doc に判断を埋め込まず、新しい ADR または既存 ADR の
+  改訂で扱う。
+- ADR は feature-specific implementation details を持たない。個別画面の
+  文言、イベントフロー、operation 呼び出し、テストケースは design doc
+  に置く。
+
 次のどちらかに該当する場合は、ADR を作成する。
 
 - 判断が複数機能、複数ドキュメント、または repository workflow に

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import adrAuthoring from "../../docs/contributing/adr-authoring.md?raw";
 import pullRequestTemplate from "../../.github/pull_request_template.md?raw";
 import mvpSpecFlow from "../../docs/contributing/mvp-spec-flow.md?raw";
 
@@ -65,5 +66,27 @@ describe("MVP spec flow", () => {
     );
 
     expect(missingAdrFragments).toEqual([]);
+  });
+
+  it("documents the boundary between ADRs and design docs", () => {
+    const requiredBoundaryFragments = [
+      "### ADR / Design Doc Boundary",
+      "判断の寿命と適用範囲",
+      "ADR は durable decision を記録する",
+      "Design doc は feature-specific application を記録する",
+      "Design doc は ADR を再決定しない",
+      "ADR は feature-specific implementation details を持たない"
+    ];
+
+    const missingBoundaryFragments = requiredBoundaryFragments.filter(
+      (fragment) => !mvpSpecFlow.includes(fragment)
+    );
+
+    expect(missingBoundaryFragments).toEqual([]);
+    expect(adrAuthoring).toContain("## Boundary With Design Docs");
+    expect(adrAuthoring).toContain("Use ADRs for durable decisions");
+    expect(adrAuthoring).toContain(
+      "Use design docs for feature-specific application"
+    );
   });
 });

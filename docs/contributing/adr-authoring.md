@@ -53,6 +53,23 @@ design:<short-kebab-title>-adr
 - `Consequences`: the benefits, tradeoffs, operational impact, and follow-up
   work.
 
+## Boundary With Design Docs
+
+Use ADRs for durable decisions: the selected foundation, policy, technology,
+architecture boundary, repository workflow, and the reasons for that choice.
+
+Use design docs for feature-specific application: how an existing ADR applies to
+one feature, the external design, internal design, UI states, operation flow, and
+test viewpoints.
+
+Design docs should not re-decide ADRs. If a feature needs a different durable
+decision, create a new ADR or update the existing ADR instead of embedding the
+decision in the feature design doc.
+
+ADRs should not carry feature-specific implementation details unless they are
+essential to the durable decision. Put screen copy, event flows, operation calls,
+and individual test cases in the design doc.
+
 ## Agent Skill
 
 The repository-local Codex skill for this convention is
