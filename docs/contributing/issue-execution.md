@@ -28,7 +28,9 @@ SIFTQ uses `sympohy` as repository-local development tooling for GitHub
 Issue-driven implementation. It is not part of the SIFTQ application runtime
 and is not listed in `package.json` or installed as a frontend dependency.
 
-`sympohy` replaces the older TAKT/taqt task workflow. Tracked configuration and
+`sympohy` replaces the older TAKT/taqt task workflow. Mentions of `takt`/`taqt`
+below are kept strictly as historical migration context.
+Tracked configuration and
 systemd templates live in `.sympohy/`; generated issue worktrees and run logs
 live in `.sympohy/worktrees/` and `.sympohy/runs/`, which are ignored by Git.
 

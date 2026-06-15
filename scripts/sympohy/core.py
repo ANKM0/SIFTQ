@@ -20,6 +20,9 @@ PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
 DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
+# Legacy task label prefixes are intentionally supported to migrate historical issues
+# from prior runners; they are expected to be removed from all active flow over
+# time after migration.
 LEGACY_TASK_LABEL_PREFIXES = ("ai:", "takt:", "taqt:")
 LEGACY_DONE_LABELS = {
     "ai:done",

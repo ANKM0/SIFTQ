@@ -83,9 +83,10 @@ task codd:elicit
 ## sympohy Issue Automation
 
 SIFTQ uses `sympohy` as repository-local development tooling for GitHub
-Issue-driven work. It replaces the older TAKT/taqt task workflow. Generated
-worktrees and logs stay under `.sympohy/worktrees/` and `.sympohy/runs/`, which
-are intentionally ignored by Git.
+Issue-driven work. It replaces the older TAKT/taqt task workflow; those
+references remain only to describe the historical migration.
+Generated worktrees and logs stay under `.sympohy/worktrees/` and `.sympohy/runs/`,
+which are intentionally ignored by Git.
 
 For sympohy-only setup or revalidation, run:
 
