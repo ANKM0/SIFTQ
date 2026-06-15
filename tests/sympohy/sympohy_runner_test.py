@@ -52,7 +52,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
             ):
-                popen.return_value.poll.return_value = None
+                popen.return_value.wait.return_value = 0
 
                 result = watch(config)
 
@@ -81,7 +81,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
             ):
-                popen.return_value.poll.return_value = None
+                popen.return_value.wait.return_value = 0
 
                 result = watch(config)
 
@@ -110,7 +110,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
             ):
-                popen.return_value.poll.return_value = None
+                popen.return_value.wait.return_value = 0
 
                 result = watch(config)
 
@@ -154,7 +154,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
             ):
-                popen.return_value.poll.return_value = None
+                popen.return_value.wait.return_value = 0
 
                 result = watch(config)
 
@@ -198,7 +198,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.subprocess.Popen") as popen,
             ):
-                popen.return_value.poll.return_value = None
+                popen.return_value.wait.return_value = 0
 
                 result = watch(config)
 

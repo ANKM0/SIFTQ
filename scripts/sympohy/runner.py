@@ -392,7 +392,8 @@ def watch(config: SympohyConfig) -> int:
             )
         )
 
-    return 0 if all(process.poll() in {None, 0} for process in processes) else 1
+    returncodes = [process.wait() for process in processes]
+    return 0 if all(code == 0 for code in returncodes) else 1
 
 
 def _watch_candidate_priority(issue: Mapping[str, object]) -> int:
@@ -2104,17 +2105,18 @@ def _heartbeat_from_payload(payload: Mapping[str, object]) -> datetime | None:
     return heartbeat.astimezone(timezone.utc)
 
 
-def _logical_steps(plan: Mapping[str, object]) -> list[object]:
+def _logical_steps(plan: Mapping[str, object]) -> list[Mapping[str, object]]:
     steps = plan.get("logical_steps", [])
     if not isinstance(steps, list) or not steps:
         raise ValueError("plan JSON must contain non-empty logical_steps")
-    logical_steps = [
-        step
-        for step in steps
-        if isinstance(step, Mapping) or (isinstance(step, str) and step.strip())
-    ]
+    logical_steps: list[Mapping[str, object]] = []
+    for step in steps:
+        if isinstance(step, Mapping):
+            logical_steps.append(step)
+        elif isinstance(step, str) and step.strip():
+            logical_steps.append({"description": step.strip()})
     if not logical_steps:
-        raise ValueError("plan JSON must contain non-empty logical_steps")
+        raise ValueError("plan JSON logical_steps must contain strings or objects")
     return logical_steps
 
 

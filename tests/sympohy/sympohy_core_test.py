@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from scripts.sympohy import (
     extract_acceptance_set,
@@ -16,7 +17,20 @@ from scripts.sympohy import (
     transition_labels,
     validate_commit_subject,
 )
+from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.core import parse_review_json
+from scripts.sympohy.runner import _logical_steps, watch
+from scripts.sympohy.systemd import _systemd_escape
+
+
+class FakeProcess:
+    def __init__(self, returncode: int = 0) -> None:
+        self.returncode = returncode
+        self.wait_called = False
+
+    def wait(self) -> int:
+        self.wait_called = True
+        return self.returncode
 
 
 class SympohyCoreTest(unittest.TestCase):
@@ -52,6 +66,32 @@ class SympohyCoreTest(unittest.TestCase):
         result = extract_acceptance_set("## AC\n- [ ] only AC", [])
 
         self.assertIsNone(result)
+
+    def test_extracts_ac_dod_after_fenced_markdown_templates(self) -> None:
+        body = """
+## Requirements template
+
+```md
+## Acceptance Criteria
+
+## Open Questions
+```
+
+## AC
+
+- [ ] real AC
+
+## DoD
+
+- [ ] real DoD
+"""
+
+        result = extract_acceptance_set(body, [])
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.acceptance_criteria, ("real AC",))
+        self.assertEqual(result.definition_of_done, ("real DoD",))
 
     def test_open_issue_without_sympohy_status_is_candidate(self) -> None:
         issue = {"state": "OPEN", "labels": [{"name": "bug"}]}
@@ -463,6 +503,45 @@ class SympohyCoreTest(unittest.TestCase):
             validate_commit_subject("#74 feat(sympohy): add issue runner")
         )
         self.assertFalse(validate_commit_subject("sympohy: add issue runner"))
+
+    def test_systemd_path_escape_preserves_executable_lookup(self) -> None:
+        self.assertEqual(
+            _systemd_escape('/opt/tools:/tmp/has"quote:/tmp/has%percent'),
+            '/opt/tools:/tmp/has\\"quote:/tmp/has%%percent',
+        )
+
+    def test_watch_waits_for_spawned_workers_under_systemd(self) -> None:
+        process = FakeProcess()
+        config = SympohyConfig(
+            max_workers=10,
+            base_branch="main",
+            worktree_root=Path(".sympohy/worktrees"),
+            run_log_root=Path(".sympohy/runs"),
+            stale_status_after_minutes=30,
+            hooks=("task ci",),
+            review_max_rounds=5,
+            retry_max_attempts=3,
+        )
+
+        with (
+            patch(
+                "scripts.sympohy.runner.list_candidate_issues",
+                return_value=[{"number": 79, "labels": []}],
+            ),
+            patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            patch("scripts.sympohy.runner.subprocess.Popen", return_value=process),
+        ):
+            result = watch(config)
+
+        self.assertEqual(result, 0)
+        self.assertTrue(process.wait_called)
+        set_issue_state.assert_not_called()
+
+    def test_logical_steps_accepts_string_and_object_planner_output(self) -> None:
+        self.assertEqual(
+            _logical_steps({"logical_steps": ["write docs", {"description": "run tests"}]}),
+            [{"description": "write docs"}, {"description": "run tests"}],
+        )
 
     def _write_run_state(
         self,
