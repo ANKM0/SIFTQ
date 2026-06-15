@@ -215,16 +215,40 @@ class _IssueRunLock:
                 raise _RunLockedError(
                     f"issue #{self.issue_number} is already locked by {self.path}"
                 ) from exc
+            fd = self._take_over_stale_lock(flags)
+        with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+            lock_file.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        self.acquired = True
+
+    def _take_over_stale_lock(self, flags: int) -> int:
+        guard_path = self.path.with_name(f"{self.path.name}.takeover")
+        try:
+            guard_fd = os.open(guard_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        except FileExistsError as exc:
+            raise _RunLockedError(
+                f"issue #{self.issue_number} lock takeover is already in progress"
+            ) from exc
+
+        try:
+            os.close(guard_fd)
+            if not _lock_takeover_allowed(
+                self.path,
+                state_path=self.log_dir / "state.json",
+                issue_number=self.issue_number,
+                stale_status_after_minutes=self.stale_status_after_minutes,
+            ):
+                raise _RunLockedError(
+                    f"issue #{self.issue_number} is already locked by {self.path}"
+                )
             self.path.unlink(missing_ok=True)
             try:
-                fd = os.open(self.path, flags, 0o644)
+                return os.open(self.path, flags, 0o644)
             except FileExistsError as retry_exc:
                 raise _RunLockedError(
                     f"issue #{self.issue_number} is already locked by {self.path}"
                 ) from retry_exc
-        with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
-            lock_file.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-        self.acquired = True
+        finally:
+            guard_path.unlink(missing_ok=True)
 
     def release(self) -> None:
         if not self.acquired:
@@ -867,7 +891,11 @@ def _run_issue_locked(
             "total_logical_steps": total_steps,
         },
     )
-    _push_branch_and_ensure_draft_pull_request(cwd=worktree, branch=branch)
+    _push_branch_and_ensure_draft_pull_request(
+        cwd=worktree,
+        branch=branch,
+        heartbeat=state.heartbeat,
+    )
     state.write(
         phase="review",
         branch=branch,
@@ -975,7 +1003,11 @@ def _resume_late_phase(
                 "resume_point": resume_from,
             },
         )
-        _push_branch_and_ensure_draft_pull_request(cwd=worktree, branch=branch)
+        _push_branch_and_ensure_draft_pull_request(
+            cwd=worktree,
+            branch=branch,
+            heartbeat=state.heartbeat,
+        )
         start_round = _review_start_round(previous_state)
         review_result = _review_fix_loop(
             issue_ref,
@@ -1086,7 +1118,7 @@ def _resume_fix_phase(
         base_branch=config.base_branch,
     )
     if committed:
-        subprocess.check_call(["git", "push"], cwd=cwd)
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
     state.write(
         phase="review",
         progress={
@@ -1342,7 +1374,7 @@ def _review_fix_loop(
             base_branch=config.base_branch,
         )
         if committed:
-            subprocess.check_call(["git", "push"], cwd=cwd)
+            _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
         state.write(
             phase="review",
             progress={
@@ -1948,16 +1980,33 @@ def _existing_run_refusal_reason(
     return None
 
 
-def _ensure_draft_pull_request(*, cwd: Path) -> None:
+def _ensure_draft_pull_request(
+    *,
+    cwd: Path,
+    heartbeat: Callable[[], None] | None = None,
+) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
         return
-    subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=cwd)
+    _check_call_with_heartbeat(
+        ["gh", "pr", "create", "--draft", "--fill"],
+        cwd=cwd,
+        heartbeat=heartbeat,
+    )
 
 
-def _push_branch_and_ensure_draft_pull_request(*, cwd: Path, branch: str) -> None:
-    subprocess.check_call(["git", "push", "-u", "origin", branch], cwd=cwd)
-    _ensure_draft_pull_request(cwd=cwd)
+def _push_branch_and_ensure_draft_pull_request(
+    *,
+    cwd: Path,
+    branch: str,
+    heartbeat: Callable[[], None] | None = None,
+) -> None:
+    _check_call_with_heartbeat(
+        ["git", "push", "-u", "origin", branch],
+        cwd=cwd,
+        heartbeat=heartbeat,
+    )
+    _ensure_draft_pull_request(cwd=cwd, heartbeat=heartbeat)
 
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:

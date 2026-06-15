@@ -1118,7 +1118,9 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 1, stdout=""),
                 ),
-                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat"
+                ) as check_call_with_heartbeat,
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
                 result = run_issue("#82", config, recover=True)
@@ -1132,9 +1134,15 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 0)
         run_hooks.assert_not_called()
         codex_text.assert_not_called()
+        heartbeat_commands = [
+            call.args[0] for call in check_call_with_heartbeat.call_args_list
+        ]
+        self.assertIn(
+            ["git", "push", "-u", "origin", "issue-82-sympohy"],
+            heartbeat_commands,
+        )
+        self.assertIn(["gh", "pr", "create", "--draft", "--fill"], heartbeat_commands)
         commands = [call.args[0] for call in check_call.call_args_list]
-        self.assertIn(["git", "push", "-u", "origin", "issue-82-sympohy"], commands)
-        self.assertIn(["gh", "pr", "create", "--draft", "--fill"], commands)
         self.assertNotIn(["git", "add", "-A"], commands)
         self.assertFalse(any(command[:2] == ["git", "commit"] for command in commands))
         self.assertEqual(state["status"], "done")
@@ -1642,6 +1650,55 @@ class SympohyRunnerTest(unittest.TestCase):
                 lock.release()
 
             self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_refuses_takeover_when_guard_exists(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            lock_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "pid": 999999,
+                "heartbeat": stale.isoformat(),
+            }
+            state_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "phase": "implement",
+                "status": "running",
+                "pid": 999999,
+                "heartbeat": stale.isoformat(),
+                "lock": {
+                    "path": str(log_dir / "run.lock"),
+                    "run_id": "old-run",
+                },
+            }
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "run.lock.takeover").write_text("", encoding="utf-8")
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+
+            with (
+                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
+                self.assertRaises(_RunLockedError),
+            ):
+                lock.acquire()
+
+            payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_id"], "old-run")
 
     def test_issue_run_lock_refuses_mismatched_stale_lock(self) -> None:
         with TemporaryDirectory() as tmp:
