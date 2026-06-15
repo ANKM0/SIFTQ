@@ -154,15 +154,34 @@ describe("App", () => {
     expect(screen.getByLabelText("Dismissed drop area")).toBeTruthy();
     expect(screen.getByLabelText("Finished drop area")).toBeTruthy();
     expect(screen.getByRole("list", { name: "Now tasks" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Later tasks" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Assign tasks" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Drop tasks" })).toBeTruthy();
+
+    createTaskInArea("Now", "Relabeled task");
+
+    expect(await screen.findByText("Relabeled task")).toBeTruthy();
+    expect(taskTitlesIn("Now tasks")).toEqual(["Relabeled task"]);
   });
 
   it("rejects blank labels on the settings page without saving", async () => {
-    const settingsRepository = new InMemorySettingsRepository();
+    const settingsRepository = new InMemorySettingsRepository({
+      areaLabels: {
+        do: "Now",
+        schedule: "Later",
+        delegate: "Assign",
+        eliminate: "Drop",
+        skipped: "Dismissed",
+        done: "Finished"
+      }
+    });
 
     render(<App settingsRepository={settingsRepository} />);
 
+    expect(await screen.findByText("Now")).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.change(screen.getByLabelText("Do label"), {
+    fireEvent.change(screen.getByLabelText("Now label"), {
       target: { value: "   " }
     });
 
@@ -174,8 +193,19 @@ describe("App", () => {
       "Area label must not be empty."
     );
     await expect(settingsRepository.loadAreaLabels()).resolves.toMatchObject({
-      do: "Do"
+      do: "Now",
+      schedule: "Later",
+      delegate: "Assign",
+      eliminate: "Drop",
+      skipped: "Dismissed",
+      done: "Finished"
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Matrix" }));
+
+    expect(screen.getByText("Now")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Now tasks" })).toBeTruthy();
+    expect(screen.queryByText("Do")).toBeNull();
   });
 
   it("restores default labels from the settings page", async () => {
