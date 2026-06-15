@@ -178,6 +178,14 @@ UI 変更 PR では、文言修正や小さいスタイル調整でも wireframe
 ADR は、なぜこの基盤、方針、技術を選ぶかを記録する。複数機能に
 影響する判断、または後から変更コストが高い durable decision に使う。
 
+次のどちらかに該当する場合は、ADR を作成する。
+
+- 判断が複数機能、複数ドキュメント、または repository workflow に
+  影響する。
+- 判断を後から変えると migration、schema 変更、toolchain 移行、
+  runtime 変更、storage 移行、または architecture boundary の変更が
+  必要になる。
+
 ADR が必要になる代表例:
 
 - アーキテクチャ判断

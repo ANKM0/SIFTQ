@@ -45,4 +45,25 @@ describe("MVP spec flow", () => {
       "`tests/docs/wireframeContract.test.ts`"
     );
   });
+
+  it("documents when an ADR is required", () => {
+    const requiredAdrFragments = [
+      "次のどちらかに該当する場合は、ADR を作成する",
+      "複数機能、複数ドキュメント、または repository workflow",
+      "後から変えると migration、schema 変更、toolchain 移行",
+      "runtime 変更、storage 移行、または architecture boundary",
+      "ADR が必要になる代表例",
+      "アーキテクチャ判断",
+      "主要モジュール",
+      "ライブラリ",
+      "ツール",
+      "governance"
+    ];
+
+    const missingAdrFragments = requiredAdrFragments.filter(
+      (fragment) => !mvpSpecFlow.includes(fragment)
+    );
+
+    expect(missingAdrFragments).toEqual([]);
+  });
 });
