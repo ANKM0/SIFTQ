@@ -11,6 +11,7 @@
 <!-- 実行したテスト、lint、手動確認結果を記載してください -->
 - ローカルでの確認
 - テスト / lint / 手動確認
+- UI 変更がある場合は wireframe HTML を更新し、`tests/docs/wireframeContract.test.ts` の確認結果を記載する
 
 ```bash
 ```
