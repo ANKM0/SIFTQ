@@ -1555,7 +1555,7 @@ def _run_final_verifier_and_merge(
     ):
         _block(
             issue_ref,
-            phase="merge",
+            phase="finalize",
             failed_command="final verifier",
             attempts=1,
             cause="final verifier did not recommend merge",
@@ -1615,9 +1615,9 @@ def _finish_merged_issue(
     )
     set_issue_state(
         issue_ref,
-        current_labels=("sympohy:running", "sympohy:phase:merge"),
+        current_labels=("sympohy:running", "sympohy:phase:finalize"),
         status="sympohy:done",
-        phase="merge",
+        phase="finalize",
     )
     subprocess.check_call(["gh", "issue", "close", issue_ref])
     return 0

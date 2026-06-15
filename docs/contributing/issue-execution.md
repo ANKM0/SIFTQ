@@ -137,7 +137,7 @@ It also owns exactly one active phase label per managed issue:
 - `sympohy:phase:hooks`
 - `sympohy:phase:review`
 - `sympohy:phase:fix`
-- `sympohy:phase:merge`
+- `sympohy:phase:finalize`
 
 Synchronize labels with:
 

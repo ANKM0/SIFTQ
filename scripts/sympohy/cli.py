@@ -134,7 +134,7 @@ def doctor(*, config_path: Path) -> int:
             "sympohy:phase:hooks",
             "sympohy:phase:review",
             "sympohy:phase:fix",
-            "sympohy:phase:merge",
+            "sympohy:phase:finalize",
         },
         "codex uses user config": _runner_source_does_not_contain("--ignore-user-config"),
         "codex uses repo rules": _runner_source_does_not_contain("--ignore-rules"),

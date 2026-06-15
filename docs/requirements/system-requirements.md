@@ -47,6 +47,9 @@ codd:
     - id: design:mvp-spec-flow
       relation: depends_on
       semantic: governance
+    - id: design:mvp-spec-flow
+      relation: depends_on
+      semantic: governance
     - id: design:issue-10-taskfile
       relation: depends_on
       semantic: governance
