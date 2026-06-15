@@ -93,5 +93,17 @@ describe("MVP spec flow", () => {
     expect(adrAuthoring).toContain(
       "Use design docs for feature-specific application"
     );
+    expect(adrAuthoring).toContain("per-feature external design");
+    expect(adrAuthoring).toContain("internal design");
+    expect(adrAuthoring).toContain("test perspectives");
+    expect(adrAuthoring).toContain(
+      "perspectives, and application of existing ADRs"
+    );
+    expect(mvpSpecFlow).toContain("per-feature");
+    expect(mvpSpecFlow).toContain("external design");
+    expect(mvpSpecFlow).toContain("internal design");
+    expect(mvpSpecFlow).toContain("test perspectives");
+    expect(mvpSpecFlow).toContain("既存 ADR の");
+    expect(mvpSpecFlow).toContain("application");
   });
 });

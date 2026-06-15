@@ -184,9 +184,10 @@ ADR と design doc の境界は、判断の寿命と適用範囲で分ける。
 
 - ADR は durable decision を記録する。採用した基盤、方針、技術、
   architecture boundary、repository workflow と、その判断理由を残す。
-- Design doc は feature-specific application を記録する。既存 ADR の
-  判断を対象機能へどう適用するか、外部設計、内部設計、テスト観点、
-  UI 状態を残す。
+- Design doc は feature-specific application を記録する。per-feature
+  external design、internal design、test perspectives、既存 ADR の
+  application を対象機能ごとに残す。あわせて UI 状態と operation flow
+  を残す。
 - Design doc は ADR を再決定しない。ADR と異なる判断が必要になった
   場合は、design doc に判断を埋め込まず、新しい ADR または既存 ADR の
   改訂で扱う。
