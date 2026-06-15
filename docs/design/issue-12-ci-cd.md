@@ -22,6 +22,9 @@ codd:
     - id: design:github-actions-ci-cd-toolchain-adr
       relation: depends_on
       semantic: ci
+    - id: design:sympohy-ticket-driven-ai-runner-adr
+      relation: depends_on
+      semantic: automation
 ---
 
 # Issue 12 CI/CD Design Proposal
@@ -60,7 +63,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 ## Acceptance Criteria
 
 - `.github/workflows/`配下にCIワークフローが存在し、`push`と`pull_request`で実行されること。
-- CIにコミットメッセージlint、Markdown lint、TypeScript typecheck、ESLint、Vitest、Vite build、CoDD検証が含まれていること。
+- CIに`sympohy` project configuration、コミットメッセージlint、Markdown lint、TypeScript typecheck、ESLint、Vitest、Vite build、CoDD検証が含まれていること。
 - Rust/TauriのCIチェックは、v2以降でRust workspaceまたはTauri appが追加された段階で有効化できる設計になっていること。
 - `.github/workflows/`配下にCDワークフローが存在し、`v*`タグからGitHub Releaseを公開できること。
 - CDワークフローが手動実行時にリリースタグを作成できること。
@@ -72,6 +75,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 
 - 人間の承認後、実装変更がIssue用ブランチにコミットされていること。
 - `task setup:python`が成功すること。
+- `task ci:sympohy`が成功すること。
 - frontend依存関係のinstallが成功すること。
 - 実装ブランチのコミット範囲に対してコミットメッセージlintが成功すること。
 - リポジトリ内のMarkdownファイルに対してMarkdown lintが成功すること。
@@ -118,6 +122,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - Rust/Tauriのチェックはv2以降で`src-tauri/`またはRust workspaceが追加された段階で有効化する。
 - パッケージやイメージ公開の要件が出るまでは、リリースワークフローの対象をGitHub Releasesに限定する。
 - CIでは`contents: read`を使い、`contents: write`はリリースワークフローだけで使う。
+- CIでは`task ci:sympohy`をfrontend checksより前に実行し、`.sympohy/config.yaml`、runner entrypoint、labels、systemd templates、Codex command shapeを検証する。
 - Markdown CIの生成物除外契約は`tests/docs/markdownCiContract.test.ts`で固定する。
 
 ## Suggested Issue Split

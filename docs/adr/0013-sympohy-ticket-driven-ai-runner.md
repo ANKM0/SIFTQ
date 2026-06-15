@@ -11,6 +11,9 @@ codd:
       relation: depends_on
       semantic: automation
   depended_by:
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: automation
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: decision
@@ -25,8 +28,6 @@ codd:
 
 Accepted.
 
-Supersedes ADR 0011.
-
 ## Context
 
 SIFTQ needs a GitHub Issue-driven automation path that can refine AC/DoD,
@@ -34,10 +35,9 @@ implement scoped changes, run repository hooks, create PRs, run adversarial
 review and fix loops, wait for GitHub checks, squash merge, close issues, and
 retain logs.
 
-The earlier runner decision optimized for a small manual workflow. Issue #74
-raises the requirement to run up to ten issues in parallel, isolate each issue
-in a `git worktree`, manage state through GitHub labels, install a systemd user
-timer, and keep the runner under direct repository control.
+Issue #74 raises the requirement to run up to ten issues in parallel, isolate
+each issue in a `git worktree`, manage state through GitHub labels, install a
+systemd user timer, and keep the runner under direct repository control.
 
 The runner remains development operations tooling. It must not become a SIFTQ
 application runtime dependency or affect the React/Vite application boundary.

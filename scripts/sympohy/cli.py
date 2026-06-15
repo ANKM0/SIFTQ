@@ -16,7 +16,7 @@ from .core import (
     transition_labels,
     validate_commit_subject,
 )
-from .github import REQUIRED_LABELS, sync_labels
+from .github import REQUIRED_LABELS, migrate_legacy_tasks, sync_labels
 from .runner import refine_issue, resume_issue, run_issue, watch
 from .systemd import install_systemd_units, print_systemd_status
 
@@ -34,6 +34,12 @@ def main(argv: list[str] | None = None) -> int:
     subcommands.add_parser("watch")
     subcommands.add_parser("systemd-install")
     subcommands.add_parser("systemd-status")
+
+    migrate_parser = subcommands.add_parser("migrate")
+    migrate_parser.add_argument("issue", nargs="?")
+    migrate_parser.add_argument("--all", action="store_true")
+    migrate_parser.add_argument("--dry-run", action="store_true")
+    migrate_parser.add_argument("--limit", type=int, default=500)
 
     refine_parser = subcommands.add_parser("refine")
     refine_parser.add_argument("issue")
@@ -57,6 +63,18 @@ def main(argv: list[str] | None = None) -> int:
         return doctor(config_path=DEFAULT_CONFIG_PATH)
     if args.command == "labels-sync":
         sync_labels()
+        return 0
+    if args.command == "migrate":
+        if args.issue is None and not args.all:
+            parser.error("migrate requires ISSUE or --all")
+        if args.issue is not None and args.all:
+            parser.error("migrate accepts ISSUE or --all, not both")
+        result = migrate_legacy_tasks(
+            args.issue,
+            dry_run=args.dry_run,
+            limit=args.limit,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     if args.command == "refine":
         code, output = refine_issue(args.issue)

@@ -28,13 +28,97 @@ SIFTQ uses `sympohy` as repository-local development tooling for GitHub
 Issue-driven implementation. It is not part of the SIFTQ application runtime
 and is not listed in `package.json` or installed as a frontend dependency.
 
-`sympohy` runs from the repository through Taskfile:
+`sympohy` replaces the older TAKT/taqt task workflow. Mentions of `takt`/`taqt`
+below are kept strictly as historical migration context.
+Tracked configuration and
+systemd templates live in `.sympohy/`; generated issue worktrees and run logs
+live in `.sympohy/worktrees/` and `.sympohy/runs/`, which are ignored by Git.
+
+## Requirements
+
+Run `sympohy` from a trusted local checkout with the normal SIFTQ development
+tooling installed:
+
+- `git`, `gh`, `aqua`, `uv`, `pnpm`, and `task`.
+- An authenticated `gh` session that can read and update issues, labels, pull
+  requests, and checks for `ANKM0/SIFTQ`.
+- A normal Codex CLI setup with the user's `HOME`, `CODEX_HOME`, repository
+  rules, and repository skills available.
+- A clean enough Git worktree for the command being run. Generated sympohy
+  worktrees are separate from the operator's checkout.
+
+Do not run Codex with flags that ignore user configuration or repository rules.
+The runner depends on those settings for command permissions and repo-specific
+workflow instructions.
+
+## Setup
+
+Install repository tools and dependencies first:
+
+```bash
+aqua install
+task setup
+```
+
+Validate only the sympohy prerequisites and configuration:
 
 ```bash
 task setup:sympohy
 task ai:sympohy:doctor
-task ai:sympohy -- '#74'
-task ai:sympohy:refine -- '#74'
+```
+
+`task setup:sympohy` checks local prerequisites for the repository runner.
+`task ai:sympohy:doctor` validates sympohy config, labels, systemd templates,
+Codex availability, hooks, and GitHub prerequisites.
+
+The local CI gate also runs the sympohy checks:
+
+```bash
+task ci:sympohy
+task ci
+```
+
+## Usage
+
+Inspect an issue for the latest complete AC/DoD set without implementation:
+
+```bash
+task ai:sympohy:refine -- '#73'
+```
+
+Run one issue through the automation:
+
+```bash
+task ai:sympohy -- '#73'
+```
+
+Resume a stale or interrupted run:
+
+```bash
+task ai:sympohy:resume -- '#73'
+```
+
+Use quotes around `#73` in shells where `#` starts a comment. The underlying
+CLI also accepts the issue token passed through Taskfile as a positional
+argument.
+
+## Common Workflow Commands
+
+These are the common operator commands for issue execution:
+
+```bash
+task setup:sympohy
+task ai:sympohy:doctor
+task ai:sympohy:labels:sync
+task ai:sympohy:refine -- '#73'
+task ai:sympohy -- '#73'
+task ai:sympohy:resume -- '#73'
+task ai:sympohy:migrate -- --dry-run '#73'
+task ai:sympohy:migrate -- '#73'
+task ai:sympohy:migrate -- --all
+task ai:sympohy:watch
+task ai:sympohy:systemd:install
+task ai:sympohy:systemd:status
 ```
 
 ## Labels
@@ -62,8 +146,51 @@ task ai:sympohy:labels:sync
 ```
 
 The sync command creates or updates `sympohy:*` labels and removes legacy
-`ai:*` labels from the repository label definitions. New issue execution state
-must use `sympohy:*` labels only.
+`ai:*` labels from the repository label definitions. Before deleting legacy
+label definitions, it migrates any issues that still carry `ai:*`, `takt:*`, or
+`taqt:*` task labels so issue-level workflow state is not lost.
+
+New issue execution state must use `sympohy:*` labels only. Do not add new
+TAKT/taqt labels or directories.
+
+## Migration
+
+Migration is label-only. It preserves issue title, body, comments, assignees,
+milestone, and link relationships because it removes only legacy workflow labels
+and applies equivalent `sympohy:*` status and phase labels. Existing
+non-workflow labels are kept.
+
+Inspect a single issue migration without writing changes:
+
+```bash
+task ai:sympohy:migrate -- --dry-run '#73'
+```
+
+Migrate a single legacy task issue:
+
+```bash
+task ai:sympohy:migrate -- '#73'
+```
+
+Migrate every issue that still has legacy `ai:*`, `takt:*`, or `taqt:*` task
+labels with:
+
+```bash
+task ai:sympohy:migrate -- --all
+```
+
+Limit bulk migration while testing:
+
+```bash
+task ai:sympohy:migrate -- --all --limit 10
+```
+
+Closed legacy tasks become `sympohy:done` and `sympohy:phase:merge`. Blocked
+tasks become `sympohy:blocked` and `sympohy:phase:triage`. In-progress workflow
+labels map to the matching `implement`, `hooks`, `review`, or `fix` phase where
+that intent is represented by sympohy. Ready or queued legacy tasks start as
+`sympohy:pending` in `triage` so sympohy can re-check the latest AC/DoD before
+implementation.
 
 ## Refinement
 
@@ -79,6 +206,12 @@ blocked reason.
 
 The watcher is intended for trusted local environments with authenticated
 `gh`, local `git`, Taskfile, and normal Codex CLI configuration.
+
+Run the watcher in the foreground:
+
+```bash
+task ai:sympohy:watch
+```
 
 Install the systemd user timer:
 

@@ -18,6 +18,3 @@ docs/test/verify_report.md
 # sympohy local worktrees and run logs
 .sympohy/worktrees/
 .sympohy/runs/
-
-# Legacy local TAKT state retained only to keep old generated files untracked
-.takt/

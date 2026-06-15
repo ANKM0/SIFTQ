@@ -36,6 +36,7 @@ tasks:
   ci:
     desc: Run the local CI gate.
     cmds:
+      - task: ci:sympohy
       - task: ci:commit-messages
       - task: ci:markdown
       - task: ci:typecheck
@@ -46,6 +47,12 @@ tasks:
       - task: codd:scan
       - task: codd:validate
       - task: codd:dag
+
+  ci:sympohy:
+    desc: Validate sympohy project configuration and required local tooling.
+    cmds:
+      - task: setup:sympohy
+      - task: ai:sympohy:doctor
 
   ci:commit-messages:
     desc: Check commit message format for the current branch.
@@ -129,9 +136,14 @@ tasks:
       - uv run python -m scripts.sympohy doctor
 
   ai:sympohy:labels:sync:
-    desc: Create/update sympohy labels and delete legacy ai:* labels.
+    desc: Create/update sympohy labels and delete legacy task labels.
     cmds:
       - uv run python -m scripts.sympohy labels-sync
+
+  ai:sympohy:migrate:
+    desc: Migrate legacy task labels to sympohy labels, for example task ai:sympohy:migrate -- '#73' or --all.
+    cmds:
+      - uv run python -m scripts.sympohy migrate {{.CLI_ARGS}}
 
   ai:sympohy:watch:
     desc: Watch open GitHub issues and start up to 10 independent sympohy workers.
