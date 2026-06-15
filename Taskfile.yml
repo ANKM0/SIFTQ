@@ -44,6 +44,7 @@ tasks:
   ci:
     desc: Run the local CI gate.
     cmds:
+      - task: setup:python
       - task: ci:sympohy
       - task: ci:commit-messages
       - task: ci:markdown
@@ -86,7 +87,7 @@ tasks:
     desc: Run Vitest.
     cmds:
       - pnpm test
-      - uv run python -m unittest discover tests/sympohy -p "*_test.py"
+      - task pytest
 
   ci:build:
     desc: Build the frontend.
