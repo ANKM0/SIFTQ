@@ -60,11 +60,25 @@ Manual Matrix MVP smoke check:
   matrix display.
 - Confirm a long 256-character title wraps inside the card without overlapping
   nearby controls or changing the page into an unusable layout.
-- Open `Settings`, change all matrix area labels plus `Done` and `Skipped`,
-  save them, return to the matrix, and confirm the updated labels are shown.
-- Reopen `Settings`, confirm blank labels cannot be saved, then use
-  `Restore defaults` and confirm the labels return to `Do`, `Schedule`,
-  `Delegate`, `Eliminate`, `Done`, and `Skipped`.
+
+Manual v7 settings smoke check:
+
+- Open `Settings`, change all four matrix area labels plus `Done` and
+  `Skipped`, click `Save labels`, return to the matrix, and confirm every
+  updated label is shown in the matrix and terminal drop areas.
+- For restart persistence, run the app in a host that provides the SQLite
+  settings connection, change and save the labels, restart the app, and confirm
+  the saved labels are restored on the matrix page. The plain Vite development
+  server uses the in-memory fallback and cannot prove restart persistence by
+  itself.
+- Reopen `Settings`, replace one or more labels with only spaces, and confirm
+  `Save labels` is disabled with `Area label must not be empty.` Confirm the
+  previously saved labels remain unchanged after returning to the matrix.
+- Reopen `Settings`, click `Restore defaults`, return to the matrix, and confirm
+  the labels return to `Do`, `Schedule`, `Delegate`, `Eliminate`, `Done`, and
+  `Skipped`.
+- Restart the SQLite-backed app again and confirm the restored default labels
+  are still shown.
 
 Common frontend checks:
 
