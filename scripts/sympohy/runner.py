@@ -16,6 +16,7 @@ from .core import (
     merge_gate_allows_merge,
     next_retry_action,
     parse_review_json,
+    resolve_resume_point,
     validate_commit_subject,
 )
 from .github import Issue, comment, fetch_issue, list_candidate_issues, set_issue_state
@@ -162,16 +163,35 @@ def watch(config: SympohyConfig) -> int:
 
 def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     issue = fetch_issue(issue_ref)
+    labels = [{"name": label} for label in issue.labels]
+    resume_point = resolve_resume_point(labels)
+    log_dir = config.run_log_root / f"issue-{issue.number}"
+
+    if resume_point.terminal:
+        state = _RunStateWriter(
+            issue_number=issue.number,
+            log_dir=log_dir,
+            base_branch=config.base_branch,
+        )
+        state.write(
+            phase=resume_point.phase or "triage",
+            status="done" if resume_point.name == "completed" else resume_point.name,
+            progress={
+                "message": "resume skipped for terminal issue state",
+                "resume_point": resume_point.name,
+            },
+        )
+        return 0
+
     payload = {
         "number": issue.number,
         "state": "OPEN",
-        "labels": [{"name": label} for label in issue.labels],
+        "labels": labels,
     }
     inspection = inspect_running_issue(payload, run_log_root=config.run_log_root)
     if not inspection.stale:
         return 0
 
-    log_dir = config.run_log_root / f"issue-{issue.number}"
     state = _RunStateWriter(
         issue_number=issue.number,
         log_dir=log_dir,
@@ -181,6 +201,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         phase=inspection.phase or "triage",
         progress={
             "message": "routing stale running issue into resume handling",
+            "resume_point": resume_point.name,
             "stale_reason": inspection.reason,
             "stale_state_path": str(inspection.state_path)
             if inspection.state_path is not None

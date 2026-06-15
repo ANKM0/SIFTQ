@@ -67,6 +67,18 @@ open issues still receive `sympohy:pending` and `sympohy:phase:triage` before a
 `resume` entrypoint instead, preserving their running labels and phase context
 for resume handling.
 
+## Resume Point Resolution
+
+`resume` resolves a coarse resume point from the current `sympohy` labels before
+restarting automation. `sympohy:phase:triage` and missing phase context map to
+`planning`; `sympohy:phase:implement` and `sympohy:phase:hooks` map to
+`implement`; and `sympohy:phase:review`, `sympohy:phase:fix`, and
+`sympohy:phase:merge` map to `push_pr`.
+
+Terminal status labels are not restarted. `sympohy:blocked` resolves to the
+`blocked` terminal point, and `sympohy:done` resolves to the `completed`
+terminal point.
+
 ## Existing Tests
 
 `tests/sympohy/sympohy_core_test.py` covers stale-running inspection and

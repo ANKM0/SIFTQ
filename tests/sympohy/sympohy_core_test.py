@@ -12,6 +12,7 @@ from scripts.sympohy import (
     is_candidate_issue,
     merge_gate_allows_merge,
     next_retry_action,
+    resolve_resume_point,
     transition_labels,
     validate_commit_subject,
 )
@@ -205,6 +206,62 @@ class SympohyCoreTest(unittest.TestCase):
         )
 
         self.assertEqual(labels, ("bug", "sympohy:blocked", "sympohy:phase:fix"))
+
+    def test_resume_point_resolution_maps_phase_labels_to_resume_categories(self) -> None:
+        planning = resolve_resume_point(
+            [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:triage"},
+            ]
+        )
+        self.assertEqual(planning.name, "planning")
+        self.assertEqual(planning.phase, "triage")
+        self.assertFalse(planning.terminal)
+
+        for phase in ("implement", "hooks"):
+            with self.subTest(phase=phase):
+                resume_point = resolve_resume_point(
+                    [
+                        {"name": "sympohy:running"},
+                        {"name": f"sympohy:phase:{phase}"},
+                    ]
+                )
+                self.assertEqual(resume_point.name, "implement")
+                self.assertEqual(resume_point.phase, phase)
+                self.assertFalse(resume_point.terminal)
+
+        for phase in ("review", "fix", "merge"):
+            with self.subTest(phase=phase):
+                resume_point = resolve_resume_point(
+                    [
+                        {"name": "sympohy:running"},
+                        {"name": f"sympohy:phase:{phase}"},
+                    ]
+                )
+                self.assertEqual(resume_point.name, "push_pr")
+                self.assertEqual(resume_point.phase, phase)
+                self.assertFalse(resume_point.terminal)
+
+    def test_resume_point_resolution_handles_terminal_status_labels(self) -> None:
+        blocked = resolve_resume_point(
+            [
+                "sympohy:blocked",
+                "sympohy:phase:implement",
+            ]
+        )
+        self.assertEqual(blocked.name, "blocked")
+        self.assertEqual(blocked.phase, "implement")
+        self.assertTrue(blocked.terminal)
+
+        completed = resolve_resume_point(
+            [
+                "sympohy:done",
+                "sympohy:phase:merge",
+            ]
+        )
+        self.assertEqual(completed.name, "completed")
+        self.assertEqual(completed.phase, "merge")
+        self.assertTrue(completed.terminal)
 
     def test_review_json_blocks_critical_high_and_medium_findings(self) -> None:
         result = parse_review_json(

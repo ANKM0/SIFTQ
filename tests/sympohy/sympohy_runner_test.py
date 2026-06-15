@@ -100,7 +100,66 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 0)
         run_issue.assert_called_once_with("#82", config)
         self.assertEqual(state["phase"], "implement")
+        self.assertEqual(state["last_known_progress"]["resume_point"], "implement")
         self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
+
+    def test_resume_issue_does_not_restart_terminal_issue_states(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Already blocked",
+                body="",
+                labels=("sympohy:blocked", "sympohy:phase:hooks"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        self.assertEqual(state["phase"], "hooks")
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["last_known_progress"]["resume_point"], "blocked")
+
+    def test_resume_issue_does_not_restart_completed_issue_states(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Already completed",
+                body="",
+                labels=("sympohy:done", "sympohy:phase:merge"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        self.assertEqual(state["phase"], "merge")
+        self.assertEqual(state["status"], "done")
+        self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)

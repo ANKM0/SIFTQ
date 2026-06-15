@@ -47,6 +47,13 @@ class RunningIssueInspection:
 
 
 @dataclass(frozen=True)
+class ResumePoint:
+    name: str
+    phase: str | None
+    terminal: bool = False
+
+
+@dataclass(frozen=True)
 class ReviewFinding:
     severity: str
     summary: str
@@ -203,6 +210,25 @@ def transition_labels(
         labels.add(phase_label)
 
     return tuple(sorted(labels))
+
+
+def resolve_resume_point(labels: object) -> ResumePoint:
+    names = set(_label_names(labels))
+    phase = _phase_from_labels(names)
+
+    if "sympohy:done" in names:
+        return ResumePoint(name="completed", phase=phase, terminal=True)
+    if "sympohy:blocked" in names:
+        return ResumePoint(name="blocked", phase=phase, terminal=True)
+
+    if phase in {None, "triage"}:
+        return ResumePoint(name="planning", phase=phase)
+    if phase in {"implement", "hooks"}:
+        return ResumePoint(name="implement", phase=phase)
+    if phase in {"review", "fix", "merge"}:
+        return ResumePoint(name="push_pr", phase=phase)
+
+    return ResumePoint(name="planning", phase=phase)
 
 
 def extract_acceptance_set(body: str, comments: Sequence[Mapping[str, object]]) -> AcceptanceSet | None:
@@ -399,7 +425,7 @@ def _process_alive(pid: int) -> bool:
 
 
 def _label_names(labels: object) -> list[str]:
-    if not isinstance(labels, list):
+    if not isinstance(labels, (list, tuple)):
         return []
     names: list[str] = []
     for label in labels:
