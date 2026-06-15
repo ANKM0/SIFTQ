@@ -27,7 +27,7 @@ SIFTQ の system requirement anchor である `req:siftq-system` に依存し、
 基本フローは次の順序とする。
 
 ```text
-Requirements -> Design -> Tests + Implementation
+Requirements -> Design -> Wireframe（UI 変更時） -> ADR Decision -> Implementation Request
 ```
 
 必須文書は原則として次の 2 つにする。
@@ -138,7 +138,7 @@ UI 変更 PR では、文言修正や小さいスタイル調整でも wireframe
 確認する。新しい UI 状態、操作、表示契約が増える場合だけ、この契約
 テストの更新を必須にする。
 
-## ADR との切り分け
+## ADR Decision
 
 ADR は、なぜこの基盤、方針、技術を選ぶかを記録する。複数機能に
 影響する判断、または後から変更コストが高い durable decision に使う。
@@ -160,6 +160,18 @@ ADR が必要になる代表例:
 例として、React + Vite、dnd-kit、Rust/Tauri、SQLite、
 port-adapter boundary、pnpm、Taskfile、GitHub Actions のような判断は
 ADR で扱う。
+
+実装依頼へ進む前に、次のどちらかを design doc に明記する。
+
+- 既存 ADR を使う場合: 参照する ADR と、その判断をこの機能へどう
+  適用するか。
+- 新しい ADR が必要な場合: `docs/adr/` に ADR を追加し、ADR が
+  Accepted になってから implementation request へ進むこと。
+
+ADR が不要な場合は、不要と判断した理由を design doc の Open Questions
+または decision note に残す。たとえば既存の module boundary、runtime、
+storage、toolchain を変えず、機能固有の UI / operation / test だけで
+閉じる変更は ADR なしで進める。
 
 Design docs は、その基盤や方針を使って、この機能をどう作るかを
 記録する。たとえば title edit 機能では、card 内の Edit から modal を
