@@ -101,6 +101,7 @@ task ci
 
 ## Contributor Docs
 
-- Branch strategy: `docs/contributing/branch-strategy.md`
-- Commit messages: `docs/contributing/commit-message-format.md`
-- Issue execution: `docs/contributing/issue-execution.md`
+- Branch strategy: [docs/contributing/branch-strategy.md](docs/contributing/branch-strategy.md)
+- Commit messages: [docs/contributing/commit-message-format.md](docs/contributing/commit-message-format.md)
+- Issue execution: [docs/contributing/issue-execution.md](docs/contributing/issue-execution.md)
+- MVP spec flow: [docs/contributing/mvp-spec-flow.md](docs/contributing/mvp-spec-flow.md)
