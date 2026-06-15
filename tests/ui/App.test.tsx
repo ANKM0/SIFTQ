@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { InMemorySettingsRepository } from "../../src/adapters/inMemorySettingsRepository";
 import { InMemoryTaskRepository } from "../../src/adapters/inMemoryTaskRepository";
 import {
   createTask,
@@ -73,6 +74,135 @@ describe("App", () => {
     expect(screen.getByText("Done")).toBeTruthy();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
+  });
+
+  it("loads custom area labels from the settings repository", async () => {
+    const settingsRepository = new InMemorySettingsRepository({
+      areaLabels: {
+        do: "Now",
+        schedule: "Later",
+        delegate: "Assign",
+        eliminate: "Drop",
+        skipped: "Dismissed",
+        done: "Finished"
+      }
+    });
+
+    render(<App settingsRepository={settingsRepository} />);
+
+    expect(await screen.findByText("Now")).toBeTruthy();
+    expect(screen.getByText("Later")).toBeTruthy();
+    expect(screen.getByText("Assign")).toBeTruthy();
+    expect(screen.getByText("Drop")).toBeTruthy();
+    expect(screen.getByText("Dismissed")).toBeTruthy();
+    expect(screen.getByText("Finished")).toBeTruthy();
+    expect(screen.getByLabelText("New task title for Now")).toBeTruthy();
+  });
+
+  it("saves area label edits from the settings page", async () => {
+    const settingsRepository = new InMemorySettingsRepository();
+
+    render(<App settingsRepository={settingsRepository} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Do label"), {
+      target: { value: "  Now  " }
+    });
+    fireEvent.change(screen.getByLabelText("Schedule label"), {
+      target: { value: "Later" }
+    });
+    fireEvent.change(screen.getByLabelText("Delegate label"), {
+      target: { value: "Assign" }
+    });
+    fireEvent.change(screen.getByLabelText("Eliminate label"), {
+      target: { value: "Drop" }
+    });
+    fireEvent.change(screen.getByLabelText("Skipped label"), {
+      target: { value: "Dismissed" }
+    });
+    fireEvent.change(screen.getByLabelText("Done label"), {
+      target: { value: "Finished" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save labels" }));
+
+    await waitFor(() =>
+      expect(settingsRepository.loadAreaLabels()).resolves.toMatchObject({
+        do: "Now",
+        schedule: "Later",
+        delegate: "Assign",
+        eliminate: "Drop",
+        skipped: "Dismissed",
+        done: "Finished"
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Now label")).toHaveProperty("value", "Now")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Matrix" }));
+
+    expect(screen.getByText("Now")).toBeTruthy();
+    expect(screen.getByText("Later")).toBeTruthy();
+    expect(screen.getByText("Dismissed")).toBeTruthy();
+    expect(screen.getByText("Finished")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Now tasks" })).toBeTruthy();
+  });
+
+  it("rejects blank labels on the settings page without saving", async () => {
+    const settingsRepository = new InMemorySettingsRepository();
+
+    render(<App settingsRepository={settingsRepository} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Do label"), {
+      target: { value: "   " }
+    });
+
+    expect(screen.getByRole("button", { name: "Save labels" })).toHaveProperty(
+      "disabled",
+      true
+    );
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Area label must not be empty."
+    );
+    await expect(settingsRepository.loadAreaLabels()).resolves.toMatchObject({
+      do: "Do"
+    });
+  });
+
+  it("restores default labels from the settings page", async () => {
+    const settingsRepository = new InMemorySettingsRepository({
+      areaLabels: {
+        do: "Now",
+        schedule: "Later",
+        delegate: "Assign",
+        eliminate: "Drop",
+        skipped: "Dismissed",
+        done: "Finished"
+      }
+    });
+
+    render(<App settingsRepository={settingsRepository} />);
+
+    expect(await screen.findByText("Now")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore defaults" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Do label")).toHaveProperty("value", "Do")
+    );
+    await expect(settingsRepository.loadAreaLabels()).resolves.toMatchObject({
+      do: "Do",
+      skipped: "Skipped",
+      done: "Done"
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Matrix" }));
+
+    expect(screen.getByText("Do")).toBeTruthy();
+    expect(screen.getByText("Skipped")).toBeTruthy();
+    expect(screen.getByText("Done")).toBeTruthy();
   });
 
   it("renders area panels with card counts and task card regions", () => {

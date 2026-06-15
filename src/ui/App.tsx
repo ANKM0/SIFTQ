@@ -7,7 +7,13 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
+import { InMemorySettingsRepository } from "../adapters/inMemorySettingsRepository";
 import { InMemoryTaskRepository } from "../adapters/inMemoryTaskRepository";
+import {
+  loadAreaLabels,
+  restoreDefaultAreaLabels,
+  saveAreaLabels
+} from "../application/settingsOperations";
 import {
   createTask,
   listTasks,
@@ -16,16 +22,23 @@ import {
   updateTaskTitle
 } from "../application/taskOperations";
 import {
+  INITIAL_AREAS,
   MATRIX_AREAS,
   TERMINAL_AREAS,
   type MatrixAreaId,
   type TerminalAreaId
 } from "../domain/area";
 import {
+  areasWithLabels,
+  getDefaultAreaLabelSettings,
+  type AreaLabelSettings
+} from "../domain/settings";
+import {
   isTaskVisibleInMatrix,
   TASK_TITLE_MAX_LENGTH,
   type Task
 } from "../domain/task";
+import { type SettingsRepository } from "../ports/settingsRepository";
 import { type TaskRepository } from "../ports/taskRepository";
 import {
   areaDropId,
@@ -39,16 +52,39 @@ const dragModifiers = [restrictDragToWindowEdges];
 
 type AppProps = {
   repository?: TaskRepository;
+  settingsRepository?: SettingsRepository;
 };
 
-export function App({ repository }: AppProps) {
+type Page = "matrix" | "settings";
+
+export function App({ repository, settingsRepository }: AppProps) {
   const ownedRepository = useRef(new InMemoryTaskRepository());
+  const ownedSettingsRepository = useRef(new InMemorySettingsRepository());
+  const settingsRequestVersion = useRef(0);
   const activeRepository = repository ?? ownedRepository.current;
+  const activeSettingsRepository =
+    settingsRepository ?? ownedSettingsRepository.current;
   const [tasks, setTasks] = useState<readonly Task[]>([]);
+  const [areaLabels, setAreaLabels] = useState<AreaLabelSettings>(
+    getDefaultAreaLabelSettings()
+  );
+  const [page, setPage] = useState<Page>("matrix");
 
   useEffect(() => {
     void refreshTasks(activeRepository, setTasks);
   }, [activeRepository]);
+
+  useEffect(() => {
+    const requestVersion = settingsRequestVersion.current + 1;
+    settingsRequestVersion.current = requestVersion;
+
+    void refreshAreaLabels(
+      activeSettingsRepository,
+      setAreaLabels,
+      requestVersion,
+      settingsRequestVersion
+    );
+  }, [activeSettingsRepository]);
 
   async function handleCreateTask(
     areaId: MatrixAreaId,
@@ -98,31 +134,88 @@ export function App({ repository }: AppProps) {
     await refreshTasks(activeRepository, setTasks);
   }
 
+  async function handleSaveAreaLabels(
+    labels: AreaLabelSettings
+  ): Promise<string | null> {
+    const requestVersion = settingsRequestVersion.current + 1;
+    settingsRequestVersion.current = requestVersion;
+
+    try {
+      const savedLabels = await saveAreaLabels(activeSettingsRepository, labels);
+
+      if (settingsRequestVersion.current === requestVersion) {
+        setAreaLabels(savedLabels);
+      }
+
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : "Area labels could not be saved.";
+    }
+  }
+
+  async function handleRestoreDefaultAreaLabels(): Promise<string | null> {
+    const requestVersion = settingsRequestVersion.current + 1;
+    settingsRequestVersion.current = requestVersion;
+
+    try {
+      const restoredLabels = await restoreDefaultAreaLabels(activeSettingsRepository);
+
+      if (settingsRequestVersion.current === requestVersion) {
+        setAreaLabels(restoredLabels);
+      }
+
+      return null;
+    } catch (error) {
+      return error instanceof Error
+        ? error.message
+        : "Area labels could not be restored.";
+    }
+  }
+
   return (
     <DndContext
       autoScroll={false}
       modifiers={dragModifiers}
       onDragEnd={(event) => void handleDragEnd(event)}
     >
-      <MatrixPage
-        tasks={tasks}
-        onCreateTask={handleCreateTask}
-        onUpdateTaskTitle={handleUpdateTaskTitle}
-      />
+      {page === "matrix" ? (
+        <MatrixPage
+          areaLabels={areaLabels}
+          tasks={tasks}
+          onCreateTask={handleCreateTask}
+          onOpenSettings={() => setPage("settings")}
+          onUpdateTaskTitle={handleUpdateTaskTitle}
+        />
+      ) : (
+        <SettingsPage
+          areaLabels={areaLabels}
+          onBack={() => setPage("matrix")}
+          onRestoreDefaults={handleRestoreDefaultAreaLabels}
+          onSave={handleSaveAreaLabels}
+        />
+      )}
     </DndContext>
   );
 }
 
 type MatrixPageProps = {
+  readonly areaLabels: AreaLabelSettings;
   readonly tasks: readonly Task[];
   readonly onCreateTask: (areaId: MatrixAreaId, title: string) => Promise<string | null>;
+  readonly onOpenSettings: () => void;
   readonly onUpdateTaskTitle: (
     taskId: Task["id"],
     title: string
   ) => Promise<string | null>;
 };
 
-function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps) {
+function MatrixPage({
+  areaLabels,
+  tasks,
+  onCreateTask,
+  onOpenSettings,
+  onUpdateTaskTitle
+}: MatrixPageProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   async function handleSaveTitle(title: string): Promise<string | null> {
@@ -143,11 +236,22 @@ function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps)
     <main className="matrix-page">
       <header className="matrix-page__header">
         <h1>SIFTQ</h1>
+        <button
+          className="matrix-page__settings-button"
+          type="button"
+          onClick={onOpenSettings}
+        >
+          Settings
+        </button>
       </header>
       <section aria-label="Matrix workspace" className="matrix-workspace">
         <div className="matrix-workspace__status matrix-workspace__status--skipped">
           {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
-            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
+            <StatusDropArea
+              key={area.id}
+              areaId={area.id}
+              label={areaLabels[area.id]}
+            />
           ))}
         </div>
         <section aria-label="Task matrix" className="matrix-grid">
@@ -155,7 +259,7 @@ function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps)
             <AreaPanel
               key={area.id}
               areaId={area.id}
-              label={area.label}
+              label={areaLabels[area.id]}
               tasks={tasksForArea(tasks, area.id)}
               onCreateTask={(title) => onCreateTask(area.id, title)}
               onEditTask={setEditingTask}
@@ -164,7 +268,11 @@ function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps)
         </section>
         <div className="matrix-workspace__status matrix-workspace__status--done">
           {TERMINAL_AREAS.filter((area) => area.id === "done").map((area) => (
-            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
+            <StatusDropArea
+              key={area.id}
+              areaId={area.id}
+              label={areaLabels[area.id]}
+            />
           ))}
         </div>
       </section>
@@ -175,6 +283,104 @@ function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps)
           onSave={handleSaveTitle}
         />
       ) : null}
+    </main>
+  );
+}
+
+type SettingsPageProps = {
+  readonly areaLabels: AreaLabelSettings;
+  readonly onBack: () => void;
+  readonly onRestoreDefaults: () => Promise<string | null>;
+  readonly onSave: (labels: AreaLabelSettings) => Promise<string | null>;
+};
+
+function SettingsPage({
+  areaLabels,
+  onBack,
+  onRestoreDefaults,
+  onSave
+}: SettingsPageProps) {
+  const [draftLabels, setDraftLabels] = useState<AreaLabelSettings>(areaLabels);
+  const [error, setError] = useState<string | null>(null);
+  const areas = areasWithLabels(areaLabels);
+  const canSave = INITIAL_AREAS.every(
+    (area) => draftLabels[area.id].trim().length > 0
+  );
+
+  useEffect(() => {
+    setDraftLabels(areaLabels);
+  }, [areaLabels]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSave) {
+      setError("Area label must not be empty.");
+      return;
+    }
+
+    setError(await onSave(draftLabels));
+  }
+
+  async function handleRestoreDefaults() {
+    setError(await onRestoreDefaults());
+  }
+
+  return (
+    <main className="matrix-page settings-page">
+      <header className="matrix-page__header">
+        <h1>Settings</h1>
+        <button
+          className="matrix-page__settings-button"
+          type="button"
+          onClick={onBack}
+        >
+          Matrix
+        </button>
+      </header>
+      <section aria-labelledby="area-label-settings-title" className="settings-panel">
+        <h2 id="area-label-settings-title">Area labels</h2>
+        <form className="settings-form" onSubmit={(event) => void handleSubmit(event)}>
+          <div className="settings-form__fields">
+            {areas.map((area) => (
+              <label key={area.id} className="settings-form__label">
+                {area.role}
+                <input
+                  aria-label={`${area.label} label`}
+                  className="settings-form__input"
+                  type="text"
+                  value={draftLabels[area.id]}
+                  onChange={(event) => {
+                    setDraftLabels((currentLabels) => ({
+                      ...currentLabels,
+                      [area.id]: event.target.value
+                    }));
+                    setError(null);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          {!canSave ? (
+            <p className="settings-form__error" role="alert">
+              Area label must not be empty.
+            </p>
+          ) : null}
+          {error !== null ? (
+            <p className="settings-form__error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="settings-form__actions">
+            <button type="button" onClick={() => void handleRestoreDefaults()}>
+              Restore defaults
+            </button>
+            <button disabled={!canSave} type="submit">
+              Save labels
+            </button>
+          </div>
+        </form>
+      </section>
     </main>
   );
 }
@@ -429,6 +635,19 @@ async function refreshTasks(
   setTasks: (tasks: readonly Task[]) => void
 ) {
   setTasks(await listTasks(repository));
+}
+
+async function refreshAreaLabels(
+  repository: SettingsRepository,
+  setAreaLabels: (labels: AreaLabelSettings) => void,
+  requestVersion: number,
+  settingsRequestVersion: { current: number }
+) {
+  const labels = await loadAreaLabels(repository);
+
+  if (settingsRequestVersion.current === requestVersion) {
+    setAreaLabels(labels);
+  }
 }
 
 function tasksForArea(tasks: readonly Task[], areaId: MatrixAreaId): Task[] {
