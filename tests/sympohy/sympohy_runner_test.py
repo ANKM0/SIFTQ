@@ -209,7 +209,9 @@ class SympohyRunnerTest(unittest.TestCase):
                     )
                 if args == ["git", "status", "--porcelain"]:
                     status_calls += 1
-                    return "" if status_calls == 1 else " M scripts/sympohy/runner.py\n"
+                    if status_calls == 1:
+                        return ""
+                    return " M scripts/sympohy/runner.py\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -257,6 +259,134 @@ class SympohyRunnerTest(unittest.TestCase):
         codex_text.assert_called_once()
         prompts = codex_text.call_args.args[0]
         self.assertIn("Implement logical step 3", prompts[0])
+
+    def test_resume_issue_reuses_partial_commits_from_stale_running_implement(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "plan.json").write_text(
+                json.dumps(
+                    {
+                        "logical_steps": [
+                            {"name": "one"},
+                            {"name": "two"},
+                            {"name": "three"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (log_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "worktree": {
+                            "path": str(worktree),
+                            "branch": "issue-82-sympohy",
+                            "base_branch": "main",
+                        },
+                        "plan_reference": str(log_dir / "plan.json"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Recover stale run with partial commits",
+                body="""
+## AC
+- [ ] recover implementation
+
+## DoD
+- [ ] avoid redoing completed steps
+""",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            status_calls = 0
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                nonlocal status_calls
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return (
+                        "#82 feat(sympohy): implement logical step 2\n"
+                        "#82 feat(sympohy): implement logical step 1\n"
+                    )
+                if args == ["git", "status", "--porcelain"]:
+                    status_calls += 1
+                    if status_calls == 1:
+                        return ""
+                    return " M scripts/sympohy/runner.py\n"
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            def codex_json(
+                _prompts: list[str],
+                *,
+                log_path: Path,
+                **_kwargs: object,
+            ) -> dict[str, object]:
+                if log_path.name == "final-verifier.json":
+                    return {
+                        "acceptance_criteria_satisfied": True,
+                        "definition_of_done_satisfied": True,
+                        "merge_recommendation": "merge",
+                    }
+                raise AssertionError(
+                    "resume should load the saved plan instead of re-planning"
+                )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner._run_hooks", return_value=0),
+                patch("scripts.sympohy.runner._review_fix_loop", return_value=0),
+                patch("scripts.sympohy.runner._codex_json", side_effect=codex_json),
+                patch(
+                    "scripts.sympohy.runner._codex_text",
+                    return_value="",
+                ) as codex_text,
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0),
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        codex_text.assert_called_once()
+        prompts = codex_text.call_args.args[0]
+        self.assertIn("Implement logical step 3", prompts[0])
+        self.assertNotIn("Implement logical step 1", prompts[0])
+        commands = [call.args[0] for call in check_call.call_args_list]
+        self.assertIn(
+            [
+                "git",
+                "commit",
+                "-m",
+                "#82 feat(sympohy): implement logical step 3",
+            ],
+            commands,
+        )
 
     def test_implementation_recovery_blocks_dirty_worktree(self) -> None:
         def check_output(args: list[str], **_kwargs: object) -> str:
