@@ -2011,12 +2011,7 @@ def _lock_takeover_allowed(
 
     state_payload = read_run_state(state_path)
     if state_payload is None:
-        return (not _payload_process_alive(lock_payload)) or (
-            not _payload_has_fresh_heartbeat(
-                lock_payload,
-                stale_status_after_minutes=stale_status_after_minutes,
-            )
-        )
+        return False
     if state_payload.get("issue") != issue_number:
         return False
 
@@ -2026,20 +2021,14 @@ def _lock_takeover_allowed(
 
     state_lock = state_payload.get("lock")
     if isinstance(state_lock, Mapping):
-        if state_lock.get("run_id") not in {None, lock_run_id, state_run_id}:
+        if state_lock.get("run_id") not in {None, state_run_id}:
             return False
         lock_path_in_state = state_lock.get("path")
         if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
             return False
 
     if state_run_id != lock_run_id:
-        return not _payload_has_fresh_heartbeat(
-            lock_payload,
-            stale_status_after_minutes=stale_status_after_minutes,
-        ) and not _payload_has_fresh_heartbeat(
-            state_payload,
-            stale_status_after_minutes=stale_status_after_minutes,
-        )
+        return False
 
     if not _payload_process_alive(lock_payload):
         return True
