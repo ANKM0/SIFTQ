@@ -131,6 +131,31 @@ class SympohyCoreTest(unittest.TestCase):
                 )
             )
 
+    def test_running_issue_uses_state_phase_before_label_phase(self) -> None:
+        issue = {
+            "number": 82,
+            "state": "OPEN",
+            "labels": [
+                {"name": "sympohy:running"},
+                {"name": "sympohy:phase:triage"},
+            ],
+        }
+
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_run_state(root, 82, pid=123, heartbeat=now, phase="hooks")
+
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 123,
+            )
+
+            self.assertEqual(inspection.phase, "hooks")
+            self.assertFalse(inspection.stale)
+
     def test_running_issue_without_state_is_stale_candidate(self) -> None:
         issue = {
             "number": 82,
@@ -212,6 +237,15 @@ class SympohyCoreTest(unittest.TestCase):
             self.assertTrue(inspection.stale)
             self.assertEqual(inspection.phase, "review")
             self.assertEqual(inspection.reason, "stale heartbeat")
+
+            custom_ttl = inspect_running_issue(
+                issue,
+                run_log_root=root,
+                now=now,
+                process_alive=lambda pid: pid == 789,
+                stale_status_after_minutes=20,
+            )
+            self.assertFalse(custom_ttl.stale)
 
     def test_label_transition_keeps_one_status_and_one_phase(self) -> None:
         labels = transition_labels(
@@ -376,10 +410,13 @@ class SympohyCoreTest(unittest.TestCase):
         *,
         pid: int | None = None,
         heartbeat: datetime | None = None,
+        phase: str | None = None,
     ) -> None:
         state_dir = root / f"issue-{issue_number}"
         state_dir.mkdir(parents=True, exist_ok=True)
         payload: dict[str, object] = {}
+        if phase is not None:
+            payload["phase"] = phase
         if pid is not None:
             payload["pid"] = pid
         if heartbeat is not None:

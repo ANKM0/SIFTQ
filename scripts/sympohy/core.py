@@ -19,7 +19,7 @@ STATUS_LABELS = (
 PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
-RUNNING_HEARTBEAT_TIMEOUT_SECONDS = 15 * 60
+DEFAULT_STALE_STATUS_AFTER_MINUTES = 15
 
 COMMIT_SUBJECT_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
@@ -44,6 +44,7 @@ class RunningIssueInspection:
     stale: bool
     reason: str | None
     state_path: Path | None
+    state: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,7 @@ def is_candidate_issue(
     run_log_root: Path | None = None,
     now: datetime | None = None,
     process_alive: Callable[[int], bool] | None = None,
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
 ) -> bool:
     if issue.get("state", "OPEN") not in {"OPEN", "open"}:
         return False
@@ -104,6 +106,7 @@ def is_candidate_issue(
         run_log_root=run_log_root or Path(".sympohy/runs"),
         now=now,
         process_alive=process_alive,
+        stale_status_after_minutes=stale_status_after_minutes,
     ).stale
 
 
@@ -113,35 +116,40 @@ def inspect_running_issue(
     run_log_root: Path,
     now: datetime | None = None,
     process_alive: Callable[[int], bool] | None = None,
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
 ) -> RunningIssueInspection:
     names = set(_label_names(issue.get("labels", [])))
-    phase = _phase_from_labels(names)
+    label_phase = _phase_from_labels(names)
     try:
         number = int(issue["number"])
     except (KeyError, TypeError, ValueError):
         return RunningIssueInspection(
-            phase=phase,
+            phase=label_phase,
             stale=True,
             reason="missing issue number",
             state_path=None,
         )
 
     state_path = run_log_root / f"issue-{number}" / "state.json"
+    state = read_run_state(state_path)
+    if state is None:
+        reason = "corrupt state" if state_path.exists() else "missing state"
+        return RunningIssueInspection(
+            phase=label_phase,
+            stale=True,
+            reason=reason,
+            state_path=state_path,
+            state=None,
+        )
+
+    phase = phase_from_state(state) or label_phase
     if phase is None:
         return RunningIssueInspection(
             phase=None,
             stale=True,
-            reason="missing phase label",
+            reason="missing phase",
             state_path=state_path,
-        )
-
-    state = _read_run_state(state_path)
-    if state is None:
-        return RunningIssueInspection(
-            phase=phase,
-            stale=True,
-            reason="missing state",
-            state_path=state_path,
+            state=state,
         )
 
     pid = _state_pid(state)
@@ -151,6 +159,7 @@ def inspect_running_issue(
             stale=True,
             reason="missing pid",
             state_path=state_path,
+            state=state,
         )
     alive = process_alive or _process_alive
     if not alive(pid):
@@ -159,6 +168,7 @@ def inspect_running_issue(
             stale=True,
             reason="dead pid",
             state_path=state_path,
+            state=state,
         )
 
     heartbeat = _state_heartbeat(state)
@@ -168,14 +178,17 @@ def inspect_running_issue(
             stale=True,
             reason="missing heartbeat",
             state_path=state_path,
+            state=state,
         )
     current_time = _normalize_datetime(now or datetime.now(timezone.utc))
-    if (current_time - heartbeat).total_seconds() > RUNNING_HEARTBEAT_TIMEOUT_SECONDS:
+    stale_after_seconds = stale_status_after_minutes * 60
+    if (current_time - heartbeat).total_seconds() > stale_after_seconds:
         return RunningIssueInspection(
             phase=phase,
             stale=True,
             reason="stale heartbeat",
             state_path=state_path,
+            state=state,
         )
 
     return RunningIssueInspection(
@@ -183,6 +196,7 @@ def inspect_running_issue(
         stale=False,
         reason=None,
         state_path=state_path,
+        state=state,
     )
 
 
@@ -212,13 +226,20 @@ def transition_labels(
     return tuple(sorted(labels))
 
 
-def resolve_resume_point(labels: object) -> ResumePoint:
+def resolve_resume_point(
+    labels: object,
+    *,
+    state: Mapping[str, object] | None = None,
+) -> ResumePoint:
     names = set(_label_names(labels))
-    phase = _phase_from_labels(names)
+    phase = phase_from_state(state) if state is not None else None
+    if phase is None:
+        phase = _phase_from_labels(names)
+    status = state.get("status") if state is not None else None
 
-    if "sympohy:done" in names:
+    if status == "done" or "sympohy:done" in names:
         return ResumePoint(name="completed", phase=phase, terminal=True)
-    if "sympohy:blocked" in names:
+    if status == "blocked" or "sympohy:blocked" in names:
         return ResumePoint(name="blocked", phase=phase, terminal=True)
 
     if phase in {None, "triage"}:
@@ -376,7 +397,7 @@ def _phase_from_labels(labels: Iterable[str]) -> str | None:
     return phases[0]
 
 
-def _read_run_state(path: Path) -> Mapping[str, object] | None:
+def read_run_state(path: Path) -> Mapping[str, object] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
@@ -384,6 +405,15 @@ def _read_run_state(path: Path) -> Mapping[str, object] | None:
     if not isinstance(payload, Mapping):
         return None
     return payload
+
+
+def phase_from_state(state: Mapping[str, object] | None) -> str | None:
+    if state is None:
+        return None
+    phase = state.get("phase")
+    if isinstance(phase, str) and phase in PHASES:
+        return phase
+    return None
 
 
 def _state_pid(state: Mapping[str, object]) -> int | None:

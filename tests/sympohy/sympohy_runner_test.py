@@ -157,7 +157,7 @@ class SympohyRunnerTest(unittest.TestCase):
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["resume", "#82"])
 
-    def test_resume_issue_blocks_when_required_run_state_is_missing(self) -> None:
+    def test_resume_issue_bootstraps_missing_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
             issue = Issue(
@@ -182,25 +182,22 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(result, 2)
-        run_issue.assert_not_called()
-        set_issue_state.assert_called_once_with(
+        self.assertEqual(result, 0)
+        run_issue.assert_called_once_with(
             "#82",
-            current_labels=("sympohy:running", "sympohy:phase:implement"),
-            status="sympohy:blocked",
-            phase="implement",
-            cwd=None,
+            config,
+            recover=True,
+            from_resume=True,
         )
-        body = comment.call_args.args[1]
-        self.assertIn("missing required run state", body)
-        self.assertIn("missing state", body)
+        set_issue_state.assert_not_called()
+        comment.assert_not_called()
         self.assertEqual(state["phase"], "implement")
-        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["status"], "running")
         self.assertEqual(
-            state["last_known_progress"]["failed_command"],
-            "resume safety check",
+            state["last_known_progress"]["message"],
+            "routing stale running issue into resume handling",
         )
-        self.assertIn("missing state", state["last_known_progress"]["cause"])
+        self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
 
     def test_resume_issue_selects_recovery_mode_from_phase_label(self) -> None:
         for phase in ("triage", "implement", "hooks", "review", "fix", "merge"):
@@ -243,7 +240,55 @@ class SympohyRunnerTest(unittest.TestCase):
                     "#82",
                     config,
                     recover=phase != "triage",
+                    from_resume=True,
                 )
+
+    def test_resume_issue_routes_from_state_phase_and_corrects_label(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover state-owned phase",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:triage"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "hooks",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:triage"),
+            status="sympohy:running",
+            phase="hooks",
+        )
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+        )
 
     def test_resume_issue_ignores_active_running_state_for_double_resume_safety(
         self,
@@ -316,7 +361,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 result = resume_issue("#82", config)
 
         self.assertEqual(result, 0)
-        run_issue.assert_called_once_with("#82", config, recover=False)
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=False,
+            from_resume=True,
+        )
 
     def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -341,7 +391,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 result = resume_issue("#82", config)
 
         self.assertEqual(result, 0)
-        run_issue.assert_called_once_with("#82", config, recover=False)
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=False,
+            from_resume=True,
+        )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
 
@@ -1031,6 +1086,52 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
 
+    def test_direct_run_refuses_existing_run_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "state.json").write_text(
+                json.dumps({"phase": "implement"}),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Existing run",
+                body="""
+## AC
+- [ ] avoid duplicate fresh run
+
+## DoD
+- [ ] operator is directed to resume
+""",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree") as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = run_issue("#82", config)
+
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+            status="sympohy:blocked",
+            phase="implement",
+            cwd=None,
+        )
+        self.assertIn("use resume", comment.call_args.args[1])
+        self.assertEqual(state["status"], "blocked")
+        self.assertIn("use resume", state["last_known_progress"]["cause"])
+
     def test_ensure_worktree_reuses_existing_issue_branch(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -1140,10 +1241,14 @@ class SympohyRunnerTest(unittest.TestCase):
             state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
 
         self.assertEqual(state["issue"], 82)
+        self.assertIsInstance(state["run_id"], str)
+        self.assertTrue(state["run_id"])
         self.assertEqual(state["phase"], "implement")
         self.assertEqual(state["status"], "running")
         self.assertEqual(state["pid"], os.getpid())
         self.assertEqual(state["heartbeat"], "2026-06-15T12:00:00Z")
+        self.assertEqual(state["lock"]["path"], str(log_dir / "run.lock"))
+        self.assertEqual(state["lock"]["run_id"], state["run_id"])
         self.assertEqual(state["branch"], "issue-82-sympohy")
         self.assertEqual(state["worktree"]["path"], str(worktree))
         self.assertEqual(state["worktree"]["branch"], "issue-82-sympohy")
@@ -1165,6 +1270,7 @@ class SympohyRunnerTest(unittest.TestCase):
             base_branch="main",
             worktree_root=root / "worktrees",
             run_log_root=root / "runs",
+            stale_status_after_minutes=15,
             hooks=("task ci",),
             review_max_rounds=5,
             retry_max_attempts=3,

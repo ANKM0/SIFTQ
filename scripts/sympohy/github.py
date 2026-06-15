@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from .core import PHASE_LABELS, STATUS_LABELS, is_candidate_issue, transition_labels
+from .core import (
+    DEFAULT_STALE_STATUS_AFTER_MINUTES,
+    PHASE_LABELS,
+    STATUS_LABELS,
+    is_candidate_issue,
+    transition_labels,
+)
 
 
 REQUIRED_LABELS = {
@@ -67,6 +73,7 @@ def list_candidate_issues(
     *,
     limit: int,
     run_log_root: Path = Path(".sympohy/runs"),
+    stale_status_after_minutes: int = DEFAULT_STALE_STATUS_AFTER_MINUTES,
     cwd: Path | None = None,
 ) -> list[Mapping[str, object]]:
     payload = gh_json(
@@ -88,7 +95,11 @@ def list_candidate_issues(
         issue
         for issue in payload
         if isinstance(issue, Mapping)
-        and is_candidate_issue(issue, run_log_root=run_log_root)
+        and is_candidate_issue(
+            issue,
+            run_log_root=run_log_root,
+            stale_status_after_minutes=stale_status_after_minutes,
+        )
     ]
 
 

@@ -98,6 +98,7 @@ def doctor(*, config_path: Path) -> int:
     checks = {
         ".sympohy/config.yaml": config_path.exists(),
         "max_workers <= 10": config.max_workers <= 10,
+        "stale_status_after_minutes > 0": config.stale_status_after_minutes > 0,
         "default hook task ci": "task ci" in config.hooks,
         "systemd service template": (ROOT / ".sympohy/systemd/sympohy-watch.service").exists(),
         "systemd timer template": (ROOT / ".sympohy/systemd/sympohy-watch.timer").exists(),

@@ -9,6 +9,7 @@ import re
 import shlex
 import subprocess
 import sys
+import uuid
 from typing import Callable, Iterable, Mapping, Sequence
 
 from .config import SympohyConfig
@@ -17,7 +18,9 @@ from .core import (
     inspect_running_issue,
     merge_gate_allows_merge,
     next_retry_action,
+    phase_from_state,
     parse_review_json,
+    read_run_state,
     resolve_resume_point,
     validate_commit_subject,
 )
@@ -28,6 +31,14 @@ HEARTBEAT_INTERVAL_SECONDS = 30
 LOGICAL_STEP_COMMIT_RE = re.compile(
     r"^#(?P<issue>\d+) feat\(sympohy\): implement logical step (?P<step>\d+)$"
 )
+
+
+class _RunLockedError(RuntimeError):
+    pass
+
+
+class _ExistingRunError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -68,10 +79,16 @@ class _RunStateWriter:
         worktree: Path | None = None,
         branch: str | None = None,
         plan_path: Path | None = None,
+        run_id: str | None = None,
+        lock_path: Path | None = None,
+        refresh_lock: bool = False,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self.issue_number = issue_number
         self.log_dir = log_dir
+        self.run_id = run_id or _new_run_id()
+        self.lock_path = lock_path or (log_dir / "run.lock")
+        self.refresh_lock = refresh_lock
         self.base_branch = base_branch
         self.worktree = worktree
         self.branch = branch
@@ -109,12 +126,18 @@ class _RunStateWriter:
             self.last_known_progress = progress
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        heartbeat = _isoformat_utc(self._clock())
         payload = {
+            "run_id": self.run_id,
             "issue": self.issue_number,
             "phase": self.phase,
             "status": self.status,
             "pid": os.getpid(),
-            "heartbeat": _isoformat_utc(self._clock()),
+            "heartbeat": heartbeat,
+            "lock": {
+                "path": str(self.lock_path),
+                "run_id": self.run_id,
+            },
             "branch": self.branch,
             "worktree": {
                 "path": str(self.worktree) if self.worktree is not None else None,
@@ -130,15 +153,83 @@ class _RunStateWriter:
             encoding="utf-8",
         )
         tmp_path.replace(self.state_path)
+        if self.refresh_lock:
+            _refresh_lock_metadata(
+                self.lock_path,
+                run_id=self.run_id,
+                issue_number=self.issue_number,
+                phase=self.phase,
+                heartbeat=heartbeat,
+            )
 
     def heartbeat(self) -> None:
         self.write()
 
 
-def ensure_worktree(issue: Issue, config: SympohyConfig) -> Path:
+class _IssueRunLock:
+    def __init__(self, *, issue_number: int, log_dir: Path, run_id: str) -> None:
+        self.issue_number = issue_number
+        self.log_dir = log_dir
+        self.run_id = run_id
+        self.path = log_dir / "run.lock"
+        self.acquired = False
+
+    def __enter__(self) -> _IssueRunLock:
+        self.acquire()
+        return self
+
+    def __exit__(
+        self,
+        _exc_type: object,
+        _exc: object,
+        _tb: object,
+    ) -> None:
+        self.release()
+
+    def acquire(self) -> None:
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        payload = _lock_payload(
+            run_id=self.run_id,
+            issue_number=self.issue_number,
+            phase=None,
+            heartbeat=_isoformat_utc(datetime.now(timezone.utc)),
+        )
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        try:
+            fd = os.open(self.path, flags, 0o644)
+        except FileExistsError as exc:
+            if _lock_process_alive(self.path):
+                raise _RunLockedError(
+                    f"issue #{self.issue_number} is already locked by {self.path}"
+                ) from exc
+            self.path.unlink(missing_ok=True)
+            try:
+                fd = os.open(self.path, flags, 0o644)
+            except FileExistsError as retry_exc:
+                raise _RunLockedError(
+                    f"issue #{self.issue_number} is already locked by {self.path}"
+                ) from retry_exc
+        with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+            lock_file.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        self.acquired = True
+
+    def release(self) -> None:
+        if not self.acquired:
+            return
+        payload = read_run_state(self.path)
+        if payload is not None and payload.get("run_id") == self.run_id:
+            self.path.unlink(missing_ok=True)
+        self.acquired = False
+
+
+def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = False) -> Path:
     worktree = config.worktree_root / f"issue-{issue.number}"
     branch = f"issue-{issue.number}-sympohy"
     if worktree.exists():
+        if not recover:
+            raise _ExistingRunError(
+                f"worktree already exists for issue #{issue.number}: {worktree}; use resume"
+            )
         return worktree
 
     worktree.parent.mkdir(parents=True, exist_ok=True)
@@ -152,7 +243,11 @@ def ensure_worktree(issue: Issue, config: SympohyConfig) -> Path:
 
 
 def watch(config: SympohyConfig) -> int:
-    candidates = list_candidate_issues(limit=100, run_log_root=config.run_log_root)
+    candidates = list_candidate_issues(
+        limit=100,
+        run_log_root=config.run_log_root,
+        stale_status_after_minutes=config.stale_status_after_minutes,
+    )
     selected = candidates[: config.max_workers]
     processes: list[subprocess.Popen[bytes]] = []
 
@@ -160,7 +255,11 @@ def watch(config: SympohyConfig) -> int:
         number = int(issue["number"])
         labels = _label_names(issue.get("labels", []))
         if "sympohy:pending" in labels or "sympohy:running" in labels:
-            inspection = inspect_running_issue(issue, run_log_root=config.run_log_root)
+            inspection = inspect_running_issue(
+                issue,
+                run_log_root=config.run_log_root,
+                stale_status_after_minutes=config.stale_status_after_minutes,
+            )
             if not inspection.stale:
                 continue
             processes.append(
@@ -200,8 +299,10 @@ def watch(config: SympohyConfig) -> int:
 def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     issue = fetch_issue(issue_ref)
     labels = [{"name": label} for label in issue.labels]
-    resume_point = resolve_resume_point(labels)
     log_dir = config.run_log_root / f"issue-{issue.number}"
+    state_path = log_dir / "state.json"
+    state_payload = read_run_state(state_path)
+    resume_point = resolve_resume_point(labels, state=state_payload)
 
     if resume_point.terminal:
         state = _RunStateWriter(
@@ -224,12 +325,34 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         "state": "OPEN",
         "labels": labels,
     }
-    inspection = inspect_running_issue(payload, run_log_root=config.run_log_root)
+    inspection = inspect_running_issue(
+        payload,
+        run_log_root=config.run_log_root,
+        stale_status_after_minutes=config.stale_status_after_minutes,
+    )
     if not inspection.stale:
+        if inspection.phase is not None and inspection.phase != _phase_from_labels(issue.labels):
+            set_issue_state(
+                issue_ref,
+                current_labels=issue.labels,
+                status="sympohy:running",
+                phase=inspection.phase,
+            )
         return 0
 
     if "sympohy:pending" in issue.labels and "sympohy:running" not in issue.labels:
-        return run_issue(issue_ref, config, recover=False)
+        return run_issue(issue_ref, config, recover=False, from_resume=True)
+
+    if inspection.state is None or inspection.reason in {"missing phase", "corrupt state"}:
+        bootstrap_phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
+        state_payload = _bootstrap_run_state(
+            issue,
+            config,
+            log_dir,
+            phase=bootstrap_phase,
+            reason=inspection.reason,
+        )
+        resume_point = resolve_resume_point(labels, state=state_payload)
 
     state = _RunStateWriter(
         issue_number=issue.number,
@@ -237,7 +360,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         base_branch=config.base_branch,
     )
     state.write(
-        phase=inspection.phase or "triage",
+        phase=inspection.phase or resume_point.phase or "triage",
         progress={
             "message": "routing stale running issue into resume handling",
             "resume_point": resume_point.name,
@@ -247,31 +370,21 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             else None,
         },
     )
-
-    if inspection.reason in {
-        "missing phase label",
-        "missing state",
-        "missing pid",
-        "missing heartbeat",
-    }:
-        _block(
+    phase = inspection.phase or resume_point.phase or "triage"
+    if phase != _phase_from_labels(issue.labels):
+        set_issue_state(
             issue_ref,
-            phase=inspection.phase or resume_point.phase or "triage",
-            failed_command="resume safety check",
-            attempts=1,
-            cause=_unsafe_resume_reason(
-                "missing required run state",
-                inspection.reason,
-                inspection.state_path,
-            ),
-            run_log_path=log_dir,
-            cwd=None,
-            state=state,
             current_labels=issue.labels,
+            status="sympohy:running",
+            phase=phase,
         )
-        return 2
 
-    return run_issue(issue_ref, config, recover=resume_point.name != "planning")
+    return run_issue(
+        issue_ref,
+        config,
+        recover=resume_point.name != "planning",
+        from_resume=True,
+    )
 
 
 def refine_issue(issue_ref: str) -> tuple[int, str]:
@@ -301,14 +414,82 @@ def refine_issue(issue_ref: str) -> tuple[int, str]:
     return 0, json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -> int:
+def run_issue(
+    issue_ref: str,
+    config: SympohyConfig,
+    *,
+    recover: bool = False,
+    from_resume: bool = False,
+) -> int:
     issue = fetch_issue(issue_ref)
+    log_dir = config.run_log_root / f"issue-{issue.number}"
+    run_id = _new_run_id()
+    lock = _IssueRunLock(issue_number=issue.number, log_dir=log_dir, run_id=run_id)
+    try:
+        lock.acquire()
+    except _RunLockedError:
+        return 0
+    try:
+        return _run_issue_locked(
+            issue_ref,
+            config,
+            issue=issue,
+            recover=recover,
+            from_resume=from_resume,
+            run_id=run_id,
+            lock_path=lock.path,
+        )
+    finally:
+        lock.release()
+
+
+def _run_issue_locked(
+    issue_ref: str,
+    config: SympohyConfig,
+    *,
+    issue: Issue,
+    recover: bool,
+    from_resume: bool,
+    run_id: str,
+    lock_path: Path,
+) -> int:
     log_dir = config.run_log_root / f"issue-{issue.number}"
     state = _RunStateWriter(
         issue_number=issue.number,
         log_dir=log_dir,
         base_branch=config.base_branch,
+        run_id=run_id,
+        lock_path=lock_path,
+        refresh_lock=True,
     )
+    if not recover and not from_resume:
+        existing_run_reason = _existing_run_refusal_reason(issue, config, log_dir)
+        if existing_run_reason is not None:
+            phase = (
+                phase_from_state(read_run_state(log_dir / "state.json"))
+                or _phase_from_labels(issue.labels)
+                or "triage"
+            )
+            state.write(
+                phase=phase,
+                status="blocked",
+                progress={
+                    "message": "fresh run refused; use resume",
+                    "cause": existing_run_reason,
+                },
+            )
+            _block(
+                issue_ref,
+                phase=phase,
+                failed_command="run safety check",
+                attempts=1,
+                cause=existing_run_reason,
+                run_log_path=log_dir,
+                cwd=None,
+                state=state,
+                current_labels=issue.labels,
+            )
+            return 2
     state.write(
         phase="triage",
         progress={"message": "checking acceptance criteria and definition of done"},
@@ -334,7 +515,7 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
         comment(issue_ref, message)
         return 2
 
-    worktree = ensure_worktree(issue, config)
+    worktree = ensure_worktree(issue, config, recover=recover or from_resume)
     log_dir.mkdir(parents=True, exist_ok=True)
     try:
         branch = _current_branch(worktree)
@@ -955,6 +1136,79 @@ def _isoformat_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _new_run_id() -> str:
+    return uuid.uuid4().hex
+
+
+def _lock_payload(
+    *,
+    run_id: str,
+    issue_number: int,
+    phase: str | None,
+    heartbeat: str,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "issue": issue_number,
+        "pid": os.getpid(),
+        "phase": phase,
+        "heartbeat": heartbeat,
+    }
+
+
+def _refresh_lock_metadata(
+    lock_path: Path,
+    *,
+    run_id: str,
+    issue_number: int,
+    phase: str | None,
+    heartbeat: str,
+) -> None:
+    current = read_run_state(lock_path)
+    if current is not None and current.get("run_id") not in {None, run_id}:
+        return
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = lock_path.with_suffix(".lock.tmp")
+    tmp_path.write_text(
+        json.dumps(
+            _lock_payload(
+                run_id=run_id,
+                issue_number=issue_number,
+                phase=phase,
+                heartbeat=heartbeat,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(lock_path)
+
+
+def _lock_process_alive(lock_path: Path) -> bool:
+    payload = read_run_state(lock_path)
+    if payload is None:
+        return False
+    pid = payload.get("pid")
+    if isinstance(pid, bool):
+        return False
+    if isinstance(pid, str):
+        try:
+            pid = int(pid)
+        except ValueError:
+            return False
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _logical_steps(plan: Mapping[str, object]) -> list[object]:
     steps = plan.get("logical_steps", [])
     if not isinstance(steps, list) or not steps:
@@ -1165,6 +1419,85 @@ def _unsafe_resume_reason(
     return "; ".join(parts)
 
 
+def _bootstrap_run_state(
+    issue: Issue,
+    config: SympohyConfig,
+    log_dir: Path,
+    *,
+    phase: str,
+    reason: str | None,
+) -> Mapping[str, object]:
+    worktree = config.worktree_root / f"issue-{issue.number}"
+    branch = f"issue-{issue.number}-sympohy"
+    if worktree.exists():
+        try:
+            branch = _current_branch(worktree)
+        except subprocess.CalledProcessError:
+            pass
+    plan_path = log_dir / "plan.json"
+    progress: dict[str, object] = {
+        "message": "bootstrapped missing or corrupt run state",
+        "bootstrap_reason": reason,
+        "worktree_exists": worktree.exists(),
+        "plan_exists": plan_path.exists(),
+    }
+    if worktree.exists() and plan_path.exists():
+        plan = _load_existing_plan(plan_path)
+        if plan is not None:
+            logical_steps = _logical_steps(plan)
+            recovery = _infer_implementation_recovery(
+                issue.number,
+                cwd=worktree,
+                base_branch=config.base_branch,
+                total_steps=len(logical_steps),
+            )
+            progress.update(
+                {
+                    "completed_logical_steps": recovery.committed_logical_steps,
+                    "total_logical_steps": len(logical_steps),
+                    "worktree_clean": recovery.worktree_clean,
+                    "unsafe_resume_reason": recovery.unsafe_reason,
+                    "resume_action": recovery.resume_action(len(logical_steps)),
+                }
+            )
+    if worktree.exists():
+        try:
+            progress["pull_request_exists"] = _pull_request_exists(
+                branch=branch,
+                cwd=worktree,
+            )
+        except (OSError, subprocess.SubprocessError):
+            progress["pull_request_exists"] = None
+    writer = _RunStateWriter(
+        issue_number=issue.number,
+        log_dir=log_dir,
+        base_branch=config.base_branch,
+        worktree=worktree if worktree.exists() else None,
+        branch=branch,
+        plan_path=plan_path if plan_path.exists() else None,
+    )
+    writer.write(
+        phase=phase,
+        progress=progress,
+    )
+    state = read_run_state(writer.state_path)
+    return state or {}
+
+
+def _existing_run_refusal_reason(
+    issue: Issue,
+    config: SympohyConfig,
+    log_dir: Path,
+) -> str | None:
+    state_path = log_dir / "state.json"
+    if state_path.exists():
+        return f"existing run state found at {state_path}; use resume"
+    worktree = config.worktree_root / f"issue-{issue.number}"
+    if worktree.exists():
+        return f"existing worktree found at {worktree}; use resume"
+    return None
+
+
 def _ensure_draft_pull_request(*, cwd: Path) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
@@ -1229,3 +1562,12 @@ def _label_names(labels: object) -> list[str]:
             if isinstance(name, str):
                 names.append(name)
     return names
+
+
+def _phase_from_labels(labels: Iterable[str]) -> str | None:
+    phases = [
+        label.removeprefix("sympohy:phase:")
+        for label in labels
+        if label.startswith("sympohy:phase:")
+    ]
+    return phases[0] if len(phases) == 1 else None

@@ -2,6 +2,7 @@ max_workers: 10
 base_branch: main
 worktree_root: .sympohy/worktrees
 run_log_root: .sympohy/runs
+stale_status_after_minutes: 15
 review_max_rounds: 5
 retry_max_attempts: 3
 hooks:

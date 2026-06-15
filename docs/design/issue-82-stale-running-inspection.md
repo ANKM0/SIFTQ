@@ -53,11 +53,14 @@ The configuration already defines `run_log_root` as `.sympohy/runs`, and
 `.sympohy/runs/issue-<number>/`.
 
 The runner now writes `.sympohy/runs/issue-<number>/state.json` for each issue
-run. The document includes the current phase, worker pid, heartbeat timestamp,
-branch and worktree metadata, plan reference, and last known progress.
+run. The document includes the shared `run_id`, current phase, worker pid,
+heartbeat timestamp, lock metadata, branch and worktree metadata, plan
+reference, and last known progress.
 
 The heartbeat is refreshed while Codex and hook subprocesses are still running,
 which gives stale-run inspection a durable signal separate from GitHub labels.
+The stale threshold is configured by `stale_status_after_minutes` and validated
+as a positive value by `sympohy doctor`.
 
 ## Watcher Resume Routing
 
@@ -69,11 +72,12 @@ for resume handling.
 
 ## Resume Point Resolution
 
-`resume` resolves a coarse resume point from the current `sympohy` labels before
-restarting automation. `sympohy:phase:triage` and missing phase context map to
-`planning`; `sympohy:phase:implement` and `sympohy:phase:hooks` map to
-`implement`; and `sympohy:phase:review`, `sympohy:phase:fix`, and
-`sympohy:phase:merge` map to `push_pr`.
+`resume` resolves a coarse resume point from `state.json.phase` when run state
+exists. GitHub phase labels are treated as fallback bootstrap input only when
+state is missing or corrupt, and resume corrects stale phase labels from the
+resolved state phase before continuing. `triage` maps to `planning`,
+`implement` and `hooks` map to `implement`, and `review`, `fix`, and `merge`
+map to `push_pr`.
 
 Terminal status labels are not restarted. `sympohy:blocked` resolves to the
 `blocked` terminal point, and `sympohy:done` resolves to the `completed`
@@ -89,9 +93,9 @@ numbering stable across restarts.
 The runner infers completed work from local Git state. Commit subjects matching
 `#<issue> feat(sympohy): implement logical step <n>` count as completed only for
 the contiguous prefix of logical steps on top of the configured base branch. If
-the worktree still has uncommitted changes after those commits, recovery treats
-those changes as the next logical step and resumes with hooks and commit instead
-of invoking Codex for that same step again.
+the worktree still has uncommitted changes after those commits, recovery blocks
+and leaves the dirty worktree for operator inspection instead of guessing that
+the changes belong to the next logical step.
 
 If the recovered worktree is clean, the same contiguous commit prefix determines
 the next action. A clean worktree with incomplete implementation resumes Codex

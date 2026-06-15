@@ -41,7 +41,8 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("sympohy:done");
     expect(core).toContain("is_candidate_issue");
     expect(core).toContain("inspect_running_issue");
-    expect(core).toContain("RUNNING_HEARTBEAT_TIMEOUT_SECONDS");
+    expect(config).toContain("stale_status_after_minutes: 15");
+    expect(core).toContain("DEFAULT_STALE_STATUS_AFTER_MINUTES");
     expect(core).toContain("\"dead pid\"");
     expect(runner).toContain("\"resume\"");
     expect(runner).toContain("resume_issue");
@@ -49,6 +50,8 @@ describe("sympohy watcher contract", () => {
 
   it("persists run state for stale-running inspection", () => {
     expect(runner).toContain("state.json");
+    expect(runner).toContain("\"run_id\"");
+    expect(runner).toContain("\"lock\"");
     expect(runner).toContain("\"phase\"");
     expect(runner).toContain("\"pid\"");
     expect(runner).toContain("\"heartbeat\"");
@@ -62,7 +65,7 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("_load_existing_plan");
     expect(runner).toContain("_infer_implementation_recovery");
     expect(runner).toContain("recovered_existing_plan");
-    expect(runner).toContain("reused_worktree_changes");
+    expect(runner).toContain("worktree has uncommitted changes during resume");
     expect(runner).toContain("next_logical_step");
     expect(runner).toContain("resume_action");
     expect(runner).toContain("implement_next_step");
@@ -95,6 +98,7 @@ describe("sympohy automation contract", () => {
 
   it("doctor checks config, labels, systemd templates, hooks, and commit subjects", () => {
     expect(cli).toContain("\"default hook task ci\"");
+    expect(cli).toContain("\"stale_status_after_minutes > 0\"");
     expect(cli).toContain("\"required labels declared\"");
     expect(cli).toContain("\"systemd service template\"");
     expect(cli).toContain("validate_commit_subject");
