@@ -29,6 +29,9 @@ codd:
     - id: design:dnd-kit-matrix-drag-and-drop-adr
       relation: depends_on
       semantic: interaction
+    - id: design:settings-repository-adapter-boundary-adr
+      relation: depends_on
+      semantic: architecture
 ---
 
 # Matrix MVP Non-Functional Requirements

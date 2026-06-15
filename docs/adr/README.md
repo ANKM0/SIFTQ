@@ -36,3 +36,4 @@ The ADR index contract is covered by `tests/docs/adrIndex.test.ts`.
 | [0011](./0011-takt-ticket-driven-ai-runner.md) | TAKT for Ticket-Driven AI Runner | Superseded by ADR 0013 |
 | [0012](./0012-matrix-mvp-wireframe-layout.md) | Matrix MVP Wireframe Layout | Accepted |
 | [0013](./0013-sympohy-ticket-driven-ai-runner.md) | sympohy for Ticket-Driven AI Runner | Accepted |
+| [0014](./0014-settings-repository-adapter-boundary.md) | Settings Repository Adapter Boundary | Accepted |

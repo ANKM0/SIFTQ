@@ -14,6 +14,9 @@ codd:
     - id: design:issue-6-matrix-mvp-tech-selection
       relation: depends_on
       semantic: decision
+    - id: design:settings-repository-adapter-boundary-adr
+      relation: depends_on
+      semantic: architecture
 ---
 
 # ADR 0005: Frontend Port Adapter Boundary

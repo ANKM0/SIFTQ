@@ -35,6 +35,9 @@ codd:
     - id: design:matrix-mvp-wireframe-layout-adr
       relation: depends_on
       semantic: scope
+    - id: design:settings-repository-adapter-boundary-adr
+      relation: depends_on
+      semantic: settings-scope
 ---
 
 # Matrix MVP Functional Requirements
