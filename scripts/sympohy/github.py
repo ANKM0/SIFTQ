@@ -36,6 +36,7 @@ class Issue:
     body: str
     labels: tuple[str, ...]
     comments: tuple[Mapping[str, object], ...]
+    state: str = "UNKNOWN"
 
 
 def gh_json(args: Sequence[str], *, cwd: Path | None = None) -> object:
@@ -54,7 +55,7 @@ def fetch_issue(issue_ref: str, *, cwd: Path | None = None) -> Issue:
             "view",
             issue_ref,
             "--json",
-            "number,title,body,labels,comments",
+            "number,title,body,labels,comments,state",
         ],
         cwd=cwd,
     )
@@ -66,6 +67,7 @@ def fetch_issue(issue_ref: str, *, cwd: Path | None = None) -> Issue:
         body=str(payload.get("body", "")),
         labels=tuple(_label_names(payload.get("labels", []))),
         comments=tuple(_comments(payload.get("comments", []))),
+        state=str(payload.get("state", "UNKNOWN")),
     )
 
 

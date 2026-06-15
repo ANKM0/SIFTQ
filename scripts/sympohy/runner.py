@@ -318,24 +318,33 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     resume_point = resolve_resume_point(labels, state=state_payload)
 
     if resume_point.terminal:
+        terminal_phase = resume_point.phase or (
+            "merge" if resume_point.name == "completed" else "triage"
+        )
         state = _RunStateWriter(
             issue_number=issue.number,
             log_dir=log_dir,
             base_branch=config.base_branch,
         )
         state.write(
-            phase=resume_point.phase or "triage",
+            phase=terminal_phase,
             status="done" if resume_point.name == "completed" else resume_point.name,
             progress={
-                "message": "resume skipped for terminal issue state",
+                "message": "reconciling terminal issue state",
                 "resume_point": resume_point.name,
             },
+        )
+        _reconcile_terminal_issue_state(
+            issue_ref,
+            issue,
+            terminal_name=resume_point.name,
+            phase=terminal_phase,
         )
         return 0
 
     payload = {
         "number": issue.number,
-        "state": "OPEN",
+        "state": issue.state,
         "labels": labels,
     }
     inspection = inspect_running_issue(
@@ -393,6 +402,40 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         from_resume=True,
         resume_point=resume_point.name,
     )
+
+
+def _reconcile_terminal_issue_state(
+    issue_ref: str,
+    issue: Issue,
+    *,
+    terminal_name: str,
+    phase: str,
+) -> None:
+    if terminal_name == "completed":
+        if (
+            "sympohy:done" not in issue.labels
+            or _phase_from_labels(issue.labels) != phase
+        ):
+            set_issue_state(
+                issue_ref,
+                current_labels=issue.labels,
+                status="sympohy:done",
+                phase=phase,
+            )
+        if issue.state in {"OPEN", "open"}:
+            subprocess.check_call(["gh", "issue", "close", issue_ref])
+        return
+
+    if terminal_name == "blocked" and (
+        "sympohy:blocked" not in issue.labels
+        or _phase_from_labels(issue.labels) != phase
+    ):
+        set_issue_state(
+            issue_ref,
+            current_labels=issue.labels,
+            status="sympohy:blocked",
+            phase=phase,
+        )
 
 
 def refine_issue(issue_ref: str) -> tuple[int, str]:
@@ -816,7 +859,7 @@ def _run_issue_locked(
         text=True,
     ).strip()
     state.write(
-        phase="review",
+        phase="implement",
         branch=branch,
         progress={
             "message": "pushing branch and opening draft pull request",
@@ -824,8 +867,16 @@ def _run_issue_locked(
             "total_logical_steps": total_steps,
         },
     )
-    subprocess.check_call(["git", "push", "-u", "origin", branch], cwd=worktree)
-    _ensure_draft_pull_request(cwd=worktree)
+    _push_branch_and_ensure_draft_pull_request(cwd=worktree, branch=branch)
+    state.write(
+        phase="review",
+        branch=branch,
+        progress={
+            "message": "draft pull request ready for review",
+            "completed_logical_steps": total_steps,
+            "total_logical_steps": total_steps,
+        },
+    )
     review_result = _review_fix_loop(issue_ref, issue, config, worktree, log_dir, state)
     if review_result != 0:
         return review_result
@@ -914,6 +965,17 @@ def _resume_late_phase(
         if fix_result != 0:
             return fix_result
     else:
+        state.write(
+            phase="review",
+            worktree=worktree,
+            branch=branch,
+            plan_path=plan_path if plan_path.exists() else None,
+            progress={
+                "message": "ensuring draft pull request exists before review",
+                "resume_point": resume_from,
+            },
+        )
+        _push_branch_and_ensure_draft_pull_request(cwd=worktree, branch=branch)
         start_round = _review_start_round(previous_state)
         review_result = _review_fix_loop(
             issue_ref,
@@ -1797,7 +1859,7 @@ def _bootstrap_run_state(
     plan_path = log_dir / "plan.json"
     progress: dict[str, object] = {
         "message": "routing stale running issue into resume handling",
-        "bootstrap_reason": reason,
+        "stale_reason": reason,
         "worktree_exists": worktree.exists(),
         "plan_exists": plan_path.exists(),
     }
@@ -1863,6 +1925,11 @@ def _ensure_draft_pull_request(*, cwd: Path) -> None:
     if _pull_request_exists(branch=branch, cwd=cwd):
         return
     subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=cwd)
+
+
+def _push_branch_and_ensure_draft_pull_request(*, cwd: Path, branch: str) -> None:
+    subprocess.check_call(["git", "push", "-u", "origin", branch], cwd=cwd)
+    _ensure_draft_pull_request(cwd=cwd)
 
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
