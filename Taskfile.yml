@@ -36,6 +36,7 @@ tasks:
   ci:
     desc: Run the local CI gate.
     cmds:
+      - task: ci:sympohy
       - task: ci:commit-messages
       - task: ci:markdown
       - task: ci:typecheck
@@ -46,6 +47,12 @@ tasks:
       - task: codd:scan
       - task: codd:validate
       - task: codd:dag
+
+  ci:sympohy:
+    desc: Validate sympohy project configuration and required local tooling.
+    cmds:
+      - task: setup:sympohy
+      - task: ai:sympohy:doctor
 
   ci:commit-messages:
     desc: Check commit message format for the current branch.

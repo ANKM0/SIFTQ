@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import ciWorkflow from "../../.github/workflows/ci.yml?raw";
 import config from "../../.sympohy/config.yaml?raw";
 import taskfile from "../../Taskfile.yml?raw";
 import cli from "../../scripts/sympohy/cli.py?raw";
@@ -10,6 +11,7 @@ describe("sympohy Taskfile and CLI integration", () => {
   it("exposes setup, run, refine, doctor, watch, labels, and systemd entrypoints", () => {
     const requiredTasks = [
       "setup:sympohy",
+      "ci:sympohy",
       "ai:sympohy",
       "ai:sympohy:refine",
       "ai:sympohy:doctor",
@@ -27,6 +29,14 @@ describe("sympohy Taskfile and CLI integration", () => {
 
   it("keeps sympohy outside application runtime dependencies", () => {
     expect(taskfile).toContain("uv run python -m scripts.sympohy");
+  });
+
+  it("validates sympohy project configuration in local and GitHub CI", () => {
+    expect(taskfile).toContain("task: ci:sympohy");
+    expect(taskfile).toContain("task: setup:sympohy");
+    expect(taskfile).toContain("task: ai:sympohy:doctor");
+    expect(ciWorkflow).toContain("Check sympohy project configuration");
+    expect(ciWorkflow).toContain("task ci:sympohy");
   });
 });
 
