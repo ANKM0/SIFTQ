@@ -1484,6 +1484,17 @@ def _resume_fix_phase(
     *,
     previous_state: Mapping[str, object] | None,
 ) -> int:
+    if _last_progress(previous_state).get("fix_source") == "final_verifier":
+        return _resume_final_verifier_fix_phase(
+            issue_ref,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            previous_state=previous_state,
+        )
+
     round_index = _progress_int(previous_state, "review_round")
     if round_index is None:
         _block(
@@ -1544,6 +1555,69 @@ def _resume_fix_phase(
             existing_fix_subjects=existing_fix_subjects,
         )
     return review_result
+
+
+def _resume_final_verifier_fix_phase(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    previous_state: Mapping[str, object] | None,
+) -> int:
+    fix_attempt = _progress_int(previous_state, "final_verifier_fix_attempt")
+    if fix_attempt is None or fix_attempt < 1:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause="saved final verifier fix phase is missing final_verifier_fix_attempt",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    final_verifier_log_path = _final_verifier_log_path(log_dir, fix_attempt)
+    try:
+        final_verifier = json.loads(
+            final_verifier_log_path.read_text(encoding="utf-8")
+        )
+        findings = parse_final_verifier_block_findings(final_verifier)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=(
+                "could not load final verifier findings from "
+                f"{final_verifier_log_path}: {exc}"
+            ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    fix_result = _run_final_verifier_fix_round(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        findings=findings,
+        fix_attempt=fix_attempt,
+        total_steps=_progress_int(previous_state, "total_logical_steps"),
+        from_resume=True,
+    )
+    if fix_result == 1:
+        return 0
+    return fix_result
 
 
 def _block_dirty_late_phase_resume(
@@ -1764,12 +1838,26 @@ def _run_final_verifier_fix_round(
     findings: Sequence[FinalVerifierFinding],
     fix_attempt: int,
     total_steps: int | None,
+    existing_fix_subjects: set[str] | None = None,
+    from_resume: bool = False,
 ) -> int:
+    subject = _final_verifier_fix_subject(issue.number, fix_attempt)
     if _worktree_has_changes(cwd):
         cause = (
-            "final verifier fix phase worktree has uncommitted changes: "
+            "final verifier fix phase worktree has uncommitted changes"
+            f"{' during resume' if from_resume else ''}: "
             f"{_summarize_status(_worktree_status(cwd))}"
         )
+        if from_resume:
+            state.record_recovery(
+                "unsafe_recovery_blocked",
+                {
+                    "cause": cause,
+                    "resume_point": "fix",
+                    "fix_source": "final_verifier",
+                    "final_verifier_fix_attempt": fix_attempt,
+                },
+            )
         _block(
             issue_ref,
             phase="fix",
@@ -1781,6 +1869,24 @@ def _run_final_verifier_fix_round(
             state=state,
         )
         return 2
+
+    if _commit_subject_exists(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
+    ):
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        state.write(
+            phase="finalize",
+            progress={
+                "message": "final verifier fix commit already exists",
+                "fix_source": "final_verifier",
+                "final_verifier_fix_attempt": fix_attempt,
+                "commit_subject": subject,
+            },
+        )
+        return 1
 
     set_issue_state(
         issue_ref,
@@ -1821,6 +1927,22 @@ def _run_final_verifier_fix_round(
         heartbeat=state.heartbeat,
     )
 
+    if not _worktree_has_changes(cwd):
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="final verifier fix",
+            attempts=fix_attempt,
+            cause=(
+                "final verifier fix produced no changes for commit subject: "
+                f"{subject}"
+            ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
     if _run_hooks(
         config.hooks,
         config.retry_max_attempts,
@@ -1840,11 +1962,12 @@ def _run_final_verifier_fix_round(
         )
         return 2
 
-    subject = (
-        f"#{issue.number} fix(sympohy): "
-        f"resolve final verifier finding {fix_attempt}"
+    committed = _commit_all_if_new(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
     )
-    committed = _commit_all_if_new(subject, cwd=cwd, base_branch=config.base_branch)
     if committed:
         _check_call_with_heartbeat(
             ["git", "push"],
@@ -1863,6 +1986,16 @@ def _run_final_verifier_fix_round(
         },
     )
     return 1
+
+
+def _final_verifier_fix_subject(issue_number: int, fix_attempt: int) -> str:
+    subject = (
+        f"#{issue_number} fix(sympohy): "
+        f"resolve final verifier finding {fix_attempt}"
+    )
+    if not validate_commit_subject(subject):
+        raise ValueError(f"invalid generated commit subject: {subject}")
+    return subject
 
 
 def _finish_merged_issue(
