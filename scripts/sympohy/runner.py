@@ -353,7 +353,11 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             )
         return 0
 
-    if "sympohy:pending" in issue.labels and "sympohy:running" not in issue.labels:
+    if (
+        "sympohy:pending" in issue.labels
+        and "sympohy:running" not in issue.labels
+        and resume_point.name == "planning"
+    ):
         return run_issue(
             issue_ref,
             config,
@@ -1485,6 +1489,9 @@ def _lock_takeover_allowed(
         if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
             return False
 
+    if _lock_process_alive(lock_path):
+        return False
+
     heartbeat = _heartbeat_from_payload(state_payload)
     if heartbeat is None:
         return False
@@ -1789,7 +1796,7 @@ def _bootstrap_run_state(
             pass
     plan_path = log_dir / "plan.json"
     progress: dict[str, object] = {
-        "message": "bootstrapped missing or corrupt run state",
+        "message": "routing stale running issue into resume handling",
         "bootstrap_reason": reason,
         "worktree_exists": worktree.exists(),
         "plan_exists": plan_path.exists(),

@@ -407,6 +407,59 @@ class SympohyRunnerTest(unittest.TestCase):
         set_issue_state.assert_not_called()
         comment.assert_not_called()
 
+    def test_resume_issue_recovers_stale_pending_with_saved_implementation_state(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale pending implementation",
+                body="",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:pending", "sympohy:phase:triage"),
+            status="sympohy:running",
+            phase="implement",
+        )
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+            resume_point="implement",
+        )
+
     def test_recovered_run_loads_existing_plan_and_skips_committed_steps(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1271,7 +1324,7 @@ class SympohyRunnerTest(unittest.TestCase):
             },
         )
 
-    def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(
+    def test_issue_run_lock_refuses_consistent_stale_heartbeat_with_live_pid(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -1311,8 +1364,56 @@ class SympohyRunnerTest(unittest.TestCase):
                 run_id="new-run",
                 stale_status_after_minutes=15,
             )
-            lock.acquire()
-            lock.release()
+
+            with self.assertRaises(_RunLockedError):
+                lock.acquire()
+
+            payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_id"], "old-run")
+
+    def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_dead_pid(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            lock_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "pid": 999999,
+                "heartbeat": stale.isoformat(),
+            }
+            state_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "phase": "implement",
+                "status": "running",
+                "pid": 999999,
+                "heartbeat": stale.isoformat(),
+                "lock": {
+                    "path": str(log_dir / "run.lock"),
+                    "run_id": "old-run",
+                },
+            }
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+                lock.acquire()
+                lock.release()
 
             self.assertFalse((log_dir / "run.lock").exists())
 
