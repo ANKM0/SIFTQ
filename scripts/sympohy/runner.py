@@ -1616,7 +1616,18 @@ def _resume_final_verifier_fix_phase(
         from_resume=True,
     )
     if fix_result == 1:
-        return 0
+        return _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            start_round=_next_review_rerun_round(
+                log_dir,
+                max_review_rounds=config.review_max_rounds,
+            ),
+        )
     return fix_result
 
 

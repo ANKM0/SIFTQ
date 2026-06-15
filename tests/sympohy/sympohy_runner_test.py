@@ -2590,6 +2590,83 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(final_state["phase"], "hooks")
         self.assertEqual(final_state["status"], "blocked")
 
+    def test_final_verifier_fix_resume_reruns_review_before_finalize(self) -> None:
+        verifier_response = {
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "acceptance_criteria",
+                    "summary": "resume must re-review verifier fixes",
+                    "evidence": "final verifier fix resume has pushed a new commit",
+                    "suggested_fix": "rerun adversarial review before final verifier",
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "final-verifier-1.json").write_text(
+                json.dumps(verifier_response),
+                encoding="utf-8",
+            )
+            (log_dir / "review-1.json").write_text(
+                '{"findings":[]}\n',
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Resume verifier fix through review",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
+            ):
+                result = _resume_fix_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    previous_state={
+                        "last_known_progress": {
+                            "fix_source": "final_verifier",
+                            "final_verifier_fix_attempt": 1,
+                            "total_logical_steps": 3,
+                        }
+                    },
+                )
+
+        self.assertEqual(result, 0)
+        run_final_verifier_fix_round.assert_called_once()
+        self.assertTrue(run_final_verifier_fix_round.call_args.kwargs["from_resume"])
+        self.assertEqual(run_final_verifier_fix_round.call_args.kwargs["total_steps"], 3)
+        review_fix_loop.assert_called_once()
+        self.assertEqual(review_fix_loop.call_args.kwargs["start_round"], 2)
+
     def test_final_verifier_fix_resume_blocks_dirty_worktree_before_rerun(
         self,
     ) -> None:
