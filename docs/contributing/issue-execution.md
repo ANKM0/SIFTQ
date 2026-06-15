@@ -94,7 +94,12 @@ task ai:sympohy:systemd:status
 
 The timer runs once per minute. It selects open issues that do not have any of
 `sympohy:pending`, `sympohy:running`, `sympohy:blocked`, or `sympohy:done`.
-It starts at most ten workers, and each worker uses an independent
+It also reselects `sympohy:running` issues whose run state is stale because the
+worker pid is missing or dead, the state file is missing, or the heartbeat has
+expired. Fresh issues start through normal triage, while stale running issues
+are routed through resume handling so they are not excluded permanently.
+
+The watcher starts at most ten workers, and each worker uses an independent
 `.sympohy/worktrees/issue-<number>` worktree and issue branch.
 
 ## Hooks, Review, and Merge

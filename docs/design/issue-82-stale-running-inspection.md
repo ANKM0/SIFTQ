@@ -59,16 +59,23 @@ branch and worktree metadata, plan reference, and last known progress.
 The heartbeat is refreshed while Codex and hook subprocesses are still running,
 which gives stale-run inspection a durable signal separate from GitHub labels.
 
+## Watcher Resume Routing
+
+The watcher now keeps fresh issue starts and stale-run recovery separate. Fresh
+open issues still receive `sympohy:pending` and `sympohy:phase:triage` before a
+`run` worker starts. Stale `sympohy:running` issues are dispatched to the
+`resume` entrypoint instead, preserving their running labels and phase context
+for resume handling.
+
 ## Existing Tests
 
-`tests/sympohy/sympohy_core_test.py` covers candidate exclusion for an open
-issue with `sympohy:running` and covers status/phase replacement through
-`transition_labels`.
+`tests/sympohy/sympohy_core_test.py` covers stale-running inspection and
+candidate selection for `sympohy:running` issues, plus status/phase replacement
+through `transition_labels`.
 
-`tests/sympohy/sympohyWorkflowContracts.test.ts` contains a string-level
-watcher contract that asserts managed issues are excluded by checking for
-`not names.intersection(STATUS_LABELS)`.
+`tests/sympohy/sympohy_runner_test.py` covers watcher dispatch for both fresh
+issues and stale `sympohy:running` issues.
 
-These tests describe the current baseline. The stale-run implementation should
-replace the blanket running exclusion with explicit stale detection and resume
-selection tests.
+`tests/sympohy/sympohyWorkflowContracts.test.ts` contains string-level
+watcher contracts for stale-running inspection, run state persistence, and the
+resume entrypoint.

@@ -6,7 +6,7 @@ import cli from "../../scripts/sympohy/cli.py?raw";
 import core from "../../scripts/sympohy/core.py?raw";
 import runner from "../../scripts/sympohy/runner.py?raw";
 
-describe("sympohy Taskfile integration", () => {
+describe("sympohy Taskfile and CLI integration", () => {
   it("exposes setup, run, refine, doctor, watch, labels, and systemd entrypoints", () => {
     const requiredTasks = [
       "setup:sympohy",
@@ -24,6 +24,7 @@ describe("sympohy Taskfile integration", () => {
     );
     expect(taskfile).not.toContain("ai:takt");
     expect(taskfile).not.toContain("setup:takt");
+    expect(cli).toContain("resume");
   });
 
   it("keeps sympohy outside application runtime dependencies", () => {
@@ -42,6 +43,8 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("inspect_running_issue");
     expect(core).toContain("RUNNING_HEARTBEAT_TIMEOUT_SECONDS");
     expect(core).toContain("\"dead pid\"");
+    expect(runner).toContain("\"resume\"");
+    expect(runner).toContain("resume_issue");
   });
 
   it("persists run state for stale-running inspection", () => {
