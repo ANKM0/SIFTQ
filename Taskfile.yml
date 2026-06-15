@@ -89,8 +89,15 @@ tasks:
         rg '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
           | sed -E 's/^[[:space:]]*run:[[:space:]]*task[[:space:]]*//; s/[[:space:]].*$//; /^$/d' \
           | sort -u > "$refs"
-        rg -o '^  [A-Za-z0-9_:-]+:' Taskfile.yml \
-          | sed -E 's/^  //; s/:$//' \
+        awk '
+          /^tasks:/ { in_tasks = 1; next }
+          in_tasks && /^[^[:space:]]/ { in_tasks = 0 }
+          in_tasks && /^  [A-Za-z0-9_:-]+:/ {
+            sub(/^  /, "")
+            sub(/:$/, "")
+            print
+          }
+        ' Taskfile.yml \
           | sort -u > "$tasks"
 
         missing="$(comm -23 "$refs" "$tasks")"
@@ -108,8 +115,15 @@ tasks:
         allowed="$(mktemp)"
         trap 'rm -f "$tasks" "$allowed"' EXIT
 
-        rg -o '^  [A-Za-z0-9_:-]+:' Taskfile.yml \
-          | sed -E 's/^  //; s/:$//' \
+        awk '
+          /^tasks:/ { in_tasks = 1; next }
+          in_tasks && /^[^[:space:]]/ { in_tasks = 0 }
+          in_tasks && /^  [A-Za-z0-9_:-]+:/ {
+            sub(/^  /, "")
+            sub(/:$/, "")
+            print
+          }
+        ' Taskfile.yml \
           | sort -u > "$tasks"
         rg 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
           | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
