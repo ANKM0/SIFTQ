@@ -1159,9 +1159,21 @@ def _run_final_verifier_and_merge(
         merge_progress["completed_logical_steps"] = total_steps
         merge_progress["total_logical_steps"] = total_steps
     state.write(phase="merge", progress=merge_progress)
-    subprocess.check_call(["gh", "pr", "ready"], cwd=worktree)
-    subprocess.check_call(["gh", "pr", "checks", "--watch"], cwd=worktree)
-    subprocess.check_call(["gh", "pr", "merge", "--squash", "--delete-branch"], cwd=worktree)
+    _check_call_with_heartbeat(
+        ["gh", "pr", "ready"],
+        cwd=worktree,
+        heartbeat=state.heartbeat,
+    )
+    _check_call_with_heartbeat(
+        ["gh", "pr", "checks", "--watch"],
+        cwd=worktree,
+        heartbeat=state.heartbeat,
+    )
+    _check_call_with_heartbeat(
+        ["gh", "pr", "merge", "--squash", "--delete-branch"],
+        cwd=worktree,
+        heartbeat=state.heartbeat,
+    )
     subprocess.check_call(["git", "worktree", "remove", str(worktree)])
     done_progress: dict[str, object] = {"message": "merged pull request and removed worktree"}
     if total_steps is not None:
@@ -1459,6 +1471,17 @@ def _run_command_with_heartbeat(
                 heartbeat()
 
 
+def _check_call_with_heartbeat(
+    args: Sequence[str],
+    *,
+    cwd: Path,
+    heartbeat: Callable[[], None] | None = None,
+) -> None:
+    returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
+    if returncode != 0:
+        raise subprocess.CalledProcessError(returncode, args)
+
+
 def _current_branch(cwd: Path) -> str:
     return subprocess.check_output(
         ["git", "branch", "--show-current"],
@@ -1531,27 +1554,33 @@ def _lock_takeover_allowed(
     stale_status_after_minutes: int,
 ) -> bool:
     lock_payload = read_run_state(lock_path)
-    state_payload = read_run_state(state_path)
-    if lock_payload is None or state_payload is None:
+    if lock_payload is None:
         return False
-    if lock_payload.get("issue") != issue_number or state_payload.get("issue") != issue_number:
+    if lock_payload.get("issue") != issue_number:
         return False
 
     lock_run_id = lock_payload.get("run_id")
     if not isinstance(lock_run_id, str) or not lock_run_id:
         return False
-    if state_payload.get("run_id") != lock_run_id:
-        return False
 
-    state_lock = state_payload.get("lock")
-    if isinstance(state_lock, Mapping):
-        if state_lock.get("run_id") not in {None, lock_run_id}:
+    state_payload = read_run_state(state_path)
+    heartbeat_payload = lock_payload
+    if state_payload is not None:
+        if state_payload.get("issue") != issue_number:
             return False
-        lock_path_in_state = state_lock.get("path")
-        if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
+        if state_payload.get("run_id") != lock_run_id:
             return False
+        heartbeat_payload = state_payload
 
-    heartbeat = _heartbeat_from_payload(state_payload)
+        state_lock = state_payload.get("lock")
+        if isinstance(state_lock, Mapping):
+            if state_lock.get("run_id") not in {None, lock_run_id}:
+                return False
+            lock_path_in_state = state_lock.get("path")
+            if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
+                return False
+
+    heartbeat = _heartbeat_from_payload(heartbeat_payload)
     if not _lock_process_alive(lock_path):
         return True
     if heartbeat is None:

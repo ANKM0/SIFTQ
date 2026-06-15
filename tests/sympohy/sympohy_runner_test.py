@@ -18,6 +18,7 @@ from scripts.sympohy.runner import (
     _commit_all_if_new,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
+    _run_final_verifier_and_merge,
     ensure_worktree,
     resume_issue,
     run_issue,
@@ -594,6 +595,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner.subprocess.check_call"),
             ):
                 result = run_issue("#82", config, recover=True)
@@ -711,6 +713,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
                 result = resume_issue("#82", config)
@@ -1115,6 +1118,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 1, stdout=""),
                 ),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
                 result = run_issue("#82", config, recover=True)
@@ -1371,6 +1375,72 @@ class SympohyRunnerTest(unittest.TestCase):
             },
         )
 
+    def test_final_merge_github_commands_refresh_heartbeat(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Merge stale-safe PR",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:merge"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={
+                        "acceptance_criteria_satisfied": True,
+                        "definition_of_done_satisfied": True,
+                        "merge_recommendation": "merge",
+                    },
+                ),
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch("scripts.sympohy.runner.set_issue_state"),
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+        self.assertEqual(result, 0)
+        heartbeat_commands = [call.args[0] for call in run_command.call_args_list]
+        self.assertEqual(
+            heartbeat_commands,
+            [
+                ["gh", "pr", "ready"],
+                ["gh", "pr", "checks", "--watch"],
+                ["gh", "pr", "merge", "--squash", "--delete-branch"],
+            ],
+        )
+        self.assertTrue(
+            all(
+                call.kwargs["heartbeat"] == state.heartbeat
+                for call in run_command.call_args_list
+            )
+        )
+        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
+        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+
     def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(
         self,
     ) -> None:
@@ -1497,6 +1567,69 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(state_payload),
                 encoding="utf-8",
             )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+                lock.acquire()
+                lock.release()
+
+            self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_takes_over_orphan_stale_lock_without_state(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (log_dir / "run.lock").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "old-run",
+                        "pid": 999999,
+                        "heartbeat": stale.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+                lock.acquire()
+                lock.release()
+
+            self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_takes_over_stale_lock_with_corrupt_state(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (log_dir / "run.lock").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "old-run",
+                        "pid": 999999,
+                        "heartbeat": stale.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text("{not json", encoding="utf-8")
 
             lock = _IssueRunLock(
                 issue_number=82,
