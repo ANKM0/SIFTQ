@@ -1193,6 +1193,16 @@ def _resume_late_phase(
             "worktree": str(worktree),
         },
     )
+    if resume_from in {"review", "merge"}:
+        dirty_result = _block_dirty_late_phase_resume(
+            issue_ref,
+            resume_from=resume_from,
+            worktree=worktree,
+            log_dir=log_dir,
+            state=state,
+        )
+        if dirty_result is not None:
+            return dirty_result
     set_issue_state(
         issue_ref,
         current_labels=issue.labels,
@@ -1425,6 +1435,46 @@ def _resume_fix_phase(
         start_round=round_index + 1,
     )
     return review_result
+
+
+def _block_dirty_late_phase_resume(
+    issue_ref: str,
+    *,
+    resume_from: str,
+    worktree: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+) -> int | None:
+    try:
+        status = _worktree_status(worktree)
+    except subprocess.CalledProcessError:
+        cause = f"could not inspect worktree status for {worktree}"
+    else:
+        if not status.strip():
+            return None
+        cause = (
+            f"{resume_from} phase worktree has uncommitted changes during resume: "
+            f"{_summarize_status(status)}"
+        )
+    state.record_recovery(
+        "unsafe_recovery_blocked",
+        {
+            "cause": cause,
+            "resume_point": resume_from,
+        },
+    )
+    _block(
+        issue_ref,
+        phase=resume_from,
+        failed_command="resume safety check",
+        attempts=1,
+        cause=cause,
+        run_log_path=log_dir,
+        cwd=worktree,
+        state=state,
+        current_labels=("sympohy:running", f"sympohy:phase:{resume_from}"),
+    )
+    return 2
 
 
 def _run_final_verifier_and_merge(

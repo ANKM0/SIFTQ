@@ -22,6 +22,7 @@ from scripts.sympohy.runner import (
     _infer_implementation_recovery,
     _pull_request_exists,
     _resume_fix_phase,
+    _resume_late_phase,
     _run_final_verifier_and_merge,
     _run_hooks,
     ensure_worktree,
@@ -1929,6 +1930,76 @@ class SympohyRunnerTest(unittest.TestCase):
             final_state["last_known_progress"]["message"],
             "reconciled already-merged pull request",
         )
+
+    def test_late_phase_resume_blocks_dirty_review_and_merge_worktrees(self) -> None:
+        for phase in ("review", "merge"):
+            with self.subTest(phase=phase), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                worktree = root / "worktrees" / "issue-82"
+                log_dir = root / "runs" / "issue-82"
+                worktree.mkdir(parents=True)
+                log_dir.mkdir(parents=True)
+                issue = Issue(
+                    number=82,
+                    title="Dirty late phase",
+                    body="",
+                    labels=("sympohy:running", f"sympohy:phase:{phase}"),
+                    comments=(),
+                )
+                state = _RunStateWriter(
+                    issue_number=82,
+                    log_dir=log_dir,
+                    base_branch="main",
+                    worktree=worktree,
+                    branch="issue-82-sympohy",
+                )
+
+                with (
+                    patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                    patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-82-sympohy",
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._worktree_status",
+                        return_value=" M scripts/sympohy/runner.py\n",
+                    ),
+                    patch("scripts.sympohy.runner._review_fix_loop") as review_fix_loop,
+                    patch(
+                        "scripts.sympohy.runner._run_final_verifier_and_merge"
+                    ) as final_merge,
+                    patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                    patch("scripts.sympohy.runner.comment") as comment,
+                ):
+                    result = _resume_late_phase(
+                        "#82",
+                        issue,
+                        self._config(root),
+                        log_dir,
+                        state,
+                        previous_state={"last_known_progress": {"review_round": 2}},
+                        resume_from=phase,
+                    )
+
+                final_state = json.loads(
+                    (log_dir / "state.json").read_text(encoding="utf-8")
+                )
+
+            self.assertEqual(result, 2)
+            review_fix_loop.assert_not_called()
+            final_merge.assert_not_called()
+            set_issue_state.assert_called_once_with(
+                "#82",
+                current_labels=("sympohy:running", f"sympohy:phase:{phase}"),
+                status="sympohy:blocked",
+                phase=phase,
+                cwd=worktree,
+            )
+            self.assertIn(
+                f"{phase} phase worktree has uncommitted changes",
+                comment.call_args.args[1],
+            )
+            self.assertEqual(final_state["status"], "blocked")
 
     def test_fix_resume_blocks_existing_fix_commit_with_dirty_worktree(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -237,10 +237,16 @@ def resolve_resume_point(
         phase = _phase_from_labels(names)
     status = state.get("status") if state is not None else None
 
-    if status == "done" or "sympohy:done" in names:
-        return ResumePoint(name="completed", phase=phase, terminal=True)
-    if status == "blocked" or "sympohy:blocked" in names:
-        return ResumePoint(name="blocked", phase=phase, terminal=True)
+    if state is not None:
+        if status == "done":
+            return ResumePoint(name="completed", phase=phase, terminal=True)
+        if status == "blocked":
+            return ResumePoint(name="blocked", phase=phase, terminal=True)
+    else:
+        if "sympohy:done" in names:
+            return ResumePoint(name="completed", phase=phase, terminal=True)
+        if "sympohy:blocked" in names:
+            return ResumePoint(name="blocked", phase=phase, terminal=True)
 
     if phase in {None, "triage"}:
         return ResumePoint(name="planning", phase=phase)

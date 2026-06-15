@@ -330,6 +330,29 @@ class SympohyCoreTest(unittest.TestCase):
         self.assertEqual(completed.phase, "merge")
         self.assertTrue(completed.terminal)
 
+    def test_resume_point_resolution_prefers_state_over_terminal_labels(self) -> None:
+        blocked_label = resolve_resume_point(
+            [
+                "sympohy:blocked",
+                "sympohy:phase:implement",
+            ],
+            state={"status": "running", "phase": "review"},
+        )
+        self.assertEqual(blocked_label.name, "review")
+        self.assertEqual(blocked_label.phase, "review")
+        self.assertFalse(blocked_label.terminal)
+
+        done_label = resolve_resume_point(
+            [
+                "sympohy:done",
+                "sympohy:phase:merge",
+            ],
+            state={"status": "running", "phase": "implement"},
+        )
+        self.assertEqual(done_label.name, "implement")
+        self.assertEqual(done_label.phase, "implement")
+        self.assertFalse(done_label.terminal)
+
     def test_review_json_blocks_critical_high_and_medium_findings(self) -> None:
         result = parse_review_json(
             json.dumps(
