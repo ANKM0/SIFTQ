@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -23,6 +25,18 @@ from .github import Issue, comment, fetch_issue, list_candidate_issues, set_issu
 
 
 HEARTBEAT_INTERVAL_SECONDS = 30
+LOGICAL_STEP_COMMIT_RE = re.compile(
+    r"^#(?P<issue>\d+) feat\(sympohy\): implement logical step (?P<step>\d+)$"
+)
+
+
+@dataclass(frozen=True)
+class _ImplementationRecovery:
+    committed_logical_steps: int
+    worktree_logical_step: int | None = None
+
+    def should_reuse_worktree(self, index: int) -> bool:
+        return self.worktree_logical_step == index
 
 
 class _RunStateWriter:
@@ -208,7 +222,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             else None,
         },
     )
-    return run_issue(issue_ref, config)
+    return run_issue(issue_ref, config, recover=True)
 
 
 def refine_issue(issue_ref: str) -> tuple[int, str]:
@@ -238,7 +252,7 @@ def refine_issue(issue_ref: str) -> tuple[int, str]:
     return 0, json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def run_issue(issue_ref: str, config: SympohyConfig) -> int:
+def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -> int:
     issue = fetch_issue(issue_ref)
     log_dir = config.run_log_root / f"issue-{issue.number}"
     state = _RunStateWriter(
@@ -290,37 +304,56 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
         phase="implement",
     )
 
-    plan = _codex_json(
-        [
-            "You are implementing SIFTQ GitHub Issue "
-            f"#{issue.number}. Produce JSON with key logical_steps, an array "
-            "of implementation steps. Use the issue AC/DoD as source of truth.",
-            json.dumps(
-                {
-                    "title": issue.title,
-                    "acceptance_criteria": list(acceptance.acceptance_criteria),
-                    "definition_of_done": list(acceptance.definition_of_done),
-                },
-                ensure_ascii=False,
-            ),
-        ],
-        cwd=worktree,
-        log_path=plan_path,
-        heartbeat=state.heartbeat,
-    )
+    plan = _load_existing_plan(plan_path) if recover else None
+    loaded_existing_plan = plan is not None
+    if plan is None:
+        plan = _codex_json(
+            [
+                "You are implementing SIFTQ GitHub Issue "
+                f"#{issue.number}. Produce JSON with key logical_steps, an array "
+                "of implementation steps. Use the issue AC/DoD as source of truth.",
+                json.dumps(
+                    {
+                        "title": issue.title,
+                        "acceptance_criteria": list(acceptance.acceptance_criteria),
+                        "definition_of_done": list(acceptance.definition_of_done),
+                    },
+                    ensure_ascii=False,
+                ),
+            ],
+            cwd=worktree,
+            log_path=plan_path,
+            heartbeat=state.heartbeat,
+        )
     logical_steps = _logical_steps(plan)
     total_steps = len(logical_steps)
+    recovery = (
+        _infer_implementation_recovery(
+            issue.number,
+            cwd=worktree,
+            base_branch=config.base_branch,
+            total_steps=total_steps,
+        )
+        if recover
+        else _ImplementationRecovery(committed_logical_steps=0)
+    )
     state.write(
         phase="implement",
         progress={
-            "message": "implementation plan generated",
-            "completed_logical_steps": 0,
+            "message": "implementation plan loaded"
+            if loaded_existing_plan
+            else "implementation plan generated",
+            "completed_logical_steps": recovery.committed_logical_steps,
             "total_logical_steps": total_steps,
             "plan_log_path": str(plan_path),
+            "recovered_existing_plan": loaded_existing_plan,
+            "worktree_logical_step": recovery.worktree_logical_step,
         },
     )
 
     for index, step in enumerate(logical_steps, start=1):
+        if index <= recovery.committed_logical_steps:
+            continue
         set_issue_state(
             issue_ref,
             current_labels=("sympohy:running", "sympohy:phase:implement"),
@@ -329,26 +362,31 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
             cwd=worktree,
         )
         implement_log_path = log_dir / f"implement-{index}.log"
+        reuse_worktree = recovery.should_reuse_worktree(index)
         state.write(
             phase="implement",
             progress={
-                "message": "implementing logical step",
+                "message": "resuming logical step from existing worktree changes"
+                if reuse_worktree
+                else "implementing logical step",
                 "current_logical_step": index,
                 "completed_logical_steps": index - 1,
                 "total_logical_steps": total_steps,
                 "log_path": str(implement_log_path),
+                "reused_worktree_changes": reuse_worktree,
             },
         )
-        _codex_text(
-            [
-                f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
-                json.dumps(step, ensure_ascii=False),
-                "Use normal Codex user config and repository rules.",
-            ],
-            cwd=worktree,
-            log_path=implement_log_path,
-            heartbeat=state.heartbeat,
-        )
+        if not reuse_worktree:
+            _codex_text(
+                [
+                    f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
+                    json.dumps(step, ensure_ascii=False),
+                    "Use normal Codex user config and repository rules.",
+                ],
+                cwd=worktree,
+                log_path=implement_log_path,
+                heartbeat=state.heartbeat,
+            )
         state.write(
             phase="hooks",
             progress={
@@ -768,6 +806,90 @@ def _logical_steps(plan: Mapping[str, object]) -> list[Mapping[str, object]]:
     if not isinstance(steps, list) or not steps:
         raise ValueError("plan JSON must contain non-empty logical_steps")
     return [step for step in steps if isinstance(step, Mapping)]
+
+
+def _load_existing_plan(plan_path: Path) -> Mapping[str, object] | None:
+    if not plan_path.exists():
+        return None
+    try:
+        payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    try:
+        _logical_steps(payload)
+    except ValueError:
+        return None
+    return payload
+
+
+def _infer_implementation_recovery(
+    issue_number: int,
+    *,
+    cwd: Path,
+    base_branch: str,
+    total_steps: int,
+) -> _ImplementationRecovery:
+    completed = _completed_logical_steps_from_commits(
+        issue_number,
+        cwd=cwd,
+        base_branch=base_branch,
+        total_steps=total_steps,
+    )
+    worktree_step = (
+        completed + 1 if _worktree_has_changes(cwd) and completed < total_steps else None
+    )
+    return _ImplementationRecovery(
+        committed_logical_steps=completed,
+        worktree_logical_step=worktree_step,
+    )
+
+
+def _completed_logical_steps_from_commits(
+    issue_number: int,
+    *,
+    cwd: Path,
+    base_branch: str,
+    total_steps: int,
+) -> int:
+    subjects = _commit_subjects(cwd=cwd, base_branch=base_branch)
+    committed_steps: set[int] = set()
+    for subject in subjects:
+        match = LOGICAL_STEP_COMMIT_RE.match(subject)
+        if match is None or int(match.group("issue")) != issue_number:
+            continue
+        committed_steps.add(int(match.group("step")))
+
+    completed = 0
+    while completed + 1 in committed_steps and completed < total_steps:
+        completed += 1
+    return completed
+
+
+def _commit_subjects(*, cwd: Path, base_branch: str) -> list[str]:
+    try:
+        output = subprocess.check_output(
+            ["git", "log", "--format=%s", f"{base_branch}..HEAD"],
+            cwd=cwd,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        output = subprocess.check_output(
+            ["git", "log", "--format=%s"],
+            cwd=cwd,
+            text=True,
+        )
+    return output.splitlines()
+
+
+def _worktree_has_changes(cwd: Path) -> bool:
+    output = subprocess.check_output(
+        ["git", "status", "--porcelain"],
+        cwd=cwd,
+        text=True,
+    )
+    return bool(output.strip())
 
 
 def _label_names(labels: object) -> list[str]:

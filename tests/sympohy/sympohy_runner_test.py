@@ -10,7 +10,13 @@ from unittest.mock import patch
 
 from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
-from scripts.sympohy.runner import _RunStateWriter, resume_issue, watch
+from scripts.sympohy.runner import (
+    _RunStateWriter,
+    _infer_implementation_recovery,
+    resume_issue,
+    run_issue,
+    watch,
+)
 
 
 class SympohyRunnerTest(unittest.TestCase):
@@ -98,10 +104,119 @@ class SympohyRunnerTest(unittest.TestCase):
             )
 
         self.assertEqual(result, 0)
-        run_issue.assert_called_once_with("#82", config)
+        run_issue.assert_called_once_with("#82", config, recover=True)
         self.assertEqual(state["phase"], "implement")
         self.assertEqual(state["last_known_progress"]["resume_point"], "implement")
         self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
+
+    def test_recovered_run_loads_existing_plan_and_skips_committed_steps(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "plan.json").write_text(
+                json.dumps(
+                    {
+                        "logical_steps": [
+                            {"name": "one"},
+                            {"name": "two"},
+                            {"name": "three"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Recover stale run",
+                body="""
+## AC
+- [ ] recover implementation
+
+## DoD
+- [ ] avoid redoing completed steps
+""",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return (
+                        "#82 feat(sympohy): implement logical step 2\n"
+                        "#82 feat(sympohy): implement logical step 1\n"
+                    )
+                if args == ["git", "status", "--porcelain"]:
+                    return ""
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            def codex_json(
+                _prompts: list[str],
+                *,
+                log_path: Path,
+                **_kwargs: object,
+            ) -> dict[str, object]:
+                if log_path.name == "final-verifier.json":
+                    return {
+                        "acceptance_criteria_satisfied": True,
+                        "definition_of_done_satisfied": True,
+                        "merge_recommendation": "merge",
+                    }
+                raise AssertionError(
+                    "recovery should load the existing implementation plan"
+                )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner._run_hooks", return_value=0),
+                patch("scripts.sympohy.runner._review_fix_loop", return_value=0),
+                patch("scripts.sympohy.runner._codex_json", side_effect=codex_json),
+                patch(
+                    "scripts.sympohy.runner._codex_text",
+                    return_value="",
+                ) as codex_text,
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call"),
+            ):
+                result = run_issue("#82", config, recover=True)
+
+        self.assertEqual(result, 0)
+        codex_text.assert_called_once()
+        prompts = codex_text.call_args.args[0]
+        self.assertIn("Implement logical step 3", prompts[0])
+
+    def test_implementation_recovery_reuses_dirty_worktree_for_next_step(self) -> None:
+        def check_output(args: list[str], **_kwargs: object) -> str:
+            if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                return "#82 feat(sympohy): implement logical step 1\n"
+            if args == ["git", "status", "--porcelain"]:
+                return " M scripts/sympohy/runner.py\n"
+            raise AssertionError(f"unexpected check_output: {args}")
+
+        with patch(
+            "scripts.sympohy.runner.subprocess.check_output",
+            side_effect=check_output,
+        ):
+            recovery = _infer_implementation_recovery(
+                82,
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+                total_steps=3,
+            )
+
+        self.assertEqual(recovery.committed_logical_steps, 1)
+        self.assertEqual(recovery.worktree_logical_step, 2)
+        self.assertTrue(recovery.should_reuse_worktree(2))
 
     def test_resume_issue_does_not_restart_terminal_issue_states(self) -> None:
         with TemporaryDirectory() as tmp:

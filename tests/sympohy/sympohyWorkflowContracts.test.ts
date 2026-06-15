@@ -58,6 +58,15 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("\"last_known_progress\"");
   });
 
+  it("recovers implementation from saved plans and existing worktree state", () => {
+    expect(runner).toContain("_load_existing_plan");
+    expect(runner).toContain("_infer_implementation_recovery");
+    expect(runner).toContain("recovered_existing_plan");
+    expect(runner).toContain("reused_worktree_changes");
+    expect(runner).toContain("git\", \"log\", \"--format=%s\"");
+    expect(runner).toContain("git\", \"status\", \"--porcelain\"");
+  });
+
   it("limits parallel issue starts to ten and uses independent worktrees", () => {
     expect(config).toContain("max_workers: 10");
     expect(runner).toContain("candidates[: config.max_workers]");

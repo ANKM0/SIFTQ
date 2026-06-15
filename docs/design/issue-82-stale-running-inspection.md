@@ -79,6 +79,20 @@ Terminal status labels are not restarted. `sympohy:blocked` resolves to the
 `blocked` terminal point, and `sympohy:done` resolves to the `completed`
 terminal point.
 
+## Implement-Phase Recovery
+
+When stale-run recovery re-enters implementation, the runner first attempts to
+load the existing `.sympohy/runs/issue-<number>/plan.json`. A valid saved plan is
+reused instead of asking Codex to generate a new plan, keeping logical step
+numbering stable across restarts.
+
+The runner infers completed work from local Git state. Commit subjects matching
+`#<issue> feat(sympohy): implement logical step <n>` count as completed only for
+the contiguous prefix of logical steps on top of the configured base branch. If
+the worktree still has uncommitted changes after those commits, recovery treats
+those changes as the next logical step and resumes with hooks and commit instead
+of invoking Codex for that same step again.
+
 ## Existing Tests
 
 `tests/sympohy/sympohy_core_test.py` covers stale-running inspection and
