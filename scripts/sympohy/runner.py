@@ -481,7 +481,7 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
         },
     )
     subprocess.check_call(["git", "push", "-u", "origin", branch], cwd=worktree)
-    subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=worktree)
+    _ensure_draft_pull_request(cwd=worktree)
     review_result = _review_fix_loop(issue_ref, issue, config, worktree, log_dir, state)
     if review_result != 0:
         return review_result
@@ -932,6 +932,20 @@ def _worktree_has_changes(cwd: Path) -> bool:
         text=True,
     )
     return bool(output.strip())
+
+
+def _ensure_draft_pull_request(*, cwd: Path) -> None:
+    result = subprocess.run(
+        ["gh", "pr", "view", "--json", "number"],
+        cwd=cwd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return
+    subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=cwd)
 
 
 def _label_names(labels: object) -> list[str]:
