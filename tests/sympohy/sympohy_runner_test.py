@@ -170,6 +170,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 hooks=("task ci",),
                 review_max_rounds=5,
                 retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
             )
             new_issue = {
                 "number": 81,
@@ -2730,6 +2731,7 @@ class SympohyRunnerTest(unittest.TestCase):
             hooks=("task ci",),
             review_max_rounds=5,
             retry_max_attempts=3,
+            final_verifier_fix_max_attempts=2,
         )
 
 
