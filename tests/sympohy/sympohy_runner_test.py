@@ -17,6 +17,7 @@ from scripts.sympohy.runner import (
     _RunLockedError,
     _RunStateWriter,
     _UnsafeRecoveryError,
+    _check_output_with_heartbeat,
     _commit_all_if_new,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
@@ -24,6 +25,7 @@ from scripts.sympohy.runner import (
     _resume_fix_phase,
     _resume_late_phase,
     _run_final_verifier_and_merge,
+    _run_command_with_heartbeat,
     _run_hooks,
     ensure_worktree,
     resume_issue,
@@ -1787,6 +1789,71 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["run_id"], "new-run")
         self.assertEqual(state["last_known_progress"]["message"], "new")
 
+    def test_check_output_terminates_child_when_heartbeat_loses_lock(self) -> None:
+        class FakeProcess:
+            returncode = None
+
+            def __init__(self) -> None:
+                self.terminated = False
+                self.killed = False
+
+            def communicate(self, *, timeout: int) -> tuple[str, None]:
+                raise subprocess.TimeoutExpired(["codex"], timeout)
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def kill(self) -> None:
+                self.killed = True
+
+            def wait(self, timeout: int | None = None) -> int:
+                return 0
+
+        process = FakeProcess()
+        with (
+            patch("scripts.sympohy.runner.subprocess.Popen", return_value=process),
+            self.assertRaises(_RunLockedError),
+        ):
+            _check_output_with_heartbeat(
+                ["codex"],
+                cwd=Path("/tmp/worktree"),
+                heartbeat=lambda: (_ for _ in ()).throw(_RunLockedError("lost lock")),
+            )
+
+        self.assertTrue(process.terminated)
+        self.assertFalse(process.killed)
+
+    def test_run_command_terminates_child_when_heartbeat_loses_lock(self) -> None:
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.terminated = False
+                self.killed = False
+
+            def wait(self, timeout: int | None = None) -> int:
+                if self.terminated:
+                    return 0
+                raise subprocess.TimeoutExpired(["task"], timeout)
+
+            def terminate(self) -> None:
+                self.terminated = True
+
+            def kill(self) -> None:
+                self.killed = True
+
+        process = FakeProcess()
+        with (
+            patch("scripts.sympohy.runner.subprocess.Popen", return_value=process),
+            self.assertRaises(_RunLockedError),
+        ):
+            _run_command_with_heartbeat(
+                ["task", "ci"],
+                cwd=Path("/tmp/worktree"),
+                heartbeat=lambda: (_ for _ in ()).throw(_RunLockedError("lost lock")),
+            )
+
+        self.assertTrue(process.terminated)
+        self.assertFalse(process.killed)
+
     def test_pull_request_exists_blocks_duplicate_head_prs(self) -> None:
         result = subprocess.CompletedProcess(
             [],
@@ -2222,6 +2289,52 @@ class SympohyRunnerTest(unittest.TestCase):
                 "status": "running",
                 "pid": os.getpid(),
                 "heartbeat": fresh.isoformat(),
+                "lock": {
+                    "path": str(log_dir / "run.lock"),
+                    "run_id": "old-run",
+                },
+            }
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=30,
+            )
+
+            with self.assertRaises(_RunLockedError):
+                lock.acquire()
+
+            payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_id"], "old-run")
+
+    def test_issue_run_lock_refuses_takeover_with_fresh_lock_heartbeat(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
+            fresh = datetime.now(timezone.utc)
+            lock_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "pid": os.getpid(),
+                "heartbeat": fresh.isoformat(),
+            }
+            state_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "phase": "implement",
+                "status": "running",
+                "pid": os.getpid(),
+                "heartbeat": stale.isoformat(),
                 "lock": {
                     "path": str(log_dir / "run.lock"),
                     "run_id": "old-run",

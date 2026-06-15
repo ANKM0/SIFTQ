@@ -1837,7 +1837,11 @@ def _check_output_with_heartbeat(
             output, _ = process.communicate(timeout=HEARTBEAT_INTERVAL_SECONDS)
         except subprocess.TimeoutExpired:
             if heartbeat is not None:
-                heartbeat()
+                try:
+                    heartbeat()
+                except Exception:
+                    _terminate_process(process)
+                    raise
             continue
         if process.returncode != 0:
             raise subprocess.CalledProcessError(
@@ -1861,7 +1865,11 @@ def _run_command_with_heartbeat(
             return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
         except subprocess.TimeoutExpired:
             if heartbeat is not None:
-                heartbeat()
+                try:
+                    heartbeat()
+                except Exception:
+                    _terminate_process(process)
+                    raise
 
 
 def _check_call_with_heartbeat(
@@ -1873,6 +1881,15 @@ def _check_call_with_heartbeat(
     returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
     if returncode != 0:
         raise subprocess.CalledProcessError(returncode, args)
+
+
+def _terminate_process(process: subprocess.Popen[object]) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
 
 
 def _current_branch(cwd: Path) -> str:
@@ -1993,6 +2010,9 @@ def _lock_takeover_allowed(
     if not _payload_process_alive(lock_payload):
         return True
     return not _payload_has_fresh_heartbeat(
+        lock_payload,
+        stale_status_after_minutes=stale_status_after_minutes,
+    ) and not _payload_has_fresh_heartbeat(
         state_payload,
         stale_status_after_minutes=stale_status_after_minutes,
     )
