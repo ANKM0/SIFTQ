@@ -122,7 +122,7 @@ def sync_labels(*, cwd: Path | None = None) -> None:
     migrate_legacy_tasks(cwd=cwd)
 
     for name in sorted(existing):
-        if name.startswith("ai:"):
+        if _is_legacy_task_label(name):
             gh_run(["label", "delete", name, "--yes"], cwd=cwd)
 
 

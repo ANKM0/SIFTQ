@@ -57,17 +57,22 @@ class SympohyGithubTest(unittest.TestCase):
         )
         gh_run.assert_not_called()
 
-    def test_sync_labels_migrates_issues_before_deleting_legacy_labels(self) -> None:
+    def test_sync_labels_migrates_issues_before_deleting_legacy_task_labels(self) -> None:
         events: list[str] = []
 
         def run(args: list[str], *, cwd=None) -> None:  # noqa: ANN001
             if args[:2] == ["label", "delete"]:
-                events.append("delete")
+                events.append(f"delete:{args[2]}")
 
         with (
             patch(
                 "scripts.sympohy.github.gh_json",
-                return_value=[{"name": "ai:impl-ready"}],
+                return_value=[
+                    {"name": "ai:impl-ready"},
+                    {"name": "bug"},
+                    {"name": "takt:running"},
+                    {"name": "taqt:blocked"},
+                ],
             ),
             patch("scripts.sympohy.github.gh_run", side_effect=run),
             patch("scripts.sympohy.github.migrate_legacy_tasks") as migrate,
@@ -76,7 +81,15 @@ class SympohyGithubTest(unittest.TestCase):
 
             sync_labels()
 
-        self.assertEqual(events, ["migrate", "delete"])
+        self.assertEqual(
+            events,
+            [
+                "migrate",
+                "delete:ai:impl-ready",
+                "delete:takt:running",
+                "delete:taqt:blocked",
+            ],
+        )
         self.assertEqual(migrate.call_count, 1)
 
     def test_migrate_issue_labels_replaces_only_managed_labels(self) -> None:

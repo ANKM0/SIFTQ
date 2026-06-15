@@ -118,6 +118,7 @@ describe("sympohy automation contract", () => {
     expect(core).toContain("migrate_task_labels");
     expect(core).toContain("LEGACY_TASK_LABEL_PREFIXES");
     expect(cli).toContain("migrate_legacy_tasks");
+    expect(taskfile).toContain("delete legacy task labels");
     expect(taskfile).toContain("ai:sympohy:migrate");
   });
 });

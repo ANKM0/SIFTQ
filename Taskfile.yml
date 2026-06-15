@@ -136,7 +136,7 @@ tasks:
       - uv run python -m scripts.sympohy doctor
 
   ai:sympohy:labels:sync:
-    desc: Create/update sympohy labels and delete legacy ai:* labels.
+    desc: Create/update sympohy labels and delete legacy task labels.
     cmds:
       - uv run python -m scripts.sympohy labels-sync
 
