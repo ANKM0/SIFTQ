@@ -525,6 +525,41 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 lock_path=lock.path,
             )
             resume_point = resolve_resume_point(labels, state=state_payload)
+        elif inspection.reason == "invalid state":
+            phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
+            state = _RunStateWriter(
+                issue_number=issue.number,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                run_id=run_id,
+                lock_path=lock.path,
+                refresh_lock=True,
+            )
+            cause = (
+                f"invalid run state for issue #{issue.number}; refusing automatic resume"
+            )
+            if inspection.state_path is not None:
+                cause = f"{cause}: {inspection.state_path}"
+            state.record_recovery(
+                "unsafe_recovery_blocked",
+                {
+                    "cause": cause,
+                    "resume_point": resume_point.name,
+                    "stale_reason": inspection.reason,
+                },
+            )
+            _block(
+                issue_ref,
+                phase=phase,
+                failed_command="resume safety check",
+                attempts=1,
+                cause=cause,
+                run_log_path=log_dir,
+                cwd=None,
+                state=state,
+                current_labels=issue.labels,
+            )
+            return 2
 
         phase = inspection.phase or resume_point.phase or "triage"
         if phase != _phase_from_labels(issue.labels):

@@ -250,6 +250,59 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
 
+    def test_resume_issue_blocks_invalid_run_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Reject mismatched state",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 79,
+                        "run_id": "wrong-run",
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "wrong-run"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        run_issue.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+            status="sympohy:blocked",
+            phase="implement",
+            cwd=None,
+        )
+        self.assertIn("invalid run state", comment.call_args.args[1])
+        self.assertEqual(state["issue"], 82)
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["phase"], "implement")
+        self.assertIn("invalid run state", state["last_known_progress"]["cause"])
+
     def test_resume_issue_selects_recovery_mode_from_phase_label(self) -> None:
         for phase in ("triage", "implement", "hooks", "review", "fix", "merge"):
             with self.subTest(phase=phase), TemporaryDirectory() as tmp:
@@ -268,10 +321,12 @@ class SympohyRunnerTest(unittest.TestCase):
                     json.dumps(
                         {
                             "issue": 82,
+                            "run_id": f"stale-{phase}",
                             "phase": phase,
                             "status": "running",
                             "pid": os.getpid(),
                             "heartbeat": stale_heartbeat.isoformat(),
+                            "lock": {"run_id": f"stale-{phase}"},
                         }
                     ),
                     encoding="utf-8",
@@ -312,10 +367,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-hooks",
                         "phase": "hooks",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-hooks"},
                     }
                 ),
                 encoding="utf-8",
@@ -400,10 +457,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-triage",
                         "phase": "triage",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-triage"},
                     }
                 ),
                 encoding="utf-8",
@@ -531,10 +590,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-pending",
                         "phase": "triage",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-pending"},
                     }
                 ),
                 encoding="utf-8",
@@ -626,10 +687,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-pending-implementation",
                         "phase": "implement",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-pending-implementation"},
                     }
                 ),
                 encoding="utf-8",
@@ -784,10 +847,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-implementation",
                         "phase": "implement",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-implementation"},
                         "worktree": {
                             "path": str(worktree),
                             "branch": "issue-82-sympohy",
@@ -1063,10 +1128,12 @@ class SympohyRunnerTest(unittest.TestCase):
                 json.dumps(
                     {
                         "issue": 82,
+                        "run_id": "stale-dirty-implementation",
                         "phase": "implement",
                         "status": "running",
                         "pid": os.getpid(),
                         "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "stale-dirty-implementation"},
                         "worktree": {
                             "path": str(worktree),
                             "branch": "issue-82-sympohy",
