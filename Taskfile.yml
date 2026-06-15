@@ -33,6 +33,14 @@ tasks:
     cmds:
       - uv run python -m scripts.sympohy setup
 
+  pytest:
+    desc: Run pytest with optional file targets and additional arguments.
+    vars:
+      FILES: tests/sympohy
+      ARGS:
+    cmds:
+      - uv run python -m pytest {{.ARGS}} {{.FILES}}
+
   ci:
     desc: Run the local CI gate.
     cmds:
