@@ -27,6 +27,13 @@ def _normalize_phase_label(phase: str) -> str:
     normalized = PHASE_ALIASES.get(normalized, normalized)
     return f"sympohy:phase:{normalized}"
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
+FINAL_VERIFIER_FINDING_KINDS = {
+    "acceptance_criteria",
+    "definition_of_done",
+    "verification",
+    "reviewability",
+    "other",
+}
 DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
 # Legacy task label prefixes are intentionally supported to migrate historical issues
 # from prior runners; they are expected to be removed from all active flow over
@@ -121,6 +128,14 @@ class ReviewResult:
     @property
     def approved(self) -> bool:
         return not self.blocking_findings
+
+
+@dataclass(frozen=True)
+class FinalVerifierFinding:
+    kind: str
+    summary: str
+    evidence: str
+    suggested_fix: str
 
 
 def validate_commit_subject(subject: str) -> bool:
@@ -366,6 +381,38 @@ def parse_review_json(source: str) -> ReviewResult:
         )
 
     return ReviewResult(findings=tuple(findings), raw=payload)
+
+
+def parse_final_verifier_block_findings(
+    final_verifier: Mapping[str, object],
+) -> tuple[FinalVerifierFinding, ...]:
+    if "findings" not in final_verifier:
+        raise ValueError("final verifier block response must include findings")
+    findings_payload = final_verifier["findings"]
+    if not isinstance(findings_payload, list):
+        raise ValueError("final verifier findings must be a list")
+    if not findings_payload:
+        raise ValueError("final verifier block response must include non-empty findings")
+
+    findings: list[FinalVerifierFinding] = []
+    for index, item in enumerate(findings_payload, start=1):
+        if not isinstance(item, Mapping):
+            raise ValueError(f"final verifier finding {index} must be an object")
+        fields: dict[str, str] = {}
+        for field in ("kind", "summary", "evidence", "suggested_fix"):
+            value = item.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    f"final verifier finding {index} must include non-empty {field}"
+                )
+            fields[field] = value.strip()
+        if fields["kind"] not in FINAL_VERIFIER_FINDING_KINDS:
+            raise ValueError(
+                f"final verifier finding {index} has unknown kind: {fields['kind']}"
+            )
+        findings.append(FinalVerifierFinding(**fields))
+
+    return tuple(findings)
 
 
 def next_retry_action(attempts: int, max_attempts: int = 3) -> str:

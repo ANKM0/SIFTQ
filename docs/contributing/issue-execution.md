@@ -265,9 +265,11 @@ an empty `findings[]` array. `block` responses must include a non-empty
 `findings[]` array whose entries provide `kind`, `summary`, `evidence`, and
 `suggested_fix` fields so the runner can feed the result into automated fixing.
 `kind` is one of `acceptance_criteria`, `definition_of_done`, `verification`,
-`reviewability`, or `other`. `sympohy` then marks the PR ready, waits for GitHub
-checks, and squash merges through the PR with branch deletion when the final
-gate allows merge.
+`reviewability`, or `other`. Valid non-empty verifier findings move the issue
+to `sympohy:phase:fix` with `fix_source=final_verifier`; missing, empty, or
+schema-invalid block findings add `sympohy:blocked` instead of starting a fix.
+`sympohy` then marks the PR ready, waits for GitHub checks, and squash merges
+through the PR with branch deletion when the final gate allows merge.
 
 Successful merge adds `sympohy:done`, closes the issue, removes the issue
 worktree, and keeps `.sympohy/runs/*` logs. Blocked runs keep both the worktree

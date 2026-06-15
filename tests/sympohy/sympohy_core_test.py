@@ -19,7 +19,11 @@ from scripts.sympohy import (
     validate_commit_subject,
 )
 from scripts.sympohy.config import SympohyConfig
-from scripts.sympohy.core import _phase_from_labels, parse_review_json
+from scripts.sympohy.core import (
+    _phase_from_labels,
+    parse_final_verifier_block_findings,
+    parse_review_json,
+)
 from scripts.sympohy.runner import _logical_steps, watch
 from scripts.sympohy.systemd import _systemd_escape
 
@@ -581,6 +585,49 @@ class SympohyCoreTest(unittest.TestCase):
                 review_result=clean_review,
             )
         )
+
+    def test_final_verifier_block_findings_require_actionable_schema(self) -> None:
+        findings = parse_final_verifier_block_findings(
+            {
+                "merge_recommendation": "block",
+                "findings": [
+                    {
+                        "kind": "verification",
+                        "summary": "CI was not rerun",
+                        "evidence": "No post-fix hook log exists",
+                        "suggested_fix": "Run task ci after the verifier fix",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].kind, "verification")
+        self.assertEqual(findings[0].suggested_fix, "Run task ci after the verifier fix")
+
+    def test_final_verifier_block_findings_reject_empty_missing_or_invalid_schema(
+        self,
+    ) -> None:
+        invalid_payloads = (
+            {},
+            {"findings": []},
+            {"findings": "missing list"},
+            {"findings": [{"kind": "verification", "summary": "missing evidence"}]},
+            {
+                "findings": [
+                    {
+                        "kind": "unsupported",
+                        "summary": "bad kind",
+                        "evidence": "bad kind",
+                        "suggested_fix": "use a supported kind",
+                    }
+                ]
+            },
+        )
+
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                parse_final_verifier_block_findings(payload)
 
     def test_commit_subject_matches_repository_format(self) -> None:
         self.assertTrue(
