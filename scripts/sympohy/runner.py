@@ -561,6 +561,7 @@ def run_issue(issue_ref: str, config: SympohyConfig, *, recover: bool = False) -
                 subject,
                 cwd=worktree,
                 base_branch=config.base_branch,
+                allow_empty=True,
             )
             state.write(
                 phase="implement",
@@ -1099,7 +1100,13 @@ def _commit_subject_exists(subject: str, *, cwd: Path, base_branch: str) -> bool
     return subject in _commit_subjects(cwd=cwd, base_branch=base_branch)
 
 
-def _commit_all_if_new(subject: str, *, cwd: Path, base_branch: str) -> bool:
+def _commit_all_if_new(
+    subject: str,
+    *,
+    cwd: Path,
+    base_branch: str,
+    allow_empty: bool = False,
+) -> bool:
     if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
         return False
 
@@ -1107,6 +1114,12 @@ def _commit_all_if_new(subject: str, *, cwd: Path, base_branch: str) -> bool:
     if not _worktree_has_changes(cwd):
         if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
             return False
+        if allow_empty:
+            subprocess.check_call(
+                ["git", "commit", "--allow-empty", "-m", subject],
+                cwd=cwd,
+            )
+            return True
         raise RuntimeError(f"no changes to commit for subject: {subject}")
 
     subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)

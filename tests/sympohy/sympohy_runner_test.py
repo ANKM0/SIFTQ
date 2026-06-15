@@ -1017,6 +1017,29 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertFalse(committed)
         check_call.assert_not_called()
 
+    def test_commit_all_if_new_allows_empty_logical_step_marker(self) -> None:
+        subject = "#82 feat(sympohy): implement logical step 12"
+        with (
+            patch("scripts.sympohy.runner._commit_subject_exists", return_value=False),
+            patch("scripts.sympohy.runner._worktree_has_changes", return_value=False),
+            patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+        ):
+            committed = _commit_all_if_new(
+                subject,
+                cwd=Path("/tmp/worktree"),
+                base_branch="main",
+                allow_empty=True,
+            )
+
+        self.assertTrue(committed)
+        self.assertEqual(
+            [call.args[0] for call in check_call.call_args_list],
+            [
+                ["git", "add", "-A"],
+                ["git", "commit", "--allow-empty", "-m", subject],
+            ],
+        )
+
     def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
         with (
             patch(
