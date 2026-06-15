@@ -266,8 +266,12 @@ an empty `findings[]` array. `block` responses must include a non-empty
 `suggested_fix` fields so the runner can feed the result into automated fixing.
 `kind` is one of `acceptance_criteria`, `definition_of_done`, `verification`,
 `reviewability`, or `other`. Valid non-empty verifier findings move the issue
-to `sympohy:phase:fix` with `fix_source=final_verifier`; missing, empty, or
-schema-invalid block findings add `sympohy:blocked` instead of starting a fix.
+to `sympohy:phase:fix` with `fix_source=final_verifier`, up to
+`final_verifier_fix_max_attempts` configured in `.sympohy/config.yaml` (default
+`2`); missing, empty, or schema-invalid block findings add `sympohy:blocked`
+instead of starting a fix. If the final verifier still reports blocking findings
+after the configured fix attempts, `sympohy` blocks the issue instead of
+starting another fix.
 `sympohy` then marks the PR ready, waits for GitHub checks, and squash merges
 through the PR with branch deletion when the final gate allows merge.
 

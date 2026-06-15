@@ -29,6 +29,12 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
     if stale_status_after_minutes <= 0:
         raise ValueError("stale_status_after_minutes must be positive")
 
+    final_verifier_fix_max_attempts = int(
+        values.get("final_verifier_fix_max_attempts", "2")
+    )
+    if final_verifier_fix_max_attempts < 0:
+        raise ValueError("final_verifier_fix_max_attempts must be non-negative")
+
     return SympohyConfig(
         max_workers=int(values.get("max_workers", "10")),
         base_branch=str(values.get("base_branch", "main")),
@@ -38,9 +44,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
         hooks=tuple(values.get("hooks", ["task ci"])),
         review_max_rounds=int(values.get("review_max_rounds", "5")),
         retry_max_attempts=int(values.get("retry_max_attempts", "3")),
-        final_verifier_fix_max_attempts=int(
-            values.get("final_verifier_fix_max_attempts", "2")
-        ),
+        final_verifier_fix_max_attempts=final_verifier_fix_max_attempts,
     )
 
 

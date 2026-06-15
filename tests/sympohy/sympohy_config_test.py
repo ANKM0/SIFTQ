@@ -38,6 +38,20 @@ hooks:
         self.assertEqual(config.final_verifier_fix_max_attempts, 5)
         self.assertEqual(config.hooks, ("task test", "task lint"))
 
+    def test_load_config_rejects_negative_final_verifier_fix_limit(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "config.yaml"
+            config_path.write_text(
+                "final_verifier_fix_max_attempts: -1\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "final_verifier_fix_max_attempts must be non-negative",
+            ):
+                load_config(config_path)
+
 
 if __name__ == "__main__":
     unittest.main()

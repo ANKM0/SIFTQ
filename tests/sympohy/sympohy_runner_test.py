@@ -2180,6 +2180,89 @@ class SympohyRunnerTest(unittest.TestCase):
             "merged pull request and removed worktree",
         )
 
+    def test_final_verifier_blocks_after_configured_fix_limit(self) -> None:
+        def block_response(summary: str) -> dict[str, object]:
+            return {
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [
+                    {
+                        "kind": "acceptance_criteria",
+                        "summary": summary,
+                        "evidence": "final verifier still finds a blocker",
+                        "suggested_fix": "fix the remaining blocker",
+                    }
+                ],
+            }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Stop final verifier fix loop",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    side_effect=[
+                        block_response("first blocker"),
+                        block_response("second blocker"),
+                        block_response("third blocker"),
+                    ],
+                ) as codex_json,
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        self.assertEqual(codex_json.call_count, 3)
+        self.assertEqual(run_final_verifier_fix_round.call_count, 2)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            status="sympohy:blocked",
+            phase="finalize",
+            cwd=worktree,
+        )
+        self.assertIn(
+            "after 2 fix attempts",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(final_state["last_known_progress"]["attempts"], 2)
+
     def test_final_verifier_block_with_invalid_findings_blocks_issue(self) -> None:
         invalid_responses = (
             {
