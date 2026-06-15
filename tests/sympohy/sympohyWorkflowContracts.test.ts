@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import ciWorkflow from "../../.github/workflows/ci.yml?raw";
+import releaseWorkflow from "../../.github/workflows/release.yml?raw";
 import config from "../../.sympohy/config.yaml?raw";
 import taskfile from "../../Taskfile.yml?raw";
 import cli from "../../scripts/sympohy/cli.py?raw";
 import core from "../../scripts/sympohy/core.py?raw";
 import runner from "../../scripts/sympohy/runner.py?raw";
+
+const ciCdWorkflows = [ciWorkflow, releaseWorkflow].join("\n");
 
 describe("sympohy Taskfile and CLI integration", () => {
   it("exposes setup, run, refine, doctor, watch, labels, and systemd entrypoints", () => {
@@ -37,8 +40,20 @@ describe("sympohy Taskfile and CLI integration", () => {
     expect(taskfile).toContain("task: ci:sympohy");
     expect(taskfile).toContain("task: setup:sympohy");
     expect(taskfile).toContain("task: ai:sympohy:doctor");
+    expect(ciWorkflow).toContain("UV_CACHE_DIR");
     expect(ciWorkflow).toContain("Check sympohy project configuration");
     expect(ciWorkflow).toContain("task ci:sympohy");
+  });
+
+  it("keeps CI/CD workflows free of legacy taqt runner assumptions", () => {
+    expect(ciCdWorkflows).not.toMatch(/\btaqt\b/i);
+    expect(ciCdWorkflows).not.toMatch(/\btakt\b/i);
+    expect(ciCdWorkflows).not.toContain(".takt");
+    expect(ciCdWorkflows).not.toContain("setup:takt");
+    expect(ciCdWorkflows).not.toContain("ai:takt");
+    expect(taskfile).not.toContain("setup:takt");
+    expect(taskfile).not.toContain("ai:takt");
+    expect(taskfile).not.toContain("pnpm dlx takt");
   });
 });
 

@@ -87,6 +87,7 @@ Run the same local checks before opening or updating a pull request:
 ```bash
 task setup:python
 task setup:frontend:ci
+task ci:sympohy
 task ci
 ```
 

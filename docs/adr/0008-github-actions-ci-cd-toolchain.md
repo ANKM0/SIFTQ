@@ -41,18 +41,18 @@ Issue #12では、SIFTQにCI/CDを追加し、選定したツールをADRへ記�
 よるBrowser SPAとして実装し、v2以降でRustとTauriへ拡張する方針を決定
 している。
 
-CIは、現在のCoDD検証を維持しつつ、v1 frontendのtypecheck、lint、test、
-buildを検証する必要がある。CDは、`v*`タグからGitHub Releaseを公開できる
-最小構成にする。
+CIは、現在のCoDD検証と`sympohy` automation設定検証を維持しつつ、v1
+frontendのtypecheck、lint、test、buildを検証する必要がある。CDは、`v*`
+タグからGitHub Releaseを公開できる最小構成にする。
 
 ## Decision
 
 CI/CD基盤にはGitHub Actionsを採用する。
 
 CIでは、aquaでrepository toolsを入れ、uvでPython/CoDD依存を入れ、pnpmで
-frontend dependenciesを入れる。検証対象は、commit message、Markdown、
-TypeScript typecheck、ESLint、Vitest、Vite build、CoDD version/scan/
-validate/dag verifyとする。
+frontend dependenciesを入れる。検証対象は、`sympohy` project
+configuration、commit message、Markdown、TypeScript typecheck、ESLint、
+Vitest、Vite build、CoDD version/scan/validate/dag verifyとする。
 
 CDでは、`v*`タグpushまたは手動実行からGitHub Releaseを作成する。手動実行
 では指定された`v*`タグを作成してpushし、そのタグからreleaseを作成する。

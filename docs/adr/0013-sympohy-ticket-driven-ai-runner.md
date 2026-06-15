@@ -11,6 +11,9 @@ codd:
       relation: depends_on
       semantic: automation
   depended_by:
+    - id: design:issue-12-ci-cd
+      relation: depends_on
+      semantic: automation
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: decision
