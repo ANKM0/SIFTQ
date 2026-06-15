@@ -73,9 +73,10 @@ tasks:
       - uv run python scripts/ci/check_commit_messages.py {{.CLI_ARGS}}
 
   ci:markdown:
-    desc: Check Markdown formatting.
+    desc: Check Markdown formatting and repository document readability.
     cmds:
       - uv run python scripts/ci/check_markdown.py
+      - uv run python scripts/ci/check_repository_documents.py
 
   ci:lint:task-refs:
     desc: Check that CI task references are defined in Taskfile.yml.
