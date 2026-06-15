@@ -20,6 +20,7 @@ from scripts.sympohy.runner import (
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
     _pull_request_exists,
+    _resume_fix_phase,
     _run_final_verifier_and_merge,
     ensure_worktree,
     resume_issue,
@@ -1253,7 +1254,7 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["status"], "blocked")
         self.assertIn("use resume", state["last_known_progress"]["cause"])
 
-    def test_ensure_worktree_reuses_existing_issue_branch(self) -> None:
+    def test_ensure_worktree_recovers_existing_issue_branch(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
             issue = Issue(
@@ -1268,7 +1269,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner._branch_exists", return_value=True),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
-                worktree = ensure_worktree(issue, config)
+                worktree = ensure_worktree(issue, config, recover=True)
 
         self.assertEqual(worktree, Path(tmp) / "worktrees" / "issue-82")
         check_call.assert_called_once_with(
@@ -1280,6 +1281,26 @@ class SympohyRunnerTest(unittest.TestCase):
                 "issue-82-sympohy",
             ]
         )
+
+    def test_ensure_worktree_blocks_fresh_run_with_existing_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Fresh run with stale branch",
+                body="",
+                labels=(),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=True),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                self.assertRaisesRegex(RuntimeError, "existing branch"),
+            ):
+                ensure_worktree(issue, config)
+
+        check_call.assert_not_called()
 
     def test_ensure_worktree_recovers_remote_issue_branch(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1526,6 +1547,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._run_command_with_heartbeat",
                     return_value=0,
                 ) as run_command,
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
                 patch("scripts.sympohy.runner.set_issue_state"),
             ):
@@ -1556,6 +1578,122 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
         check_call.assert_any_call(["gh", "issue", "close", "#82"])
+
+    def test_merge_resume_reconciles_already_merged_pull_request(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Merge stale-safe PR",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:merge"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=True),
+                patch("scripts.sympohy.runner._codex_json") as codex_json,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 0)
+        codex_json.assert_not_called()
+        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
+        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:merge"),
+            status="sympohy:done",
+            phase="merge",
+        )
+        self.assertEqual(final_state["status"], "done")
+        self.assertEqual(
+            final_state["last_known_progress"]["message"],
+            "reconciled already-merged pull request",
+        )
+
+    def test_fix_resume_blocks_existing_fix_commit_with_dirty_worktree(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "review-2.json").write_text(
+                json.dumps({"findings": [{"severity": "high", "summary": "fix"}]}),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Resume fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
+                patch("scripts.sympohy.runner._worktree_has_changes", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._worktree_status",
+                    return_value=" M scripts/sympohy/runner.py\n",
+                ),
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _resume_fix_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    previous_state={"last_known_progress": {"review_round": 2}},
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        codex_text.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:fix"),
+            status="sympohy:blocked",
+            phase="fix",
+            cwd=cwd,
+        )
+        self.assertIn("fix commit already exists", comment.call_args.args[1])
+        self.assertEqual(final_state["status"], "blocked")
 
     def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(
         self,

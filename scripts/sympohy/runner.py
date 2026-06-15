@@ -302,6 +302,10 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
 
     worktree.parent.mkdir(parents=True, exist_ok=True)
     if _branch_exists(branch):
+        if not recover:
+            raise _ExistingRunError(
+                f"existing branch found for issue #{issue.number}: {branch}; use resume"
+            )
         subprocess.check_call(["git", "worktree", "add", str(worktree), branch])
     elif recover and _remote_branch_exists(branch):
         subprocess.check_call(
@@ -1295,6 +1299,51 @@ def _resume_fix_phase(
         )
         return 2
 
+    subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
+    if _commit_subject_exists(subject, cwd=cwd, base_branch=config.base_branch):
+        if _worktree_has_changes(cwd):
+            cause = (
+                "fix commit already exists but worktree has uncommitted changes during resume: "
+                f"{_summarize_status(_worktree_status(cwd))}"
+            )
+            state.record_recovery(
+                "unsafe_recovery_blocked",
+                {
+                    "cause": cause,
+                    "resume_point": "fix",
+                    "review_round": round_index,
+                },
+            )
+            _block(
+                issue_ref,
+                phase="fix",
+                failed_command="resume safety check",
+                attempts=1,
+                cause=cause,
+                run_log_path=log_dir,
+                cwd=cwd,
+                state=state,
+            )
+            return 2
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        state.write(
+            phase="review",
+            progress={
+                "message": "review fix commit already exists",
+                "review_round": round_index,
+                "commit_subject": subject,
+            },
+        )
+        return _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            start_round=round_index + 1,
+        )
+
     set_issue_state(
         issue_ref,
         current_labels=("sympohy:running", "sympohy:phase:fix"),
@@ -1321,7 +1370,6 @@ def _resume_fix_phase(
         log_path=fix_log_path,
         heartbeat=state.heartbeat,
     )
-    subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
     committed = _commit_all_if_new(
         subject,
         cwd=cwd,
@@ -1358,6 +1406,15 @@ def _run_final_verifier_and_merge(
     *,
     total_steps: int | None,
 ) -> int:
+    if _pull_request_merged(cwd=worktree):
+        return _finish_merged_issue(
+            issue_ref,
+            worktree,
+            state,
+            total_steps=total_steps,
+            message="reconciled already-merged pull request",
+        )
+
     final_verifier_path = log_dir / "final-verifier.json"
     progress: dict[str, object] = {
         "message": "running final verifier",
@@ -1416,8 +1473,26 @@ def _run_final_verifier_and_merge(
         cwd=worktree,
         heartbeat=state.heartbeat,
     )
-    subprocess.check_call(["git", "worktree", "remove", str(worktree)])
-    done_progress: dict[str, object] = {"message": "merged pull request and removed worktree"}
+    return _finish_merged_issue(
+        issue_ref,
+        worktree,
+        state,
+        total_steps=total_steps,
+        message="merged pull request and removed worktree",
+    )
+
+
+def _finish_merged_issue(
+    issue_ref: str,
+    worktree: Path,
+    state: _RunStateWriter,
+    *,
+    total_steps: int | None,
+    message: str,
+) -> int:
+    if worktree.exists():
+        subprocess.check_call(["git", "worktree", "remove", str(worktree)])
+    done_progress: dict[str, object] = {"message": message}
     if total_steps is not None:
         done_progress["completed_logical_steps"] = total_steps
         done_progress["total_logical_steps"] = total_steps
@@ -2201,6 +2276,9 @@ def _existing_run_refusal_reason(
     worktree = config.worktree_root / f"issue-{issue.number}"
     if worktree.exists():
         return f"existing worktree found at {worktree}; use resume"
+    branch = f"issue-{issue.number}-sympohy"
+    if _branch_exists(branch):
+        return f"existing branch found at {branch}; use resume"
     return None
 
 
@@ -2231,6 +2309,26 @@ def _push_branch_and_ensure_draft_pull_request(
         heartbeat=heartbeat,
     )
     _ensure_draft_pull_request(cwd=cwd, heartbeat=heartbeat)
+
+
+def _pull_request_merged(*, cwd: Path) -> bool:
+    result = subprocess.run(
+        ["gh", "pr", "view", "--json", "state,merged"],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return False
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, Mapping):
+        return False
+    return bool(payload.get("merged")) or payload.get("state") == "MERGED"
 
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
