@@ -105,7 +105,7 @@ ADR で決まった判断をその機能へどう適用するかを書く。
 Design docs は ADR を再決定しない。既存 ADR を参照し、その判断を
 個別機能の設計へどう適用するかだけを記録する。
 
-## Wireframe
+## Wireframe Markdown Template
 
 Wireframe は外部設計の一部として扱う。UI 変更がある機能では、
 Markdown で UI 契約を記録し、HTML wireframe で表示状態を確認できる
@@ -121,20 +121,49 @@ design:<feature-wireframe>
 `design:<feature-wireframe>` の CoDD node は
 `docs/wireframes/<feature>.md` に置く。
 
-最小テンプレート:
+`docs/wireframes/<feature>.md` は次の最小テンプレートで作成する。
+Markdown では画面の実装方法ではなく、HTML wireframe が満たすべき
+外部契約を記録する。各節は空のまま残さず、未確定の内容は
+`Open Questions（未決事項）` に集約する。
 
 ```md
+---
+codd:
+  node_id: design:<feature-wireframe>
+  type: design
+  status: draft
+  depends_on:
+    - id: design:<feature>
+      relation: depends_on
+      semantic: ui
+---
+
 # <Feature> Wireframe
 
 ## Target HTML（対象HTML）
 
+対象の HTML wireframe ファイル、または更新する既存 HTML wireframe を
+列挙する。
+
 ## UI Contract（UI契約）
+
+ユーザーやテストから観測できる領域、操作、表示ルールを記録する。
 
 ## States（状態）
 
+通常、空、入力中、検証エラー、成功、失敗など、HTML wireframe で
+確認する状態を記録する。
+
 ## Copy and Layout（文言とレイアウト）
 
+表示文言、主要な配置、表示順、表示しない情報を記録する。
+
 ## Contract Test（契約テスト）
+
+`tests/docs/wireframeContract.test.ts` で固定する契約と、更新不要と
+判断した契約を記録する。
+
+## Open Questions（未決事項）
 ```
 
 UI 変更 PR では、文言修正や小さいスタイル調整でも wireframe HTML を
