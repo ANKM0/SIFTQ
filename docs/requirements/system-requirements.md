@@ -20,9 +20,6 @@ codd:
     - id: design:command-permissions
       relation: depends_on
       semantic: governance
-    - id: design:issue-label-policy
-      relation: depends_on
-      semantic: governance
     - id: design:adr-authoring
       relation: depends_on
       semantic: governance
