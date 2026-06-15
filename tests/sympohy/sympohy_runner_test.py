@@ -821,7 +821,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -941,7 +941,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -1351,7 +1351,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
-                if log_path.name == "final-verifier.json":
+                if log_path.name == "final-verifier-1.json":
                     return {
                         "acceptance_criteria_satisfied": True,
                         "definition_of_done_satisfied": True,
@@ -2114,32 +2114,46 @@ class SympohyRunnerTest(unittest.TestCase):
                 worktree=worktree,
                 branch="issue-82-sympohy",
             )
+            verifier_responses = [
+                {
+                    "acceptance_criteria_satisfied": False,
+                    "definition_of_done_satisfied": True,
+                    "merge_recommendation": "block",
+                    "findings": [
+                        {
+                            "kind": "acceptance_criteria",
+                            "summary": "resume state is not validated",
+                            "evidence": "state.json accepts missing fix_source",
+                            "suggested_fix": "persist fix_source for verifier fixes",
+                        }
+                    ],
+                },
+                {
+                    "acceptance_criteria_satisfied": True,
+                    "definition_of_done_satisfied": True,
+                    "merge_recommendation": "merge",
+                },
+            ]
+
+            def codex_json(
+                _prompts: list[str],
+                *,
+                log_path: Path,
+                **_kwargs: object,
+            ) -> dict[str, object]:
+                response = verifier_responses.pop(0)
+                log_path.write_text(
+                    json.dumps(response, ensure_ascii=False, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                return response
 
             with (
                 patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
                 patch(
                     "scripts.sympohy.runner._codex_json",
-                    side_effect=[
-                        {
-                            "acceptance_criteria_satisfied": False,
-                            "definition_of_done_satisfied": True,
-                            "merge_recommendation": "block",
-                            "findings": [
-                                {
-                                    "kind": "acceptance_criteria",
-                                    "summary": "resume state is not validated",
-                                    "evidence": "state.json accepts missing fix_source",
-                                    "suggested_fix": "persist fix_source for verifier fixes",
-                                }
-                            ],
-                        },
-                        {
-                            "acceptance_criteria_satisfied": True,
-                            "definition_of_done_satisfied": True,
-                            "merge_recommendation": "merge",
-                        },
-                    ],
-                ),
+                    side_effect=codex_json,
+                ) as codex_json_mock,
                 patch("scripts.sympohy.runner._worktree_has_changes", return_value=False),
                 patch("scripts.sympohy.runner._codex_text", return_value="") as codex_text,
                 patch("scripts.sympohy.runner._run_hooks", return_value=0) as run_hooks,
@@ -2159,8 +2173,27 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
 
             final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            first_attempt = json.loads(
+                (log_dir / "final-verifier-1.json").read_text(encoding="utf-8")
+            )
+            second_attempt = json.loads(
+                (log_dir / "final-verifier-2.json").read_text(encoding="utf-8")
+            )
+            latest_attempt = json.loads(
+                (log_dir / "final-verifier.json").read_text(encoding="utf-8")
+            )
 
         self.assertEqual(result, 0)
+        self.assertEqual(
+            [
+                call.kwargs["log_path"].name
+                for call in codex_json_mock.call_args_list
+            ],
+            ["final-verifier-1.json", "final-verifier-2.json"],
+        )
+        self.assertEqual(first_attempt["merge_recommendation"], "block")
+        self.assertEqual(second_attempt["merge_recommendation"], "merge")
+        self.assertEqual(latest_attempt, second_attempt)
         set_issue_state.assert_any_call(
             "#82",
             current_labels=(),

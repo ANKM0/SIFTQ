@@ -264,6 +264,9 @@ satisfaction and recommending `merge` or `block`. `merge` responses must include
 an empty `findings[]` array. `block` responses must include a non-empty
 `findings[]` array whose entries provide `kind`, `summary`, `evidence`, and
 `suggested_fix` fields so the runner can feed the result into automated fixing.
+Each verifier attempt is persisted as `final-verifier-<attempt>.json`; the
+runner also refreshes `final-verifier.json` with the latest attempt for
+compatibility with existing tooling.
 `kind` is one of `acceptance_criteria`, `definition_of_done`, `verification`,
 `reviewability`, or `other`. Valid non-empty verifier findings move the issue
 to `sympohy:phase:fix` with `fix_source=final_verifier`, up to

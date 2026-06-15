@@ -1627,6 +1627,7 @@ def _run_final_verifier_and_merge(
             log_path=final_verifier_path,
             heartbeat=state.heartbeat,
         )
+        _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
         if merge_gate_allows_merge(
             final_verifier=final,
             github_checks_status="success",
@@ -1733,9 +1734,23 @@ def _run_final_verifier_and_merge(
 
 
 def _final_verifier_log_path(log_dir: Path, attempt: int) -> Path:
-    if attempt == 1:
-        return log_dir / "final-verifier.json"
     return log_dir / f"final-verifier-{attempt}.json"
+
+
+def _persist_final_verifier_artifacts(
+    log_dir: Path,
+    attempt_path: Path,
+    payload: Mapping[str, object],
+) -> None:
+    latest_path = log_dir / "final-verifier.json"
+    if attempt_path.exists():
+        content = attempt_path.read_bytes()
+    else:
+        content = (
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        attempt_path.write_bytes(content)
+    latest_path.write_bytes(content)
 
 
 def _run_final_verifier_fix_round(
