@@ -244,10 +244,8 @@ def resolve_resume_point(
 
     if phase in {None, "triage"}:
         return ResumePoint(name="planning", phase=phase)
-    if phase in {"implement", "hooks"}:
-        return ResumePoint(name="implement", phase=phase)
-    if phase in {"review", "fix", "merge"}:
-        return ResumePoint(name="push_pr", phase=phase)
+    if phase in {"implement", "hooks", "review", "fix", "merge"}:
+        return ResumePoint(name=phase, phase=phase)
 
     return ResumePoint(name="planning", phase=phase)
 

@@ -167,10 +167,18 @@ class _RunStateWriter:
 
 
 class _IssueRunLock:
-    def __init__(self, *, issue_number: int, log_dir: Path, run_id: str) -> None:
+    def __init__(
+        self,
+        *,
+        issue_number: int,
+        log_dir: Path,
+        run_id: str,
+        stale_status_after_minutes: int,
+    ) -> None:
         self.issue_number = issue_number
         self.log_dir = log_dir
         self.run_id = run_id
+        self.stale_status_after_minutes = stale_status_after_minutes
         self.path = log_dir / "run.lock"
         self.acquired = False
 
@@ -198,7 +206,12 @@ class _IssueRunLock:
         try:
             fd = os.open(self.path, flags, 0o644)
         except FileExistsError as exc:
-            if _lock_process_alive(self.path):
+            if not _lock_takeover_allowed(
+                self.path,
+                state_path=self.log_dir / "state.json",
+                issue_number=self.issue_number,
+                stale_status_after_minutes=self.stale_status_after_minutes,
+            ):
                 raise _RunLockedError(
                     f"issue #{self.issue_number} is already locked by {self.path}"
                 ) from exc
@@ -341,7 +354,13 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         return 0
 
     if "sympohy:pending" in issue.labels and "sympohy:running" not in issue.labels:
-        return run_issue(issue_ref, config, recover=False, from_resume=True)
+        return run_issue(
+            issue_ref,
+            config,
+            recover=False,
+            from_resume=True,
+            resume_point=resume_point.name,
+        )
 
     if inspection.state is None or inspection.reason in {"missing phase", "corrupt state"}:
         bootstrap_phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
@@ -354,22 +373,6 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         )
         resume_point = resolve_resume_point(labels, state=state_payload)
 
-    state = _RunStateWriter(
-        issue_number=issue.number,
-        log_dir=log_dir,
-        base_branch=config.base_branch,
-    )
-    state.write(
-        phase=inspection.phase or resume_point.phase or "triage",
-        progress={
-            "message": "routing stale running issue into resume handling",
-            "resume_point": resume_point.name,
-            "stale_reason": inspection.reason,
-            "stale_state_path": str(inspection.state_path)
-            if inspection.state_path is not None
-            else None,
-        },
-    )
     phase = inspection.phase or resume_point.phase or "triage"
     if phase != _phase_from_labels(issue.labels):
         set_issue_state(
@@ -384,6 +387,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         config,
         recover=resume_point.name != "planning",
         from_resume=True,
+        resume_point=resume_point.name,
     )
 
 
@@ -420,11 +424,17 @@ def run_issue(
     *,
     recover: bool = False,
     from_resume: bool = False,
+    resume_point: str | None = None,
 ) -> int:
     issue = fetch_issue(issue_ref)
     log_dir = config.run_log_root / f"issue-{issue.number}"
     run_id = _new_run_id()
-    lock = _IssueRunLock(issue_number=issue.number, log_dir=log_dir, run_id=run_id)
+    lock = _IssueRunLock(
+        issue_number=issue.number,
+        log_dir=log_dir,
+        run_id=run_id,
+        stale_status_after_minutes=config.stale_status_after_minutes,
+    )
     try:
         lock.acquire()
     except _RunLockedError:
@@ -436,6 +446,7 @@ def run_issue(
             issue=issue,
             recover=recover,
             from_resume=from_resume,
+            resume_point=resume_point,
             run_id=run_id,
             lock_path=lock.path,
         )
@@ -450,10 +461,15 @@ def _run_issue_locked(
     issue: Issue,
     recover: bool,
     from_resume: bool,
+    resume_point: str | None,
     run_id: str,
     lock_path: Path,
 ) -> int:
     log_dir = config.run_log_root / f"issue-{issue.number}"
+    previous_state = read_run_state(log_dir / "state.json")
+    resume_from = resume_point or ("implement" if recover else "planning")
+    if resume_from not in {"planning", "implement", "hooks", "review", "fix", "merge"}:
+        raise ValueError(f"unknown resume point: {resume_from}")
     state = _RunStateWriter(
         issue_number=issue.number,
         log_dir=log_dir,
@@ -490,6 +506,18 @@ def _run_issue_locked(
                 current_labels=issue.labels,
             )
             return 2
+
+    if from_resume and resume_from in {"review", "fix", "merge"}:
+        return _resume_late_phase(
+            issue_ref,
+            issue,
+            config,
+            log_dir,
+            state,
+            previous_state=previous_state,
+            resume_from=resume_from,
+        )
+
     state.write(
         phase="triage",
         progress={"message": "checking acceptance criteria and definition of done"},
@@ -591,16 +619,35 @@ def _run_issue_locked(
         )
     logical_steps = _logical_steps(plan)
     total_steps = len(logical_steps)
-    recovery = (
-        _infer_implementation_recovery(
+    if from_resume and resume_from == "hooks":
+        hook_step = _progress_int(previous_state, "current_logical_step")
+        if hook_step is None or hook_step < 1 or hook_step > total_steps:
+            _block(
+                issue_ref,
+                phase="hooks",
+                failed_command="resume safety check",
+                attempts=1,
+                cause="saved hooks phase is missing a valid current_logical_step",
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:hooks"),
+            )
+            return 2
+        recovery = _ImplementationRecovery(
+            committed_logical_steps=hook_step - 1,
+            worktree_logical_step=hook_step,
+            worktree_clean=False,
+        )
+    elif recover:
+        recovery = _infer_implementation_recovery(
             issue.number,
             cwd=worktree,
             base_branch=config.base_branch,
             total_steps=total_steps,
         )
-        if recover
-        else _ImplementationRecovery(committed_logical_steps=0)
-    )
+    else:
+        recovery = _ImplementationRecovery(committed_logical_steps=0)
     if recovery.unsafe_reason is not None:
         state.write(
             phase="implement",
@@ -779,16 +826,239 @@ def _run_issue_locked(
     if review_result != 0:
         return review_result
 
-    final_verifier_path = log_dir / "final-verifier.json"
+    return _run_final_verifier_and_merge(
+        issue_ref,
+        issue,
+        worktree,
+        log_dir,
+        state,
+        total_steps=total_steps,
+    )
+
+
+def _resume_late_phase(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    previous_state: Mapping[str, object] | None,
+    resume_from: str,
+) -> int:
+    worktree = ensure_worktree(issue, config, recover=True)
+    try:
+        branch = _current_branch(worktree)
+    except subprocess.CalledProcessError:
+        state.write(
+            phase=resume_from,
+            worktree=worktree,
+            status="blocked",
+            progress={"message": "unsafe resume blocked"},
+        )
+        _block(
+            issue_ref,
+            phase=resume_from,
+            failed_command="resume safety check",
+            attempts=1,
+            cause=f"could not inspect current branch for worktree {worktree}",
+            run_log_path=log_dir,
+            cwd=None,
+            state=state,
+            current_labels=("sympohy:running", f"sympohy:phase:{resume_from}"),
+        )
+        return 2
+
+    plan_path = log_dir / "plan.json"
     state.write(
-        phase="merge",
+        phase=resume_from,
+        worktree=worktree,
+        branch=branch,
+        plan_path=plan_path if plan_path.exists() else None,
         progress={
-            "message": "running final verifier",
-            "completed_logical_steps": total_steps,
-            "total_logical_steps": total_steps,
-            "log_path": str(final_verifier_path),
+            "message": f"resuming {resume_from} phase",
+            "resume_point": resume_from,
         },
     )
+    set_issue_state(
+        issue_ref,
+        current_labels=issue.labels,
+        status="sympohy:running",
+        phase=resume_from,
+        cwd=worktree,
+    )
+
+    if resume_from == "merge":
+        return _run_final_verifier_and_merge(
+            issue_ref,
+            issue,
+            worktree,
+            log_dir,
+            state,
+            total_steps=_progress_int(previous_state, "total_logical_steps"),
+        )
+    if resume_from == "fix":
+        fix_result = _resume_fix_phase(
+            issue_ref,
+            issue,
+            config,
+            worktree,
+            log_dir,
+            state,
+            previous_state=previous_state,
+        )
+        if fix_result != 0:
+            return fix_result
+    else:
+        start_round = _review_start_round(previous_state)
+        review_result = _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            worktree,
+            log_dir,
+            state,
+            start_round=start_round,
+        )
+        if review_result != 0:
+            return review_result
+
+    return _run_final_verifier_and_merge(
+        issue_ref,
+        issue,
+        worktree,
+        log_dir,
+        state,
+        total_steps=_progress_int(previous_state, "total_logical_steps"),
+    )
+
+
+def _resume_fix_phase(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    previous_state: Mapping[str, object] | None,
+) -> int:
+    round_index = _progress_int(previous_state, "review_round")
+    if round_index is None:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause="saved fix phase is missing review_round",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+    review_log_path = log_dir / f"review-{round_index}.json"
+    try:
+        review_json = review_log_path.read_text(encoding="utf-8")
+        review = parse_review_json(review_json)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=f"could not load review findings from {review_log_path}: {exc}",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+    if review.approved:
+        return 0
+    if round_index >= config.review_max_rounds:
+        _block(
+            issue_ref,
+            phase="review",
+            failed_command="adversarial review",
+            attempts=round_index,
+            cause="blocking findings remained after review/fix loop",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    set_issue_state(
+        issue_ref,
+        current_labels=("sympohy:running", "sympohy:phase:fix"),
+        status="sympohy:running",
+        phase="fix",
+        cwd=cwd,
+    )
+    fix_log_path = log_dir / f"fix-{round_index}.log"
+    state.write(
+        phase="fix",
+        progress={
+            "message": "resuming fix for blocking review findings",
+            "review_round": round_index,
+            "blocking_findings": len(review.blocking_findings),
+            "log_path": str(fix_log_path),
+        },
+    )
+    _codex_text(
+        [
+            "Fix these blocking review findings and stop after edits.",
+            review_json,
+        ],
+        cwd=cwd,
+        log_path=fix_log_path,
+        heartbeat=state.heartbeat,
+    )
+    subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
+    committed = _commit_all_if_new(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+    )
+    if committed:
+        subprocess.check_call(["git", "push"], cwd=cwd)
+    state.write(
+        phase="review",
+        progress={
+            "message": "pushed review fix" if committed else "review fix commit already exists",
+            "review_round": round_index,
+            "commit_subject": subject,
+        },
+    )
+    review_result = _review_fix_loop(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        start_round=round_index + 1,
+    )
+    return review_result
+
+
+def _run_final_verifier_and_merge(
+    issue_ref: str,
+    issue: Issue,
+    worktree: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    total_steps: int | None,
+) -> int:
+    final_verifier_path = log_dir / "final-verifier.json"
+    progress: dict[str, object] = {
+        "message": "running final verifier",
+        "log_path": str(final_verifier_path),
+    }
+    if total_steps is not None:
+        progress["completed_logical_steps"] = total_steps
+        progress["total_logical_steps"] = total_steps
+    state.write(phase="merge", progress=progress)
     final = _codex_json(
         [
             "Act as final verifier. Return JSON with boolean "
@@ -818,26 +1088,23 @@ def _run_issue_locked(
         )
         return 2
 
-    state.write(
-        phase="merge",
-        progress={
-            "message": "merging pull request",
-            "completed_logical_steps": total_steps,
-            "total_logical_steps": total_steps,
-        },
-    )
+    merge_progress: dict[str, object] = {"message": "merging pull request"}
+    if total_steps is not None:
+        merge_progress["completed_logical_steps"] = total_steps
+        merge_progress["total_logical_steps"] = total_steps
+    state.write(phase="merge", progress=merge_progress)
     subprocess.check_call(["gh", "pr", "ready"], cwd=worktree)
     subprocess.check_call(["gh", "pr", "checks", "--watch"], cwd=worktree)
     subprocess.check_call(["gh", "pr", "merge", "--squash", "--delete-branch"], cwd=worktree)
     subprocess.check_call(["git", "worktree", "remove", str(worktree)])
+    done_progress: dict[str, object] = {"message": "merged pull request and removed worktree"}
+    if total_steps is not None:
+        done_progress["completed_logical_steps"] = total_steps
+        done_progress["total_logical_steps"] = total_steps
     state.write(
         phase="merge",
         status="done",
-        progress={
-            "message": "merged pull request and removed worktree",
-            "completed_logical_steps": total_steps,
-            "total_logical_steps": total_steps,
-        },
+        progress=done_progress,
     )
     set_issue_state(
         issue_ref,
@@ -909,8 +1176,12 @@ def _review_fix_loop(
     cwd: Path,
     log_dir: Path,
     state: _RunStateWriter,
+    *,
+    start_round: int = 1,
 ) -> int:
-    for round_index in range(1, config.review_max_rounds + 1):
+    if start_round > config.review_max_rounds:
+        return 0
+    for round_index in range(start_round, config.review_max_rounds + 1):
         set_issue_state(
             issue_ref,
             current_labels=("sympohy:running", "sympohy:phase:review"),
@@ -1186,6 +1457,42 @@ def _refresh_lock_metadata(
     tmp_path.replace(lock_path)
 
 
+def _lock_takeover_allowed(
+    lock_path: Path,
+    *,
+    state_path: Path,
+    issue_number: int,
+    stale_status_after_minutes: int,
+) -> bool:
+    lock_payload = read_run_state(lock_path)
+    state_payload = read_run_state(state_path)
+    if lock_payload is None or state_payload is None:
+        return False
+    if lock_payload.get("issue") != issue_number or state_payload.get("issue") != issue_number:
+        return False
+
+    lock_run_id = lock_payload.get("run_id")
+    if not isinstance(lock_run_id, str) or not lock_run_id:
+        return False
+    if state_payload.get("run_id") != lock_run_id:
+        return False
+
+    state_lock = state_payload.get("lock")
+    if isinstance(state_lock, Mapping):
+        if state_lock.get("run_id") not in {None, lock_run_id}:
+            return False
+        lock_path_in_state = state_lock.get("path")
+        if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
+            return False
+
+    heartbeat = _heartbeat_from_payload(state_payload)
+    if heartbeat is None:
+        return False
+    stale_after_seconds = stale_status_after_minutes * 60
+    age_seconds = (datetime.now(timezone.utc) - heartbeat).total_seconds()
+    return age_seconds > stale_after_seconds
+
+
 def _lock_process_alive(lock_path: Path) -> bool:
     payload = read_run_state(lock_path)
     if payload is None:
@@ -1207,6 +1514,19 @@ def _lock_process_alive(lock_path: Path) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def _heartbeat_from_payload(payload: Mapping[str, object]) -> datetime | None:
+    value = payload.get("heartbeat")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        heartbeat = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if heartbeat.tzinfo is None:
+        return heartbeat.replace(tzinfo=timezone.utc)
+    return heartbeat.astimezone(timezone.utc)
 
 
 def _logical_steps(plan: Mapping[str, object]) -> list[object]:
@@ -1417,6 +1737,39 @@ def _unsafe_resume_reason(
     if state_path is not None:
         parts.append(f"state path: {state_path}")
     return "; ".join(parts)
+
+
+def _last_progress(state: Mapping[str, object] | None) -> Mapping[str, object]:
+    if state is None:
+        return {}
+    progress = state.get("last_known_progress")
+    if isinstance(progress, Mapping):
+        return progress
+    return {}
+
+
+def _progress_int(state: Mapping[str, object] | None, key: str) -> int | None:
+    value = _last_progress(state).get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _review_start_round(state: Mapping[str, object] | None) -> int:
+    round_index = _progress_int(state, "review_round")
+    if round_index is None:
+        return 1
+    message = _last_progress(state).get("message")
+    if message in {"pushed review fix", "review fix commit already exists"}:
+        return round_index + 1
+    return round_index
 
 
 def _bootstrap_run_state(

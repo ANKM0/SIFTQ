@@ -293,7 +293,7 @@ class SympohyCoreTest(unittest.TestCase):
                         {"name": f"sympohy:phase:{phase}"},
                     ]
                 )
-                self.assertEqual(resume_point.name, "implement")
+                self.assertEqual(resume_point.name, phase)
                 self.assertEqual(resume_point.phase, phase)
                 self.assertFalse(resume_point.terminal)
 
@@ -305,7 +305,7 @@ class SympohyCoreTest(unittest.TestCase):
                         {"name": f"sympohy:phase:{phase}"},
                     ]
                 )
-                self.assertEqual(resume_point.name, "push_pr")
+                self.assertEqual(resume_point.name, phase)
                 self.assertEqual(resume_point.phase, phase)
                 self.assertFalse(resume_point.terminal)
 

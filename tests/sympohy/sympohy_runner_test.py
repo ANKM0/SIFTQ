@@ -12,6 +12,8 @@ from unittest.mock import patch
 from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
 from scripts.sympohy.runner import (
+    _IssueRunLock,
+    _RunLockedError,
     _RunStateWriter,
     _commit_all_if_new,
     _ensure_draft_pull_request,
@@ -188,6 +190,7 @@ class SympohyRunnerTest(unittest.TestCase):
             config,
             recover=True,
             from_resume=True,
+            resume_point="implement",
         )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
@@ -241,6 +244,7 @@ class SympohyRunnerTest(unittest.TestCase):
                     config,
                     recover=phase != "triage",
                     from_resume=True,
+                    resume_point="planning" if phase == "triage" else phase,
                 )
 
     def test_resume_issue_routes_from_state_phase_and_corrects_label(self) -> None:
@@ -288,6 +292,7 @@ class SympohyRunnerTest(unittest.TestCase):
             config,
             recover=True,
             from_resume=True,
+            resume_point="hooks",
         )
 
     def test_resume_issue_ignores_active_running_state_for_double_resume_safety(
@@ -366,6 +371,7 @@ class SympohyRunnerTest(unittest.TestCase):
             config,
             recover=False,
             from_resume=True,
+            resume_point="planning",
         )
 
     def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
@@ -396,6 +402,7 @@ class SympohyRunnerTest(unittest.TestCase):
             config,
             recover=False,
             from_resume=True,
+            resume_point="planning",
         )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
@@ -1263,6 +1270,94 @@ class SympohyRunnerTest(unittest.TestCase):
                 "total_logical_steps": 5,
             },
         )
+
+    def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            lock_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "pid": os.getpid(),
+                "heartbeat": stale.isoformat(),
+            }
+            state_payload = {
+                "issue": 82,
+                "run_id": "old-run",
+                "phase": "implement",
+                "status": "running",
+                "pid": os.getpid(),
+                "heartbeat": stale.isoformat(),
+                "lock": {
+                    "path": str(log_dir / "run.lock"),
+                    "run_id": "old-run",
+                },
+            }
+            (log_dir / "run.lock").write_text(
+                json.dumps(lock_payload),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(state_payload),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+            lock.acquire()
+            lock.release()
+
+            self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_refuses_mismatched_stale_lock(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            (log_dir / "run.lock").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "old-run",
+                        "pid": 999999,
+                        "heartbeat": stale.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "different-run",
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": 999999,
+                        "heartbeat": stale.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=15,
+            )
+
+            with self.assertRaises(_RunLockedError):
+                lock.acquire()
+
+            payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
+            self.assertEqual(payload["run_id"], "old-run")
 
     def _config(self, root: Path) -> SympohyConfig:
         return SympohyConfig(
