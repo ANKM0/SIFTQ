@@ -74,7 +74,7 @@ describe("MVP spec flow", () => {
       "判断の寿命と適用範囲",
       "ADR は durable decision を記録する",
       "Design doc は feature-specific application を記録する",
-      "Design doc は ADR を再決定しない",
+      "Design doc は ADR の判断を再決定してはならない",
       "ADR は feature-specific implementation details を持たない"
     ];
 
@@ -92,6 +92,9 @@ describe("MVP spec flow", () => {
     expect(adrAuthoring).toContain("architecture boundaries");
     expect(adrAuthoring).toContain(
       "Use design docs for feature-specific application"
+    );
+    expect(adrAuthoring).toContain(
+      "Design docs must not re-decide ADR decisions"
     );
     expect(adrAuthoring).toContain("per-feature external design");
     expect(adrAuthoring).toContain("internal design");

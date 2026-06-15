@@ -64,9 +64,9 @@ internal design, test perspectives, and application of existing ADRs. They
 record how an existing ADR applies to one feature, plus UI states and operation
 flow.
 
-Design docs should not re-decide ADRs. If a feature needs a different durable
-decision, create a new ADR or update the existing ADR instead of embedding the
-decision in the feature design doc.
+Design docs must not re-decide ADR decisions. If a feature needs a different
+durable decision, create a new ADR or update the existing ADR instead of
+embedding the decision in the feature design doc.
 
 ADRs should not carry feature-specific implementation details unless they are
 essential to the durable decision. Put screen copy, event flows, operation calls,

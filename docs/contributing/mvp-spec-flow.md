@@ -102,8 +102,8 @@ ADR で決まった判断をその機能へどう適用するかを書く。
 ## Open Questions（未決事項）
 ```
 
-Design docs は ADR を再決定しない。既存 ADR を参照し、その判断を
-個別機能の設計へどう適用するかだけを記録する。
+Design docs は ADR の判断を再決定してはならない。既存 ADR を参照し、
+その判断を個別機能の設計へどう適用するかだけを記録する。
 
 ## Wireframe Markdown Template
 
@@ -188,9 +188,9 @@ ADR と design doc の境界は、判断の寿命と適用範囲で分ける。
   external design、internal design、test perspectives、既存 ADR の
   application を対象機能ごとに残す。あわせて UI 状態と operation flow
   を残す。
-- Design doc は ADR を再決定しない。ADR と異なる判断が必要になった
-  場合は、design doc に判断を埋め込まず、新しい ADR または既存 ADR の
-  改訂で扱う。
+- Design doc は ADR の判断を再決定してはならない。ADR と異なる判断が
+  必要になった場合は、design doc に判断を埋め込まず、新しい ADR または
+  既存 ADR の改訂で扱う。
 - ADR は feature-specific implementation details を持たない。個別画面の
   文言、イベントフロー、operation 呼び出し、テストケースは design doc
   に置く。
@@ -239,4 +239,4 @@ Design docs は、その基盤や方針を使って、この機能をどう作�
 を使う、どのテストで何を確認するかを書く。
 
 ADR は durable decision、design docs は feature-specific application
-を扱う。design docs は ADR を再決定しない。
+を扱う。design docs は ADR の判断を再決定してはならない。
