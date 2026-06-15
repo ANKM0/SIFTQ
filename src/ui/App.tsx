@@ -67,6 +67,9 @@ export function App({ repository, settingsRepository }: AppProps) {
   const [areaLabels, setAreaLabels] = useState<AreaLabelSettings>(
     getDefaultAreaLabelSettings()
   );
+  const [areAreaLabelsLoaded, setAreaLabelsLoaded] = useState(false);
+  const [isAreaLabelsLoading, setAreaLabelsLoading] = useState(true);
+  const [areaLabelsError, setAreaLabelsError] = useState<string | null>(null);
   const [page, setPage] = useState<Page>("matrix");
 
   useEffect(() => {
@@ -74,6 +77,10 @@ export function App({ repository, settingsRepository }: AppProps) {
   }, [activeRepository]);
 
   useEffect(() => {
+    setAreaLabelsLoading(true);
+    setAreaLabelsLoaded(false);
+    setAreaLabelsError(null);
+
     const requestVersion = settingsRequestVersion.current + 1;
     settingsRequestVersion.current = requestVersion;
 
@@ -81,7 +88,10 @@ export function App({ repository, settingsRepository }: AppProps) {
       activeSettingsRepository,
       setAreaLabels,
       requestVersion,
-      settingsRequestVersion
+      settingsRequestVersion,
+      setAreaLabelsError,
+      setAreaLabelsLoading,
+      setAreaLabelsLoaded
     );
   }, [activeSettingsRepository]);
 
@@ -136,6 +146,10 @@ export function App({ repository, settingsRepository }: AppProps) {
   async function handleSaveAreaLabels(
     labels: AreaLabelSettings
   ): Promise<string | null> {
+    if (!areAreaLabelsLoaded) {
+      return "Area labels could not be saved while settings are still loading.";
+    }
+
     const requestVersion = settingsRequestVersion.current + 1;
     settingsRequestVersion.current = requestVersion;
 
@@ -153,6 +167,10 @@ export function App({ repository, settingsRepository }: AppProps) {
   }
 
   async function handleRestoreDefaultAreaLabels(): Promise<string | null> {
+    if (!areAreaLabelsLoaded) {
+      return "Area labels could not be restored while settings are still loading.";
+    }
+
     const requestVersion = settingsRequestVersion.current + 1;
     settingsRequestVersion.current = requestVersion;
 
@@ -191,10 +209,20 @@ export function App({ repository, settingsRepository }: AppProps) {
         <SettingsPage
           areaLabels={areaLabels}
           onBack={() => setPage("matrix")}
+          areAreaLabelsLoaded={areAreaLabelsLoaded && !isAreaLabelsLoading}
           onRestoreDefaults={handleRestoreDefaultAreaLabels}
           onSave={handleSaveAreaLabels}
         />
       )}
+      {areaLabelsError !== null ? (
+        <p
+          className="app__error"
+          role="alert"
+          style={{ color: "red", margin: "0 1rem" }}
+        >
+          {areaLabelsError}
+        </p>
+      ) : null}
     </DndContext>
   );
 }
@@ -292,6 +320,7 @@ function MatrixPage({
 type SettingsPageProps = {
   readonly areaLabels: AreaLabelSettings;
   readonly onBack: () => void;
+  readonly areAreaLabelsLoaded: boolean;
   readonly onRestoreDefaults: () => Promise<string | null>;
   readonly onSave: (labels: AreaLabelSettings) => Promise<string | null>;
 };
@@ -299,6 +328,7 @@ type SettingsPageProps = {
 function SettingsPage({
   areaLabels,
   onBack,
+  areAreaLabelsLoaded,
   onRestoreDefaults,
   onSave
 }: SettingsPageProps) {
@@ -316,6 +346,11 @@ function SettingsPage({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!areAreaLabelsLoaded) {
+      setError("Area labels are still loading.");
+      return;
+    }
+
     if (!canSave) {
       setError("Area label must not be empty.");
       return;
@@ -325,6 +360,11 @@ function SettingsPage({
   }
 
   async function handleRestoreDefaults() {
+    if (!areAreaLabelsLoaded) {
+      setError("Area labels are still loading.");
+      return;
+    }
+
     setError(await onRestoreDefaults());
   }
 
@@ -351,6 +391,7 @@ function SettingsPage({
                   aria-label={`${area.label} label`}
                   className="settings-form__input"
                   type="text"
+                  disabled={!areAreaLabelsLoaded}
                   value={draftLabels[area.id]}
                   onChange={(event) => {
                     setDraftLabels((currentLabels) => ({
@@ -374,10 +415,14 @@ function SettingsPage({
             </p>
           ) : null}
           <div className="settings-form__actions">
-            <button type="button" onClick={() => void handleRestoreDefaults()}>
+            <button
+              disabled={!areAreaLabelsLoaded}
+              type="button"
+              onClick={() => void handleRestoreDefaults()}
+            >
               Restore defaults
             </button>
-            <button disabled={!canSave} type="submit">
+            <button disabled={!areAreaLabelsLoaded || !canSave} type="submit">
               Save labels
             </button>
           </div>
@@ -647,12 +692,32 @@ async function refreshAreaLabels(
   repository: SettingsRepository,
   setAreaLabels: (labels: AreaLabelSettings) => void,
   requestVersion: number,
-  settingsRequestVersion: { current: number }
+  settingsRequestVersion: { current: number },
+  setAreaLabelsError: (error: string | null) => void,
+  setAreaLabelsLoading: (isLoading: boolean) => void,
+  setAreaLabelsLoaded: (isLoaded: boolean) => void
 ) {
-  const labels = await loadAreaLabels(repository);
+  try {
+    const labels = await loadAreaLabels(repository);
 
-  if (settingsRequestVersion.current === requestVersion) {
+    if (settingsRequestVersion.current !== requestVersion) {
+      return;
+    }
+
     setAreaLabels(labels);
+    setAreaLabelsLoaded(true);
+    setAreaLabelsError(null);
+  } catch (error) {
+    if (settingsRequestVersion.current === requestVersion) {
+      setAreaLabelsLoaded(false);
+      setAreaLabelsError(
+        error instanceof Error ? error.message : "Area labels could not be restored."
+      );
+    }
+  } finally {
+    if (settingsRequestVersion.current === requestVersion) {
+      setAreaLabelsLoading(false);
+    }
   }
 }
 
