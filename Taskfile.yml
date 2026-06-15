@@ -1,5 +1,8 @@
 version: "3"
 
+env:
+  UV_CACHE_DIR: "{{.TASKFILE_DIR}}/tmp/uv-cache"
+
 tasks:
   default:
     desc: List available tasks.
@@ -37,11 +40,8 @@ tasks:
   # See docs/adr/0014-pytest-as-default-python-test-runner.md
   pytest:
     desc: Run pytest with optional file targets and additional arguments (ADR 0014).
-    vars:
-      FILES: tests/sympohy
-      ARGS:
     cmds:
-      - uv run python -m pytest {{.ARGS}} {{.FILES}}
+      - uv run python -m pytest {{.ARGS}} {{default "tests/sympohy" .FILES}}
 
   ci:
     desc: Run the local CI gate.
