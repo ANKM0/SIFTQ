@@ -69,6 +69,7 @@ prefix_rule(pattern=["python3", "/home/develop/.codex/skills/.system/skill-creat
 # Allow: Taskfile command entrypoints
 prefix_rule(pattern=["task", "--list"], decision="allow")
 prefix_rule(pattern=["task", "default"], decision="allow")
+prefix_rule(pattern=["task", "pytest"], decision="allow")
 prefix_rule(pattern=["task", "setup"], decision="allow")
 prefix_rule(pattern=["task", "setup:python"], decision="allow")
 prefix_rule(pattern=["task", "setup:frontend"], decision="allow")

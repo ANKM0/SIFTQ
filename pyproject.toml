@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "codd-dev>=2.19.0,<3",
+  "pytest>=8.4.0",
 ]
 
 [tool.uv]

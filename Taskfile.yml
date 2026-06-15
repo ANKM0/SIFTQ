@@ -1,5 +1,8 @@
 version: "3"
 
+env:
+  UV_CACHE_DIR: "{{.TASKFILE_DIR}}/tmp/uv-cache"
+
 tasks:
   default:
     desc: List available tasks.
@@ -33,9 +36,17 @@ tasks:
     cmds:
       - uv run python -m scripts.sympohy setup
 
+  # Review anchor for SIFTQ-89: pytest migration decision is tracked in ADR 0014.
+  # See docs/adr/0014-pytest-as-default-python-test-runner.md
+  pytest:
+    desc: Run pytest with optional file targets and additional arguments (ADR 0014).
+    cmds:
+      - uv run python -m pytest {{.ARGS}} {{default "tests/sympohy" .FILES}}
+
   ci:
     desc: Run the local CI gate.
     cmds:
+      - task: setup:python
       - task: ci:sympohy
       - task: ci:commit-messages
       - task: ci:markdown
@@ -78,8 +89,15 @@ tasks:
         rg '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
           | sed -E 's/^[[:space:]]*run:[[:space:]]*task[[:space:]]*//; s/[[:space:]].*$//; /^$/d' \
           | sort -u > "$refs"
-        rg -o '^  [A-Za-z0-9_:-]+:' Taskfile.yml \
-          | sed -E 's/^  //; s/:$//' \
+        awk '
+          /^tasks:/ { in_tasks = 1; next }
+          in_tasks && /^[^[:space:]]/ { in_tasks = 0 }
+          in_tasks && /^  [A-Za-z0-9_:-]+:/ {
+            sub(/^  /, "")
+            sub(/:$/, "")
+            print
+          }
+        ' Taskfile.yml \
           | sort -u > "$tasks"
 
         missing="$(comm -23 "$refs" "$tasks")"
@@ -97,8 +115,15 @@ tasks:
         allowed="$(mktemp)"
         trap 'rm -f "$tasks" "$allowed"' EXIT
 
-        rg -o '^  [A-Za-z0-9_:-]+:' Taskfile.yml \
-          | sed -E 's/^  //; s/:$//' \
+        awk '
+          /^tasks:/ { in_tasks = 1; next }
+          in_tasks && /^[^[:space:]]/ { in_tasks = 0 }
+          in_tasks && /^  [A-Za-z0-9_:-]+:/ {
+            sub(/^  /, "")
+            sub(/:$/, "")
+            print
+          }
+        ' Taskfile.yml \
           | sort -u > "$tasks"
         rg 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
           | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
@@ -121,10 +146,10 @@ tasks:
       - pnpm lint
 
   ci:test:
-    desc: Run Vitest.
+    desc: Run Vitest and the configured pytest suite (ADR 0014 review anchor).
     cmds:
       - pnpm test
-      - uv run python -m unittest discover tests/sympohy -p "*_test.py"
+      - task pytest
 
   ci:build:
     desc: Build the frontend.
