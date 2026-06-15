@@ -54,6 +54,12 @@ jobs:
       - name: Check Markdown
         run: task ci:markdown
 
+      - name: Check CI task references
+        run: task ci:lint:task-refs
+
+      - name: Check Codex task permissions
+        run: task ci:lint:codex-task-perms
+
       - name: Typecheck
         run: task ci:typecheck
 
