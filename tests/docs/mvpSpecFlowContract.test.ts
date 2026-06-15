@@ -7,6 +7,7 @@ describe("MVP spec flow", () => {
   it("defines the required wireframe markdown template anchors", () => {
     const requiredAnchors = [
       "## Wireframe Markdown Template",
+      "wireframe CoDD node の命名規則は `design:<feature-wireframe>`",
       "node_id: design:<feature-wireframe>",
       "## Target HTML（対象HTML）",
       "## UI Contract（UI契約）",

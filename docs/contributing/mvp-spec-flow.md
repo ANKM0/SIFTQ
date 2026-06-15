@@ -111,7 +111,9 @@ Wireframe は外部設計の一部として扱う。UI 変更がある機能で�
 Markdown で UI 契約を記録し、HTML wireframe で表示状態を確認できる
 ようにする。
 
-wireframe の CoDD node は機能 design とは分ける。
+wireframe CoDD node の命名規則は `design:<feature-wireframe>` とする。
+UI 契約は機能 design 本体とは別の design node として扱い、機能 design
+本体の `design:<feature>` と混在させない。
 
 ```text
 design:<feature>
