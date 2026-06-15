@@ -134,13 +134,17 @@ class _RunStateWriter:
         if progress is not None:
             self.last_known_progress = progress
 
-        if self.refresh_lock and not _lock_owned_by_run(self.lock_path, self.run_id):
-            raise _RunLockedError(
-                f"run {self.run_id} no longer owns issue #{self.issue_number} lock"
-            )
-
         self.log_dir.mkdir(parents=True, exist_ok=True)
         heartbeat = _isoformat_utc(self._clock())
+        if self.refresh_lock:
+            _refresh_lock_metadata(
+                self.lock_path,
+                run_id=self.run_id,
+                issue_number=self.issue_number,
+                phase=self.phase,
+                heartbeat=heartbeat,
+            )
+
         payload = {
             "run_id": self.run_id,
             "issue": self.issue_number,
@@ -170,14 +174,6 @@ class _RunStateWriter:
             encoding="utf-8",
         )
         tmp_path.replace(self.state_path)
-        if self.refresh_lock:
-            _refresh_lock_metadata(
-                self.lock_path,
-                run_id=self.run_id,
-                issue_number=self.issue_number,
-                phase=self.phase,
-                heartbeat=heartbeat,
-            )
 
     def heartbeat(self) -> None:
         self.write()
@@ -1922,8 +1918,8 @@ def _refresh_lock_metadata(
     heartbeat: str,
 ) -> None:
     current = read_run_state(lock_path)
-    if current is not None and current.get("run_id") not in {None, run_id}:
-        return
+    if current is None or current.get("run_id") not in {None, run_id}:
+        raise _RunLockedError(f"run {run_id} no longer owns lock {lock_path}")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = lock_path.with_suffix(".lock.tmp")
     tmp_path.write_text(
@@ -1941,11 +1937,6 @@ def _refresh_lock_metadata(
         encoding="utf-8",
     )
     tmp_path.replace(lock_path)
-
-
-def _lock_owned_by_run(lock_path: Path, run_id: str) -> bool:
-    payload = read_run_state(lock_path)
-    return payload is not None and payload.get("run_id") == run_id
 
 
 def _lock_takeover_allowed(
@@ -1967,7 +1958,14 @@ def _lock_takeover_allowed(
 
     state_payload = read_run_state(state_path)
     if state_payload is None:
-        return False
+        if state_path.exists():
+            return False
+        return (not _payload_process_alive(lock_payload)) or (
+            not _payload_has_fresh_heartbeat(
+                lock_payload,
+                stale_status_after_minutes=stale_status_after_minutes,
+            )
+        )
     if state_payload.get("issue") != issue_number:
         return False
 

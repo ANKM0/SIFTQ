@@ -2295,7 +2295,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
             self.assertFalse((log_dir / "run.lock").exists())
 
-    def test_issue_run_lock_refuses_orphan_stale_lock_without_state(
+    def test_issue_run_lock_takes_over_orphan_stale_lock_without_state(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -2320,13 +2320,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 run_id="new-run",
                 stale_status_after_minutes=30,
             )
-            with (
-                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
-                self.assertRaises(_RunLockedError),
-            ):
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
                 lock.acquire()
+                lock.release()
 
-            self.assertTrue((log_dir / "run.lock").exists())
+            self.assertFalse((log_dir / "run.lock").exists())
 
     def test_issue_run_lock_refuses_stale_lock_with_corrupt_state(
         self,
