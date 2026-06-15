@@ -17,6 +17,9 @@ codd:
       relation: depends_on
       semantic: workflow
   depended_by:
+    - id: design:issue-label-policy
+      relation: depends_on
+      semantic: workflow
     - id: design:issue-82-stale-running-inspection
       relation: depends_on
       semantic: automation
@@ -122,6 +125,9 @@ task ai:sympohy:systemd:status
 ```
 
 ## Labels
+
+See `docs/contributing/issue-label-policy.md` for manual queueing policy and
+the list of automation-owned status labels that must not be applied by hand.
 
 `sympohy` owns these status labels:
 
