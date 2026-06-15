@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import shlex
 import subprocess
 import sys
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 from .config import SympohyConfig
 from .core import (
@@ -16,6 +18,86 @@ from .core import (
     validate_commit_subject,
 )
 from .github import Issue, comment, fetch_issue, list_candidate_issues, set_issue_state
+
+
+HEARTBEAT_INTERVAL_SECONDS = 30
+
+
+class _RunStateWriter:
+    def __init__(
+        self,
+        *,
+        issue_number: int,
+        log_dir: Path,
+        base_branch: str | None = None,
+        worktree: Path | None = None,
+        branch: str | None = None,
+        plan_path: Path | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self.issue_number = issue_number
+        self.log_dir = log_dir
+        self.base_branch = base_branch
+        self.worktree = worktree
+        self.branch = branch
+        self.plan_path = plan_path
+        self.phase: str | None = None
+        self.status = "running"
+        self.last_known_progress: Mapping[str, object] = {}
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    @property
+    def state_path(self) -> Path:
+        return self.log_dir / "state.json"
+
+    def write(
+        self,
+        *,
+        phase: str | None = None,
+        status: str | None = None,
+        worktree: Path | None = None,
+        branch: str | None = None,
+        plan_path: Path | None = None,
+        progress: Mapping[str, object] | None = None,
+    ) -> None:
+        if phase is not None:
+            self.phase = phase
+        if status is not None:
+            self.status = status
+        if worktree is not None:
+            self.worktree = worktree
+        if branch is not None:
+            self.branch = branch
+        if plan_path is not None:
+            self.plan_path = plan_path
+        if progress is not None:
+            self.last_known_progress = progress
+
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "issue": self.issue_number,
+            "phase": self.phase,
+            "status": self.status,
+            "pid": os.getpid(),
+            "heartbeat": _isoformat_utc(self._clock()),
+            "branch": self.branch,
+            "worktree": {
+                "path": str(self.worktree) if self.worktree is not None else None,
+                "branch": self.branch,
+                "base_branch": self.base_branch,
+            },
+            "plan_reference": str(self.plan_path) if self.plan_path is not None else None,
+            "last_known_progress": dict(self.last_known_progress),
+        }
+        tmp_path = self.state_path.with_suffix(".json.tmp")
+        tmp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp_path.replace(self.state_path)
+
+    def heartbeat(self) -> None:
+        self.write()
 
 
 def ensure_worktree(issue: Issue, config: SympohyConfig) -> Path:
@@ -89,8 +171,23 @@ def refine_issue(issue_ref: str) -> tuple[int, str]:
 
 def run_issue(issue_ref: str, config: SympohyConfig) -> int:
     issue = fetch_issue(issue_ref)
+    log_dir = config.run_log_root / f"issue-{issue.number}"
+    state = _RunStateWriter(
+        issue_number=issue.number,
+        log_dir=log_dir,
+        base_branch=config.base_branch,
+    )
+    state.write(
+        phase="triage",
+        progress={"message": "checking acceptance criteria and definition of done"},
+    )
     acceptance = extract_acceptance_set(issue.body, issue.comments)
     if acceptance is None:
+        state.write(
+            phase="triage",
+            status="blocked",
+            progress={"message": "missing complete acceptance criteria or definition of done"},
+        )
         message = (
             "sympohy blocked this issue during triage.\n\n"
             "- phase: triage\n"
@@ -106,8 +203,16 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
         return 2
 
     worktree = ensure_worktree(issue, config)
-    log_dir = config.run_log_root / f"issue-{issue.number}"
     log_dir.mkdir(parents=True, exist_ok=True)
+    branch = _current_branch(worktree)
+    plan_path = log_dir / "plan.json"
+    state.write(
+        phase="implement",
+        worktree=worktree,
+        branch=branch,
+        plan_path=plan_path,
+        progress={"message": "starting implementation planning"},
+    )
 
     set_issue_state(
         issue_ref,
@@ -131,16 +236,39 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
             ),
         ],
         cwd=worktree,
-        log_path=log_dir / "plan.json",
+        log_path=plan_path,
+        heartbeat=state.heartbeat,
+    )
+    logical_steps = _logical_steps(plan)
+    total_steps = len(logical_steps)
+    state.write(
+        phase="implement",
+        progress={
+            "message": "implementation plan generated",
+            "completed_logical_steps": 0,
+            "total_logical_steps": total_steps,
+            "plan_log_path": str(plan_path),
+        },
     )
 
-    for index, step in enumerate(_logical_steps(plan), start=1):
+    for index, step in enumerate(logical_steps, start=1):
         set_issue_state(
             issue_ref,
             current_labels=("sympohy:running", "sympohy:phase:implement"),
             status="sympohy:running",
             phase="implement",
             cwd=worktree,
+        )
+        implement_log_path = log_dir / f"implement-{index}.log"
+        state.write(
+            phase="implement",
+            progress={
+                "message": "implementing logical step",
+                "current_logical_step": index,
+                "completed_logical_steps": index - 1,
+                "total_logical_steps": total_steps,
+                "log_path": str(implement_log_path),
+            },
         )
         _codex_text(
             [
@@ -149,9 +277,27 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
                 "Use normal Codex user config and repository rules.",
             ],
             cwd=worktree,
-            log_path=log_dir / f"implement-{index}.log",
+            log_path=implement_log_path,
+            heartbeat=state.heartbeat,
         )
-        if _run_hooks(config.hooks, config.retry_max_attempts, worktree, log_dir) != 0:
+        state.write(
+            phase="hooks",
+            progress={
+                "message": "running verification hooks",
+                "current_logical_step": index,
+                "completed_logical_steps": index,
+                "total_logical_steps": total_steps,
+            },
+        )
+        if _run_hooks(
+            config.hooks,
+            config.retry_max_attempts,
+            worktree,
+            log_dir,
+            state=state,
+            logical_step=index,
+            total_logical_steps=total_steps,
+        ) != 0:
             _block(
                 issue_ref,
                 phase="hooks",
@@ -160,6 +306,7 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
                 cause="verification hooks still failed after retries",
                 run_log_path=log_dir,
                 cwd=worktree,
+                state=state,
             )
             return 2
         subject = f"#{issue.number} feat(sympohy): implement logical step {index}"
@@ -167,18 +314,46 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
             raise ValueError(f"invalid generated commit subject: {subject}")
         subprocess.check_call(["git", "add", "-A"], cwd=worktree)
         subprocess.check_call(["git", "commit", "-m", subject], cwd=worktree)
+        state.write(
+            phase="implement",
+            progress={
+                "message": "committed logical step",
+                "completed_logical_steps": index,
+                "total_logical_steps": total_steps,
+                "commit_subject": subject,
+            },
+        )
 
     branch = subprocess.check_output(
         ["git", "branch", "--show-current"],
         cwd=worktree,
         text=True,
     ).strip()
+    state.write(
+        phase="review",
+        branch=branch,
+        progress={
+            "message": "pushing branch and opening draft pull request",
+            "completed_logical_steps": total_steps,
+            "total_logical_steps": total_steps,
+        },
+    )
     subprocess.check_call(["git", "push", "-u", "origin", branch], cwd=worktree)
     subprocess.check_call(["gh", "pr", "create", "--draft", "--fill"], cwd=worktree)
-    review_result = _review_fix_loop(issue_ref, issue, config, worktree, log_dir)
+    review_result = _review_fix_loop(issue_ref, issue, config, worktree, log_dir, state)
     if review_result != 0:
         return review_result
 
+    final_verifier_path = log_dir / "final-verifier.json"
+    state.write(
+        phase="merge",
+        progress={
+            "message": "running final verifier",
+            "completed_logical_steps": total_steps,
+            "total_logical_steps": total_steps,
+            "log_path": str(final_verifier_path),
+        },
+    )
     final = _codex_json(
         [
             "Act as final verifier. Return JSON with boolean "
@@ -187,7 +362,8 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
             f"Issue #{issue.number}",
         ],
         cwd=worktree,
-        log_path=log_dir / "final-verifier.json",
+        log_path=final_verifier_path,
+        heartbeat=state.heartbeat,
     )
     empty_review = parse_review_json('{"findings":[]}')
     if not merge_gate_allows_merge(
@@ -203,13 +379,31 @@ def run_issue(issue_ref: str, config: SympohyConfig) -> int:
             cause="final verifier did not recommend merge",
             run_log_path=log_dir,
             cwd=worktree,
+            state=state,
         )
         return 2
 
+    state.write(
+        phase="merge",
+        progress={
+            "message": "merging pull request",
+            "completed_logical_steps": total_steps,
+            "total_logical_steps": total_steps,
+        },
+    )
     subprocess.check_call(["gh", "pr", "ready"], cwd=worktree)
     subprocess.check_call(["gh", "pr", "checks", "--watch"], cwd=worktree)
     subprocess.check_call(["gh", "pr", "merge", "--squash", "--delete-branch"], cwd=worktree)
     subprocess.check_call(["git", "worktree", "remove", str(worktree)])
+    state.write(
+        phase="merge",
+        status="done",
+        progress={
+            "message": "merged pull request and removed worktree",
+            "completed_logical_steps": total_steps,
+            "total_logical_steps": total_steps,
+        },
+    )
     set_issue_state(
         issue_ref,
         current_labels=("sympohy:running", "sympohy:phase:merge"),
@@ -225,25 +419,42 @@ def _run_hooks(
     retry_max_attempts: int,
     cwd: Path,
     log_dir: Path,
+    *,
+    state: _RunStateWriter | None = None,
+    logical_step: int | None = None,
+    total_logical_steps: int | None = None,
 ) -> int:
     for command in hooks:
         attempts = 0
         while True:
             attempts += 1
             log_path = log_dir / f"hook-{attempts}.log"
+            if state is not None:
+                progress: dict[str, object] = {
+                    "message": "running verification hook",
+                    "hook": command,
+                    "attempt": attempts,
+                    "log_path": str(log_path),
+                }
+                if logical_step is not None:
+                    progress["current_logical_step"] = logical_step
+                    progress["completed_logical_steps"] = logical_step
+                if total_logical_steps is not None:
+                    progress["total_logical_steps"] = total_logical_steps
+                state.write(phase="hooks", progress=progress)
             with log_path.open("w", encoding="utf-8") as log:
-                result = subprocess.run(
+                returncode = _run_command_with_heartbeat(
                     shlex.split(command),
                     cwd=cwd,
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    check=False,
+                    heartbeat=state.heartbeat if state is not None else None,
                 )
-            if result.returncode == 0:
+            if returncode == 0:
                 break
             if next_retry_action(attempts, retry_max_attempts) == "block":
-                return result.returncode
+                return returncode
             _codex_text(
                 [
                     f"The hook failed: {command}",
@@ -251,6 +462,7 @@ def _run_hooks(
                 ],
                 cwd=cwd,
                 log_path=log_dir / f"hook-fix-{attempts}.log",
+                heartbeat=state.heartbeat if state is not None else None,
             )
     return 0
 
@@ -261,6 +473,7 @@ def _review_fix_loop(
     config: SympohyConfig,
     cwd: Path,
     log_dir: Path,
+    state: _RunStateWriter,
 ) -> int:
     for round_index in range(1, config.review_max_rounds + 1):
         set_issue_state(
@@ -270,6 +483,16 @@ def _review_fix_loop(
             phase="review",
             cwd=cwd,
         )
+        review_log_path = log_dir / f"review-{round_index}.json"
+        state.write(
+            phase="review",
+            progress={
+                "message": "running adversarial review",
+                "review_round": round_index,
+                "max_review_rounds": config.review_max_rounds,
+                "log_path": str(review_log_path),
+            },
+        )
         review_json = _codex_text(
             [
                 "Review this PR adversarially. Return machine-parseable JSON "
@@ -278,7 +501,8 @@ def _review_fix_loop(
                 f"Issue #{issue.number}",
             ],
             cwd=cwd,
-            log_path=log_dir / f"review-{round_index}.json",
+            log_path=review_log_path,
+            heartbeat=state.heartbeat,
         )
         review = parse_review_json(review_json)
         pr_number = subprocess.check_output(
@@ -298,6 +522,7 @@ def _review_fix_loop(
                 cause="blocking findings remained after review/fix loop",
                 run_log_path=log_dir,
                 cwd=cwd,
+                state=state,
             )
             return 2
         set_issue_state(
@@ -307,18 +532,37 @@ def _review_fix_loop(
             phase="fix",
             cwd=cwd,
         )
+        fix_log_path = log_dir / f"fix-{round_index}.log"
+        state.write(
+            phase="fix",
+            progress={
+                "message": "fixing blocking review findings",
+                "review_round": round_index,
+                "blocking_findings": len(review.blocking_findings),
+                "log_path": str(fix_log_path),
+            },
+        )
         _codex_text(
             [
                 "Fix these blocking review findings and stop after edits.",
                 review_json,
             ],
             cwd=cwd,
-            log_path=log_dir / f"fix-{round_index}.log",
+            log_path=fix_log_path,
+            heartbeat=state.heartbeat,
         )
         subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
         subprocess.check_call(["git", "add", "-A"], cwd=cwd)
         subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
         subprocess.check_call(["git", "push"], cwd=cwd)
+        state.write(
+            phase="review",
+            progress={
+                "message": "pushed review fix",
+                "review_round": round_index,
+                "commit_subject": subject,
+            },
+        )
     return 2
 
 
@@ -331,7 +575,20 @@ def _block(
     cause: str,
     run_log_path: Path,
     cwd: Path | None,
+    state: _RunStateWriter | None = None,
 ) -> None:
+    if state is not None:
+        state.write(
+            phase=phase,
+            status="blocked",
+            progress={
+                "message": "blocked",
+                "failed_command": failed_command,
+                "attempts": attempts,
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+            },
+        )
     set_issue_state(
         issue_ref,
         current_labels=("sympohy:running", f"sympohy:phase:{phase}"),
@@ -353,19 +610,88 @@ def _block(
     )
 
 
-def _codex_json(prompts: Sequence[str], *, cwd: Path, log_path: Path) -> Mapping[str, object]:
-    output = _codex_text(prompts, cwd=cwd, log_path=log_path)
+def _codex_json(
+    prompts: Sequence[str],
+    *,
+    cwd: Path,
+    log_path: Path,
+    heartbeat: Callable[[], None] | None = None,
+) -> Mapping[str, object]:
+    output = _codex_text(prompts, cwd=cwd, log_path=log_path, heartbeat=heartbeat)
     payload = json.loads(output)
     if not isinstance(payload, Mapping):
         raise ValueError("Codex JSON output must be an object")
     return payload
 
 
-def _codex_text(prompts: Sequence[str], *, cwd: Path, log_path: Path) -> str:
+def _codex_text(
+    prompts: Sequence[str],
+    *,
+    cwd: Path,
+    log_path: Path,
+    heartbeat: Callable[[], None] | None = None,
+) -> str:
     prompt = "\n\n".join(prompts)
-    output = subprocess.check_output(["codex", "exec", prompt], cwd=cwd, text=True)
+    output = _check_output_with_heartbeat(
+        ["codex", "exec", prompt],
+        cwd=cwd,
+        heartbeat=heartbeat,
+    )
     log_path.write_text(output, encoding="utf-8")
     return output
+
+
+def _check_output_with_heartbeat(
+    args: Sequence[str],
+    *,
+    cwd: Path,
+    heartbeat: Callable[[], None] | None = None,
+) -> str:
+    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, text=True)
+    while True:
+        try:
+            output, _ = process.communicate(timeout=HEARTBEAT_INTERVAL_SECONDS)
+        except subprocess.TimeoutExpired:
+            if heartbeat is not None:
+                heartbeat()
+            continue
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                process.returncode,
+                args,
+                output=output,
+            )
+        return output
+
+
+def _run_command_with_heartbeat(
+    args: Sequence[str],
+    *,
+    cwd: Path,
+    heartbeat: Callable[[], None] | None = None,
+    **popen_kwargs: object,
+) -> int:
+    process = subprocess.Popen(args, cwd=cwd, **popen_kwargs)
+    while True:
+        try:
+            return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
+        except subprocess.TimeoutExpired:
+            if heartbeat is not None:
+                heartbeat()
+
+
+def _current_branch(cwd: Path) -> str:
+    return subprocess.check_output(
+        ["git", "branch", "--show-current"],
+        cwd=cwd,
+        text=True,
+    ).strip()
+
+
+def _isoformat_utc(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _logical_steps(plan: Mapping[str, object]) -> list[Mapping[str, object]]:

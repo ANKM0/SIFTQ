@@ -44,6 +44,17 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("\"dead pid\"");
   });
 
+  it("persists run state for stale-running inspection", () => {
+    expect(runner).toContain("state.json");
+    expect(runner).toContain("\"phase\"");
+    expect(runner).toContain("\"pid\"");
+    expect(runner).toContain("\"heartbeat\"");
+    expect(runner).toContain("\"worktree\"");
+    expect(runner).toContain("\"branch\"");
+    expect(runner).toContain("\"plan_reference\"");
+    expect(runner).toContain("\"last_known_progress\"");
+  });
+
   it("limits parallel issue starts to ten and uses independent worktrees", () => {
     expect(config).toContain("max_workers: 10");
     expect(runner).toContain("candidates[: config.max_workers]");

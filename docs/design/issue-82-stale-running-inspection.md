@@ -52,10 +52,12 @@ The configuration already defines `run_log_root` as `.sympohy/runs`, and
 `runner.py` writes Codex output and hook output below
 `.sympohy/runs/issue-<number>/`.
 
-There is no durable run-state document yet. In particular, the code does not
-write `.sympohy/runs/issue-<number>/state.json`, and it does not persist a
-heartbeat timestamp, worker pid, current phase, completed logical steps, branch,
-worktree path, or PR number.
+The runner now writes `.sympohy/runs/issue-<number>/state.json` for each issue
+run. The document includes the current phase, worker pid, heartbeat timestamp,
+branch and worktree metadata, plan reference, and last known progress.
+
+The heartbeat is refreshed while Codex and hook subprocesses are still running,
+which gives stale-run inspection a durable signal separate from GitHub labels.
 
 ## Existing Tests
 
