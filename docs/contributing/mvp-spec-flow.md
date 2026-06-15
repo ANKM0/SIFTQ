@@ -77,7 +77,7 @@ Requirements は「何を満たすべきか」を記録する。機能の目的�
 ## Non-Functional Requirements（非機能要件）
 ```
 
-## Design
+## Design Template
 
 Design docs は「この機能をどう作るか」を記録する。個別機能の外部設計、
 内部設計、テスト観点、UI 状態、operation / port / adapter の追加内容、
@@ -86,7 +86,9 @@ ADR で決まった判断をその機能へどう適用するかを書く。
 `External Design（外部設計）` は UI 限定ではない。ユーザー、テスト、
 外部モジュールから観測できる振る舞いを書く。
 
-最小テンプレート:
+`docs/design/<feature>.md` は次の最小テンプレートで作成する。
+各節は implementation request に進める粒度まで具体化し、未確定の内容は
+`Open Questions（未決事項）` に集約する。
 
 ```md
 # <Feature> Design
