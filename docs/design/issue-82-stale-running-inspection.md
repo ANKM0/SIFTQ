@@ -16,8 +16,73 @@ codd:
 
 ## Scope
 
-This note records the current `sympohy:running` watcher behavior before adding
-stale-run detection and resume logic for issue #82.
+This note records the current `sympohy:running` watcher behavior, stale-run
+detection, resume routing, and phase lifecycle boundaries for issue #82.
+
+## Logical Step 1 Boundary Map
+
+This inspection covers the current watcher, CLI, lock, run-state, heartbeat,
+label, worktree, and test code paths. The important boundary is that GitHub
+labels are the externally visible issue lifecycle, while `.sympohy/runs` and
+per-issue worktrees are the local execution lifecycle.
+
+- Watcher boundary: `runner.py:watch` asks `github.py:list_candidate_issues`
+  for open issues, then decides only between fresh worker start and stale-run
+  resume routing. Fresh issues are moved to `sympohy:pending` and
+  `sympohy:phase:triage` before spawning `run`. Issues already carrying
+  `sympohy:pending` or `sympohy:running` are never relabeled by the watcher; if
+  stale, they are spawned through `resume`.
+- CLI boundary: `cli.py` exposes `run` for fresh execution, `resume` for
+  interrupted or stale execution, `refine` for AC/DoD inspection, `watch` for
+  polling, `labels-sync` for GitHub label definitions, and `doctor` for local
+  runner prerequisites. Taskfile entrypoints call these Python commands through
+  `uv run python -m scripts.sympohy`.
+- Candidate-selection boundary: `core.py:is_candidate_issue` accepts open
+  issues without a `sympohy` status label, and only reselects
+  `sympohy:pending` or `sympohy:running` issues when
+  `inspect_running_issue` reports stale state. `sympohy:blocked` and
+  `sympohy:done` are terminal for watcher selection.
+- Lock boundary: `runner.py:_IssueRunLock` owns one
+  `.sympohy/runs/issue-<number>/run.lock` per issue. It rejects concurrent
+  active runs, permits takeover only when lock/state metadata agree that the
+  previous owner is stale, and prevents an old writer from updating state after
+  takeover.
+- Run-state boundary: `runner.py:_RunStateWriter` owns
+  `.sympohy/runs/issue-<number>/state.json`, including `run_id`, phase, status,
+  pid, heartbeat, lock metadata, branch, worktree, plan reference,
+  `last_known_progress`, and `last_recovery`. This state is the local source of
+  truth for resume point resolution when present.
+- Heartbeat boundary: long-running Codex, hook, GitHub check, and merge
+  subprocesses refresh state through heartbeat callbacks. Stale inspection
+  treats missing state, corrupt state, missing phase, missing pid, dead pid,
+  missing heartbeat, and expired heartbeat as recoverable stale signals.
+- Label boundary: `core.py:transition_labels` keeps at most one known
+  `sympohy` status label and one known phase label while preserving non-Sympohy
+  labels. `github.py:set_issue_state` fetches latest labels before applying
+  remove/add diffs, so label transitions are centralized.
+- Phase lifecycle boundary: `run_issue` starts at triage, moves to implement
+  after AC/DoD is complete, writes hooks progress for each logical step, then
+  advances through review, fix, and merge. Blocking paths call `_block`, which
+  marks `sympohy:blocked`, preserves logs/worktrees, and comments with the
+  failed phase and cause. Successful merge marks `sympohy:done`, closes the
+  issue, removes the issue worktree, and keeps run logs.
+- Worktree boundary: `ensure_worktree` creates or recovers
+  `.sympohy/worktrees/issue-<number>` on branch `issue-<number>-sympohy`.
+  Fresh runs refuse existing local or remote issue branches; recovery requires
+  the expected branch and blocks if neither local nor remote state can be
+  recovered safely.
+- Resume boundary: `resume_issue` resolves terminal, planning, implement,
+  hooks, review, fix, and merge points from state first, then phase labels.
+  Terminal blocked/done states are reconciled without restarting work. Planning
+  restarts without recovery mode, implementation reloads `plan.json` and
+  inspects logical-step commits, hooks resumes the saved current logical step,
+  and late phases use phase-specific safety checks.
+- Test boundary: Python unit tests cover candidate selection, stale inspection,
+  resume routing, lock takeover, run-state persistence, worktree recovery,
+  implementation recovery, terminal reconciliation, and late-phase dirty
+  worktree blocking. The TypeScript workflow contract test keeps the Taskfile,
+  CLI, stale-running, run-state, and Codex-config contracts visible in the
+  frontend test suite.
 
 ## Candidate Selection
 
@@ -28,12 +93,10 @@ gh issue list --state open --limit <limit> --json number,title,state,labels
 ```
 
 It then delegates filtering to `scripts/sympohy/core.py:is_candidate_issue`.
-The current predicate accepts only open issues without any status label in
-`STATUS_LABELS`.
-
-As a result, an issue with `sympohy:running` is excluded even when it also has a
-specific phase label such as `sympohy:phase:implement`. The watcher never
-reconsiders that issue unless the status label is changed externally.
+The current predicate accepts open issues without any `sympohy` status label as
+fresh work. It excludes terminal `sympohy:blocked` and `sympohy:done` issues,
+and it only reselects `sympohy:pending` or `sympohy:running` issues when
+`inspect_running_issue` reports stale local run state.
 
 ## Label Handling
 
