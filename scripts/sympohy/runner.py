@@ -41,6 +41,14 @@ class _ExistingRunError(RuntimeError):
     pass
 
 
+class _UnsafeRecoveryError(RuntimeError):
+    pass
+
+
+class _AmbiguousPullRequestError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class _ImplementationRecovery:
     committed_logical_steps: int
@@ -96,6 +104,7 @@ class _RunStateWriter:
         self.phase: str | None = None
         self.status = "running"
         self.last_known_progress: Mapping[str, object] = {}
+        self.last_recovery: Mapping[str, object] | None = None
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     @property
@@ -146,6 +155,9 @@ class _RunStateWriter:
             },
             "plan_reference": str(self.plan_path) if self.plan_path is not None else None,
             "last_known_progress": dict(self.last_known_progress),
+            "last_recovery": dict(self.last_recovery)
+            if self.last_recovery is not None
+            else None,
         }
         tmp_path = self.state_path.with_suffix(".json.tmp")
         tmp_path.write_text(
@@ -164,6 +176,25 @@ class _RunStateWriter:
 
     def heartbeat(self) -> None:
         self.write()
+
+    def record_recovery(
+        self,
+        event: str,
+        details: Mapping[str, object] | None = None,
+    ) -> None:
+        payload = {
+            "timestamp": _isoformat_utc(self._clock()),
+            "run_id": self.run_id,
+            "issue": self.issue_number,
+            "phase": self.phase,
+            "event": event,
+            **dict(details or {}),
+        }
+        self.last_recovery = payload
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
+            log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+        self.write(progress=self.last_known_progress)
 
 
 class _IssueRunLock:
@@ -272,6 +303,23 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
     worktree.parent.mkdir(parents=True, exist_ok=True)
     if _branch_exists(branch):
         subprocess.check_call(["git", "worktree", "add", str(worktree), branch])
+    elif recover and _remote_branch_exists(branch):
+        subprocess.check_call(
+            [
+                "git",
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                str(worktree),
+                f"origin/{branch}",
+            ]
+        )
+    elif recover:
+        raise _UnsafeRecoveryError(
+            f"cannot recover issue #{issue.number}: neither worktree {worktree} "
+            f"nor existing branch {branch} was found"
+        )
     else:
         subprocess.check_call(
             ["git", "worktree", "add", "-b", branch, str(worktree), config.base_branch]
@@ -345,25 +393,49 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         terminal_phase = resume_point.phase or (
             "merge" if resume_point.name == "completed" else "triage"
         )
-        state = _RunStateWriter(
+        run_id = _new_run_id()
+        lock = _IssueRunLock(
             issue_number=issue.number,
             log_dir=log_dir,
-            base_branch=config.base_branch,
+            run_id=run_id,
+            stale_status_after_minutes=config.stale_status_after_minutes,
         )
-        state.write(
-            phase=terminal_phase,
-            status="done" if resume_point.name == "completed" else resume_point.name,
-            progress={
-                "message": "reconciling terminal issue state",
-                "resume_point": resume_point.name,
-            },
-        )
-        _reconcile_terminal_issue_state(
-            issue_ref,
-            issue,
-            terminal_name=resume_point.name,
-            phase=terminal_phase,
-        )
+        try:
+            lock.acquire()
+        except _RunLockedError:
+            return 0
+        try:
+            state = _RunStateWriter(
+                issue_number=issue.number,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                run_id=run_id,
+                lock_path=lock.path,
+                refresh_lock=True,
+            )
+            state.write(
+                phase=terminal_phase,
+                status="done" if resume_point.name == "completed" else resume_point.name,
+                progress={
+                    "message": "reconciling terminal issue state",
+                    "resume_point": resume_point.name,
+                },
+            )
+            state.record_recovery(
+                "terminal_state_reconciled",
+                {
+                    "resume_point": resume_point.name,
+                    "phase": terminal_phase,
+                },
+            )
+            _reconcile_terminal_issue_state(
+                issue_ref,
+                issue,
+                terminal_name=resume_point.name,
+                phase=terminal_phase,
+            )
+        finally:
+            lock.release()
         return 0
 
     payload = {
@@ -377,13 +449,6 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         stale_status_after_minutes=config.stale_status_after_minutes,
     )
     if not inspection.stale:
-        if inspection.phase is not None and inspection.phase != _phase_from_labels(issue.labels):
-            set_issue_state(
-                issue_ref,
-                current_labels=issue.labels,
-                status="sympohy:running",
-                phase=inspection.phase,
-            )
         return 0
 
     if (
@@ -399,25 +464,54 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             resume_point=resume_point.name,
         )
 
-    if inspection.state is None or inspection.reason in {"missing phase", "corrupt state"}:
-        bootstrap_phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
-        state_payload = _bootstrap_run_state(
-            issue,
-            config,
-            log_dir,
-            phase=bootstrap_phase,
-            reason=inspection.reason,
-        )
+    run_id = _new_run_id()
+    lock = _IssueRunLock(
+        issue_number=issue.number,
+        log_dir=log_dir,
+        run_id=run_id,
+        stale_status_after_minutes=config.stale_status_after_minutes,
+    )
+    try:
+        lock.acquire()
+    except _RunLockedError:
+        return 0
+    try:
+        state_payload = read_run_state(state_path)
         resume_point = resolve_resume_point(labels, state=state_payload)
+        if resume_point.terminal:
+            return 0
 
-    phase = inspection.phase or resume_point.phase or "triage"
-    if phase != _phase_from_labels(issue.labels):
-        set_issue_state(
-            issue_ref,
-            current_labels=issue.labels,
-            status="sympohy:running",
-            phase=phase,
+        inspection = inspect_running_issue(
+            payload,
+            run_log_root=config.run_log_root,
+            stale_status_after_minutes=config.stale_status_after_minutes,
         )
+        if not inspection.stale:
+            return 0
+
+        if inspection.state is None or inspection.reason in {"missing phase", "corrupt state"}:
+            bootstrap_phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
+            state_payload = _bootstrap_run_state(
+                issue,
+                config,
+                log_dir,
+                phase=bootstrap_phase,
+                reason=inspection.reason,
+                run_id=run_id,
+                lock_path=lock.path,
+            )
+            resume_point = resolve_resume_point(labels, state=state_payload)
+
+        phase = inspection.phase or resume_point.phase or "triage"
+        if phase != _phase_from_labels(issue.labels):
+            set_issue_state(
+                issue_ref,
+                current_labels=issue.labels,
+                status="sympohy:running",
+                phase=phase,
+            )
+    finally:
+        lock.release()
 
     return run_issue(
         issue_ref,
@@ -614,7 +708,37 @@ def _run_issue_locked(
         comment(issue_ref, message)
         return 2
 
-    worktree = ensure_worktree(issue, config, recover=recover or from_resume)
+    try:
+        worktree = ensure_worktree(issue, config, recover=recover or from_resume)
+    except _UnsafeRecoveryError as exc:
+        phase = resume_from if resume_from != "planning" else "implement"
+        state.write(
+            phase=phase,
+            status="blocked",
+            progress={
+                "message": "unsafe resume blocked",
+                "cause": str(exc),
+            },
+        )
+        state.record_recovery(
+            "unsafe_recovery_blocked",
+            {
+                "cause": str(exc),
+                "resume_point": resume_from,
+            },
+        )
+        _block(
+            issue_ref,
+            phase=phase,
+            failed_command="resume safety check",
+            attempts=1,
+            cause=str(exc),
+            run_log_path=log_dir,
+            cwd=None,
+            state=state,
+            current_labels=issue.labels,
+        )
+        return 2
     log_dir.mkdir(parents=True, exist_ok=True)
     try:
         branch = _current_branch(worktree)
@@ -731,6 +855,16 @@ def _run_issue_locked(
                 "worktree_clean": recovery.worktree_clean,
             },
         )
+        state.record_recovery(
+            "unsafe_recovery_blocked",
+            {
+                "cause": recovery.unsafe_reason,
+                "resume_point": resume_from,
+                "completed_logical_steps": recovery.committed_logical_steps,
+                "total_logical_steps": total_steps,
+                "worktree_clean": recovery.worktree_clean,
+            },
+        )
         _block(
             issue_ref,
             phase="implement",
@@ -744,6 +878,20 @@ def _run_issue_locked(
         )
         return 2
     next_logical_step = recovery.next_logical_step(total_steps)
+    if recover or from_resume:
+        state.record_recovery(
+            "implementation_recovery_inspected",
+            {
+                "resume_point": resume_from,
+                "completed_logical_steps": recovery.committed_logical_steps,
+                "total_logical_steps": total_steps,
+                "worktree_clean": recovery.worktree_clean,
+                "worktree_logical_step": recovery.worktree_logical_step,
+                "next_logical_step": next_logical_step,
+                "resume_action": recovery.resume_action(total_steps),
+                "recovered_existing_plan": loaded_existing_plan,
+            },
+        )
     state.write(
         phase="implement",
         progress={
@@ -891,11 +1039,25 @@ def _run_issue_locked(
             "total_logical_steps": total_steps,
         },
     )
-    _push_branch_and_ensure_draft_pull_request(
-        cwd=worktree,
-        branch=branch,
-        heartbeat=state.heartbeat,
-    )
+    try:
+        _push_branch_and_ensure_draft_pull_request(
+            cwd=worktree,
+            branch=branch,
+            heartbeat=state.heartbeat,
+        )
+    except _AmbiguousPullRequestError as exc:
+        _block(
+            issue_ref,
+            phase="review",
+            failed_command="pull request safety check",
+            attempts=1,
+            cause=str(exc),
+            run_log_path=log_dir,
+            cwd=worktree,
+            state=state,
+            current_labels=("sympohy:running", "sympohy:phase:implement"),
+        )
+        return 2
     state.write(
         phase="review",
         branch=branch,
@@ -929,7 +1091,33 @@ def _resume_late_phase(
     previous_state: Mapping[str, object] | None,
     resume_from: str,
 ) -> int:
-    worktree = ensure_worktree(issue, config, recover=True)
+    try:
+        worktree = ensure_worktree(issue, config, recover=True)
+    except _UnsafeRecoveryError as exc:
+        state.write(
+            phase=resume_from,
+            status="blocked",
+            progress={"message": "unsafe resume blocked", "cause": str(exc)},
+        )
+        state.record_recovery(
+            "unsafe_recovery_blocked",
+            {
+                "cause": str(exc),
+                "resume_point": resume_from,
+            },
+        )
+        _block(
+            issue_ref,
+            phase=resume_from,
+            failed_command="resume safety check",
+            attempts=1,
+            cause=str(exc),
+            run_log_path=log_dir,
+            cwd=None,
+            state=state,
+            current_labels=("sympohy:running", f"sympohy:phase:{resume_from}"),
+        )
+        return 2
     try:
         branch = _current_branch(worktree)
     except subprocess.CalledProcessError:
@@ -961,6 +1149,14 @@ def _resume_late_phase(
         progress={
             "message": f"resuming {resume_from} phase",
             "resume_point": resume_from,
+        },
+    )
+    state.record_recovery(
+        "late_phase_recovery_resumed",
+        {
+            "resume_point": resume_from,
+            "branch": branch,
+            "worktree": str(worktree),
         },
     )
     set_issue_state(
@@ -1003,11 +1199,25 @@ def _resume_late_phase(
                 "resume_point": resume_from,
             },
         )
-        _push_branch_and_ensure_draft_pull_request(
-            cwd=worktree,
-            branch=branch,
-            heartbeat=state.heartbeat,
-        )
+        try:
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=worktree,
+                branch=branch,
+                heartbeat=state.heartbeat,
+            )
+        except _AmbiguousPullRequestError as exc:
+            _block(
+                issue_ref,
+                phase="review",
+                failed_command="pull request safety check",
+                attempts=1,
+                cause=str(exc),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", f"sympohy:phase:{resume_from}"),
+            )
+            return 2
         start_round = _review_start_round(previous_state)
         review_result = _review_fix_loop(
             issue_ref,
@@ -1908,6 +2118,8 @@ def _bootstrap_run_state(
     *,
     phase: str,
     reason: str | None,
+    run_id: str | None = None,
+    lock_path: Path | None = None,
 ) -> Mapping[str, object]:
     worktree = config.worktree_root / f"issue-{issue.number}"
     branch = f"issue-{issue.number}-sympohy"
@@ -1948,7 +2160,7 @@ def _bootstrap_run_state(
                 branch=branch,
                 cwd=worktree,
             )
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError, _AmbiguousPullRequestError):
             progress["pull_request_exists"] = None
     writer = _RunStateWriter(
         issue_number=issue.number,
@@ -1957,10 +2169,22 @@ def _bootstrap_run_state(
         worktree=worktree if worktree.exists() else None,
         branch=branch,
         plan_path=plan_path if plan_path.exists() else None,
+        run_id=run_id,
+        lock_path=lock_path,
+        refresh_lock=lock_path is not None,
     )
     writer.write(
         phase=phase,
         progress=progress,
+    )
+    writer.record_recovery(
+        "stale_run_bootstrapped",
+        {
+            "stale_reason": reason,
+            "phase": phase,
+            "worktree_exists": worktree.exists(),
+            "plan_exists": plan_path.exists(),
+        },
     )
     state = read_run_state(writer.state_path)
     return state or {}
@@ -2011,17 +2235,6 @@ def _push_branch_and_ensure_draft_pull_request(
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
     result = subprocess.run(
-        ["gh", "pr", "view", "--json", "number"],
-        cwd=cwd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        check=False,
-    )
-    if result.returncode == 0:
-        return True
-
-    result = subprocess.run(
         [
             "gh",
             "pr",
@@ -2032,8 +2245,6 @@ def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
             "open",
             "--json",
             "number",
-            "--jq",
-            ".[0].number",
         ],
         cwd=cwd,
         stdout=subprocess.PIPE,
@@ -2041,12 +2252,49 @@ def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
         text=True,
         check=False,
     )
-    return result.returncode == 0 and bool(result.stdout.strip())
+    if result.returncode == 0:
+        try:
+            payload = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError:
+            payload = []
+        if isinstance(payload, list):
+            if len(payload) > 1:
+                numbers = [
+                    str(item.get("number"))
+                    for item in payload
+                    if isinstance(item, Mapping) and item.get("number") is not None
+                ]
+                raise _AmbiguousPullRequestError(
+                    f"multiple open pull requests found for head branch {branch}: "
+                    f"{', '.join(numbers) or 'unknown PR numbers'}"
+                )
+            if len(payload) == 1:
+                return True
+
+    result = subprocess.run(
+        ["gh", "pr", "view", "--json", "number"],
+        cwd=cwd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _branch_exists(branch: str) -> bool:
     result = subprocess.run(
         ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _remote_branch_exists(branch: str) -> bool:
+    result = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,

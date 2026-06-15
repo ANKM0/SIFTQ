@@ -225,7 +225,7 @@ class SympohyCoreTest(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            self._write_run_state(root, 82, pid=789, heartbeat=now - timedelta(minutes=16))
+            self._write_run_state(root, 82, pid=789, heartbeat=now - timedelta(minutes=31))
 
             inspection = inspect_running_issue(
                 issue,
@@ -243,7 +243,7 @@ class SympohyCoreTest(unittest.TestCase):
                 run_log_root=root,
                 now=now,
                 process_alive=lambda pid: pid == 789,
-                stale_status_after_minutes=20,
+                stale_status_after_minutes=40,
             )
             self.assertFalse(custom_ttl.stale)
 

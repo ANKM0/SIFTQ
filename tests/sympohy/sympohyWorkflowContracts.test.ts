@@ -41,7 +41,7 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("sympohy:done");
     expect(core).toContain("is_candidate_issue");
     expect(core).toContain("inspect_running_issue");
-    expect(config).toContain("stale_status_after_minutes: 15");
+    expect(config).toContain("stale_status_after_minutes: 30");
     expect(core).toContain("DEFAULT_STALE_STATUS_AFTER_MINUTES");
     expect(core).toContain("\"dead pid\"");
     expect(runner).toContain("\"resume\"");

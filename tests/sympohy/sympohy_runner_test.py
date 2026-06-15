@@ -13,11 +13,13 @@ from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
 from scripts.sympohy.runner import (
     _IssueRunLock,
+    _AmbiguousPullRequestError,
     _RunLockedError,
     _RunStateWriter,
     _commit_all_if_new,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
+    _pull_request_exists,
     _run_final_verifier_and_merge,
     ensure_worktree,
     resume_issue,
@@ -216,7 +218,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
                 state_dir = config.run_log_root / "issue-82"
                 state_dir.mkdir(parents=True)
-                stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+                stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
                 (state_dir / "state.json").write_text(
                     json.dumps(
                         {
@@ -260,7 +262,7 @@ class SympohyRunnerTest(unittest.TestCase):
             )
             state_dir = config.run_log_root / "issue-82"
             state_dir.mkdir(parents=True)
-            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
             (state_dir / "state.json").write_text(
                 json.dumps(
                     {
@@ -346,7 +348,7 @@ class SympohyRunnerTest(unittest.TestCase):
             )
             state_dir = config.run_log_root / "issue-82"
             state_dir.mkdir(parents=True)
-            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
             (state_dir / "state.json").write_text(
                 json.dumps(
                     {
@@ -469,7 +471,7 @@ class SympohyRunnerTest(unittest.TestCase):
             )
             state_dir = config.run_log_root / "issue-82"
             state_dir.mkdir(parents=True)
-            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
             (state_dir / "state.json").write_text(
                 json.dumps(
                     {
@@ -627,7 +629,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
             (log_dir / "state.json").write_text(
                 json.dumps(
                     {
@@ -906,7 +908,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
             (log_dir / "state.json").write_text(
                 json.dumps(
                     {
@@ -1279,6 +1281,58 @@ class SympohyRunnerTest(unittest.TestCase):
             ]
         )
 
+    def test_ensure_worktree_recovers_remote_issue_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover remote branch",
+                body="",
+                labels=(),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=False),
+                patch("scripts.sympohy.runner._remote_branch_exists", return_value=True),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                worktree = ensure_worktree(issue, config, recover=True)
+
+        self.assertEqual(worktree, Path(tmp) / "worktrees" / "issue-82")
+        check_call.assert_called_once_with(
+            [
+                "git",
+                "worktree",
+                "add",
+                "-b",
+                "issue-82-sympohy",
+                str(Path(tmp) / "worktrees" / "issue-82"),
+                "origin/issue-82-sympohy",
+            ]
+        )
+
+    def test_ensure_worktree_blocks_recovery_without_worktree_or_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover missing branch",
+                body="",
+                labels=(),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=False),
+                patch("scripts.sympohy.runner._remote_branch_exists", return_value=False),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                self.assertRaisesRegex(RuntimeError, "neither worktree"),
+            ):
+                ensure_worktree(issue, config, recover=True)
+
+        check_call.assert_not_called()
+
     def test_commit_all_if_new_skips_existing_subject(self) -> None:
         with (
             patch("scripts.sympohy.runner._commit_subject_exists", return_value=True),
@@ -1382,6 +1436,60 @@ class SympohyRunnerTest(unittest.TestCase):
                 "total_logical_steps": 5,
             },
         )
+        self.assertIsNone(state["last_recovery"])
+
+    def test_run_state_writer_records_recovery_log(self) -> None:
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                run_id="run-82",
+                clock=lambda: now,
+            )
+            writer.write(phase="implement", progress={"message": "resume"})
+            writer.record_recovery(
+                "implementation_recovery_inspected",
+                {"completed_logical_steps": 2},
+            )
+
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            recovery_lines = (log_dir / "recovery.log").read_text(
+                encoding="utf-8"
+            ).splitlines()
+
+        self.assertEqual(state["last_recovery"]["event"], "implementation_recovery_inspected")
+        self.assertEqual(state["last_recovery"]["completed_logical_steps"], 2)
+        self.assertEqual(len(recovery_lines), 1)
+        self.assertEqual(
+            json.loads(recovery_lines[0])["event"],
+            "implementation_recovery_inspected",
+        )
+
+    def test_pull_request_exists_blocks_duplicate_head_prs(self) -> None:
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps([{"number": 83}, {"number": 84}]),
+        )
+        with (
+            patch("scripts.sympohy.runner.subprocess.run", return_value=result),
+            self.assertRaises(_AmbiguousPullRequestError),
+        ):
+            _pull_request_exists(branch="issue-82-sympohy", cwd=Path("/tmp/worktree"))
+
+    def test_pull_request_exists_accepts_single_head_pr(self) -> None:
+        result = subprocess.CompletedProcess([], 0, stdout=json.dumps([{"number": 83}]))
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            exists = _pull_request_exists(
+                branch="issue-82-sympohy",
+                cwd=Path("/tmp/worktree"),
+            )
+
+        self.assertTrue(exists)
 
     def test_final_merge_github_commands_refresh_heartbeat(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1455,7 +1563,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             lock_payload = {
                 "issue": 82,
                 "run_id": "old-run",
@@ -1487,7 +1595,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
 
             lock.acquire()
@@ -1533,7 +1641,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
 
             with self.assertRaises(_RunLockedError):
@@ -1548,7 +1656,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             lock_payload = {
                 "issue": 82,
                 "run_id": "old-run",
@@ -1580,7 +1688,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
             with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
                 lock.acquire()
@@ -1594,7 +1702,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             (log_dir / "run.lock").write_text(
                 json.dumps(
                     {
@@ -1611,7 +1719,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
             with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
                 lock.acquire()
@@ -1625,7 +1733,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             (log_dir / "run.lock").write_text(
                 json.dumps(
                     {
@@ -1643,7 +1751,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
             with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
                 lock.acquire()
@@ -1655,7 +1763,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             lock_payload = {
                 "issue": 82,
                 "run_id": "old-run",
@@ -1688,7 +1796,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
 
             with (
@@ -1704,7 +1812,7 @@ class SympohyRunnerTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
-            stale = datetime.now(timezone.utc) - timedelta(minutes=16)
+            stale = datetime.now(timezone.utc) - timedelta(minutes=31)
             (log_dir / "run.lock").write_text(
                 json.dumps(
                     {
@@ -1734,7 +1842,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 issue_number=82,
                 log_dir=log_dir,
                 run_id="new-run",
-                stale_status_after_minutes=15,
+                stale_status_after_minutes=30,
             )
 
             with self.assertRaises(_RunLockedError):
@@ -1749,7 +1857,7 @@ class SympohyRunnerTest(unittest.TestCase):
             base_branch="main",
             worktree_root=root / "worktrees",
             run_log_root=root / "runs",
-            stale_status_after_minutes=15,
+            stale_status_after_minutes=30,
             hooks=("task ci",),
             review_max_rounds=5,
             retry_max_attempts=3,

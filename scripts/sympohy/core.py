@@ -19,7 +19,7 @@ STATUS_LABELS = (
 PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
-DEFAULT_STALE_STATUS_AFTER_MINUTES = 15
+DEFAULT_STALE_STATUS_AFTER_MINUTES = 30
 
 COMMIT_SUBJECT_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"

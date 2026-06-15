@@ -24,7 +24,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
         return default_config()
 
     values = _parse_simple_yaml(path.read_text(encoding="utf-8"))
-    stale_status_after_minutes = int(values.get("stale_status_after_minutes", "15"))
+    stale_status_after_minutes = int(values.get("stale_status_after_minutes", "30"))
     if stale_status_after_minutes <= 0:
         raise ValueError("stale_status_after_minutes must be positive")
 
@@ -46,7 +46,7 @@ def default_config() -> SympohyConfig:
         base_branch="main",
         worktree_root=Path(".sympohy/worktrees"),
         run_log_root=Path(".sympohy/runs"),
-        stale_status_after_minutes=15,
+        stale_status_after_minutes=30,
         hooks=("task ci",),
         review_max_rounds=5,
         retry_max_attempts=3,
