@@ -185,7 +185,7 @@ Limit bulk migration while testing:
 task ai:sympohy:migrate -- --all --limit 10
 ```
 
-Closed legacy tasks become `sympohy:done` and `sympohy:phase:merge`. Blocked
+Closed legacy tasks become `sympohy:done` and `sympohy:phase:finalize`. Blocked
 tasks become `sympohy:blocked` and `sympohy:phase:triage`. In-progress workflow
 labels map to the matching `implement`, `hooks`, `review`, or `fix` phase where
 that intent is represented by sympohy. Ready or queued legacy tasks start as

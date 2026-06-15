@@ -19,7 +19,7 @@ from scripts.sympohy import (
     validate_commit_subject,
 )
 from scripts.sympohy.config import SympohyConfig
-from scripts.sympohy.core import parse_review_json
+from scripts.sympohy.core import _phase_from_labels, parse_review_json
 from scripts.sympohy.runner import _logical_steps, watch
 from scripts.sympohy.systemd import _systemd_escape
 
@@ -133,7 +133,7 @@ class SympohyCoreTest(unittest.TestCase):
             (
                 "release:next",
                 "sympohy:done",
-                "sympohy:phase:merge",
+                "sympohy:phase:finalize",
             ),
         )
 
@@ -413,6 +413,14 @@ class SympohyCoreTest(unittest.TestCase):
             ("sympohy:done", "sympohy:phase:finalize"),
         )
 
+    def test_phase_from_labels_normalizes_legacy_merge_aliases(self) -> None:
+        self.assertEqual(
+            _phase_from_labels(
+                ["sympohy:phase:merge", "sympohy:phase:finalize", "sympohy:pending"]
+            ),
+            "finalize",
+        )
+
     def test_label_transition_removes_stale_status_and_phase_labels(self) -> None:
         labels = transition_labels(
             [
@@ -451,7 +459,7 @@ class SympohyCoreTest(unittest.TestCase):
                 self.assertEqual(resume_point.phase, phase)
                 self.assertFalse(resume_point.terminal)
 
-        for phase in ("review", "fix", "merge"):
+        for phase in ("review", "fix", "finalize"):
             with self.subTest(phase=phase):
                 resume_point = resolve_resume_point(
                     [
@@ -477,11 +485,11 @@ class SympohyCoreTest(unittest.TestCase):
         completed = resolve_resume_point(
             [
                 "sympohy:done",
-                "sympohy:phase:merge",
+                "sympohy:phase:finalize",
             ]
         )
         self.assertEqual(completed.name, "completed")
-        self.assertEqual(completed.phase, "merge")
+        self.assertEqual(completed.phase, "finalize")
         self.assertTrue(completed.terminal)
 
     def test_resume_point_resolution_prefers_state_over_terminal_labels(self) -> None:
@@ -499,7 +507,7 @@ class SympohyCoreTest(unittest.TestCase):
         done_label = resolve_resume_point(
             [
                 "sympohy:done",
-                "sympohy:phase:merge",
+                "sympohy:phase:finalize",
             ],
             state={"status": "running", "phase": "implement"},
         )

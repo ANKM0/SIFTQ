@@ -14,6 +14,7 @@ from typing import Callable, Iterable, Mapping, Sequence
 
 from .config import SympohyConfig
 from .core import (
+    PHASE_ALIASES,
     extract_acceptance_set,
     inspect_running_issue,
     merge_gate_allows_merge,
@@ -693,7 +694,8 @@ def _run_issue_locked(
     log_dir = config.run_log_root / f"issue-{issue.number}"
     previous_state = read_run_state(log_dir / "state.json")
     resume_from = resume_point or ("implement" if recover else "planning")
-    if resume_from not in {"planning", "implement", "hooks", "review", "fix", "merge"}:
+    resume_from = PHASE_ALIASES.get(resume_from, resume_from)
+    if resume_from not in {"planning", "implement", "hooks", "review", "fix", "finalize"}:
         raise ValueError(f"unknown resume point: {resume_from}")
     state = _RunStateWriter(
         issue_number=issue.number,
@@ -738,7 +740,7 @@ def _run_issue_locked(
             phase="triage",
         )
 
-    if from_resume and resume_from in {"review", "fix", "merge"}:
+    if from_resume and resume_from in {"review", "fix", "finalize"}:
         return _resume_late_phase(
             issue_ref,
             issue,
@@ -988,6 +990,12 @@ def _run_issue_locked(
             },
         )
     else:
+        existing_commit_subjects = set(
+            _commit_subjects(
+                cwd=worktree,
+                base_branch=config.base_branch,
+            )
+        )
         for index, step in enumerate(logical_steps, start=1):
             if index < next_logical_step:
                 continue
@@ -998,6 +1006,7 @@ def _run_issue_locked(
                 subject,
                 cwd=worktree,
                 base_branch=config.base_branch,
+                existing_subjects=existing_commit_subjects,
             ):
                 state.write(
                     phase="implement",
@@ -1078,6 +1087,7 @@ def _run_issue_locked(
                 cwd=worktree,
                 base_branch=config.base_branch,
                 allow_empty=True,
+                existing_subjects=existing_commit_subjects,
             )
             state.write(
                 phase="implement",
@@ -1225,7 +1235,7 @@ def _resume_late_phase(
             "worktree": str(worktree),
         },
     )
-    if resume_from in {"review", "merge"}:
+    if resume_from in {"review", "finalize"}:
         dirty_result = _block_dirty_late_phase_resume(
             issue_ref,
             resume_from=resume_from,
@@ -1243,7 +1253,7 @@ def _resume_late_phase(
         cwd=worktree,
     )
 
-    if resume_from == "merge":
+    if resume_from == "finalize":
         return _run_final_verifier_and_merge(
             issue_ref,
             issue,
@@ -1317,6 +1327,136 @@ def _resume_late_phase(
     )
 
 
+def _resolve_pull_request_number(cwd: Path) -> str:
+    return subprocess.check_output(
+        ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
+        cwd=cwd,
+        text=True,
+    ).strip()
+
+
+def _run_review_fix_round(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    round_index: int,
+    review: ReviewResult,
+    review_json: str,
+    review_pull_request: str,
+    comment_review: bool,
+    existing_fix_subjects: set[str] | None = None,
+) -> int:
+    if review.approved:
+        if comment_review:
+            comment(review_pull_request, review_json, cwd=cwd)
+        return 0
+    if comment_review:
+        comment(review_pull_request, review_json, cwd=cwd)
+    if round_index >= config.review_max_rounds:
+        _block(
+            issue_ref,
+            phase="review",
+            failed_command="adversarial review",
+            attempts=round_index,
+            cause="blocking findings remained after review/fix loop",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
+    if _worktree_has_changes(cwd):
+        cause = (
+            "fix phase worktree has uncommitted changes during resume: "
+            f"{_summarize_status(_worktree_status(cwd))}"
+        )
+        state.record_recovery(
+            "unsafe_recovery_blocked",
+            {
+                "cause": cause,
+                "resume_point": "fix",
+                "review_round": round_index,
+            },
+        )
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=cause,
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    if _commit_subject_exists(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
+    ):
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        state.write(
+            phase="review",
+            progress={
+                "message": "review fix commit already exists",
+                "review_round": round_index,
+                "commit_subject": subject,
+            },
+        )
+        return 1
+
+    set_issue_state(
+        issue_ref,
+        current_labels=("sympohy:running", "sympohy:phase:review"),
+        status="sympohy:running",
+        phase="fix",
+        cwd=cwd,
+    )
+    fix_log_path = log_dir / f"fix-{round_index}.log"
+    state.write(
+        phase="fix",
+        progress={
+            "message": "fixing blocking review findings",
+            "review_round": round_index,
+            "blocking_findings": len(review.blocking_findings),
+            "log_path": str(fix_log_path),
+        },
+    )
+    _codex_text(
+        [
+            "Fix these blocking review findings and stop after edits.",
+            review_json,
+        ],
+        cwd=cwd,
+        log_path=fix_log_path,
+        heartbeat=state.heartbeat,
+    )
+    committed = _commit_all_if_new(
+        subject,
+        cwd=cwd,
+        base_branch=config.base_branch,
+        existing_subjects=existing_fix_subjects,
+    )
+    if committed:
+        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+    state.write(
+        phase="review",
+        progress={
+            "message": "pushed review fix" if committed else "review fix commit already exists",
+            "review_round": round_index,
+            "commit_subject": subject,
+        },
+    )
+    return 1
+
+
 def _resume_fix_phase(
     issue_ref: str,
     issue: Issue,
@@ -1356,56 +1496,25 @@ def _resume_fix_phase(
             state=state,
         )
         return 2
-    if review.approved:
-        return 0
-    if round_index >= config.review_max_rounds:
-        _block(
-            issue_ref,
-            phase="review",
-            failed_command="adversarial review",
-            attempts=round_index,
-            cause="blocking findings remained after review/fix loop",
-            run_log_path=log_dir,
-            cwd=cwd,
-            state=state,
-        )
-        return 2
 
-    subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
-    if _worktree_has_changes(cwd):
-        cause = (
-            "fix phase worktree has uncommitted changes during resume: "
-            f"{_summarize_status(_worktree_status(cwd))}"
-        )
-        state.record_recovery(
-            "unsafe_recovery_blocked",
-            {
-                "cause": cause,
-                "resume_point": "fix",
-                "review_round": round_index,
-            },
-        )
-        _block(
-            issue_ref,
-            phase="fix",
-            failed_command="resume safety check",
-            attempts=1,
-            cause=cause,
-            run_log_path=log_dir,
-            cwd=cwd,
-            state=state,
-        )
-        return 2
-    if _commit_subject_exists(subject, cwd=cwd, base_branch=config.base_branch):
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
-        state.write(
-            phase="review",
-            progress={
-                "message": "review fix commit already exists",
-                "review_round": round_index,
-                "commit_subject": subject,
-            },
-        )
+    existing_fix_subjects = set(_commit_subjects(cwd=cwd, base_branch=config.base_branch))
+    review_result = _run_review_fix_round(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        round_index=round_index,
+        review=review,
+        review_json=review_json,
+        review_pull_request="",
+        comment_review=False,
+        existing_fix_subjects=existing_fix_subjects,
+    )
+
+    if review_result == 1:
+        pull_request_number = _resolve_pull_request_number(cwd)
         return _review_fix_loop(
             issue_ref,
             issue,
@@ -1414,58 +1523,9 @@ def _resume_fix_phase(
             log_dir,
             state,
             start_round=round_index + 1,
+            pull_request_number=pull_request_number,
+            existing_fix_subjects=existing_fix_subjects,
         )
-
-    set_issue_state(
-        issue_ref,
-        current_labels=("sympohy:running", "sympohy:phase:fix"),
-        status="sympohy:running",
-        phase="fix",
-        cwd=cwd,
-    )
-    fix_log_path = log_dir / f"fix-{round_index}.log"
-    state.write(
-        phase="fix",
-        progress={
-            "message": "resuming fix for blocking review findings",
-            "review_round": round_index,
-            "blocking_findings": len(review.blocking_findings),
-            "log_path": str(fix_log_path),
-        },
-    )
-    _codex_text(
-        [
-            "Fix these blocking review findings and stop after edits.",
-            review_json,
-        ],
-        cwd=cwd,
-        log_path=fix_log_path,
-        heartbeat=state.heartbeat,
-    )
-    committed = _commit_all_if_new(
-        subject,
-        cwd=cwd,
-        base_branch=config.base_branch,
-    )
-    if committed:
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
-    state.write(
-        phase="review",
-        progress={
-            "message": "pushed review fix" if committed else "review fix commit already exists",
-            "review_round": round_index,
-            "commit_subject": subject,
-        },
-    )
-    review_result = _review_fix_loop(
-        issue_ref,
-        issue,
-        config,
-        cwd,
-        log_dir,
-        state,
-        start_round=round_index + 1,
-    )
     return review_result
 
 
@@ -1535,7 +1595,7 @@ def _run_final_verifier_and_merge(
     if total_steps is not None:
         progress["completed_logical_steps"] = total_steps
         progress["total_logical_steps"] = total_steps
-    state.write(phase="merge", progress=progress)
+    state.write(phase="finalize", progress=progress)
     final = _codex_json(
         [
             "Act as final verifier. Return JSON with boolean "
@@ -1569,7 +1629,7 @@ def _run_final_verifier_and_merge(
     if total_steps is not None:
         merge_progress["completed_logical_steps"] = total_steps
         merge_progress["total_logical_steps"] = total_steps
-    state.write(phase="merge", progress=merge_progress)
+    state.write(phase="finalize", progress=merge_progress)
     _check_call_with_heartbeat(
         ["gh", "pr", "ready"],
         cwd=worktree,
@@ -1609,7 +1669,7 @@ def _finish_merged_issue(
         done_progress["completed_logical_steps"] = total_steps
         done_progress["total_logical_steps"] = total_steps
     state.write(
-        phase="merge",
+        phase="finalize",
         status="done",
         progress=done_progress,
     )
@@ -1685,9 +1745,17 @@ def _review_fix_loop(
     state: _RunStateWriter,
     *,
     start_round: int = 1,
+    pull_request_number: str | None = None,
+    existing_fix_subjects: set[str] | None = None,
 ) -> int:
     if start_round > config.review_max_rounds:
         return 0
+    if pull_request_number is None:
+        pull_request_number = _resolve_pull_request_number(cwd)
+    if existing_fix_subjects is None:
+        existing_fix_subjects = set(
+            _commit_subjects(cwd=cwd, base_branch=config.base_branch)
+        )
     for round_index in range(start_round, config.review_max_rounds + 1):
         set_issue_state(
             issue_ref,
@@ -1718,70 +1786,22 @@ def _review_fix_loop(
             heartbeat=state.heartbeat,
         )
         review = parse_review_json(review_json)
-        pr_number = subprocess.check_output(
-            ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
-            cwd=cwd,
-            text=True,
-        ).strip()
-        comment(pr_number, review_json, cwd=cwd)
-        if review.approved:
-            return 0
-        if round_index == config.review_max_rounds:
-            _block(
-                issue_ref,
-                phase="review",
-                failed_command="adversarial review",
-                attempts=round_index,
-                cause="blocking findings remained after review/fix loop",
-                run_log_path=log_dir,
-                cwd=cwd,
-                state=state,
-            )
-            return 2
-        set_issue_state(
+        review_result = _run_review_fix_round(
             issue_ref,
-            current_labels=("sympohy:running", "sympohy:phase:fix"),
-            status="sympohy:running",
-            phase="fix",
-            cwd=cwd,
+            issue,
+            config,
+            cwd,
+            log_dir,
+            state,
+            round_index=round_index,
+            review=review,
+            review_json=review_json,
+            review_pull_request=pull_request_number,
+            comment_review=True,
+            existing_fix_subjects=existing_fix_subjects,
         )
-        fix_log_path = log_dir / f"fix-{round_index}.log"
-        state.write(
-            phase="fix",
-            progress={
-                "message": "fixing blocking review findings",
-                "review_round": round_index,
-                "blocking_findings": len(review.blocking_findings),
-                "log_path": str(fix_log_path),
-            },
-        )
-        _codex_text(
-            [
-                "Fix these blocking review findings and stop after edits.",
-                review_json,
-            ],
-            cwd=cwd,
-            log_path=fix_log_path,
-            heartbeat=state.heartbeat,
-        )
-        subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
-        committed = _commit_all_if_new(
-            subject,
-            cwd=cwd,
-            base_branch=config.base_branch,
-        )
-        if committed:
-            _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
-        state.write(
-            phase="review",
-            progress={
-                "message": "pushed review fix"
-                if committed
-                else "review fix commit already exists",
-                "review_round": round_index,
-                "commit_subject": subject,
-            },
-        )
+        if review_result != 1:
+            return review_result
     return 2
 
 
@@ -2239,7 +2259,15 @@ def _commit_subjects(
     return output.splitlines()
 
 
-def _commit_subject_exists(subject: str, *, cwd: Path, base_branch: str) -> bool:
+def _commit_subject_exists(
+    subject: str,
+    *,
+    cwd: Path,
+    base_branch: str,
+    existing_subjects: set[str] | None = None,
+) -> bool:
+    if existing_subjects is not None:
+        return subject in existing_subjects
     return subject in _commit_subjects(cwd=cwd, base_branch=base_branch)
 
 
@@ -2249,23 +2277,38 @@ def _commit_all_if_new(
     cwd: Path,
     base_branch: str,
     allow_empty: bool = False,
+    existing_subjects: set[str] | None = None,
 ) -> bool:
-    if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
+    if _commit_subject_exists(
+        subject,
+        cwd=cwd,
+        base_branch=base_branch,
+        existing_subjects=existing_subjects,
+    ):
         return False
 
     subprocess.check_call(["git", "add", "-A"], cwd=cwd)
     if not _worktree_has_changes(cwd):
-        if _commit_subject_exists(subject, cwd=cwd, base_branch=base_branch):
+        if _commit_subject_exists(
+            subject,
+            cwd=cwd,
+            base_branch=base_branch,
+            existing_subjects=existing_subjects,
+        ):
             return False
         if allow_empty:
             subprocess.check_call(
                 ["git", "commit", "--allow-empty", "-m", subject],
                 cwd=cwd,
             )
+            if existing_subjects is not None:
+                existing_subjects.add(subject)
             return True
         raise RuntimeError(f"no changes to commit for subject: {subject}")
 
     subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
+    if existing_subjects is not None:
+        existing_subjects.add(subject)
     return True
 
 
