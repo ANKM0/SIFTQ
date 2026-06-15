@@ -1966,36 +1966,48 @@ def _lock_takeover_allowed(
         return False
 
     state_payload = read_run_state(state_path)
-    heartbeat_payload = lock_payload
-    if state_payload is not None:
-        if state_payload.get("issue") != issue_number:
-            return False
-        if state_payload.get("run_id") != lock_run_id:
-            return False
-        heartbeat_payload = state_payload
+    if state_payload is None:
+        return False
+    if state_payload.get("issue") != issue_number:
+        return False
 
-        state_lock = state_payload.get("lock")
-        if isinstance(state_lock, Mapping):
-            if state_lock.get("run_id") not in {None, lock_run_id}:
-                return False
-            lock_path_in_state = state_lock.get("path")
-            if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
-                return False
+    state_run_id = state_payload.get("run_id")
+    if not isinstance(state_run_id, str) or not state_run_id:
+        return False
 
-    heartbeat = _heartbeat_from_payload(heartbeat_payload)
-    if not _lock_process_alive(lock_path):
+    state_lock = state_payload.get("lock")
+    if isinstance(state_lock, Mapping):
+        if state_lock.get("run_id") not in {None, lock_run_id, state_run_id}:
+            return False
+        lock_path_in_state = state_lock.get("path")
+        if isinstance(lock_path_in_state, str) and Path(lock_path_in_state) != lock_path:
+            return False
+
+    if state_run_id != lock_run_id:
+        return not _payload_has_fresh_heartbeat(
+            lock_payload,
+            stale_status_after_minutes=stale_status_after_minutes,
+        ) and not _payload_has_fresh_heartbeat(
+            state_payload,
+            stale_status_after_minutes=stale_status_after_minutes,
+        )
+
+    if not _payload_process_alive(lock_payload):
         return True
-    if heartbeat is None:
-        return True
-    stale_after_seconds = stale_status_after_minutes * 60
-    age_seconds = (datetime.now(timezone.utc) - heartbeat).total_seconds()
-    return age_seconds > stale_after_seconds
+    return not _payload_has_fresh_heartbeat(
+        state_payload,
+        stale_status_after_minutes=stale_status_after_minutes,
+    )
 
 
 def _lock_process_alive(lock_path: Path) -> bool:
     payload = read_run_state(lock_path)
     if payload is None:
         return False
+    return _payload_process_alive(payload)
+
+
+def _payload_process_alive(payload: Mapping[str, object]) -> bool:
     pid = payload.get("pid")
     if isinstance(pid, bool):
         return False
@@ -2013,6 +2025,19 @@ def _lock_process_alive(lock_path: Path) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def _payload_has_fresh_heartbeat(
+    payload: Mapping[str, object],
+    *,
+    stale_status_after_minutes: int,
+) -> bool:
+    heartbeat = _heartbeat_from_payload(payload)
+    if heartbeat is None:
+        return False
+    stale_after_seconds = stale_status_after_minutes * 60
+    age_seconds = (datetime.now(timezone.utc) - heartbeat).total_seconds()
+    return age_seconds <= stale_after_seconds
 
 
 def _heartbeat_from_payload(payload: Mapping[str, object]) -> datetime | None:
@@ -2456,15 +2481,26 @@ def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
             if len(payload) == 1:
                 return True
 
+    if result.returncode == 0:
+        return False
+
     result = subprocess.run(
-        ["gh", "pr", "view", "--json", "number"],
+        ["gh", "pr", "view", "--json", "headRefName,state"],
         cwd=cwd,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
         check=False,
     )
-    return result.returncode == 0
+    if result.returncode != 0:
+        return False
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, Mapping):
+        return False
+    return payload.get("headRefName") == branch and payload.get("state") == "OPEN"
 
 
 def _branch_exists(branch: str) -> bool:

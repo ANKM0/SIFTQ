@@ -1809,6 +1809,35 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertTrue(exists)
 
+    def test_pull_request_exists_ignores_closed_pr_for_head_branch(self) -> None:
+        result = subprocess.CompletedProcess([], 0, stdout=json.dumps([]))
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result) as run:
+            exists = _pull_request_exists(
+                branch="issue-82-sympohy",
+                cwd=Path("/tmp/worktree"),
+            )
+
+        self.assertFalse(exists)
+        run.assert_called_once()
+
+    def test_pull_request_exists_fallback_requires_open_matching_head(self) -> None:
+        list_failure = subprocess.CompletedProcess([], 1, stdout="")
+        closed_pr = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps({"headRefName": "issue-82-sympohy", "state": "CLOSED"}),
+        )
+        with patch(
+            "scripts.sympohy.runner.subprocess.run",
+            side_effect=[list_failure, closed_pr],
+        ):
+            exists = _pull_request_exists(
+                branch="issue-82-sympohy",
+                cwd=Path("/tmp/worktree"),
+            )
+
+        self.assertFalse(exists)
+
     def test_final_merge_github_commands_refresh_heartbeat(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2266,7 +2295,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
             self.assertFalse((log_dir / "run.lock").exists())
 
-    def test_issue_run_lock_takes_over_orphan_stale_lock_without_state(
+    def test_issue_run_lock_refuses_orphan_stale_lock_without_state(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -2291,13 +2320,15 @@ class SympohyRunnerTest(unittest.TestCase):
                 run_id="new-run",
                 stale_status_after_minutes=30,
             )
-            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+            with (
+                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
+                self.assertRaises(_RunLockedError),
+            ):
                 lock.acquire()
-                lock.release()
 
-            self.assertFalse((log_dir / "run.lock").exists())
+            self.assertTrue((log_dir / "run.lock").exists())
 
-    def test_issue_run_lock_takes_over_stale_lock_with_corrupt_state(
+    def test_issue_run_lock_refuses_stale_lock_with_corrupt_state(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -2323,11 +2354,13 @@ class SympohyRunnerTest(unittest.TestCase):
                 run_id="new-run",
                 stale_status_after_minutes=30,
             )
-            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+            with (
+                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
+                self.assertRaises(_RunLockedError),
+            ):
                 lock.acquire()
-                lock.release()
 
-            self.assertFalse((log_dir / "run.lock").exists())
+            self.assertTrue((log_dir / "run.lock").exists())
 
     def test_issue_run_lock_refuses_takeover_when_guard_exists(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -2378,7 +2411,7 @@ class SympohyRunnerTest(unittest.TestCase):
             payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
             self.assertEqual(payload["run_id"], "old-run")
 
-    def test_issue_run_lock_refuses_mismatched_stale_lock(self) -> None:
+    def test_issue_run_lock_takes_over_mismatched_stale_lock(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"
             log_dir.mkdir(parents=True)
@@ -2415,7 +2448,53 @@ class SympohyRunnerTest(unittest.TestCase):
                 stale_status_after_minutes=30,
             )
 
-            with self.assertRaises(_RunLockedError):
+            with patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError):
+                lock.acquire()
+                lock.release()
+
+            self.assertFalse((log_dir / "run.lock").exists())
+
+    def test_issue_run_lock_refuses_mismatched_fresh_lock(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            fresh = datetime.now(timezone.utc)
+            (log_dir / "run.lock").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "old-run",
+                        "pid": 999999,
+                        "heartbeat": fresh.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (log_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "different-run",
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": 999999,
+                        "heartbeat": fresh.isoformat(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            lock = _IssueRunLock(
+                issue_number=82,
+                log_dir=log_dir,
+                run_id="new-run",
+                stale_status_after_minutes=30,
+            )
+
+            with (
+                patch("scripts.sympohy.runner.os.kill", side_effect=ProcessLookupError),
+                self.assertRaises(_RunLockedError),
+            ):
                 lock.acquire()
 
             payload = json.loads((log_dir / "run.lock").read_text(encoding="utf-8"))
