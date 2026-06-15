@@ -1351,6 +1351,8 @@ def _run_review_fix_round(
     existing_fix_subjects: set[str] | None = None,
 ) -> int:
     if review.approved:
+        if comment_review:
+            comment(review_pull_request, review_json, cwd=cwd)
         return 0
     if comment_review:
         comment(review_pull_request, review_json, cwd=cwd)

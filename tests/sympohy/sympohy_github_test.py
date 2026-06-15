@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from scripts.sympohy.github import (
     list_legacy_task_issues,
@@ -14,13 +14,13 @@ from scripts.sympohy.github import (
 
 
 class SympohyGithubTest(unittest.TestCase):
-    def test_set_issue_state_rechecks_labels_and_skips_duplicate_transition(self) -> None:
+    def test_set_issue_state_refreshes_cached_labels_for_noop_transition(self) -> None:
         with (
             patch(
                 "scripts.sympohy.github.gh_json",
                 return_value={
                     "labels": [
-                        {"name": "sympohy:blocked"},
+                        {"name": "sympohy:running"},
                         {"name": "sympohy:phase:implement"},
                     ]
                 },
@@ -29,13 +29,43 @@ class SympohyGithubTest(unittest.TestCase):
         ):
             set_issue_state(
                 "#82",
-                current_labels=("sympohy:blocked", "sympohy:phase:implement"),
-                status="sympohy:blocked",
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+                status="sympohy:running",
                 phase="implement",
             )
 
-        gh_json.assert_not_called()
+        gh_json.assert_called_once_with(["issue", "view", "#82", "--json", "labels"], cwd=None)
         gh_run.assert_not_called()
+
+    def test_set_issue_state_refreshes_stale_cached_labels(self) -> None:
+        with (
+            patch(
+                "scripts.sympohy.github.gh_json",
+                return_value={
+                    "labels": [
+                        {"name": "sympohy:running"},
+                        {"name": "sympohy:blocked"},
+                        {"name": "sympohy:phase:finalize"},
+                    ]
+                },
+            ) as gh_json,
+            patch("scripts.sympohy.github.gh_run") as gh_run,
+        ):
+            set_issue_state(
+                "#82",
+                current_labels=("sympohy:running", "sympohy:phase:finalize"),
+                status="sympohy:running",
+                phase="implement",
+        )
+
+        gh_json.assert_called_once_with(["issue", "view", "#82", "--json", "labels"], cwd=None)
+        gh_run.assert_has_calls(
+            [
+                call(["issue", "edit", "#82", "--remove-label", "sympohy:blocked,sympohy:phase:finalize"], cwd=None),
+                call(["issue", "edit", "#82", "--add-label", "sympohy:phase:implement"], cwd=None),
+            ],
+            any_order=False,
+        )
 
     def test_comment_skips_existing_body(self) -> None:
         body = "sympohy blocked this run."

@@ -19,7 +19,7 @@ from scripts.sympohy import (
     validate_commit_subject,
 )
 from scripts.sympohy.config import SympohyConfig
-from scripts.sympohy.core import parse_review_json
+from scripts.sympohy.core import _phase_from_labels, parse_review_json
 from scripts.sympohy.runner import _logical_steps, watch
 from scripts.sympohy.systemd import _systemd_escape
 
@@ -411,6 +411,14 @@ class SympohyCoreTest(unittest.TestCase):
         self.assertEqual(
             labels,
             ("sympohy:done", "sympohy:phase:finalize"),
+        )
+
+    def test_phase_from_labels_normalizes_legacy_merge_aliases(self) -> None:
+        self.assertEqual(
+            _phase_from_labels(
+                ["sympohy:phase:merge", "sympohy:phase:finalize", "sympohy:pending"]
+            ),
+            "finalize",
         )
 
     def test_label_transition_removes_stale_status_and_phase_labels(self) -> None:

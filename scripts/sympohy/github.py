@@ -229,8 +229,15 @@ def set_issue_state(
     cwd: Path | None = None,
 ) -> tuple[str, ...]:
     latest_labels = tuple(current_labels)
+    use_cached_labels = len(latest_labels) > 0
     if len(latest_labels) == 0:
         latest_labels = fetch_issue_labels(issue_ref, cwd=cwd)
+
+    if use_cached_labels:
+        refreshed_labels = fetch_issue_labels(issue_ref, cwd=cwd)
+        if tuple(refreshed_labels) != latest_labels:
+            latest_labels = tuple(refreshed_labels)
+
     desired_labels = set(transition_labels(latest_labels, status=status, phase=phase))
     current_set = set(latest_labels)
     remove = {

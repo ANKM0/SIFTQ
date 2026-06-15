@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from scripts.sympohy.config import SympohyConfig
 from scripts.sympohy.github import Issue
+from scripts.sympohy.core import parse_review_json
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
@@ -27,6 +28,7 @@ from scripts.sympohy.runner import (
     _run_final_verifier_and_merge,
     _run_command_with_heartbeat,
     _run_hooks,
+    _run_review_fix_round,
     ensure_worktree,
     resume_issue,
     run_issue,
@@ -35,6 +37,43 @@ from scripts.sympohy.runner import (
 
 
 class SympohyRunnerTest(unittest.TestCase):
+    def test_run_review_fix_round_comments_approved_review(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+            )
+            issue = Issue(
+                number=82,
+                title="Run review fix round logging",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with patch("scripts.sympohy.runner.comment") as comment:
+                result = _run_review_fix_round(
+                    "#82",
+                    issue,
+                    config,
+                    root,
+                    log_dir,
+                    state,
+                    round_index=1,
+                    review=parse_review_json('{"findings": []}'),
+                    review_json='{"findings": []}',
+                    review_pull_request="99",
+                    comment_review=True,
+                )
+
+        self.assertEqual(result, 0)
+        comment.assert_called_once_with("99", '{"findings": []}', cwd=root)
+
     def test_watch_starts_new_candidate_at_pending_triage(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))

@@ -476,14 +476,19 @@ def _checklist_items(lines: Iterable[str]) -> list[str]:
 
 
 def _phase_from_labels(labels: Iterable[str]) -> str | None:
-    phases = [
-        PHASE_ALIASES.get(label.removeprefix("sympohy:phase:"), label.removeprefix("sympohy:phase:"))
+    phases = {
+        PHASE_ALIASES.get(
+            label.removeprefix("sympohy:phase:"), label.removeprefix("sympohy:phase:")
+        )
         for label in labels
         if label.startswith("sympohy:phase:")
-    ]
+    }
     if len(phases) != 1:
         return None
-    return phases[0]
+    phase = next(iter(phases))
+    if f"sympohy:phase:{phase}" in PHASE_LABELS:
+        return phase
+    return None
 
 
 def _is_legacy_task_label(label: str) -> bool:
