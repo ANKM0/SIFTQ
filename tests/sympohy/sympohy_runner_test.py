@@ -2115,6 +2115,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 worktree=worktree,
                 branch="issue-82-sympohy",
             )
+            (log_dir / "review-1.json").write_text(
+                '{"findings":[]}\n',
+                encoding="utf-8",
+            )
+            events: list[str] = []
             verifier_responses = [
                 {
                     "acceptance_criteria_satisfied": False,
@@ -2142,12 +2147,23 @@ class SympohyRunnerTest(unittest.TestCase):
                 log_path: Path,
                 **_kwargs: object,
             ) -> dict[str, object]:
+                events.append(log_path.name)
                 response = verifier_responses.pop(0)
                 log_path.write_text(
                     json.dumps(response, ensure_ascii=False, sort_keys=True) + "\n",
                     encoding="utf-8",
                 )
                 return response
+
+            def check_call_with_heartbeat(
+                command: list[str],
+                **_kwargs: object,
+            ) -> None:
+                events.append(" ".join(command))
+
+            def review_fix_loop(*_args: object, **kwargs: object) -> int:
+                events.append(f"review:{kwargs['start_round']}")
+                return 0
 
             with (
                 patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
@@ -2166,7 +2182,14 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._commit_all_if_new",
                     return_value=True,
                 ) as commit_all_if_new,
-                patch("scripts.sympohy.runner._run_command_with_heartbeat", return_value=0),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    side_effect=review_fix_loop,
+                ) as review_fix_loop_mock,
                 patch("scripts.sympohy.runner.subprocess.check_call"),
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
@@ -2202,6 +2225,20 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(first_attempt["merge_recommendation"], "block")
         self.assertEqual(second_attempt["merge_recommendation"], "merge")
         self.assertEqual(latest_attempt, second_attempt)
+        self.assertEqual(
+            events,
+            [
+                "final-verifier-1.json",
+                "git push",
+                "review:2",
+                "final-verifier-2.json",
+                "gh pr ready",
+                "gh pr checks --watch",
+                "gh pr merge --squash --delete-branch",
+            ],
+        )
+        review_fix_loop_mock.assert_called_once()
+        self.assertEqual(review_fix_loop_mock.call_args.kwargs["start_round"], 2)
         set_issue_state.assert_any_call(
             "#82",
             current_labels=(),
@@ -2278,6 +2315,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._run_final_verifier_fix_round",
                     return_value=1,
                 ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.comment") as comment,
             ):
@@ -2296,6 +2337,7 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertEqual(codex_json.call_count, 3)
         self.assertEqual(run_final_verifier_fix_round.call_count, 2)
+        self.assertEqual(review_fix_loop.call_count, 2)
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),

@@ -1765,6 +1765,20 @@ def _run_final_verifier_and_merge(
         )
         if fix_result != 1:
             return fix_result
+        review_result = _review_fix_loop(
+            issue_ref,
+            issue,
+            config,
+            worktree,
+            log_dir,
+            state,
+            start_round=_next_review_rerun_round(
+                log_dir,
+                max_review_rounds=config.review_max_rounds,
+            ),
+        )
+        if review_result != 0:
+            return review_result
     else:
         _block(
             issue_ref,
@@ -2741,6 +2755,18 @@ def _review_start_round(state: Mapping[str, object] | None) -> int:
     if message in {"pushed review fix", "review fix commit already exists"}:
         return round_index + 1
     return round_index
+
+
+def _next_review_rerun_round(log_dir: Path, *, max_review_rounds: int) -> int:
+    review_rounds: list[int] = []
+    for path in log_dir.glob("review-*.json"):
+        try:
+            review_rounds.append(int(path.stem.removeprefix("review-")))
+        except ValueError:
+            continue
+    if not review_rounds:
+        return 1
+    return min(max(review_rounds) + 1, max_review_rounds)
 
 
 def _bootstrap_run_state(
