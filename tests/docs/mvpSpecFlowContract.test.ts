@@ -85,6 +85,11 @@ describe("MVP spec flow", () => {
     expect(missingBoundaryFragments).toEqual([]);
     expect(adrAuthoring).toContain("## Boundary With Design Docs");
     expect(adrAuthoring).toContain("Use ADRs for durable decisions");
+    expect(adrAuthoring).toContain("architecture decisions");
+    expect(adrAuthoring).toContain("major modules");
+    expect(adrAuthoring).toContain("libraries, tools, runtime, storage");
+    expect(adrAuthoring).toContain("schema, migration, toolchain, governance");
+    expect(adrAuthoring).toContain("architecture boundaries");
     expect(adrAuthoring).toContain(
       "Use design docs for feature-specific application"
     );

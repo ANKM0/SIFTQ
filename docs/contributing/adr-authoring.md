@@ -55,8 +55,9 @@ design:<short-kebab-title>-adr
 
 ## Boundary With Design Docs
 
-Use ADRs for durable decisions: the selected foundation, policy, technology,
-architecture boundary, repository workflow, and the reasons for that choice.
+Use ADRs for durable decisions, such as architecture decisions, major modules,
+libraries, tools, runtime, storage, schema, migration, toolchain, governance,
+and architecture boundaries. ADRs record the reasons for those choices.
 
 Use design docs for feature-specific application: how an existing ADR applies to
 one feature, the external design, internal design, UI states, operation flow, and
