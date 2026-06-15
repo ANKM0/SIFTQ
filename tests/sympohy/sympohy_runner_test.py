@@ -851,6 +851,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ),
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.comment"),
                 patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner.subprocess.check_call"),
             ):
@@ -971,6 +976,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ),
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.comment"),
                 patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
             ):
@@ -1378,6 +1388,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner.subprocess.run",
                     return_value=subprocess.CompletedProcess([], 1, stdout=""),
                 ),
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.comment"),
                 patch(
                     "scripts.sympohy.runner._check_call_with_heartbeat"
                 ) as check_call_with_heartbeat,
@@ -2046,6 +2061,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value=0,
                 ) as run_command,
                 patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.comment") as comment,
                 patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
                 patch("scripts.sympohy.runner.set_issue_state"),
             ):
@@ -2060,6 +2080,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 )
 
         self.assertEqual(result, 0)
+        comment.assert_called_once()
+        self.assertEqual(comment.call_args.args[0], "99")
+        self.assertIn("sympohy final verifier result", comment.call_args.args[1])
+        self.assertIn("final-verifier-1.json", comment.call_args.args[1])
+        self.assertIn('"merge_recommendation": "merge"', comment.call_args.args[1])
         final_verifier_prompt = codex_json.call_args.args[0][0]
         self.assertIn("findings as an array", final_verifier_prompt)
         self.assertIn('When merge_recommendation is "merge"', final_verifier_prompt)
@@ -2190,6 +2215,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._review_fix_loop",
                     side_effect=review_fix_loop,
                 ) as review_fix_loop_mock,
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.comment") as comment,
                 patch("scripts.sympohy.runner.subprocess.check_call"),
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
@@ -2225,6 +2255,18 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(first_attempt["merge_recommendation"], "block")
         self.assertEqual(second_attempt["merge_recommendation"], "merge")
         self.assertEqual(latest_attempt, second_attempt)
+        self.assertEqual(comment.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in comment.call_args_list],
+            ["99", "99"],
+        )
+        self.assertIn("final-verifier-1.json", comment.call_args_list[0].args[1])
+        self.assertIn("final-verifier-2.json", comment.call_args_list[1].args[1])
+        self.assertIn("resume state is not validated", comment.call_args_list[0].args[1])
+        self.assertIn(
+            '"merge_recommendation": "merge"',
+            comment.call_args_list[1].args[1],
+        )
         self.assertEqual(
             events,
             [
@@ -2319,6 +2361,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     "scripts.sympohy.runner._review_fix_loop",
                     return_value=0,
                 ) as review_fix_loop,
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.comment") as comment,
             ):
@@ -2338,6 +2384,12 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(codex_json.call_count, 3)
         self.assertEqual(run_final_verifier_fix_round.call_count, 2)
         self.assertEqual(review_fix_loop.call_count, 2)
+        self.assertEqual(
+            [call.args[0] for call in comment.call_args_list[:3]],
+            ["99"] * 3,
+        )
+        self.assertIn("first blocker", comment.call_args_list[0].args[1])
+        self.assertIn("third blocker", comment.call_args_list[2].args[1])
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),
@@ -2398,6 +2450,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 with (
                     patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
                     patch("scripts.sympohy.runner._codex_json", return_value=response),
+                    patch(
+                        "scripts.sympohy.runner._resolve_pull_request_number",
+                        return_value="99",
+                    ),
                     patch("scripts.sympohy.runner._codex_text") as codex_text,
                     patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                     patch("scripts.sympohy.runner.comment") as comment,
