@@ -378,6 +378,63 @@ class SympohyRunnerTest(unittest.TestCase):
             resume_point="planning",
         )
 
+    def test_resumed_planning_run_creates_worktree_without_recovery_mode(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            issue = Issue(
+                number=82,
+                title="Restart stale triage",
+                body="""
+## AC
+- [ ] restart from planning
+
+## DoD
+- [ ] create a fresh issue worktree
+""",
+                labels=("sympohy:running", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return ""
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.ensure_worktree",
+                    return_value=worktree,
+                ) as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner.comment"),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={"logical_steps": [{"name": "one"}]},
+                ),
+                patch("scripts.sympohy.runner._codex_text", return_value=""),
+                patch("scripts.sympohy.runner._run_hooks", return_value=1),
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+            ):
+                result = run_issue(
+                    "#82",
+                    config,
+                    recover=False,
+                    from_resume=True,
+                    resume_point="planning",
+                )
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_called_once_with(issue, config, recover=False)
+
     def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -1748,7 +1805,72 @@ class SympohyRunnerTest(unittest.TestCase):
             phase="fix",
             cwd=cwd,
         )
-        self.assertIn("fix commit already exists", comment.call_args.args[1])
+        self.assertIn("fix phase worktree has uncommitted changes", comment.call_args.args[1])
+        self.assertEqual(final_state["status"], "blocked")
+
+    def test_fix_resume_blocks_dirty_worktree_before_rerunning_codex(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (log_dir / "review-2.json").write_text(
+                json.dumps({"findings": [{"severity": "high", "summary": "fix"}]}),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Resume fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=cwd,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._commit_subject_exists",
+                    return_value=False,
+                ) as commit_subject_exists,
+                patch("scripts.sympohy.runner._worktree_has_changes", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._worktree_status",
+                    return_value=" M scripts/sympohy/runner.py\n",
+                ),
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _resume_fix_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    previous_state={"last_known_progress": {"review_round": 2}},
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        commit_subject_exists.assert_not_called()
+        codex_text.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:fix"),
+            status="sympohy:blocked",
+            phase="fix",
+            cwd=cwd,
+        )
+        self.assertIn("fix phase worktree has uncommitted changes", comment.call_args.args[1])
         self.assertEqual(final_state["status"], "blocked")
 
     def test_issue_run_lock_takes_over_consistent_stale_heartbeat_with_live_pid(

@@ -718,8 +718,8 @@ def _run_issue_locked(
         return 2
 
     try:
-        worktree = ensure_worktree(issue, config, recover=recover or from_resume)
-    except _UnsafeRecoveryError as exc:
+        worktree = ensure_worktree(issue, config, recover=recover)
+    except (_ExistingRunError, _UnsafeRecoveryError) as exc:
         phase = resume_from if resume_from != "planning" else "implement"
         state.write(
             phase=phase,
@@ -1305,31 +1305,31 @@ def _resume_fix_phase(
         return 2
 
     subject = f"#{issue.number} fix(sympohy): resolve review finding {round_index}"
+    if _worktree_has_changes(cwd):
+        cause = (
+            "fix phase worktree has uncommitted changes during resume: "
+            f"{_summarize_status(_worktree_status(cwd))}"
+        )
+        state.record_recovery(
+            "unsafe_recovery_blocked",
+            {
+                "cause": cause,
+                "resume_point": "fix",
+                "review_round": round_index,
+            },
+        )
+        _block(
+            issue_ref,
+            phase="fix",
+            failed_command="resume safety check",
+            attempts=1,
+            cause=cause,
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
     if _commit_subject_exists(subject, cwd=cwd, base_branch=config.base_branch):
-        if _worktree_has_changes(cwd):
-            cause = (
-                "fix commit already exists but worktree has uncommitted changes during resume: "
-                f"{_summarize_status(_worktree_status(cwd))}"
-            )
-            state.record_recovery(
-                "unsafe_recovery_blocked",
-                {
-                    "cause": cause,
-                    "resume_point": "fix",
-                    "review_round": round_index,
-                },
-            )
-            _block(
-                issue_ref,
-                phase="fix",
-                failed_command="resume safety check",
-                attempts=1,
-                cause=cause,
-                run_log_path=log_dir,
-                cwd=cwd,
-                state=state,
-            )
-            return 2
         _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
         state.write(
             phase="review",
