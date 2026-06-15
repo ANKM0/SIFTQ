@@ -32,7 +32,7 @@ def ensure_worktree(issue: Issue, config: SympohyConfig) -> Path:
 
 
 def watch(config: SympohyConfig) -> int:
-    candidates = list_candidate_issues(limit=100)
+    candidates = list_candidate_issues(limit=100, run_log_root=config.run_log_root)
     selected = candidates[: config.max_workers]
     processes: list[subprocess.Popen[bytes]] = []
 

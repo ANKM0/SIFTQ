@@ -33,13 +33,15 @@ describe("sympohy Taskfile integration", () => {
 });
 
 describe("sympohy watcher contract", () => {
-  it("uses sympohy status labels and excludes already managed issues", () => {
+  it("uses sympohy status labels and stale-running inspection", () => {
     expect(core).toContain("sympohy:pending");
     expect(core).toContain("sympohy:running");
     expect(core).toContain("sympohy:blocked");
     expect(core).toContain("sympohy:done");
     expect(core).toContain("is_candidate_issue");
-    expect(core).toContain("not names.intersection(STATUS_LABELS)");
+    expect(core).toContain("inspect_running_issue");
+    expect(core).toContain("RUNNING_HEARTBEAT_TIMEOUT_SECONDS");
+    expect(core).toContain("\"dead pid\"");
   });
 
   it("limits parallel issue starts to ten and uses independent worktrees", () => {

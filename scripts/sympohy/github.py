@@ -63,7 +63,12 @@ def fetch_issue(issue_ref: str, *, cwd: Path | None = None) -> Issue:
     )
 
 
-def list_candidate_issues(*, limit: int, cwd: Path | None = None) -> list[Mapping[str, object]]:
+def list_candidate_issues(
+    *,
+    limit: int,
+    run_log_root: Path = Path(".sympohy/runs"),
+    cwd: Path | None = None,
+) -> list[Mapping[str, object]]:
     payload = gh_json(
         [
             "issue",
@@ -79,7 +84,12 @@ def list_candidate_issues(*, limit: int, cwd: Path | None = None) -> list[Mappin
     )
     if not isinstance(payload, list):
         raise ValueError("gh issue list returned non-list JSON")
-    return [issue for issue in payload if isinstance(issue, Mapping) and is_candidate_issue(issue)]
+    return [
+        issue
+        for issue in payload
+        if isinstance(issue, Mapping)
+        and is_candidate_issue(issue, run_log_root=run_log_root)
+    ]
 
 
 def sync_labels(*, cwd: Path | None = None) -> None:

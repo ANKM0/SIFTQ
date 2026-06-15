@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
+import os
+from pathlib import Path
 import re
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 
 STATUS_LABELS = (
@@ -16,6 +19,7 @@ STATUS_LABELS = (
 PHASES = ("triage", "implement", "hooks", "review", "fix", "merge")
 PHASE_LABELS = tuple(f"sympohy:phase:{phase}" for phase in PHASES)
 BLOCKING_REVIEW_SEVERITIES = {"critical", "high", "medium"}
+RUNNING_HEARTBEAT_TIMEOUT_SECONDS = 15 * 60
 
 COMMIT_SUBJECT_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
@@ -32,6 +36,14 @@ class AcceptanceSet:
     @property
     def complete(self) -> bool:
         return bool(self.acceptance_criteria and self.definition_of_done)
+
+
+@dataclass(frozen=True)
+class RunningIssueInspection:
+    phase: str | None
+    stale: bool
+    reason: str | None
+    state_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -66,11 +78,105 @@ def validate_commit_subject(subject: str) -> bool:
     return COMMIT_SUBJECT_RE.match(subject) is not None
 
 
-def is_candidate_issue(issue: Mapping[str, object]) -> bool:
+def is_candidate_issue(
+    issue: Mapping[str, object],
+    *,
+    run_log_root: Path | None = None,
+    now: datetime | None = None,
+    process_alive: Callable[[int], bool] | None = None,
+) -> bool:
     if issue.get("state", "OPEN") not in {"OPEN", "open"}:
         return False
     names = set(_label_names(issue.get("labels", [])))
-    return not names.intersection(STATUS_LABELS)
+    if not names.intersection(STATUS_LABELS):
+        return True
+    if "sympohy:running" not in names:
+        return False
+    return inspect_running_issue(
+        issue,
+        run_log_root=run_log_root or Path(".sympohy/runs"),
+        now=now,
+        process_alive=process_alive,
+    ).stale
+
+
+def inspect_running_issue(
+    issue: Mapping[str, object],
+    *,
+    run_log_root: Path,
+    now: datetime | None = None,
+    process_alive: Callable[[int], bool] | None = None,
+) -> RunningIssueInspection:
+    names = set(_label_names(issue.get("labels", [])))
+    phase = _phase_from_labels(names)
+    try:
+        number = int(issue["number"])
+    except (KeyError, TypeError, ValueError):
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing issue number",
+            state_path=None,
+        )
+
+    state_path = run_log_root / f"issue-{number}" / "state.json"
+    if phase is None:
+        return RunningIssueInspection(
+            phase=None,
+            stale=True,
+            reason="missing phase label",
+            state_path=state_path,
+        )
+
+    state = _read_run_state(state_path)
+    if state is None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing state",
+            state_path=state_path,
+        )
+
+    pid = _state_pid(state)
+    if pid is None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing pid",
+            state_path=state_path,
+        )
+    alive = process_alive or _process_alive
+    if not alive(pid):
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="dead pid",
+            state_path=state_path,
+        )
+
+    heartbeat = _state_heartbeat(state)
+    if heartbeat is None:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="missing heartbeat",
+            state_path=state_path,
+        )
+    current_time = _normalize_datetime(now or datetime.now(timezone.utc))
+    if (current_time - heartbeat).total_seconds() > RUNNING_HEARTBEAT_TIMEOUT_SECONDS:
+        return RunningIssueInspection(
+            phase=phase,
+            stale=True,
+            reason="stale heartbeat",
+            state_path=state_path,
+        )
+
+    return RunningIssueInspection(
+        phase=phase,
+        stale=False,
+        reason=None,
+        state_path=state_path,
+    )
 
 
 def transition_labels(
@@ -226,6 +332,70 @@ def _checklist_items(lines: Iterable[str]) -> list[str]:
             if item and not item.startswith("<!--"):
                 items.append(item)
     return items
+
+
+def _phase_from_labels(labels: Iterable[str]) -> str | None:
+    phases = [
+        label.removeprefix("sympohy:phase:")
+        for label in labels
+        if label in PHASE_LABELS
+    ]
+    if len(phases) != 1:
+        return None
+    return phases[0]
+
+
+def _read_run_state(path: Path) -> Mapping[str, object] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    return payload
+
+
+def _state_pid(state: Mapping[str, object]) -> int | None:
+    value = state.get("pid")
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        pid = value
+    elif isinstance(value, str):
+        try:
+            pid = int(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    return pid if pid > 0 else None
+
+
+def _state_heartbeat(state: Mapping[str, object]) -> datetime | None:
+    value = state.get("heartbeat")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        heartbeat = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _normalize_datetime(heartbeat)
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _process_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def _label_names(labels: object) -> list[str]:
