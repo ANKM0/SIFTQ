@@ -247,7 +247,12 @@ def extract_acceptance_set(body: str, comments: Sequence[Mapping[str, object]]) 
 
 def parse_review_json(source: str) -> ReviewResult:
     payload = json.loads(source)
-    findings_payload = payload.get("findings", [])
+    if isinstance(payload, list):
+        findings_payload = payload
+    elif isinstance(payload, Mapping):
+        findings_payload = payload.get("findings", [])
+    else:
+        raise ValueError("review JSON must be an object or findings list")
     if not isinstance(findings_payload, list):
         raise ValueError("review JSON must contain findings as a list")
 
