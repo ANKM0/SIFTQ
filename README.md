@@ -80,6 +80,43 @@ task codd:dag
 task codd:elicit
 ```
 
+## sympohy Issue Automation
+
+SIFTQ uses `sympohy` as repository-local development tooling for GitHub
+Issue-driven work. It replaces the older TAKT/taqt task workflow. Generated
+worktrees and logs stay under `.sympohy/worktrees/` and `.sympohy/runs/`, which
+are intentionally ignored by Git.
+
+For sympohy-only setup or revalidation, run:
+
+```bash
+task setup:sympohy
+task ai:sympohy:doctor
+```
+
+Common single-issue workflow commands:
+
+```bash
+task ai:sympohy:refine -- '#73'
+task ai:sympohy -- '#73'
+task ai:sympohy:resume -- '#73'
+```
+
+Common migration and watcher commands:
+
+```bash
+task ai:sympohy:labels:sync
+task ai:sympohy:migrate -- --dry-run '#73'
+task ai:sympohy:migrate -- '#73'
+task ai:sympohy:migrate -- --all
+task ai:sympohy:watch
+task ai:sympohy:systemd:install
+task ai:sympohy:systemd:status
+```
+
+See `docs/contributing/issue-execution.md` for setup requirements, label
+semantics, migration notes, and the full task workflow.
+
 ## CI Checks
 
 Run the same local checks before opening or updating a pull request:
@@ -99,6 +136,7 @@ task ci
 - `docs/design/`: issue-level design notes.
 - `docs/adr/`: accepted architecture decisions.
 - `.codd/`: local CoDD configuration.
+- `.sympohy/`: sympohy configuration and systemd templates.
 
 ## Contributor Docs
 
