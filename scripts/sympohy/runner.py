@@ -1691,6 +1691,7 @@ def _run_final_verifier_and_merge(
         )
 
     empty_review = parse_review_json('{"findings":[]}')
+    pull_request_number = _resolve_pull_request_number(worktree)
     for verifier_attempt in range(1, config.final_verifier_fix_max_attempts + 2):
         final_verifier_path = _final_verifier_log_path(log_dir, verifier_attempt)
         progress: dict[str, object] = {
@@ -1713,6 +1714,12 @@ def _run_final_verifier_and_merge(
             heartbeat=state.heartbeat,
         )
         _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
+        _comment_final_verifier_result(
+            pull_request_number,
+            final_verifier_path,
+            final,
+            cwd=worktree,
+        )
         if merge_gate_allows_merge(
             final_verifier=final,
             github_checks_status="success",
@@ -1850,6 +1857,29 @@ def _persist_final_verifier_artifacts(
         ).encode("utf-8")
         attempt_path.write_bytes(content)
     latest_path.write_bytes(content)
+
+
+def _comment_final_verifier_result(
+    pull_request_number: str,
+    attempt_path: Path,
+    payload: Mapping[str, object],
+    *,
+    cwd: Path,
+) -> None:
+    if attempt_path.exists():
+        content = attempt_path.read_text(encoding="utf-8")
+    else:
+        content = (
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        )
+    body = (
+        "sympohy final verifier result.\n\n"
+        f"- log: {attempt_path.name}\n\n"
+        "```json\n"
+        f"{content.rstrip()}\n"
+        "```\n"
+    )
+    comment(pull_request_number, body, cwd=cwd)
 
 
 def _run_final_verifier_fix_round(
