@@ -49,7 +49,7 @@ jobs:
         run: task ci:sympohy
 
       - name: Check commit messages
-        run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
+        run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.event.pull_request.head.sha || github.sha }}"
 
       - name: Check Markdown
         run: task ci:markdown
