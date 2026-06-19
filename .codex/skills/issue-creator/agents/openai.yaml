@@ -1,0 +1,4 @@
+interface:
+  display_name: "SIFTQ Issue Creator"
+  short_description: "Draft SIFTQ GitHub issue bodies and labels with AC/DoD templates."
+  default_prompt: "SIFTQのIssue作成を行います。"
