@@ -1,4 +1,4 @@
 interface:
-  display_name: "Issue Creator"
-  short_description: "Draft SIFTQ issues with sympohy labels."
-  default_prompt: "Use $issue-creator to draft a SIFTQ issue with AC/DoD and sympohy labels."
+  display_name: "SIFTQ Issue Creator"
+  short_description: "Draft SIFTQ GitHub issue bodies and labels with AC/DoD templates."
+  default_prompt: "SIFTQのIssue作成を行います。"

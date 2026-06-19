@@ -28,19 +28,20 @@ describe("Issue creator skill contract", () => {
   });
 
   it("defines the skill, templates, labels, and agent prompt", () => {
-    expect(skill).toContain("name: issue-creator");
-    expect(skill).toContain("## Workflow");
-    expect(skill).toContain("## Quality Bar");
+    expect(skill).toContain("name: siftq-issue-creator");
+    expect(skill).toContain("## 1) Issue creation workflow");
+    expect(skill).toContain("## 2) Label rule (this repository)");
+    expect(skill).toContain("## 3) Required output format");
 
-    expect(issueTemplates).toContain("## Feature Change");
-    expect(issueTemplates).toContain("## Research");
-    expect(issueTemplates).toContain("## Bug");
+    expect(issueTemplates).toContain("## Feature Change テンプレート");
+    expect(issueTemplates).toContain("## Research テンプレート");
+    expect(issueTemplates).toContain("## Bug テンプレート");
 
     expect(labelPolicy).toContain("sympohy:pending");
     expect(labelPolicy).toContain("sympohy:phase:triage");
-    expect(labelPolicy).toContain("Automation-Owned Labels");
+    expect(labelPolicy).toContain("## Forbidden as manual assignment");
 
-    expect(agentConfig).toContain('display_name: "Issue Creator"');
+    expect(agentConfig).toContain('display_name: "SIFTQ Issue Creator"');
     expect(agentConfig).toContain("default_prompt:");
   });
 });

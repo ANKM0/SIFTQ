@@ -1,91 +1,56 @@
 # SIFTQ Issue Templates
 
-Use these templates when drafting or creating SIFTQ GitHub issues. Remove
-instructional placeholders before returning or submitting an issue.
+このテンプレートは issue の本文として利用してください。必要箇所を置換してください。
 
-## Feature Change
+## Feature Change テンプレート
 
-Use for implementation, documentation, workflow, tooling, or repository changes.
+## 背景
+- <背景>
 
-```markdown
-## Background
-
-<Why this change is needed, including current behavior, constraints, and related
-context.>
-
-## Summary
-
-<What should change and what is intentionally out of scope.>
+## 概要
+- <概要>
 
 ## AC
-
-- [ ] <Reviewer-observable acceptance criterion.>
-- [ ] <Another concrete acceptance criterion.>
+- [ ] <受入条件>
 
 ## DoD
+- [ ] <完了条件>
 
-- [ ] <Required validation command, test, or inspection.>
-- [ ] <Documentation, PR description, migration note, or follow-up requirement.>
+## 補足情報
+- 依存: <依存>
+- 影響範囲: <影響範囲>
+- 検証コマンド: <検証コマンド>
 
-## Additional Context
+---
 
-<Links, file paths, examples, risks, or follow-up issue ideas. Omit this section
-when there is no useful context.>
-```
+## Research テンプレート
 
-## Research
+## 背景
+- <背景>
 
-Use for investigation work where the deliverable is a conclusion, comparison, or
-recommendation rather than an implementation.
+## 調べたいこと
+- <調査内容>
 
-```markdown
-## Background
+## 完了条件
+- [ ] <完了条件>
 
-<Why this research is needed and what decision or blocker it supports.>
+## 補足情報
+- 比較候補: <比較候補>
+- 参考資料: <参考資料>
 
-## Questions
+---
 
-- <Question, option, or uncertainty to investigate.>
-- <Another concrete research question.>
+## Bug テンプレート
 
-## Completion Criteria
+## 概要
+- <概要>
 
-- [ ] <The expected research artifact, decision record, summary, or recommendation.>
-- [ ] <Validation, stakeholder review, or follow-up issue creation requirement.>
-```
+## 再現手順
+- 1. <手順1>
+- 2. <手順2>
 
-## Bug
+## 原因(optional)
+- <原因>
 
-Use for defects, regressions, failed workflows, broken UI behavior, or incorrect
-automation behavior.
-
-```markdown
-## Summary
-
-<What is broken, who is affected, and the observed impact.>
-
-## Reproduction Steps
-
-1. <First step to reproduce.>
-2. <Second step to reproduce.>
-3. <Observed result and expected result.>
-
-## Cause(Optional)
-
-<Known or suspected cause. Omit if unknown.>
-
-## Proposed Fix(Optional)
-
-<Suggested repair direction, validation command, or affected files. Omit if
-unknown.>
-```
-
-## Template Selection Notes
-
-- Choose Feature Change when the issue will be implemented by `sympohy`; include
-  both `## AC` and `## DoD`.
-- Choose Research when the next step is discovery and the issue should close on
-  a written finding, ADR, design note, or follow-up issue set.
-- Choose Bug when the request starts from observed incorrect behavior. If the
-  fix is already clear and needs AC/DoD for automation, use Feature Change
-  instead and include the bug details in Background.
+## 修正案(optional)
+- <修正案>
