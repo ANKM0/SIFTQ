@@ -23,6 +23,9 @@ codd:
     - id: design:sympohy-run-lifecycle-state
       relation: depends_on
       semantic: automation
+    - id: design:sympohy-stale-run-recovery
+      relation: depends_on
+      semantic: automation
 ---
 
 # sympohy Issue Execution

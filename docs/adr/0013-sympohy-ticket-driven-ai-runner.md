@@ -20,6 +20,9 @@ codd:
     - id: design:sympohy-run-lifecycle-state
       relation: depends_on
       semantic: decision
+    - id: design:sympohy-stale-run-recovery
+      relation: depends_on
+      semantic: decision
 ---
 
 # ADR 0013: sympohy for Ticket-Driven AI Runner
