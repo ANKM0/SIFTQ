@@ -11,6 +11,9 @@ codd:
     - id: design:taskfile-command-runner
       relation: depends_on
       semantic: permissions
+    - id: design:codex-configuration-memo
+      relation: depends_on
+      semantic: permissions
 ---
 
 # Command Permissions

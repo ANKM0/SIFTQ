@@ -1,85 +1,57 @@
 ---
 name: issue-implementation
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: Follow the SIFTQ issue implementation workflow for repository code, test, documentation, branch, commit, push, and PR work. Use when implementing or fixing a GitHub issue, changing source files, adding tests, preparing commits, or validating work against SIFTQ development docs.
 ---
 
 # Issue Implementation
 
 ## Overview
 
-[TODO: 1-2 sentences explaining what this skill enables]
+Use this skill to carry SIFTQ issue work through implementation with the
+repository docs as the source of truth. Do not duplicate the commit or branch
+rules in this skill; load the docs listed below when those rules matter.
 
-## Structuring This Skill
+## Docs To Read
 
-[TODO: Choose the structure that best fits this skill's purpose. Common patterns:
+Read the relevant core docs before acting:
 
-**1. Workflow-Based** (best for sequential processes)
-- Works well when there are clear step-by-step procedures
-- Example: DOCX skill with "Workflow Decision Tree" -> "Reading" -> "Creating" -> "Editing"
-- Structure: ## Overview -> ## Workflow Decision Tree -> ## Step 1 -> ## Step 2...
+- `docs/contributing/development-flow.md` for the implementation stage gates.
+- `docs/contributing/assets/development-flow.mmd` when the flow details are
+  needed beyond the rendered overview.
+- `docs/contributing/branch-strategy.md` before creating, naming, pushing, or
+  merging a branch.
+- `docs/contributing/commit-message-format.md` before creating, reviewing, or
+  suggesting a commit message.
+- Feature-specific `docs/requirements/`, `docs/design/`, `docs/wireframes/`,
+  and `docs/adr/` files that are linked from the issue, AC/DoD, or changed
+  code.
 
-**2. Task-Based** (best for tool collections)
-- Works well when the skill offers different operations/capabilities
-- Example: PDF skill with "Quick Start" -> "Merge PDFs" -> "Split PDFs" -> "Extract Text"
-- Structure: ## Overview -> ## Quick Start -> ## Task Category 1 -> ## Task Category 2...
+Read `docs/contributing/issue-execution.md` only when using or updating
+`sympohy` issue automation, stale-run recovery, labels, watcher behavior, or
+review/merge automation.
 
-**3. Reference/Guidelines** (best for standards or specifications)
-- Works well for brand guidelines, coding standards, or requirements
-- Example: Brand styling with "Brand Guidelines" -> "Colors" -> "Typography" -> "Features"
-- Structure: ## Overview -> ## Guidelines -> ## Specifications -> ## Usage...
+Use `.agents/skills/feature-docs-planning/` before implementation when the
+requirements, design, wireframe, or ADR handling has not been decided.
 
-**4. Capabilities-Based** (best for integrated systems)
-- Works well when the skill provides multiple interrelated features
-- Example: Product Management with "Core Capabilities" -> numbered capability list
-- Structure: ## Overview -> ## Core Capabilities -> ### 1. Feature -> ### 2. Feature...
+## Workflow
 
-Patterns can be mixed and matched as needed. Most skills combine patterns (e.g., start with task-based, add workflow for complex operations).
+1. Identify the GitHub issue and latest AC/DoD.
+2. Confirm requirements, design, wireframes, and ADR handling is recorded.
+3. Read the current implementation area before editing.
+4. Create or use the issue branch according to
+   `docs/contributing/branch-strategy.md`.
+5. Implement focused code, docs, and tests for the issue only.
+6. Run the smallest meaningful verification first, then the repository gate
+   required by the development flow.
+7. Commit with the format in `docs/contributing/commit-message-format.md`.
+8. Push, open or update the PR, and keep review notes and validation evidence
+   traceable to the issue.
 
-Delete this entire "Structuring This Skill" section when done - it's just guidance.]
+## Guardrails
 
-## [TODO: Replace with the first main section based on chosen structure]
-
-[TODO: Add content here. See examples in existing skills:
-- Code samples for technical skills
-- Decision trees for complex workflows
-- Concrete examples with realistic user requests
-- References to scripts/templates/references as needed]
-
-## Resources (optional)
-
-Create only the resource directories this skill actually needs. Delete this section if no resources are required.
-
-### scripts/
-Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
-
-**Examples from other skills:**
-- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
-- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
-
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
-
-**Note:** Scripts may be executed without loading into context, but can still be read by Codex for patching or environment adjustments.
-
-### references/
-Documentation and reference material intended to be loaded into context to inform Codex's process and thinking.
-
-**Examples from other skills:**
-- Product management: `communication.md`, `context_building.md` - detailed workflow guides
-- BigQuery: API reference documentation and query examples
-- Finance: Schema documentation, company policies
-
-**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Codex should reference while working.
-
-### assets/
-Files not intended to be loaded into context, but rather used within the output Codex produces.
-
-**Examples from other skills:**
-- Brand styling: PowerPoint template files (.pptx), logo files
-- Frontend builder: HTML/React boilerplate project directories
-- Typography: Font files (.ttf, .woff2)
-
-**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
-
----
-
-**Not every skill requires all three types of resources.**
+- Keep the implementation scoped to one issue unless the issue has been split.
+- Prefer existing architecture, helpers, tests, and docs over new conventions.
+- Do not treat this skill as the source for branch or commit rules; those rules
+  live in `docs/contributing/`.
+- If docs and code disagree, surface the mismatch and update or cite the right
+  source before proceeding.

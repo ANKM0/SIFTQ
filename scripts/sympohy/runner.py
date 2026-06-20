@@ -9,6 +9,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 import uuid
 from typing import Callable, Iterable, Mapping, Sequence
 
@@ -517,6 +518,8 @@ def _request_artifact_decisions(
         cwd=worktree,
         log_path=log_path,
         heartbeat=heartbeat,
+        config=config,
+        role="planning",
     )
     return _artifact_decisions(payload)
 
@@ -690,55 +693,107 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
 
 
 def watch(config: SympohyConfig) -> int:
+    return watch_forever(
+        config,
+        poll_interval_seconds=config.watch_poll_interval_seconds,
+    )
+
+
+def watch_forever(
+    config: SympohyConfig,
+    *,
+    poll_interval_seconds: int,
+    stop_after_polls: int | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> int:
+    active: dict[int, subprocess.Popen[bytes]] = {}
+    failed = False
+    polls = 0
+
+    while stop_after_polls is None or polls < stop_after_polls:
+        failed = _reap_watch_workers(active) or failed
+        _start_watch_workers(config, active)
+        polls += 1
+
+        if stop_after_polls is not None and polls >= stop_after_polls:
+            break
+        sleep(poll_interval_seconds)
+
+    returncodes = [process.wait() for process in active.values()]
+    active.clear()
+    return 0 if not failed and all(code == 0 for code in returncodes) else 1
+
+
+def _reap_watch_workers(
+    active: dict[int, subprocess.Popen[bytes]],
+) -> bool:
+    failed = False
+    for number, process in list(active.items()):
+        returncode = process.poll()
+        if returncode is None:
+            continue
+        if returncode != 0:
+            failed = True
+        del active[number]
+    return failed
+
+
+def _start_watch_workers(
+    config: SympohyConfig,
+    active: dict[int, subprocess.Popen[bytes]],
+) -> None:
+    available_slots = config.max_workers - len(active)
+    if available_slots <= 0:
+        return
+
     candidates = list_candidate_issues(
         limit=100,
         run_log_root=config.run_log_root,
         stale_status_after_minutes=config.stale_status_after_minutes,
     )
-    selected = sorted(
-        candidates,
-        key=_watch_candidate_priority,
-    )[: config.max_workers]
-    processes: list[subprocess.Popen[bytes]] = []
+    selected = sorted(candidates, key=_watch_candidate_priority)
 
     for issue in selected:
+        if len(active) >= config.max_workers:
+            return
         number = int(issue["number"])
-        labels = _label_names(issue.get("labels", []))
-        if "sympohy:pending" in labels or "sympohy:running" in labels:
-            inspection = inspect_running_issue(
-                issue,
-                run_log_root=config.run_log_root,
-                stale_status_after_minutes=config.stale_status_after_minutes,
-            )
-            if not inspection.stale:
-                continue
-            processes.append(
-                subprocess.Popen(
-                    [
-                        sys.executable,
-                        "-m",
-                        "scripts.sympohy",
-                        "resume",
-                        f"#{number}",
-                    ]
-                )
-            )
+        if number in active:
             continue
+        command = _watch_worker_command(issue, config)
+        if command is None:
+            continue
+        active[number] = subprocess.Popen(command)
 
-        processes.append(
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "scripts.sympohy",
-                    "run",
-                    f"#{number}",
-                ]
-            )
+
+def _watch_worker_command(
+    issue: Mapping[str, object],
+    config: SympohyConfig,
+) -> list[str] | None:
+    number = int(issue["number"])
+    labels = _label_names(issue.get("labels", []))
+    if "sympohy:pending" in labels or "sympohy:running" in labels:
+        inspection = inspect_running_issue(
+            issue,
+            run_log_root=config.run_log_root,
+            stale_status_after_minutes=config.stale_status_after_minutes,
         )
+        if not inspection.stale:
+            return None
+        return [
+            sys.executable,
+            "-m",
+            "scripts.sympohy",
+            "resume",
+            f"#{number}",
+        ]
 
-    returncodes = [process.wait() for process in processes]
-    return 0 if all(code == 0 for code in returncodes) else 1
+    return [
+        sys.executable,
+        "-m",
+        "scripts.sympohy",
+        "run",
+        f"#{number}",
+    ]
 
 
 def _watch_candidate_priority(issue: Mapping[str, object]) -> int:
@@ -1251,6 +1306,8 @@ def _run_issue_locked(
             cwd=worktree,
             log_path=plan_path,
             heartbeat=state.heartbeat,
+            config=config,
+            role="planning",
         )
     logical_steps = _logical_steps(plan)
     total_steps = len(logical_steps)
@@ -1446,6 +1503,8 @@ def _run_issue_locked(
                     cwd=worktree,
                     log_path=implement_log_path,
                     heartbeat=state.heartbeat,
+                    config=config,
+                    role="implementation",
                 )
             state.write(
                 phase="hooks",
@@ -1461,6 +1520,7 @@ def _run_issue_locked(
                 config.ci_retry_max_attempts,
                 worktree,
                 log_dir,
+                config=config,
                 state=state,
                 logical_step=index,
                 total_logical_steps=total_steps,
@@ -1888,6 +1948,8 @@ def _run_review_fix_round(
         cwd=cwd,
         log_path=fix_log_path,
         heartbeat=state.heartbeat,
+        config=config,
+        role="fix",
     )
     committed = _commit_all_if_new(
         subject,
@@ -2147,6 +2209,8 @@ def _run_final_verifier_and_merge(
             cwd=worktree,
             log_path=final_verifier_path,
             heartbeat=state.heartbeat,
+            config=config,
+            role="merge_readiness",
         )
         final = _final_verifier_with_stage_status(final)
         _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
@@ -2385,6 +2449,7 @@ def _run_final_verifier_fix_round(
             config.ci_retry_max_attempts,
             cwd,
             log_dir,
+            config=config,
             state=state,
         ) != 0:
             _block(
@@ -2446,6 +2511,8 @@ def _run_final_verifier_fix_round(
         cwd=cwd,
         log_path=fix_log_path,
         heartbeat=state.heartbeat,
+        config=config,
+        role="fix",
     )
 
     if not _worktree_has_changes(cwd):
@@ -2469,6 +2536,7 @@ def _run_final_verifier_fix_round(
         config.ci_retry_max_attempts,
         cwd,
         log_dir,
+        config=config,
         state=state,
     ) != 0:
         _block(
@@ -2554,6 +2622,7 @@ def _run_hooks(
     cwd: Path,
     log_dir: Path,
     *,
+    config: SympohyConfig | None = None,
     state: _RunStateWriter | None = None,
     logical_step: int | None = None,
     total_logical_steps: int | None = None,
@@ -2597,6 +2666,8 @@ def _run_hooks(
                 cwd=cwd,
                 log_path=log_dir / f"hook-fix-{hook_index}-{attempts}.log",
                 heartbeat=state.heartbeat if state is not None else None,
+                config=config if state is not None else None,
+                role="fix",
             )
     return 0
 
@@ -2652,6 +2723,8 @@ def _review_fix_loop(
             cwd=cwd,
             log_path=review_log_path,
             heartbeat=state.heartbeat,
+            config=config,
+            role="review",
         )
         review = parse_review_json(review_json)
         review_json = _review_json_with_stage_status(review)
@@ -2735,8 +2808,17 @@ def _codex_json(
     cwd: Path,
     log_path: Path,
     heartbeat: Callable[[], None] | None = None,
+    config: SympohyConfig | None = None,
+    role: str = "default",
 ) -> Mapping[str, object]:
-    output = _codex_text(prompts, cwd=cwd, log_path=log_path, heartbeat=heartbeat)
+    output = _codex_text(
+        prompts,
+        cwd=cwd,
+        log_path=log_path,
+        heartbeat=heartbeat,
+        config=config,
+        role=role,
+    )
     payload = json.loads(output)
     if not isinstance(payload, Mapping):
         raise ValueError("Codex JSON output must be an object")
@@ -2749,15 +2831,38 @@ def _codex_text(
     cwd: Path,
     log_path: Path,
     heartbeat: Callable[[], None] | None = None,
+    config: SympohyConfig | None = None,
+    role: str = "default",
 ) -> str:
     prompt = "\n\n".join(prompts)
     output = _check_output_with_heartbeat(
-        ["codex", "exec", prompt],
+        _codex_exec_args(prompt, config=config, role=role),
         cwd=cwd,
         heartbeat=heartbeat,
     )
     log_path.write_text(output, encoding="utf-8")
     return output
+
+
+def _codex_exec_args(
+    prompt: str,
+    *,
+    config: SympohyConfig | None,
+    role: str,
+) -> list[str]:
+    args = ["codex", "exec"]
+    if config is not None:
+        model_config = config.codex_model_for(role)
+        args.extend(
+            [
+                "--model",
+                model_config.model,
+                "-c",
+                f'model_reasoning_effort="{model_config.reasoning_effort}"',
+            ]
+        )
+    args.append(prompt)
+    return args
 
 
 def _check_output_with_heartbeat(

@@ -74,6 +74,9 @@ codd:
     - id: design:design-index
       relation: depends_on
       semantic: governance
+    - id: design:codex-configuration-memo
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product

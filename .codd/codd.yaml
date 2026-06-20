@@ -32,10 +32,20 @@ graph:
   store: "jsonl"
   path: ".codd/scan"
 
+common_node_patterns:
+  - "tests/docs/*.test.ts"
+  - "tests/sympohy/*.test.ts"
+
 dag:
-  common_node_patterns:
-    - "tests/docs/*.test.ts"
-    - "tests/sympohy/*.test.ts"
+  # CoDD 2.19 infers runtime:db_seed:users from generic "user" wording in
+  # docs even though SIFTQ v1 has no DB seed/deployment chain. Keep deploy
+  # blocking checks enabled and exclude only the amber heuristic until CoDD
+  # exposes runtime-state filtering.
+  enabled_checks:
+    - node_completeness
+    - edge_validity
+    - depends_on_consistency
+    - task_completion
 
 bands:
   green:

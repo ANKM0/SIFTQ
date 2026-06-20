@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from scripts.sympohy.config import SympohyConfig
+from scripts.sympohy.config import CodexModelConfig, SympohyConfig
 from scripts.sympohy.github import Issue
 from scripts.sympohy.core import parse_final_verifier_block_findings, parse_review_json
 from scripts.sympohy.runner import (
@@ -20,6 +20,7 @@ from scripts.sympohy.runner import (
     _UnsafeRecoveryError,
     _check_output_with_heartbeat,
     _commit_all_if_new,
+    _codex_exec_args,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
     _pull_request_exists,
@@ -34,11 +35,40 @@ from scripts.sympohy.runner import (
     ensure_worktree,
     resume_issue,
     run_issue,
-    watch,
+    watch_forever,
 )
 
 
 class SympohyRunnerTest(unittest.TestCase):
+    def test_codex_exec_args_include_role_model_and_reasoning(self) -> None:
+        config = SympohyConfig(
+            max_workers=1,
+            base_branch="main",
+            worktree_root=Path(".worktrees"),
+            run_log_root=Path(".runs"),
+            stale_status_after_minutes=30,
+            hooks=("task ci",),
+            review_max_rounds=1,
+            codex_models={
+                "review": CodexModelConfig("gpt-5.5", "xhigh"),
+            },
+        )
+
+        args = _codex_exec_args("review prompt", config=config, role="review")
+
+        self.assertEqual(
+            args,
+            [
+                "codex",
+                "exec",
+                "--model",
+                "gpt-5.5",
+                "-c",
+                'model_reasoning_effort="xhigh"',
+                "review prompt",
+            ],
+        )
+
     def test_run_stage_gate_writes_absolute_workspace_to_input(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -198,7 +228,12 @@ class SympohyRunnerTest(unittest.TestCase):
             ):
                 popen.return_value.wait.return_value = 0
 
-                result = watch(config)
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=1,
+                    sleep=lambda _seconds: None,
+                )
 
         self.assertEqual(result, 0)
         set_issue_state.assert_not_called()
@@ -227,7 +262,12 @@ class SympohyRunnerTest(unittest.TestCase):
             ):
                 popen.return_value.wait.return_value = 0
 
-                result = watch(config)
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=1,
+                    sleep=lambda _seconds: None,
+                )
 
         self.assertEqual(result, 0)
         set_issue_state.assert_not_called()
@@ -256,7 +296,12 @@ class SympohyRunnerTest(unittest.TestCase):
             ):
                 popen.return_value.wait.return_value = 0
 
-                result = watch(config)
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=1,
+                    sleep=lambda _seconds: None,
+                )
 
         self.assertEqual(result, 0)
         set_issue_state.assert_not_called()
@@ -302,12 +347,79 @@ class SympohyRunnerTest(unittest.TestCase):
             ):
                 popen.return_value.wait.return_value = 0
 
-                result = watch(config)
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=1,
+                    sleep=lambda _seconds: None,
+                )
 
         self.assertEqual(result, 0)
         set_issue_state.assert_not_called()
         command = popen.call_args.args[0]
         self.assertEqual(command[-2:], ["resume", "#82"])
+
+    def test_watch_refills_available_worker_slots_on_next_poll(self) -> None:
+        class FakeProcess:
+            def __init__(self) -> None:
+                self.wait_called = False
+                self.poll_calls = 0
+
+            def poll(self) -> int | None:
+                self.poll_calls += 1
+                return 0
+
+            def wait(self) -> int:
+                self.wait_called = True
+                return 0
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=5,
+                retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
+                stage_gate_command=None,
+            )
+            first_issue = {
+                "number": 81,
+                "state": "OPEN",
+                "labels": [{"name": "enhancement"}],
+            }
+            second_issue = {
+                "number": 82,
+                "state": "OPEN",
+                "labels": [{"name": "documentation"}],
+            }
+            processes = [FakeProcess(), FakeProcess()]
+
+            with (
+                patch(
+                    "scripts.sympohy.runner.list_candidate_issues",
+                    side_effect=[[first_issue], [second_issue]],
+                ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.Popen",
+                    side_effect=processes,
+                ) as popen,
+            ):
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=2,
+                    sleep=lambda _seconds: None,
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(popen.call_args_list[0].args[0][-2:], ["run", "#81"])
+        self.assertEqual(popen.call_args_list[1].args[0][-2:], ["run", "#82"])
+        self.assertTrue(processes[1].wait_called)
 
     def test_watch_routes_dead_pid_running_candidate_to_resume(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -346,7 +458,12 @@ class SympohyRunnerTest(unittest.TestCase):
             ):
                 popen.return_value.wait.return_value = 0
 
-                result = watch(config)
+                result = watch_forever(
+                    config,
+                    poll_interval_seconds=1,
+                    stop_after_polls=1,
+                    sleep=lambda _seconds: None,
+                )
 
         self.assertEqual(result, 0)
         set_issue_state.assert_not_called()
@@ -2863,10 +2980,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.comment") as comment,
             ):
+                config = self._config(root)
                 result = _run_final_verifier_fix_round(
                     "#82",
                     issue,
-                    self._config(root),
+                    config,
                     cwd,
                     log_dir,
                     state,
@@ -2939,10 +3057,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.comment") as comment,
             ):
+                config = self._config(root)
                 result = _run_final_verifier_fix_round(
                     "#82",
                     issue,
-                    self._config(root),
+                    config,
                     cwd,
                     log_dir,
                     state,
@@ -2960,6 +3079,7 @@ class SympohyRunnerTest(unittest.TestCase):
             3,
             cwd,
             log_dir,
+            config=config,
             state=state,
         )
         check_call.assert_not_called()
