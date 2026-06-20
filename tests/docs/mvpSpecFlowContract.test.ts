@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import pullRequestTemplate from "../../.github/pull_request_template.md?raw";
 import featureDocsPlanning from "../../.agents/skills/feature-docs-planning/SKILL.md?raw";
+import selfImprovement from "../../.agents/skills/self-improvement/SKILL.md?raw";
 import adrAuthoring from "../../docs/contributing/adr-authoring.md?raw";
 import designTemplate from "../../docs/design/templates/design.md?raw";
 import requirementsTemplate from "../../docs/requirements/templates/requirements.md?raw";
 import wireframeTemplate from "../../docs/wireframes/templates/wireframe.md?raw";
+import learnings from "../../.learnings/LEARNINGS.md?raw";
+import errors from "../../.learnings/ERRORS.md?raw";
+import featureRequests from "../../.learnings/FEATURE_REQUESTS.md?raw";
 
 describe("feature documentation artifacts", () => {
   it("defines the required wireframe markdown template anchors", () => {
@@ -102,4 +106,16 @@ describe("feature documentation artifacts", () => {
     expect(featureDocsPlanning).toContain("docs/design/templates/design.md");
     expect(featureDocsPlanning).toContain("docs/wireframes/templates/wireframe.md");
   });
+
+  it("defines self-improvement learning capture and promotion", () => {
+    expect(selfImprovement).toContain(".learnings/LEARNINGS.md");
+    expect(selfImprovement).toContain(".learnings/ERRORS.md");
+    expect(selfImprovement).toContain(".learnings/FEATURE_REQUESTS.md");
+    expect(selfImprovement).toContain("at least three times");
+    expect(selfImprovement).toContain("promoted");
+    expect(learnings).toContain("LRN-YYYYMMDD-NNN");
+    expect(errors).toContain("ERR-YYYYMMDD-NNN");
+    expect(featureRequests).toContain("FR-YYYYMMDD-NNN");
+  });
+
 });

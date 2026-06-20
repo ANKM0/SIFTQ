@@ -26,6 +26,7 @@ scan:
     - "**/__pycache__/**"
     - "**/dist/**"
     - "**/.venv/**"
+    - "**/.sympohy/**"
 
 graph:
   store: "jsonl"
