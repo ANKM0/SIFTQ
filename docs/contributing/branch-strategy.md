@@ -14,9 +14,18 @@ codd:
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: workflow
+    - id: design:contributing-workflow-source-of-truth
+      relation: depends_on
+      semantic: workflow
 ---
 
 # Branch Strategy
+
+## Source of Truth
+
+This document is the canonical source for SIFTQ branch strategy rules.
+Issue #103 keeps the durable rule text here so contributors and
+implementation-time agent workflows use the same branch strategy reference.
 
 SIFTQ uses short-lived issue branches created from `main`. Completed work is
 merged back into `main` through pull requests after review and required checks.

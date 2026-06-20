@@ -14,9 +14,18 @@ codd:
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: workflow
+    - id: design:contributing-workflow-source-of-truth
+      relation: depends_on
+      semantic: workflow
 ---
 
 # Commit Message Format
+
+## Source of Truth
+
+This document is the canonical source for SIFTQ commit message rules.
+Issue #103 keeps the durable rule text here so contributors and
+implementation-time agent workflows use the same commit message reference.
 
 SIFTQ commits must include the related GitHub issue number before a
 Conventional Commits header.

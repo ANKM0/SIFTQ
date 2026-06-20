@@ -7,6 +7,7 @@ __pycache__/
 node_modules/
 dist/
 coverage/
+tmp/
 
 # CoDD generated artifacts
 .codd/scan/
