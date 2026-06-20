@@ -77,7 +77,7 @@ git push -u origin "$(git branch --show-current)"
 - Use the repository commit message format documented in
   `docs/contributing/commit-message-format.md`.
 
-## Agent Skill
+## Agent Reference
 
-The repository-local Codex skill for this convention is
-`.agents/skills/branch-strategy/SKILL.md`.
+Implementation-time agents must use this document as the branch strategy
+reference.

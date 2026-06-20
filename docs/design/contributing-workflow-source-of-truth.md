@@ -48,13 +48,12 @@ Issue #103のAC/DoD確認では、commit message formatとbranch strategyの
 
 実装では次の整理を行う。
 
-- `.agents/skills/branch-strategy/SKILL.md`は
-  `docs/contributing/branch-strategy.md`を実装時に読む文書として明示する。
-- `.agents/skills/commit-message-format/SKILL.md`は
-  `docs/contributing/commit-message-format.md`を実装時に読む文書として
-  明示する。
-- skill側に残す内容は、skillの発火条件、作業手順、参照すべき正本文書の
-  案内に限定する。
+- branch strategyの実装時参照は
+  `docs/contributing/branch-strategy.md`として明示する。
+- commit message formatの実装時参照は
+  `docs/contributing/commit-message-format.md`として明示する。
+- skillやagent向け補助文書に残す内容は、発火条件、作業手順、
+  参照すべき正本文書の案内に限定する。
 - branch ruleまたはcommit ruleの本文を変更する場合は、まず
   `docs/contributing/`の正本文書を更新し、skillは必要な参照だけを追従する。
 
@@ -64,8 +63,8 @@ Issue #103のAC/DoD確認では、commit message formatとbranch strategyの
 - `task ci`が通過すること。
 - `docs/contributing/branch-strategy.md`と
   `docs/contributing/commit-message-format.md`が存在し、正本として残ること。
-- branch strategy skillとcommit message format skillが、それぞれ実装時に
-  読むcontributing docを明示していること。
+- branch strategyとcommit message formatの実装時参照が、それぞれ
+  対応するcontributing docを明示していること。
 - 実装差分に対するcommit messageが
   `#103 docs: <summary>`形式を満たすこと。
 
