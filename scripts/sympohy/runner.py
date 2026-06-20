@@ -14,6 +14,7 @@ from typing import Callable, Iterable, Mapping, Sequence
 
 from .config import SympohyConfig
 from .core import (
+    AcceptanceSet,
     FinalVerifierFinding,
     PHASE_ALIASES,
     extract_acceptance_set,
@@ -31,16 +32,21 @@ from .github import Issue, comment, fetch_issue, list_candidate_issues, set_issu
 
 
 HEARTBEAT_INTERVAL_SECONDS = 30
+DOCUMENT_ARTIFACT_GATE_MAX_ATTEMPTS = 3
 LOGICAL_STEP_COMMIT_RE = re.compile(
     r"^#(?P<issue>\d+) feat\(sympohy\): implement logical step (?P<step>\d+)$"
 )
 FINAL_VERIFIER_PROMPT = (
-    "Act as final verifier. Return a single JSON object with boolean "
+    "Act as final verifier. Return a single JSON object with status set to "
+    '"pass", "retry", or "block"; boolean '
     "acceptance_criteria_satisfied, boolean definition_of_done_satisfied, "
     'merge_recommendation set to "merge" or "block", and findings as an array. '
-    'When merge_recommendation is "merge", findings must be an empty array. '
-    'When merge_recommendation is "block", findings must be a non-empty array '
-    "of objects for automated fixing. Each finding must include string fields "
+    'Use status "pass" only when merge_recommendation is "merge". Use status '
+    '"retry" when findings can be fixed automatically. Use status "block" '
+    "when manual intervention is required. When merge_recommendation is "
+    '"merge", findings must be an empty array. When merge_recommendation is '
+    '"block", findings must be a non-empty array of objects for automated '
+    "fixing or manual review. Each finding must include string fields "
     "kind, summary, evidence, and suggested_fix. kind must be one of "
     "acceptance_criteria, definition_of_done, verification, reviewability, "
     "other. summary names the unmet requirement, evidence cites the observed "
@@ -211,6 +217,319 @@ class _RunStateWriter:
         with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
         self.write(progress=self.last_known_progress)
+
+
+def _run_stage_gate(
+    stage: str,
+    *,
+    config: SympohyConfig,
+    issue: Issue,
+    log_dir: Path,
+    context: Mapping[str, object],
+    cwd: Path | None = None,
+    state: _RunStateWriter | None = None,
+) -> Mapping[str, object]:
+    if not config.stage_gate_command:
+        return {
+            "status": "pass",
+            "stage": stage,
+            "issue": issue.number,
+            "reason": "stage gate command is disabled",
+        }
+
+    gate_dir = log_dir / "stage-gates"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    input_path = gate_dir / f"{stage}-input.json"
+    output_path = gate_dir / f"{stage}.json"
+    payload = {
+        "stage": stage,
+        "issue": issue.number,
+        "run_dir": str(log_dir),
+        "context": dict(context),
+    }
+    input_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    if state is not None:
+        state.write(
+            progress={
+                "message": "running stage gate",
+                "stage_gate": stage,
+                "stage_gate_input": str(input_path),
+                "stage_gate_output": str(output_path),
+            }
+        )
+
+    command = shlex.split(config.stage_gate_command)
+    if command and command[0] == "task":
+        command.append("--")
+    command += [
+        "--stage",
+        stage,
+        "--issue",
+        str(issue.number),
+        "--run-dir",
+        str(log_dir.resolve()),
+        "--input",
+        str(input_path.resolve()),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        result_payload = json.loads(completed.stdout)
+        if not isinstance(result_payload, Mapping):
+            raise ValueError("stage gate output must be a JSON object")
+        result: dict[str, object] = dict(result_payload)
+    except (json.JSONDecodeError, ValueError) as exc:
+        result = {
+            "status": "block",
+            "stage": stage,
+            "issue": issue.number,
+            "reason": f"stage gate command returned invalid JSON: {exc}",
+        }
+    result["command"] = config.stage_gate_command
+    result["returncode"] = completed.returncode
+    result["stderr"] = completed.stderr
+    if completed.returncode != 0 and result.get("status") == "pass":
+        result["status"] = "block"
+        result["reason"] = "stage gate command failed after reporting pass"
+    output_path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return result
+
+
+def _stage_gate_passed(
+    stage: str,
+    *,
+    config: SympohyConfig,
+    issue_ref: str,
+    issue: Issue,
+    log_dir: Path,
+    context: Mapping[str, object],
+    phase: str,
+    cwd: Path | None,
+    state: _RunStateWriter,
+    current_labels: Sequence[str] | None = None,
+) -> bool:
+    result = _run_stage_gate(
+        stage,
+        config=config,
+        issue=issue,
+        log_dir=log_dir,
+        context=context,
+        cwd=cwd,
+        state=state,
+    )
+    if result.get("status") == "pass":
+        return True
+    reason = str(result.get("reason", "stage gate did not pass"))
+    _block(
+        issue_ref,
+        phase=phase,
+        failed_command=f"stage gate: {stage}",
+        attempts=1,
+        cause=f"{result.get('status')}: {reason}",
+        run_log_path=log_dir,
+        cwd=cwd,
+        state=state,
+        current_labels=current_labels,
+    )
+    return False
+
+
+def _prepare_document_artifacts(
+    *,
+    config: SympohyConfig,
+    issue_ref: str,
+    issue: Issue,
+    acceptance: AcceptanceSet,
+    worktree: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+) -> bool:
+    if not config.stage_gate_command:
+        return True
+
+    decisions_path = log_dir / "artifact-decisions.json"
+    decisions = _load_artifact_decisions(decisions_path)
+    if decisions is None:
+        state.write(
+            phase="implement",
+            worktree=worktree,
+            progress={
+                "message": "preparing feature documentation artifacts",
+                "artifact_decisions_path": str(decisions_path),
+            },
+        )
+        decisions = _request_artifact_decisions(
+            issue=issue,
+            acceptance=acceptance,
+            worktree=worktree,
+            log_path=decisions_path,
+            heartbeat=state.heartbeat,
+        )
+
+    for stage in ("requirements", "design", "wireframes", "adr"):
+        for attempt in range(1, DOCUMENT_ARTIFACT_GATE_MAX_ATTEMPTS + 1):
+            result = _run_stage_gate(
+                stage,
+                config=config,
+                issue=issue,
+                log_dir=log_dir,
+                context={
+                    "artifact_decisions": decisions,
+                    "workspace": str(worktree),
+                },
+                cwd=worktree,
+                state=state,
+            )
+            if result.get("status") == "pass":
+                break
+            if result.get("status") == "block":
+                _block(
+                    issue_ref,
+                    phase="implement",
+                    failed_command=f"stage gate: {stage}",
+                    attempts=attempt,
+                    cause=str(result.get("reason", "stage gate blocked")),
+                    run_log_path=log_dir,
+                    cwd=worktree,
+                    state=state,
+                    current_labels=("sympohy:running", "sympohy:phase:implement"),
+                )
+                return False
+            if attempt >= DOCUMENT_ARTIFACT_GATE_MAX_ATTEMPTS:
+                _block(
+                    issue_ref,
+                    phase="implement",
+                    failed_command=f"stage gate: {stage}",
+                    attempts=attempt,
+                    cause=(
+                        f"{stage} artifact gate did not pass after "
+                        f"{DOCUMENT_ARTIFACT_GATE_MAX_ATTEMPTS} attempts: "
+                        f"{result.get('reason', 'stage gate retry')}"
+                    ),
+                    run_log_path=log_dir,
+                    cwd=worktree,
+                    state=state,
+                    current_labels=("sympohy:running", "sympohy:phase:implement"),
+                )
+                return False
+            fix_log_path = log_dir / f"artifact-decisions-{stage}-{attempt + 1}.json"
+            state.write(
+                phase="implement",
+                progress={
+                    "message": "repairing feature documentation artifact evidence",
+                    "stage_gate": stage,
+                    "stage_gate_status": result.get("status"),
+                    "stage_gate_reason": result.get("reason"),
+                    "artifact_decisions_path": str(fix_log_path),
+                    "attempt": attempt + 1,
+                    "max_attempts": DOCUMENT_ARTIFACT_GATE_MAX_ATTEMPTS,
+                },
+            )
+            decisions = _request_artifact_decisions(
+                issue=issue,
+                acceptance=acceptance,
+                worktree=worktree,
+                log_path=fix_log_path,
+                heartbeat=state.heartbeat,
+                repair_stage=stage,
+                repair_reason=str(result.get("reason", "")),
+                previous_decisions=decisions,
+            )
+            decisions_path.write_text(
+                json.dumps(
+                    {"artifact_decisions": decisions},
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        else:
+            return False
+    return True
+
+
+def _request_artifact_decisions(
+    *,
+    issue: Issue,
+    acceptance: AcceptanceSet,
+    worktree: Path,
+    log_path: Path,
+    heartbeat: Callable[[], None] | None,
+    repair_stage: str | None = None,
+    repair_reason: str | None = None,
+    previous_decisions: Mapping[str, object] | None = None,
+) -> Mapping[str, object]:
+    prompt = [
+        "Prepare SIFTQ feature documentation before implementation.",
+        "Use .agents/skills/feature-docs-planning/SKILL.md and "
+        "docs/contributing/development-flow.md as the rules.",
+        "Create or update docs when needed. Then return JSON only.",
+        "The JSON object must be: {\"artifact_decisions\": {"
+        "\"requirements\": {\"mode\": \"new|existing|not_needed\", "
+        "\"path\": \"docs/requirements/...\" or \"reason\": \"...\"}, "
+        "\"design\": {\"mode\": \"new|existing|not_needed\", "
+        "\"path\": \"docs/design/...\" or \"reason\": \"...\"}, "
+        "\"wireframes\": {\"mode\": \"new|existing|not_needed\", "
+        "\"path\": \"docs/wireframes/...\" or \"reason\": \"...\"}, "
+        "\"adr\": {\"mode\": \"new|existing|not_needed\", "
+        "\"path\": \"docs/adr/...\" or \"reason\": \"...\"}}}.",
+        "For new or existing modes, the referenced relative path must exist "
+        "in the repository when you finish.",
+        json.dumps(
+            {
+                "issue": issue.number,
+                "title": issue.title,
+                "acceptance_criteria": list(acceptance.acceptance_criteria),
+                "definition_of_done": list(acceptance.definition_of_done),
+                "repair_stage": repair_stage,
+                "repair_reason": repair_reason,
+                "previous_decisions": previous_decisions,
+            },
+            ensure_ascii=False,
+        ),
+    ]
+    payload = _codex_json(
+        prompt,
+        cwd=worktree,
+        log_path=log_path,
+        heartbeat=heartbeat,
+    )
+    return _artifact_decisions(payload)
+
+
+def _artifact_decisions(payload: Mapping[str, object]) -> Mapping[str, object]:
+    decisions = payload.get("artifact_decisions", payload)
+    if not isinstance(decisions, Mapping):
+        raise ValueError("artifact decisions JSON must be an object")
+    return decisions
+
+
+def _load_artifact_decisions(path: Path) -> Mapping[str, object] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    try:
+        return _artifact_decisions(payload)
+    except ValueError:
+        return None
 
 
 class _IssueRunLock:
@@ -790,6 +1109,23 @@ def _run_issue_locked(
         comment(issue_ref, message)
         return 2
 
+    if not _stage_gate_passed(
+        "request-elaboration",
+        config=config,
+        issue_ref=issue_ref,
+        issue=issue,
+        log_dir=log_dir,
+        context={
+            "acceptance_criteria": list(acceptance.acceptance_criteria),
+            "definition_of_done": list(acceptance.definition_of_done),
+        },
+        phase="triage",
+        cwd=None,
+        state=state,
+        current_labels=issue.labels,
+    ):
+        return 2
+
     try:
         worktree = ensure_worktree(issue, config, recover=recover)
     except (_ExistingRunError, _UnsafeRecoveryError) as exc:
@@ -859,6 +1195,17 @@ def _run_issue_locked(
         status="sympohy:running",
         phase="implement",
     )
+
+    if not _prepare_document_artifacts(
+        config=config,
+        issue_ref=issue_ref,
+        issue=issue,
+        acceptance=acceptance,
+        worktree=worktree,
+        log_dir=log_dir,
+        state=state,
+    ):
+        return 2
 
     plan = _load_existing_plan(plan_path) if recover else None
     loaded_existing_plan = plan is not None
@@ -992,6 +1339,24 @@ def _run_issue_locked(
         },
     )
 
+    if not _stage_gate_passed(
+        "implementation",
+        config=config,
+        issue_ref=issue_ref,
+        issue=issue,
+        log_dir=log_dir,
+        context={
+            "branch": branch,
+            "plan_path": str(plan_path),
+            "total_steps": total_steps,
+        },
+        phase="implement",
+        cwd=worktree,
+        state=state,
+        current_labels=("sympohy:running", "sympohy:phase:implement"),
+    ):
+        return 2
+
     if next_logical_step is None:
         state.write(
             phase="implement",
@@ -1078,7 +1443,7 @@ def _run_issue_locked(
             )
             if _run_hooks(
                 config.hooks,
-                config.retry_max_attempts,
+                config.ci_retry_max_attempts,
                 worktree,
                 log_dir,
                 state=state,
@@ -1089,12 +1454,29 @@ def _run_issue_locked(
                     issue_ref,
                     phase="hooks",
                     failed_command="; ".join(config.hooks),
-                    attempts=config.retry_max_attempts,
+                    attempts=config.ci_retry_max_attempts,
                     cause="verification hooks still failed after retries",
                     run_log_path=log_dir,
                     cwd=worktree,
                     state=state,
                 )
+                return 2
+            if not _stage_gate_passed(
+                "ci",
+                config=config,
+                issue_ref=issue_ref,
+                issue=issue,
+                log_dir=log_dir,
+                context={
+                    "ci_passed": True,
+                    "current_logical_step": index,
+                    "total_logical_steps": total_steps,
+                },
+                phase="hooks",
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:hooks"),
+            ):
                 return 2
             committed = _commit_all_if_new(
                 subject,
@@ -1160,6 +1542,19 @@ def _run_issue_locked(
     review_result = _review_fix_loop(issue_ref, issue, config, worktree, log_dir, state)
     if review_result != 0:
         return review_result
+    if not _stage_gate_passed(
+        "review",
+        config=config,
+        issue_ref=issue_ref,
+        issue=issue,
+        log_dir=log_dir,
+        context={"review_approved": True},
+        phase="review",
+        cwd=worktree,
+        state=state,
+        current_labels=("sympohy:running", "sympohy:phase:review"),
+    ):
+        return 2
 
     return _run_final_verifier_and_merge(
         issue_ref,
@@ -1373,7 +1768,31 @@ def _run_review_fix_round(
         return 0
     if comment_review:
         comment(review_pull_request, review_json, cwd=cwd)
-    if round_index >= config.review_max_rounds:
+    if review.stage_gate_status == "block":
+        _block(
+            issue_ref,
+            phase="review",
+            failed_command="adversarial review",
+            attempts=round_index,
+            cause="adversarial review requested manual block",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+    if not review.blocking_findings:
+        _block(
+            issue_ref,
+            phase="review",
+            failed_command="adversarial review",
+            attempts=round_index,
+            cause="review status did not pass but no blocking findings were provided",
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+    if round_index > config.review_max_rounds:
         _block(
             issue_ref,
             phase="review",
@@ -1692,13 +2111,14 @@ def _run_final_verifier_and_merge(
 
     empty_review = parse_review_json('{"findings":[]}')
     pull_request_number = _resolve_pull_request_number(worktree)
-    for verifier_attempt in range(1, config.final_verifier_fix_max_attempts + 2):
+    verifier_attempt = 0
+    while True:
+        verifier_attempt += 1
         final_verifier_path = _final_verifier_log_path(log_dir, verifier_attempt)
         progress: dict[str, object] = {
             "message": "running final verifier",
             "log_path": str(final_verifier_path),
             "final_verifier_attempt": verifier_attempt,
-            "max_final_verifier_fix_attempts": config.final_verifier_fix_max_attempts,
         }
         if total_steps is not None:
             progress["completed_logical_steps"] = total_steps
@@ -1713,6 +2133,7 @@ def _run_final_verifier_and_merge(
             log_path=final_verifier_path,
             heartbeat=state.heartbeat,
         )
+        final = _final_verifier_with_stage_status(final)
         _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
         _comment_final_verifier_result(
             pull_request_number,
@@ -1725,6 +2146,25 @@ def _run_final_verifier_and_merge(
             github_checks_status="success",
             review_result=empty_review,
         ):
+            if not _stage_gate_passed(
+                "merge",
+                config=config,
+                issue_ref=issue_ref,
+                issue=issue,
+                log_dir=log_dir,
+                context={
+                    "acceptance_criteria_satisfied": True,
+                    "definition_of_done_satisfied": True,
+                    "ci_passed": True,
+                    "review_approved": True,
+                    "final_verifier_log_path": str(final_verifier_path),
+                },
+                phase="finalize",
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            ):
+                return 2
             break
 
         recommendation = str(final.get("merge_recommendation", "")).lower()
@@ -1735,6 +2175,18 @@ def _run_final_verifier_and_merge(
                 failed_command="final verifier",
                 attempts=verifier_attempt,
                 cause="final verifier did not recommend merge or block",
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
+        if str(final.get("status", "")).lower() == "block":
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=verifier_attempt,
+                cause="final verifier requested manual block",
                 run_log_path=log_dir,
                 cwd=worktree,
                 state=state,
@@ -1755,21 +2207,6 @@ def _run_final_verifier_and_merge(
             )
             return 2
         fix_attempt = verifier_attempt
-        if fix_attempt > config.final_verifier_fix_max_attempts:
-            _block(
-                issue_ref,
-                phase="finalize",
-                failed_command="final verifier",
-                attempts=config.final_verifier_fix_max_attempts,
-                cause=(
-                    "final verifier still reported blocking findings after "
-                    f"{config.final_verifier_fix_max_attempts} fix attempts"
-                ),
-                run_log_path=log_dir,
-                cwd=worktree,
-                state=state,
-            )
-            return 2
         fix_result = _run_final_verifier_fix_round(
             issue_ref,
             issue,
@@ -1797,18 +2234,6 @@ def _run_final_verifier_and_merge(
         )
         if review_result != 0:
             return review_result
-    else:
-        _block(
-            issue_ref,
-            phase="finalize",
-            failed_command="final verifier",
-            attempts=config.final_verifier_fix_max_attempts,
-            cause="final verifier did not recommend merge",
-            run_log_path=log_dir,
-            cwd=worktree,
-            state=state,
-        )
-        return 2
 
     merge_progress: dict[str, object] = {"message": "merging pull request"}
     if total_steps is not None:
@@ -1843,19 +2268,28 @@ def _final_verifier_log_path(log_dir: Path, attempt: int) -> Path:
     return log_dir / f"final-verifier-{attempt}.json"
 
 
+def _final_verifier_with_stage_status(
+    payload: Mapping[str, object],
+) -> Mapping[str, object]:
+    result = dict(payload)
+    status = str(result.get("status", "")).lower()
+    if status not in {"pass", "retry", "block"}:
+        recommendation = str(result.get("merge_recommendation", "")).lower()
+        status = "pass" if recommendation == "merge" else "retry"
+    result["status"] = status
+    return result
+
+
 def _persist_final_verifier_artifacts(
     log_dir: Path,
     attempt_path: Path,
     payload: Mapping[str, object],
 ) -> None:
     latest_path = log_dir / "final-verifier.json"
-    if attempt_path.exists():
-        content = attempt_path.read_bytes()
-    else:
-        content = (
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-        ).encode("utf-8")
-        attempt_path.write_bytes(content)
+    content = (
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    attempt_path.write_bytes(content)
     latest_path.write_bytes(content)
 
 
@@ -1933,7 +2367,7 @@ def _run_final_verifier_fix_round(
     ):
         if _run_hooks(
             config.hooks,
-            config.retry_max_attempts,
+            config.ci_retry_max_attempts,
             cwd,
             log_dir,
             state=state,
@@ -1942,7 +2376,7 @@ def _run_final_verifier_fix_round(
                 issue_ref,
                 phase="hooks",
                 failed_command="; ".join(config.hooks),
-                attempts=config.retry_max_attempts,
+                attempts=config.ci_retry_max_attempts,
                 cause="verification hooks still failed after final verifier fix",
                 run_log_path=log_dir,
                 cwd=cwd,
@@ -1982,7 +2416,6 @@ def _run_final_verifier_fix_round(
         "message": "fixing final verifier findings",
         "fix_source": "final_verifier",
         "final_verifier_fix_attempt": fix_attempt,
-        "max_final_verifier_fix_attempts": config.final_verifier_fix_max_attempts,
         "blocking_findings": len(findings),
         "log_path": str(fix_log_path),
     }
@@ -2018,7 +2451,7 @@ def _run_final_verifier_fix_round(
 
     if _run_hooks(
         config.hooks,
-        config.retry_max_attempts,
+        config.ci_retry_max_attempts,
         cwd,
         log_dir,
         state=state,
@@ -2027,7 +2460,7 @@ def _run_final_verifier_fix_round(
             issue_ref,
             phase="hooks",
             failed_command="; ".join(config.hooks),
-            attempts=config.retry_max_attempts,
+            attempts=config.ci_retry_max_attempts,
             cause="verification hooks still failed after final verifier fix",
             run_log_path=log_dir,
             cwd=cwd,
@@ -2165,7 +2598,7 @@ def _review_fix_loop(
     pull_request_number: str | None = None,
     existing_fix_subjects: set[str] | None = None,
 ) -> int:
-    if start_round > config.review_max_rounds:
+    if start_round > config.review_max_rounds + 1:
         return 0
     if pull_request_number is None:
         pull_request_number = _resolve_pull_request_number(cwd)
@@ -2173,7 +2606,7 @@ def _review_fix_loop(
         existing_fix_subjects = set(
             _commit_subjects(cwd=cwd, base_branch=config.base_branch)
         )
-    for round_index in range(start_round, config.review_max_rounds + 1):
+    for round_index in range(start_round, config.review_max_rounds + 2):
         set_issue_state(
             issue_ref,
             current_labels=("sympohy:running", "sympohy:phase:review"),
@@ -2194,7 +2627,10 @@ def _review_fix_loop(
         review_json = _codex_text(
             [
                 "Review this PR adversarially. Return machine-parseable JSON "
-                "with findings: [{severity, summary, status}]. Severities are "
+                "with status set to pass or retry and findings: "
+                "[{severity, summary, status}]. Use status pass only when there "
+                "are no critical/high/medium findings. Use status retry when "
+                "critical/high/medium findings remain. Severities are "
                 "critical, high, medium, low, info.",
                 f"Issue #{issue.number}",
             ],
@@ -2203,6 +2639,8 @@ def _review_fix_loop(
             heartbeat=state.heartbeat,
         )
         review = parse_review_json(review_json)
+        review_json = _review_json_with_stage_status(review)
+        review_log_path.write_text(review_json, encoding="utf-8")
         review_result = _run_review_fix_round(
             issue_ref,
             issue,
@@ -2220,6 +2658,15 @@ def _review_fix_loop(
         if review_result != 1:
             return review_result
     return 2
+
+
+def _review_json_with_stage_status(review: ReviewResult) -> str:
+    if isinstance(review.raw, Mapping):
+        payload: dict[str, object] = dict(review.raw)
+    else:
+        payload = {"findings": [finding.__dict__ for finding in review.findings]}
+    payload["status"] = review.stage_gate_status
+    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
 def _block(
@@ -2807,7 +3254,7 @@ def _next_review_rerun_round(log_dir: Path, *, max_review_rounds: int) -> int:
             continue
     if not review_rounds:
         return 1
-    return min(max(review_rounds) + 1, max_review_rounds)
+    return min(max(review_rounds) + 1, max_review_rounds + 1)
 
 
 def _bootstrap_run_state(

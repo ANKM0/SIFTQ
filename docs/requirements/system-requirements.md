@@ -44,10 +44,19 @@ codd:
     - id: design:sympohy-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
-    - id: design:mvp-spec-flow
+    - id: design:development-flow
       relation: depends_on
       semantic: governance
-    - id: design:mvp-spec-flow
+    - id: design:requirements-template
+      relation: depends_on
+      semantic: governance
+    - id: design:design-template
+      relation: depends_on
+      semantic: governance
+    - id: design:wireframe-template
+      relation: depends_on
+      semantic: governance
+    - id: design:pytest-as-default-python-test-runner-adr
       relation: depends_on
       semantic: governance
     - id: design:issue-10-taskfile

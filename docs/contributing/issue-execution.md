@@ -17,6 +17,9 @@ codd:
       relation: depends_on
       semantic: workflow
   depended_by:
+    - id: design:development-flow
+      relation: depends_on
+      semantic: automation
     - id: design:issue-82-stale-running-inspection
       relation: depends_on
       semantic: automation

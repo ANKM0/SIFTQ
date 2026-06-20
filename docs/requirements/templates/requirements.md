@@ -1,0 +1,33 @@
+---
+codd:
+  node_id: design:requirements-template
+  type: design
+  status: draft
+  depends_on:
+    - id: req:siftq-system
+      relation: depends_on
+      semantic: governance
+---
+
+# <Feature> Requirements
+
+## 背景
+
+この要求・仕様が存在する理由、業務・プロダクト上の文脈を記録する。
+
+## 概要
+
+この要求仕様が定義する機能・振る舞いの全体像を記録する。
+
+## 機能要件
+
+## 非機能要件
+
+性能、アクセシビリティ、運用、セキュリティなど、機能要件だけでは
+判断できない制約がある場合だけ記録する。
+
+## 関連Issue
+
+この要求仕様に関連する Issue を列挙する。AC / DoD の正は Issue 側に置く。
+
+## 未決事項

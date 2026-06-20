@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import adrAuthoring from "../../docs/contributing/adr-authoring.md?raw";
 import pullRequestTemplate from "../../.github/pull_request_template.md?raw";
-import mvpSpecFlow from "../../docs/contributing/mvp-spec-flow.md?raw";
+import featureDocsPlanning from "../../.agents/skills/feature-docs-planning/SKILL.md?raw";
+import adrAuthoring from "../../docs/contributing/adr-authoring.md?raw";
+import designTemplate from "../../docs/design/templates/design.md?raw";
+import requirementsTemplate from "../../docs/requirements/templates/requirements.md?raw";
+import wireframeTemplate from "../../docs/wireframes/templates/wireframe.md?raw";
 
-describe("MVP spec flow", () => {
+describe("feature documentation artifacts", () => {
   it("defines the required wireframe markdown template anchors", () => {
     const requiredAnchors = [
-      "## Wireframe Markdown Template",
-      "wireframe CoDD node の命名規則は `design:<feature-wireframe>`",
+      "# Wireframe Template",
       "node_id: design:<feature-wireframe>",
       "## Target HTML（対象HTML）",
       "## UI Contract（UI契約）",
@@ -20,25 +22,13 @@ describe("MVP spec flow", () => {
     ];
 
     const missingAnchors = requiredAnchors.filter(
-      (anchor) => !mvpSpecFlow.includes(anchor)
+      (anchor) => !wireframeTemplate.includes(anchor)
     );
 
     expect(missingAnchors).toEqual([]);
   });
 
   it("requires UI-changing PRs to update wireframe HTML", () => {
-    const requiredRuleFragments = [
-      "UI 変更 PR では",
-      "wireframe HTML を",
-      "更新する",
-      "`tests/docs/wireframeContract.test.ts`"
-    ];
-
-    const missingSpecFragments = requiredRuleFragments.filter(
-      (fragment) => !mvpSpecFlow.includes(fragment)
-    );
-
-    expect(missingSpecFragments).toEqual([]);
     expect(pullRequestTemplate).toContain(
       "UI 変更がある場合は wireframe HTML を更新し"
     );
@@ -49,40 +39,25 @@ describe("MVP spec flow", () => {
 
   it("documents when an ADR is required", () => {
     const requiredAdrFragments = [
-      "次のどちらかに該当する場合は、ADR を作成する",
-      "複数機能、複数ドキュメント、または repository workflow",
-      "後から変えると migration、schema 変更、toolchain 移行",
-      "runtime 変更、storage 移行、または architecture boundary",
-      "ADR が必要になる代表例",
-      "アーキテクチャ判断",
-      "主要モジュール",
-      "ライブラリ",
-      "ツール",
+      "Create or update an ADR when either condition applies",
+      "multiple features, multiple documents, or repository",
+      "migration, schema changes",
+      "runtime changes, storage migration, or architecture",
+      "architecture decisions",
+      "major modules",
+      "libraries",
+      "tools",
       "governance"
     ];
 
     const missingAdrFragments = requiredAdrFragments.filter(
-      (fragment) => !mvpSpecFlow.includes(fragment)
+      (fragment) => !adrAuthoring.includes(fragment)
     );
 
     expect(missingAdrFragments).toEqual([]);
   });
 
   it("documents the boundary between ADRs and design docs", () => {
-    const requiredBoundaryFragments = [
-      "### ADR / Design Doc Boundary",
-      "判断の寿命と適用範囲",
-      "ADR は durable decision を記録する",
-      "Design doc は feature-specific application を記録する",
-      "Design doc は ADR の判断を再決定してはならない",
-      "ADR は feature-specific implementation details を持たない"
-    ];
-
-    const missingBoundaryFragments = requiredBoundaryFragments.filter(
-      (fragment) => !mvpSpecFlow.includes(fragment)
-    );
-
-    expect(missingBoundaryFragments).toEqual([]);
     expect(adrAuthoring).toContain("## Boundary With Design Docs");
     expect(adrAuthoring).toContain("Use ADRs for durable decisions");
     expect(adrAuthoring).toContain("architecture decisions");
@@ -99,14 +74,32 @@ describe("MVP spec flow", () => {
     expect(adrAuthoring).toContain("per-feature external design");
     expect(adrAuthoring).toContain("internal design");
     expect(adrAuthoring).toContain("test perspectives");
-    expect(adrAuthoring).toContain(
-      "perspectives, and application of existing ADRs"
+  });
+
+  it("keeps template responsibilities in the artifact templates", () => {
+    expect(requirementsTemplate).toContain("## 背景");
+    expect(requirementsTemplate).toContain("## 概要");
+    expect(requirementsTemplate).toContain("## 機能要件");
+    expect(requirementsTemplate).toContain("## 非機能要件");
+    expect(requirementsTemplate).toContain("## 関連Issue");
+    expect(requirementsTemplate).toContain("AC / DoD の正は Issue 側に置く");
+    expect(requirementsTemplate).not.toContain("## Acceptance Criteria");
+    expect(designTemplate).toContain("## External Design（外部設計）");
+    expect(designTemplate).toContain("## Internal Design（内部設計）");
+    expect(designTemplate).toContain("## Test Viewpoints（テスト観点）");
+    expect(designTemplate).toContain("## ADR Application（ADR 適用）");
+  });
+
+  it("documents artifact decision outcomes in the feature docs skill", () => {
+    expect(featureDocsPlanning).toContain("docs/contributing/development-flow.md");
+    expect(featureDocsPlanning).toContain("development-flow diagram");
+    expect(featureDocsPlanning).toContain("new");
+    expect(featureDocsPlanning).toContain("existing");
+    expect(featureDocsPlanning).toContain("not needed");
+    expect(featureDocsPlanning).toContain(
+      "docs/requirements/templates/requirements.md"
     );
-    expect(mvpSpecFlow).toContain("per-feature");
-    expect(mvpSpecFlow).toContain("external design");
-    expect(mvpSpecFlow).toContain("internal design");
-    expect(mvpSpecFlow).toContain("test perspectives");
-    expect(mvpSpecFlow).toContain("既存 ADR の");
-    expect(mvpSpecFlow).toContain("application");
+    expect(featureDocsPlanning).toContain("docs/design/templates/design.md");
+    expect(featureDocsPlanning).toContain("docs/wireframes/templates/wireframe.md");
   });
 });

@@ -555,6 +555,12 @@ class SympohyCoreTest(unittest.TestCase):
         self.assertFalse(result.approved)
         self.assertEqual(result.blocking_findings[0].summary, "missing resume guard")
 
+    def test_review_json_uses_stage_gate_status_when_present(self) -> None:
+        result = parse_review_json('{"status":"block","findings":[]}')
+
+        self.assertEqual(result.stage_gate_status, "block")
+        self.assertFalse(result.approved)
+
     def test_retry_blocks_after_third_failed_attempt(self) -> None:
         self.assertEqual(next_retry_action(1), "retry")
         self.assertEqual(next_retry_action(2), "retry")
@@ -653,6 +659,7 @@ class SympohyCoreTest(unittest.TestCase):
             review_max_rounds=5,
             retry_max_attempts=3,
             final_verifier_fix_max_attempts=2,
+            stage_gate_command=None,
         )
 
         with (

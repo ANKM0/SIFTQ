@@ -201,6 +201,12 @@ tasks:
     cmds:
       - uv run python -m scripts.sympohy resume {{.CLI_ARGS}}
 
+  ai:sympohy:stage-gate:
+    desc: Evaluate a sympohy stage gate and emit pass/retry/block JSON.
+    silent: true
+    cmds:
+      - uv run python -m scripts.sympohy stage-gate {{.CLI_ARGS}}
+
   ai:sympohy:doctor:
     desc: Validate sympohy config, labels, systemd templates, Codex, hooks, and GitHub prerequisites.
     cmds:
