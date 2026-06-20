@@ -92,10 +92,10 @@ is not available in that catalog.
 | --- | --- | --- | --- |
 | `default` | `gpt-5.5` | `high` | Fallback for unclassified Codex calls |
 | `triage` | `gpt-5.4-mini` | `medium` | Lightweight issue classification or future triage calls |
-| `planning` | `gpt-5.5` | `high` | Documentation artifact decisions and logical implementation plan |
-| `implementation` | `gpt-5.5` | `high` | Logical-step implementation |
-| `fix` | `gpt-5.5` | `high` | Hook, review, and final-verifier fixes |
-| `review` | `gpt-5.5` | `xhigh` | Adversarial PR review |
+| `planning` | `gpt-5.4-mini` | `medium` | Documentation artifact decisions and logical implementation plan |
+| `implementation` | `gpt-5.4` | `medium` | Logical-step implementation |
+| `fix` | `gpt-5.4` | `medium` | Hook, review, and final-verifier fixes |
+| `review` | `gpt-5.5` | `high` | Adversarial PR review |
 | `merge_readiness` | `gpt-5.5` | `xhigh` | Final verifier and merge recommendation |
 
 Configure these values in `.sympohy/config.yaml` with
@@ -276,7 +276,8 @@ worker pid is missing or dead, the state file is missing, or the heartbeat has
 expired. Fresh issues start through normal triage, while stale running issues
 are routed through resume handling so they are not excluded permanently.
 
-The watcher keeps up to `max_workers` workers active. When a worker exits, the
+The checked-in conservative profile keeps `max_workers: 3` workers active.
+When a worker exits, the
 next poll reaps it and fills the open slot from the issue queue. Each worker
 uses an independent `.sympohy/worktrees/issue-<number>` worktree and issue
 branch.
@@ -295,15 +296,23 @@ Hooks are configured in `.sympohy/config.yaml`. The initial final hook is:
 task ci
 ```
 
-Hook failures trigger a Codex fix attempt and rerun, up to three attempts. If
+The checked-in conservative profile uses `ci_retry_max_attempts: 10`,
+`review_max_rounds: 3`, and `final_verifier_fix_max_attempts: 2` to avoid
+long blind retry loops during local watcher operation. The development-flow
+compatibility values remain `ci_retry_max_attempts: 50` and
+`review_max_rounds: 10` for operators that intentionally want the full loop
+budget.
+
+Hook failures trigger a Codex fix attempt and rerun, up to
+`ci_retry_max_attempts`. If
 the hook still fails, `sympohy` blocks the issue and comments with the phase,
 failed command, attempts, cause summary, and run log path.
 
 After `task ci` succeeds, `sympohy` creates a draft PR, runs an adversarial
 review Codex pass that must return machine-readable JSON, and repeats fix/review
-up to five rounds until there are no `critical`, `high`, or `medium` findings.
-Review results are posted to the PR so blocking findings and fix status are
-traceable.
+up to `review_max_rounds` until there are no `critical`, `high`, or `medium`
+findings. Review results are posted to the PR so blocking findings and fix
+status are traceable.
 
 Before merge, a final verifier Codex pass must return JSON confirming AC/DoD
 satisfaction and recommending `merge` or `block`. `merge` responses must include
@@ -317,8 +326,10 @@ compatibility with existing tooling.
 `reviewability`, or `other`. Valid non-empty verifier findings move the issue
 to `sympohy:phase:fix` with `fix_source=final_verifier`, up to
 `final_verifier_fix_max_attempts` configured in `.sympohy/config.yaml` (default
-`2`). After hooks pass for a final-verifier fix, `sympohy` commits and pushes
-the fix, reruns adversarial review, and only then reruns the final verifier.
+`2`). Setting `final_verifier_fix_max_attempts: 0` disables automated
+final-verifier fixes; valid retry findings then block the issue immediately.
+After hooks pass for a final-verifier fix, `sympohy` commits and pushes the
+fix, reruns adversarial review, and only then reruns the final verifier.
 Missing, empty, or schema-invalid block findings add `sympohy:blocked` instead
 of starting a fix. If the final verifier still reports blocking findings after
 the configured fix attempts, `sympohy` blocks the issue instead of starting

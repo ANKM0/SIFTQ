@@ -2932,6 +2932,110 @@ class SympohyRunnerTest(unittest.TestCase):
             self.assertIn("invalid findings", comment.call_args.args[1])
             self.assertEqual(final_state["status"], "blocked")
 
+    def test_final_verifier_blocks_when_fix_attempt_limit_is_exceeded(self) -> None:
+        def verifier_response(summary: str) -> dict[str, object]:
+            return {
+                "status": "retry",
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [
+                    {
+                        "kind": "acceptance_criteria",
+                        "summary": summary,
+                        "evidence": "final verifier still finds a blocker",
+                        "suggested_fix": "fix the remaining gap",
+                    }
+                ],
+            }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Stop final verifier fix loop",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=1,
+                retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
+                stage_gate_command=None,
+            )
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    side_effect=[
+                        verifier_response("first gap"),
+                        verifier_response("second gap"),
+                        verifier_response("third gap"),
+                    ],
+                ),
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    config,
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        self.assertEqual(run_final_verifier_fix_round.call_count, 2)
+        self.assertEqual(review_fix_loop.call_count, 2)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            status="sympohy:blocked",
+            phase="finalize",
+            cwd=worktree,
+        )
+        self.assertIn(
+            "final_verifier_fix_max_attempts (2)",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(final_state["last_known_progress"]["attempts"], 3)
+
     def test_final_verifier_fix_blocks_when_codex_makes_no_changes(self) -> None:
         verifier_response = {
             "acceptance_criteria_satisfied": False,

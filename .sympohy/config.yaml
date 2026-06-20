@@ -1,24 +1,25 @@
-max_workers: 10
+max_workers: 3
 watch_poll_interval_seconds: 60
 base_branch: main
 worktree_root: .sympohy/worktrees
 run_log_root: .sympohy/runs
 stale_status_after_minutes: 30
-review_max_rounds: 10
-ci_retry_max_attempts: 50
+review_max_rounds: 3
+ci_retry_max_attempts: 10
+final_verifier_fix_max_attempts: 2
 stage_gate_command: task ai:sympohy:stage-gate
 codex_model_default: gpt-5.5
 codex_reasoning_default: high
 codex_model_triage: gpt-5.4-mini
 codex_reasoning_triage: medium
-codex_model_planning: gpt-5.5
-codex_reasoning_planning: high
-codex_model_implementation: gpt-5.5
-codex_reasoning_implementation: high
-codex_model_fix: gpt-5.5
-codex_reasoning_fix: high
+codex_model_planning: gpt-5.4-mini
+codex_reasoning_planning: medium
+codex_model_implementation: gpt-5.4
+codex_reasoning_implementation: medium
+codex_model_fix: gpt-5.4
+codex_reasoning_fix: medium
 codex_model_review: gpt-5.5
-codex_reasoning_review: xhigh
+codex_reasoning_review: high
 codex_model_merge_readiness: gpt-5.5
 codex_reasoning_merge_readiness: xhigh
 hooks:
