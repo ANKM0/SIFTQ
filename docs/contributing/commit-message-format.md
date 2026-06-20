@@ -50,8 +50,3 @@ Examples:
 Use a commit body when the first line is not enough to explain the reason,
 tradeoff, migration step, or review context. Keep the first line in the required
 format even when a body is present.
-
-## Agent Skill
-
-The repository-local Codex skill for this convention is
-`.agents/skills/commit-message-format/SKILL.md`.
