@@ -104,6 +104,41 @@ class SympohyStageGateTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "pass")
 
+    def test_artifact_stage_accepts_saved_relative_workspace_from_worktree_cwd(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / ".sympohy" / "worktrees" / "issue-101"
+            requirements = worktree / "docs" / "requirements"
+            requirements.mkdir(parents=True)
+            (requirements / "system-requirements.md").write_text(
+                "# System Requirements\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(worktree)
+                result = evaluate_stage(
+                    "requirements",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": ".sympohy/worktrees/issue-101",
+                        "artifact_decisions": {
+                            "requirements": {
+                                "mode": "existing",
+                                "path": "docs/requirements/system-requirements.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "pass")
+
     def test_artifact_stage_retries_when_relative_workspace_is_missing(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

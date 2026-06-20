@@ -321,8 +321,22 @@ def _path_exists(workspace: str, relative_path: str) -> bool:
         return False
     workspace_path = Path(workspace)
     if not workspace_path.exists():
-        return False
+        return (
+            not workspace_path.is_absolute()
+            and _cwd_matches_relative_workspace(workspace_path)
+            and Path(relative_path).exists()
+        )
     return (workspace_path / relative_path).exists()
+
+
+def _cwd_matches_relative_workspace(workspace_path: Path) -> bool:
+    workspace_parts = workspace_path.parts
+    if not workspace_parts:
+        return False
+    cwd_parts = Path.cwd().parts
+    return len(cwd_parts) >= len(workspace_parts) and (
+        cwd_parts[-len(workspace_parts) :] == workspace_parts
+    )
 
 
 if __name__ == "__main__":
