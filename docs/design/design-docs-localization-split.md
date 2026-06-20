@@ -27,7 +27,7 @@ front matter、既存requirements、ADR、contributing docsからのリンク維
 既存設計書の整理結果は次の通り。
 
 | 新ファイル | 主な扱い |
-| --- | --- | --- |
+| --- | --- |
 | `codd-foundation.md` | CoDD基盤設計として日本語化する。 |
 | `matrix-mvp-technology-selection.md` | Matrix MVP技術選定設計として日本語化・リネームする。 |
 | `taskfile-command-runner.md` | Taskfile command runner設計として日本語化・リネームする。 |

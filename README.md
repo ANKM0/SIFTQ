@@ -134,7 +134,7 @@ task ci
 - `src/`: React application source.
 - `tests/`: repository-level tests.
 - `docs/requirements/`: product and system requirements.
-- `docs/design/`: issue-level design notes.
+- `docs/design/`: feature-level design documents and design templates.
 - `docs/adr/`: accepted architecture decisions.
 - `.codd/`: local CoDD configuration.
 - `.sympohy/`: sympohy configuration and systemd templates.
