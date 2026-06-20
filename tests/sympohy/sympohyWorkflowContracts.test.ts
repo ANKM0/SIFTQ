@@ -71,9 +71,10 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("inspect_running_issue");
     expect(config).toContain("stale_status_after_minutes: 30");
     expect(config).toContain("watch_poll_interval_seconds: 60");
-    expect(config).toContain("ci_retry_max_attempts: 50");
-    expect(config).toContain("review_max_rounds: 10");
-    expect(config).not.toContain("merge_gate_retry_max_attempts");
+    expect(config).toContain("ci_retry_max_attempts: 10");
+    expect(config).toContain("review_max_rounds: 3");
+    expect(config).toContain("final_verifier_fix_max_attempts: 2");
+    expect(config).not.toContain(["merge_gate", "retry_max_attempts"].join("_"));
     expect(config).toContain("stage_gate_command: task ai:sympohy:stage-gate");
     expect(core).toContain("DEFAULT_STALE_STATUS_AFTER_MINUTES");
     expect(core).toContain("\"dead pid\"");
@@ -107,8 +108,8 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("git\", \"status\", \"--porcelain\"");
   });
 
-  it("limits parallel issue starts to ten and uses independent worktrees", () => {
-    expect(config).toContain("max_workers: 10");
+  it("limits parallel issue starts with conservative workers and uses independent worktrees", () => {
+    expect(config).toContain("max_workers: 3");
     expect(runner).toContain("_watch_candidate_priority");
     expect(runner).toContain("watch_forever");
     expect(runner).toContain("_start_watch_workers");

@@ -2282,6 +2282,22 @@ def _run_final_verifier_and_merge(
             )
             return 2
         fix_attempt = verifier_attempt
+        if fix_attempt > config.final_verifier_fix_max_attempts:
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=fix_attempt,
+                cause=(
+                    "final verifier findings exceeded "
+                    "final_verifier_fix_max_attempts "
+                    f"({config.final_verifier_fix_max_attempts})"
+                ),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
         fix_result = _run_final_verifier_fix_round(
             issue_ref,
             issue,

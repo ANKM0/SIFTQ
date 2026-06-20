@@ -143,11 +143,14 @@ def setup() -> int:
 
 def doctor(*, config_path: Path) -> int:
     config = load_config(config_path)
+    retry_profile = _retry_profile(config)
     checks = {
         ".sympohy/config.yaml": config_path.exists(),
         "max_workers <= 10": config.max_workers <= 10,
         "stale_status_after_minutes > 0": config.stale_status_after_minutes > 0,
         "watch_poll_interval_seconds > 0": config.watch_poll_interval_seconds > 0,
+        f"retry profile {retry_profile}": retry_profile
+        in {"conservative", "compatibility", "custom"},
         "default hook task ci": "task ci" in config.hooks,
         "stage gate command configured": config.stage_gate_command
         == "task ai:sympohy:stage-gate",
@@ -186,6 +189,24 @@ def doctor(*, config_path: Path) -> int:
     }
     _print_checks(checks)
     return 0 if all(checks.values()) else 1
+
+
+def _retry_profile(config: object) -> str:
+    if (
+        getattr(config, "max_workers") == 3
+        and getattr(config, "review_max_rounds") == 3
+        and getattr(config, "ci_retry_max_attempts") == 10
+        and getattr(config, "final_verifier_fix_max_attempts") == 2
+    ):
+        return "conservative"
+    if (
+        getattr(config, "max_workers") == 10
+        and getattr(config, "review_max_rounds") == 10
+        and getattr(config, "ci_retry_max_attempts") == 50
+        and getattr(config, "final_verifier_fix_max_attempts") == 2
+    ):
+        return "compatibility"
+    return "custom"
 
 
 def contract(name: str, payload_source: str) -> int:
