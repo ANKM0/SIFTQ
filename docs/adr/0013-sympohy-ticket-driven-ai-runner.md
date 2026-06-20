@@ -40,7 +40,7 @@ retain logs.
 
 Issue #74 raises the requirement to run up to ten issues in parallel, isolate
 each issue in a `git worktree`, manage state through GitHub labels, install a
-systemd user timer, and keep the runner under direct repository control.
+systemd user service, and keep the runner under direct repository control.
 
 The runner remains development operations tooling. It must not become a SIFTQ
 application runtime dependency or affect the React/Vite application boundary.
@@ -59,9 +59,11 @@ GitHub state is represented by `sympohy:*` labels. Status labels are
 `implement`, `hooks`, `review`, `fix`, and `finalize`, and `sympohy` keeps them
 exclusive per issue.
 
-The watcher polls open issues once per minute and selects issues that do not
-already have a `sympohy` status label. It starts at most ten issue workers.
-Each worker creates an issue branch in an independent worktree.
+The watcher runs as a foreground daemon. Under systemd, the user service keeps
+it alive while the watcher polls open issues on the configured interval,
+selects issues that do not already have a `sympohy` status label, and fills
+available worker slots up to the configured maximum. Each worker creates an
+issue branch in an independent worktree.
 
 Workers use the normal local Codex CLI environment, including `HOME`,
 `CODEX_HOME`, repository rules, and repository skills. `codex exec` must not be
@@ -78,7 +80,7 @@ run with flags that ignore user config or repo rules.
   surface without serving the application.
 - Run from GitHub-hosted Actions: the intended environment depends on the local
   Codex CLI session, repository-local rules and skills, authenticated `gh`, and
-  systemd user timers.
+  the systemd user service.
 
 ## Consequences
 

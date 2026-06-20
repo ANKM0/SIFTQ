@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from .config import DEFAULT_CONFIG_PATH, load_config
+from .config import CODEX_MODEL_ROLES, DEFAULT_CONFIG_PATH, load_config
 from .core import (
     extract_acceptance_set,
     merge_gate_allows_merge,
@@ -19,7 +19,12 @@ from .core import (
 from .github import REQUIRED_LABELS, migrate_legacy_tasks, sync_labels
 from .runner import refine_issue, resume_issue, run_issue, watch
 from .stage_gate import main as stage_gate_main
-from .systemd import install_systemd_units, print_systemd_status
+from .systemd import (
+    install_systemd_units,
+    print_systemd_status,
+    start_systemd_service,
+    stop_systemd_service,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     subcommands.add_parser("labels-sync")
     subcommands.add_parser("watch")
     subcommands.add_parser("systemd-install")
+    subcommands.add_parser("systemd-start")
+    subcommands.add_parser("systemd-stop")
     subcommands.add_parser("systemd-status")
 
     stage_gate_parser = subcommands.add_parser("stage-gate")
@@ -95,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         return watch(config)
     if args.command == "systemd-install":
         return install_systemd_units(ROOT)
+    if args.command == "systemd-start":
+        return start_systemd_service()
+    if args.command == "systemd-stop":
+        return stop_systemd_service()
     if args.command == "systemd-status":
         return print_systemd_status()
     if args.command == "stage-gate":
@@ -136,14 +147,25 @@ def doctor(*, config_path: Path) -> int:
         ".sympohy/config.yaml": config_path.exists(),
         "max_workers <= 10": config.max_workers <= 10,
         "stale_status_after_minutes > 0": config.stale_status_after_minutes > 0,
+        "watch_poll_interval_seconds > 0": config.watch_poll_interval_seconds > 0,
         "default hook task ci": "task ci" in config.hooks,
         "stage gate command configured": config.stage_gate_command
         == "task ai:sympohy:stage-gate",
+        "codex model roles configured": all(
+            role in config.codex_models for role in CODEX_MODEL_ROLES
+        ),
         "stage gate task declared": "ai:sympohy:stage-gate:"
         in (ROOT / "Taskfile.yml").read_text(encoding="utf-8"),
-        "systemd service template": (ROOT / ".sympohy/systemd/sympohy-watch.service").exists(),
-        "systemd timer template": (ROOT / ".sympohy/systemd/sympohy-watch.timer").exists(),
-        "commit hook rejects invalid subject": not validate_commit_subject("sympohy: bad"),
+        "systemd service template": (
+            ROOT / ".sympohy/systemd/sympohy-watch.service"
+        ).exists(),
+        "systemd service install target": "WantedBy=default.target"
+        in (ROOT / ".sympohy/systemd/sympohy-watch.service").read_text(
+            encoding="utf-8"
+        ),
+        "commit hook rejects invalid subject": not validate_commit_subject(
+            "sympohy: bad"
+        ),
         "commit hook accepts repository subject": validate_commit_subject(
             "#74 feat(sympohy): add issue runner"
         ),

@@ -67,8 +67,3 @@ git push -u origin "$(git branch --show-current)"
 - Keep branch names lowercase and hyphenated.
 - Use the repository commit message format documented in
   `docs/contributing/commit-message-format.md`.
-
-## Agent Skill
-
-The repository-local Codex skill for this convention is
-`.agents/skills/branch-strategy/SKILL.md`.

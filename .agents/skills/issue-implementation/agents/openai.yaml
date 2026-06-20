@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue Implementation"
+  short_description: "Follow SIFTQ issue implementation workflow."
+  default_prompt: "Use $issue-implementation to implement a SIFTQ issue while following the repository docs."

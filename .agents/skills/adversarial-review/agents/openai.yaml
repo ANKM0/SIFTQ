@@ -1,0 +1,4 @@
+interface:
+  display_name: "Adversarial Review"
+  short_description: "Stress-test SIFTQ changes before approval."
+  default_prompt: "Use $adversarial-review to review this SIFTQ change for bugs, regressions, and missing tests."
