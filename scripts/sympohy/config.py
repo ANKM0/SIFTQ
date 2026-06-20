@@ -5,11 +5,39 @@ from pathlib import Path
 
 
 DEFAULT_CONFIG_PATH = Path(".sympohy/config.yaml")
+CODEX_MODEL_ROLES = (
+    "default",
+    "triage",
+    "planning",
+    "implementation",
+    "fix",
+    "review",
+    "merge_readiness",
+)
+CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh")
+
+
+@dataclass(frozen=True)
+class CodexModelConfig:
+    model: str
+    reasoning_effort: str
+
+
+DEFAULT_CODEX_MODELS = {
+    "default": CodexModelConfig("gpt-5.5", "high"),
+    "triage": CodexModelConfig("gpt-5.4-mini", "medium"),
+    "planning": CodexModelConfig("gpt-5.5", "high"),
+    "implementation": CodexModelConfig("gpt-5.5", "high"),
+    "fix": CodexModelConfig("gpt-5.5", "high"),
+    "review": CodexModelConfig("gpt-5.5", "xhigh"),
+    "merge_readiness": CodexModelConfig("gpt-5.5", "xhigh"),
+}
 
 
 @dataclass(frozen=True, init=False)
 class SympohyConfig:
     max_workers: int
+    watch_poll_interval_seconds: int
     base_branch: str
     worktree_root: Path
     run_log_root: Path
@@ -19,6 +47,7 @@ class SympohyConfig:
     ci_retry_max_attempts: int
     merge_gate_retry_max_attempts: int | None
     stage_gate_command: str | None
+    codex_models: dict[str, CodexModelConfig]
 
     def __init__(
         self,
@@ -35,6 +64,8 @@ class SympohyConfig:
         stage_gate_command: str | None = "task ai:sympohy:stage-gate",
         retry_max_attempts: int | None = None,
         final_verifier_fix_max_attempts: int | None = None,
+        watch_poll_interval_seconds: int = 60,
+        codex_models: dict[str, CodexModelConfig] | None = None,
     ) -> None:
         ci_attempts = (
             ci_retry_max_attempts
@@ -50,14 +81,20 @@ class SympohyConfig:
         )
         if stale_status_after_minutes <= 0:
             raise ValueError("stale_status_after_minutes must be positive")
+        if watch_poll_interval_seconds <= 0:
+            raise ValueError("watch_poll_interval_seconds must be positive")
         if review_max_rounds <= 0:
             raise ValueError("review_max_rounds must be positive")
         if ci_attempts <= 0:
             raise ValueError("ci_retry_max_attempts must be positive")
         if merge_attempts is not None and merge_attempts < 0:
             raise ValueError("merge_gate_retry_max_attempts must be non-negative")
+        resolved_codex_models = _merge_codex_models(codex_models or {})
 
         object.__setattr__(self, "max_workers", max_workers)
+        object.__setattr__(
+            self, "watch_poll_interval_seconds", watch_poll_interval_seconds
+        )
         object.__setattr__(self, "base_branch", base_branch)
         object.__setattr__(self, "worktree_root", worktree_root)
         object.__setattr__(self, "run_log_root", run_log_root)
@@ -71,6 +108,7 @@ class SympohyConfig:
             self, "merge_gate_retry_max_attempts", merge_attempts
         )
         object.__setattr__(self, "stage_gate_command", stage_gate_command)
+        object.__setattr__(self, "codex_models", resolved_codex_models)
 
     @property
     def retry_max_attempts(self) -> int:
@@ -79,6 +117,9 @@ class SympohyConfig:
     @property
     def final_verifier_fix_max_attempts(self) -> int:
         return self.merge_gate_retry_max_attempts or 0
+
+    def codex_model_for(self, role: str) -> CodexModelConfig:
+        return self.codex_models.get(role, self.codex_models["default"])
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
@@ -105,6 +146,9 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
 
     return SympohyConfig(
         max_workers=int(values.get("max_workers", "10")),
+        watch_poll_interval_seconds=int(
+            values.get("watch_poll_interval_seconds", "60")
+        ),
         base_branch=str(values.get("base_branch", "main")),
         worktree_root=Path(str(values.get("worktree_root", ".sympohy/worktrees"))),
         run_log_root=Path(str(values.get("run_log_root", ".sympohy/runs"))),
@@ -114,12 +158,14 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
         ci_retry_max_attempts=ci_retry_max_attempts,
         merge_gate_retry_max_attempts=merge_gate_retry_max_attempts,
         stage_gate_command=stage_gate_command,
+        codex_models=_load_codex_models(values),
     )
 
 
 def default_config() -> SympohyConfig:
     return SympohyConfig(
         max_workers=10,
+        watch_poll_interval_seconds=60,
         base_branch="main",
         worktree_root=Path(".sympohy/worktrees"),
         run_log_root=Path(".sympohy/runs"),
@@ -129,7 +175,51 @@ def default_config() -> SympohyConfig:
         ci_retry_max_attempts=50,
         merge_gate_retry_max_attempts=None,
         stage_gate_command="task ai:sympohy:stage-gate",
+        codex_models=DEFAULT_CODEX_MODELS,
     )
+
+
+def _load_codex_models(values: dict[str, object]) -> dict[str, CodexModelConfig]:
+    role_values: dict[str, dict[str, str]] = {}
+    for raw_key, raw_value in values.items():
+        key = str(raw_key)
+        if key.startswith("codex_model_"):
+            role = key.removeprefix("codex_model_")
+            field = "model"
+        elif key.startswith("codex_reasoning_"):
+            role = key.removeprefix("codex_reasoning_")
+            field = "reasoning_effort"
+        else:
+            continue
+        if role not in CODEX_MODEL_ROLES:
+            raise ValueError(f"unsupported codex model role: {role}")
+        role_values.setdefault(role, {})[field] = str(raw_value)
+
+    loaded: dict[str, CodexModelConfig] = {}
+    for role, fields in role_values.items():
+        default = DEFAULT_CODEX_MODELS[role]
+        reasoning_effort = fields.get("reasoning_effort", default.reasoning_effort)
+        if reasoning_effort not in CODEX_REASONING_EFFORTS:
+            raise ValueError(
+                f"codex_reasoning_{role} must be one of "
+                f"{', '.join(CODEX_REASONING_EFFORTS)}"
+            )
+        loaded[role] = CodexModelConfig(
+            model=fields.get("model", default.model),
+            reasoning_effort=reasoning_effort,
+        )
+    return _merge_codex_models(loaded)
+
+
+def _merge_codex_models(
+    overrides: dict[str, CodexModelConfig],
+) -> dict[str, CodexModelConfig]:
+    merged = dict(DEFAULT_CODEX_MODELS)
+    for role in overrides:
+        if role not in CODEX_MODEL_ROLES:
+            raise ValueError(f"unsupported codex model role: {role}")
+    merged.update(overrides)
+    return merged
 
 
 def _parse_simple_yaml(source: str) -> dict[str, object]:

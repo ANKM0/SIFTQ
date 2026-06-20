@@ -223,16 +223,26 @@ tasks:
       - uv run python -m scripts.sympohy migrate {{.CLI_ARGS}}
 
   ai:sympohy:watch:
-    desc: Watch open GitHub issues and start up to 10 independent sympohy workers.
+    desc: Run the foreground sympohy watcher daemon and keep up to 10 workers active.
     cmds:
       - uv run python -m scripts.sympohy watch
 
   ai:sympohy:systemd:install:
-    desc: Install and start the systemd --user timer that runs sympohy every minute.
+    desc: Install and start the systemd --user sympohy watcher daemon.
     cmds:
       - uv run python -m scripts.sympohy systemd-install
 
+  ai:sympohy:systemd:start:
+    desc: Start the systemd --user sympohy watcher daemon.
+    cmds:
+      - uv run python -m scripts.sympohy systemd-start
+
+  ai:sympohy:systemd:stop:
+    desc: Stop the systemd --user sympohy watcher daemon.
+    cmds:
+      - uv run python -m scripts.sympohy systemd-stop
+
   ai:sympohy:systemd:status:
-    desc: Show sympohy systemd --user timer/service status and recent logs.
+    desc: Show sympohy systemd --user service status and recent logs.
     cmds:
       - uv run python -m scripts.sympohy systemd-status

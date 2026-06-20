@@ -24,7 +24,7 @@ from scripts.sympohy.core import (
     parse_final_verifier_block_findings,
     parse_review_json,
 )
-from scripts.sympohy.runner import _logical_steps, watch
+from scripts.sympohy.runner import _logical_steps, watch_forever
 from scripts.sympohy.systemd import _systemd_escape
 
 
@@ -32,6 +32,9 @@ class FakeProcess:
     def __init__(self, returncode: int = 0) -> None:
         self.returncode = returncode
         self.wait_called = False
+
+    def poll(self) -> int | None:
+        return None
 
     def wait(self) -> int:
         self.wait_called = True
@@ -670,7 +673,12 @@ class SympohyCoreTest(unittest.TestCase):
             patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             patch("scripts.sympohy.runner.subprocess.Popen", return_value=process),
         ):
-            result = watch(config)
+            result = watch_forever(
+                config,
+                poll_interval_seconds=1,
+                stop_after_polls=1,
+                sleep=lambda _seconds: None,
+            )
 
         self.assertEqual(result, 0)
         self.assertTrue(process.wait_called)
