@@ -1,19 +1,19 @@
 ---
 codd:
-  node_id: design:issue-12-ci-cd
+  node_id: design:ci-cd-foundation
   type: design
   status: draft
   depends_on:
     - id: req:siftq-system
       relation: depends_on
       semantic: governance
-    - id: design:codd-adoption
+    - id: design:codd-foundation
       relation: depends_on
       semantic: verification
     - id: design:commit-message-format
       relation: depends_on
       semantic: workflow
-    - id: design:issue-6-matrix-mvp-tech-selection
+    - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: tool-selection
     - id: design:pnpm-frontend-package-manager-adr
@@ -27,21 +27,21 @@ codd:
       semantic: automation
 ---
 
-# Issue 12 CI/CD Design Proposal
+# CI/CD 基盤設計
 
-## Background
+## 背景
 
-Issue #12では、SIFTQにCIとCDを定義し、選定したツールをADRに記録することが求められている。現在のリポジトリには、CoDDのみを実行するGitHub
+CI/CD基盤では、SIFTQにCIとCDを定義し、選定したツールをADRに記録することが求められている。現在のリポジトリには、CoDDのみを実行するGitHub
 Actionsワークフロー、uvで管理するPython依存関係、aquaで管理するCLIインストール、コミットメッセージ形式の規約、ADR作成ルールが既に存在する。
-Issue #6では、v1 MVPをReact、TypeScript、Vite、dnd-kitによるBrowser
+Matrix MVP技術選定では、v1 MVPをReact、TypeScript、Vite、dnd-kitによるBrowser
 SPAとして実装し、v2以降でRustとTauriによるローカルアプリケーションへ進める方針を決定している。
 
-## Summary
+## 概要
 
 リポジトリの自動化をCoDDのみのチェックからCI/CDの基本形へ拡張し、Pull
 Requestの検証とバージョンタグからのGitHub Release作成を行えるようにする。
 
-## Scope
+## 対象範囲
 
 - 現在のCoDD専用ワークフローを、`push`と`pull_request`で実行されるCIワークフローに置き換える。
 - ツールのインストール方法は、既存のaqua、uvに加え、frontend用のNode.js package managerに合わせる。
@@ -52,7 +52,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - CI/CDツール選定の判断を記録するADRを追加する。
 - CIで実行されるコマンドに対応するローカル実行手順を、READMEまたはcontributingドキュメントに記載する。
 
-## Out Of Scope
+## 対象外
 
 - パッケージやコンテナイメージの公開。
 - 実行環境へのデプロイ。
@@ -60,7 +60,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - デフォルトの`GITHUB_TOKEN`を超えるシークレット管理。
 - CoDDを別のトレーサビリティシステムへ置き換えること。
 
-## Acceptance Criteria
+## 受け入れ条件
 
 - `.github/workflows/`配下にCIワークフローが存在し、`push`と`pull_request`で実行されること。
 - CIに`sympohy` project configuration、コミットメッセージlint、Markdown lint、TypeScript typecheck、ESLint、Vitest、Vite build、CoDD検証が含まれていること。
@@ -71,7 +71,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - CIチェックに対応するローカル実行コマンドがドキュメントに記載されていること。
 - 設計ドキュメントとADRを追加したあと、CoDD検証が通ること。
 
-## Definition Of Done
+## 完了条件
 
 - 人間の承認後、実装変更がIssue用ブランチにコミットされていること。
 - `task setup:python`が成功すること。
@@ -88,7 +88,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - `task codd:dag`で新しいブロッキング失敗が発生しないこと。
 - `main`向けのドラフトPull Requestが作成されていること。
 
-## Expected Files And Areas
+## 想定される変更ファイル・領域
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/release.yml`
@@ -108,11 +108,11 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - `docs/requirements/system-requirements.md`
 - `README.md`
 
-## CoDD Impact
+## CoDDへの影響
 
 実装では、CoDDの`design:`ノードを持つADRを追加し、`docs/requirements/system-requirements.md`からリンクする。新しいCIゲートを満たすためだけに補助スクリプトやスモークテストを追加する場合、それらが長期的なプロダクト挙動にならない限り、個別のCoDDノードは不要とする。
 
-## Implementation Notes
+## 実装メモ
 
 - v1 MVPではfrontend実装にNode.js ecosystemが必要になるため、CIでもfrontend dependenciesをinstallして検証する。
 - frontendのpackage managerは、lockfileによる再現性を優先してpnpmを第一候補にする。
@@ -125,6 +125,6 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - CIでは`task ci:sympohy`をfrontend checksより前に実行し、`.sympohy/config.yaml`、runner entrypoint、labels、systemd templates、Codex command shapeを検証する。
 - Markdown CIの生成物除外契約は`tests/docs/markdownCiContract.test.ts`で固定する。
 
-## Suggested Issue Split
+## Issue分割方針
 
 最初のCI/CDベースラインとしてはIssue分割は不要とする。リリース成果物、パッケージ公開、ブランチ保護が必要になった場合は、別のフォローアップIssueを作成する。

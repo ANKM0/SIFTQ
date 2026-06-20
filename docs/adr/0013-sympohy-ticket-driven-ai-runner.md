@@ -11,13 +11,16 @@ codd:
       relation: depends_on
       semantic: automation
   depended_by:
-    - id: design:issue-12-ci-cd
+    - id: design:ci-cd-foundation
       relation: depends_on
       semantic: automation
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: decision
-    - id: design:issue-82-stale-running-inspection
+    - id: design:sympohy-run-lifecycle-state
+      relation: depends_on
+      semantic: decision
+    - id: design:sympohy-stale-run-recovery
       relation: depends_on
       semantic: decision
 ---

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from scripts.sympohy.stage_gate import evaluate_stage
@@ -63,6 +65,109 @@ class SympohyStageGateTest(unittest.TestCase):
                 },
             },
         )
+
+        self.assertEqual(result["status"], "retry")
+        self.assertIn("does not exist", str(result["reason"]))
+
+    def test_artifact_stage_accepts_relative_workspace_from_cwd(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktree"
+            requirements = worktree / "docs" / "requirements"
+            requirements.mkdir(parents=True)
+            (requirements / "system-requirements.md").write_text(
+                "# System Requirements\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = evaluate_stage(
+                    "requirements",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": str(worktree.relative_to(root)),
+                        "artifact_decisions": {
+                            "requirements": {
+                                "mode": "existing",
+                                "path": "docs/requirements/system-requirements.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "pass")
+
+    def test_artifact_stage_accepts_saved_relative_workspace_from_worktree_cwd(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / ".sympohy" / "worktrees" / "issue-101"
+            requirements = worktree / "docs" / "requirements"
+            requirements.mkdir(parents=True)
+            (requirements / "system-requirements.md").write_text(
+                "# System Requirements\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(worktree)
+                result = evaluate_stage(
+                    "requirements",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": ".sympohy/worktrees/issue-101",
+                        "artifact_decisions": {
+                            "requirements": {
+                                "mode": "existing",
+                                "path": "docs/requirements/system-requirements.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "pass")
+
+    def test_artifact_stage_retries_when_relative_workspace_is_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            design = root / "docs" / "design"
+            design.mkdir(parents=True)
+            (design / "codd-foundation.md").write_text(
+                "# Codd Foundation\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = evaluate_stage(
+                    "design",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": "definitely-missing-workspace",
+                        "artifact_decisions": {
+                            "design": {
+                                "mode": "existing",
+                                "path": "docs/design/codd-foundation.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
 
         self.assertEqual(result["status"], "retry")
         self.assertIn("does not exist", str(result["reason"]))

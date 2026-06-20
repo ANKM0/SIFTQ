@@ -7,11 +7,11 @@ codd:
     - id: req:siftq-system
       relation: depends_on
       semantic: governance
-    - id: design:issue-6-matrix-mvp-tech-selection
+    - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: tool-selection
   depended_by:
-    - id: design:issue-12-ci-cd
+    - id: design:ci-cd-foundation
       relation: depends_on
       semantic: tool-selection
     - id: design:github-actions-ci-cd-toolchain-adr

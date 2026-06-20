@@ -8,7 +8,7 @@ codd:
       relation: depends_on
       semantic: governance
   depended_by:
-    - id: design:issue-10-taskfile
+    - id: design:taskfile-command-runner
       relation: depends_on
       semantic: permissions
 ---

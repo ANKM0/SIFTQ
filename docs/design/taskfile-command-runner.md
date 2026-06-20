@@ -1,6 +1,6 @@
 ---
 codd:
-  node_id: design:issue-10-taskfile
+  node_id: design:taskfile-command-runner
   type: design
   status: draft
   depends_on:
@@ -18,22 +18,22 @@ codd:
       semantic: decision
 ---
 
-# Issue 10 Taskfile Design
+# Taskfile コマンドランナー設計
 
-## Background
+## 背景
 
-Issue #10では、SIFTQで`task`コマンドを使用できるようにし、既存の
+Taskfile command runnerでは、SIFTQで`task`コマンドを使用できるようにし、既存の
 `uv run ...`、frontend setup、CI系コマンドを`task ...`から実行できるように
 することが求められている。あわせて、定義したtaskコマンドをCodexのallow
 リストに登録する必要がある。
 
-## Summary
+## 概要
 
 Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に集約する。
 個別ツールは引き続きaqua、uv、pnpmで管理し、Taskfileはそれらを置き換えず
 実行入口だけを統一する。
 
-## Scope
+## 対象範囲
 
 - `go-task/task`をaqua管理ツールに追加する。
 - `Taskfile.yml`を追加し、setup、frontend、CI、CoDDのタスクを定義する。
@@ -42,16 +42,16 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 - `.codex/rules/siftq.rules`に定義済みtaskコマンドをallowとして追加する。
 - Taskfile選定のADRを追加する。
 
-## Out Of Scope
+## 対象外
 
 - task以外のtask runner導入。
 - CI/CD workflow全体の再設計。
 - frontend実装やCoDD仕様の変更。
 - Codexの禁止ルール緩和。
 
-## Task Mapping
+## タスク対応表
 
-| Task | Underlying Command |
+| task | 実行command |
 | --- | --- |
 | `task setup` | `task setup:python` and `task setup:frontend` |
 | `task setup:python` | `uv sync --all-groups` |
@@ -71,7 +71,7 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 | `task codd:dag` | `uv run codd dag verify` |
 | `task codd:elicit` | `uv run codd elicit` |
 
-## Acceptance Criteria
+## 受け入れ条件
 
 - `aqua install`で`task`コマンドが利用できること。
 - 既存の主要なsetup、frontend、CI、CoDDコマンドを`task ...`で実行できる
