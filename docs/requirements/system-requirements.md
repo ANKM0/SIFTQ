@@ -62,6 +62,9 @@ codd:
     - id: design:issue-10-taskfile
       relation: depends_on
       semantic: governance
+    - id: design:issue-101-design-docs-localization-split
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product
@@ -85,6 +88,8 @@ This document is the initial CoDD requirements anchor for the repository.
 - Establish the CoDD configuration baseline.
 - Track future functional requirements under `docs/requirements/`.
 - Track future design decisions under `docs/design/`.
+- Maintain design documentation so it can be localized, split by feature, and
+  renamed while preserving CoDD traceability and repository links.
 - Track contributor workflow conventions under `docs/contributing/`.
 
 ## Acceptance Criteria
@@ -93,3 +98,6 @@ This document is the initial CoDD requirements anchor for the repository.
 - Regeneratable CoDD artifacts are excluded from Git.
 - Contributors can install project tools with `aqua install`, install project
   dependencies with `task setup`, and run `task codd:version`.
+- Design documentation updates keep titles, major headings, body text, CoDD
+  front matter, and cross-document links consistent with the current document
+  structure.
