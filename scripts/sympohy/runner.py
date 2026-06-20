@@ -245,7 +245,7 @@ def _run_stage_gate(
         "stage": stage,
         "issue": issue.number,
         "run_dir": str(log_dir),
-        "context": dict(context),
+        "context": _stage_gate_context(context),
     }
     input_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -304,6 +304,17 @@ def _run_stage_gate(
         encoding="utf-8",
     )
     return result
+
+
+def _stage_gate_context(context: Mapping[str, object]) -> dict[str, object]:
+    normalized = dict(context)
+    workspace = normalized.get("workspace")
+    if isinstance(workspace, str) and workspace.strip():
+        workspace_path = Path(workspace)
+        if not workspace_path.is_absolute():
+            workspace_path = workspace_path.resolve()
+        normalized["workspace"] = str(workspace_path)
+    return normalized
 
 
 def _stage_gate_passed(

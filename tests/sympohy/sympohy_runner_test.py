@@ -27,6 +27,7 @@ from scripts.sympohy.runner import (
     _resume_late_phase,
     _run_final_verifier_fix_round,
     _run_final_verifier_and_merge,
+    _run_stage_gate,
     _run_command_with_heartbeat,
     _run_hooks,
     _run_review_fix_round,
@@ -38,6 +39,61 @@ from scripts.sympohy.runner import (
 
 
 class SympohyRunnerTest(unittest.TestCase):
+    def test_run_stage_gate_writes_absolute_workspace_to_input(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            log_dir = root / "runs" / "issue-101"
+            worktree.mkdir()
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=101,
+                title="Normalize stage gate workspace",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            def run_stage_gate(
+                args: list[str],
+                **_kwargs: object,
+            ) -> subprocess.CompletedProcess[str]:
+                input_path = Path(args[args.index("--input") + 1])
+                payload = json.loads(input_path.read_text(encoding="utf-8"))
+                workspace = Path(payload["context"]["workspace"])
+                self.assertTrue(workspace.is_absolute())
+                self.assertEqual(workspace, worktree.resolve())
+                return subprocess.CompletedProcess(
+                    args=args,
+                    returncode=0,
+                    stdout='{"status":"pass","stage":"requirements","issue":101}',
+                    stderr="",
+                )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch(
+                    "scripts.sympohy.runner.subprocess.run",
+                    side_effect=run_stage_gate,
+                ):
+                    result = _run_stage_gate(
+                        "requirements",
+                        config=config,
+                        issue=issue,
+                        log_dir=log_dir,
+                        context={
+                            "artifact_decisions": {},
+                            "workspace": str(worktree.relative_to(root)),
+                        },
+                        cwd=worktree,
+                    )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "pass")
+
     def test_run_review_fix_round_comments_approved_review(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))

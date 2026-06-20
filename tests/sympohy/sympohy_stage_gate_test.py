@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from scripts.sympohy.stage_gate import evaluate_stage
@@ -66,6 +68,41 @@ class SympohyStageGateTest(unittest.TestCase):
 
         self.assertEqual(result["status"], "retry")
         self.assertIn("does not exist", str(result["reason"]))
+
+    def test_artifact_stage_accepts_relative_workspace_when_cwd_is_workspace(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktree"
+            requirements = worktree / "docs" / "requirements"
+            requirements.mkdir(parents=True)
+            (requirements / "system-requirements.md").write_text(
+                "# System Requirements\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(worktree)
+                result = evaluate_stage(
+                    "requirements",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": str(worktree.relative_to(root)),
+                        "artifact_decisions": {
+                            "requirements": {
+                                "mode": "existing",
+                                "path": "docs/requirements/system-requirements.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "pass")
 
     def test_merge_gate_retries_to_implementation_when_evidence_is_missing(self) -> None:
         result = evaluate_stage(
