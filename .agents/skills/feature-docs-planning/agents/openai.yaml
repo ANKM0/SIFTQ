@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature Docs Planning"
+  short_description: "Decide and record feature docs artifacts"
+  default_prompt: "Decide which requirements, design, wireframes, and ADR artifacts are needed for this feature, using existing docs when appropriate."

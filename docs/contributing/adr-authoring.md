@@ -72,6 +72,27 @@ ADRs should not carry feature-specific implementation details unless they are
 essential to the durable decision. Put screen copy, event flows, operation calls,
 and individual test cases in the design doc.
 
+## When To Create An ADR
+
+Create or update an ADR when either condition applies:
+
+- The decision affects multiple features, multiple documents, or repository
+  workflow.
+- Changing the decision later would require migration, schema changes,
+  toolchain migration, runtime changes, storage migration, or architecture
+  boundary changes.
+
+Common ADR subjects include architecture decisions, major modules, libraries,
+tools, runtime, storage, schema, migration, toolchain, governance, and
+architecture boundaries.
+
+Before implementation, record one of these in the feature design decision notes:
+
+- Existing ADR used: cite the ADR and how it applies to the feature.
+- New ADR needed: create or update an ADR before implementation.
+- ADR not needed: record the reason, such as staying within existing module
+  boundaries, runtime, storage, toolchain, and workflow decisions.
+
 ## Agent Skill
 
 The repository-local Codex skill for this convention is

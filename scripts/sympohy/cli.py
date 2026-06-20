@@ -18,6 +18,7 @@ from .core import (
 )
 from .github import REQUIRED_LABELS, migrate_legacy_tasks, sync_labels
 from .runner import refine_issue, resume_issue, run_issue, watch
+from .stage_gate import main as stage_gate_main
 from .systemd import install_systemd_units, print_systemd_status
 
 
@@ -34,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     subcommands.add_parser("watch")
     subcommands.add_parser("systemd-install")
     subcommands.add_parser("systemd-status")
+
+    stage_gate_parser = subcommands.add_parser("stage-gate")
+    stage_gate_parser.add_argument("--stage", required=True)
+    stage_gate_parser.add_argument("--issue", required=True, type=int)
+    stage_gate_parser.add_argument("--run-dir", required=True)
+    stage_gate_parser.add_argument("--input")
 
     migrate_parser = subcommands.add_parser("migrate")
     migrate_parser.add_argument("issue", nargs="?")
@@ -90,6 +97,18 @@ def main(argv: list[str] | None = None) -> int:
         return install_systemd_units(ROOT)
     if args.command == "systemd-status":
         return print_systemd_status()
+    if args.command == "stage-gate":
+        stage_gate_args = [
+            "--stage",
+            args.stage,
+            "--issue",
+            str(args.issue),
+            "--run-dir",
+            args.run_dir,
+        ]
+        if args.input is not None:
+            stage_gate_args.extend(["--input", args.input])
+        return stage_gate_main(stage_gate_args)
     if args.command == "contract":
         return contract(args.name, args.payload)
 
@@ -118,6 +137,10 @@ def doctor(*, config_path: Path) -> int:
         "max_workers <= 10": config.max_workers <= 10,
         "stale_status_after_minutes > 0": config.stale_status_after_minutes > 0,
         "default hook task ci": "task ci" in config.hooks,
+        "stage gate command configured": config.stage_gate_command
+        == "task ai:sympohy:stage-gate",
+        "stage gate task declared": "ai:sympohy:stage-gate:"
+        in (ROOT / "Taskfile.yml").read_text(encoding="utf-8"),
         "systemd service template": (ROOT / ".sympohy/systemd/sympohy-watch.service").exists(),
         "systemd timer template": (ROOT / ".sympohy/systemd/sympohy-watch.timer").exists(),
         "commit hook rejects invalid subject": not validate_commit_subject("sympohy: bad"),

@@ -75,6 +75,54 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 0)
         comment.assert_called_once_with("99", '{"findings": []}', cwd=root)
 
+    def test_review_blocks_on_round_after_configured_fix_rounds(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            worktree = root / "worktree"
+            log_dir.mkdir(parents=True)
+            worktree.mkdir()
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=worktree,
+            )
+            issue = Issue(
+                number=82,
+                title="Review upper bound",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_review_fix_round(
+                    "#82",
+                    issue,
+                    config,
+                    worktree,
+                    log_dir,
+                    state,
+                    round_index=config.review_max_rounds + 1,
+                    review=parse_review_json(
+                        '{"findings":[{"severity":"high","summary":"still broken"}]}'
+                    ),
+                    review_json=(
+                        '{"findings":[{"severity":"high","summary":"still broken"}]}'
+                    ),
+                    review_pull_request="99",
+                    comment_review=False,
+                )
+
+        self.assertEqual(result, 2)
+        set_issue_state.assert_called_once()
+        self.assertIn("blocking findings remained", comment.call_args.args[1])
+
     def test_watch_starts_new_candidate_at_pending_triage(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -172,6 +220,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 review_max_rounds=5,
                 retry_max_attempts=3,
                 final_verifier_fix_max_attempts=2,
+                stage_gate_command=None,
             )
             new_issue = {
                 "number": 81,
@@ -2508,9 +2557,10 @@ class SympohyRunnerTest(unittest.TestCase):
             "merged pull request and removed worktree",
         )
 
-    def test_final_verifier_blocks_after_configured_fix_limit(self) -> None:
-        def block_response(summary: str) -> dict[str, object]:
+    def test_final_verifier_blocks_when_verifier_returns_manual_block(self) -> None:
+        def retry_response(summary: str) -> dict[str, object]:
             return {
+                "status": "retry",
                 "acceptance_criteria_satisfied": False,
                 "definition_of_done_satisfied": True,
                 "merge_recommendation": "block",
@@ -2523,6 +2573,21 @@ class SympohyRunnerTest(unittest.TestCase):
                     }
                 ],
             }
+
+        manual_block_response = {
+            "status": "block",
+            "acceptance_criteria_satisfied": False,
+            "definition_of_done_satisfied": True,
+            "merge_recommendation": "block",
+            "findings": [
+                {
+                    "kind": "other",
+                    "summary": "manual decision required",
+                    "evidence": "final verifier cannot determine a safe fix",
+                    "suggested_fix": "ask a human owner to decide",
+                }
+            ],
+        }
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2550,9 +2615,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch(
                     "scripts.sympohy.runner._codex_json",
                     side_effect=[
-                        block_response("first blocker"),
-                        block_response("second blocker"),
-                        block_response("third blocker"),
+                        retry_response("first blocker"),
+                        manual_block_response,
                     ],
                 ) as codex_json,
                 patch(
@@ -2583,15 +2647,15 @@ class SympohyRunnerTest(unittest.TestCase):
             final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
 
         self.assertEqual(result, 2)
-        self.assertEqual(codex_json.call_count, 3)
-        self.assertEqual(run_final_verifier_fix_round.call_count, 2)
-        self.assertEqual(review_fix_loop.call_count, 2)
+        self.assertEqual(codex_json.call_count, 2)
+        self.assertEqual(run_final_verifier_fix_round.call_count, 1)
+        self.assertEqual(review_fix_loop.call_count, 1)
         self.assertEqual(
-            [call.args[0] for call in comment.call_args_list[:3]],
-            ["99"] * 3,
+            [call.args[0] for call in comment.call_args_list[:2]],
+            ["99"] * 2,
         )
         self.assertIn("first blocker", comment.call_args_list[0].args[1])
-        self.assertIn("third blocker", comment.call_args_list[2].args[1])
+        self.assertIn("manual decision required", comment.call_args_list[1].args[1])
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),
@@ -2600,7 +2664,7 @@ class SympohyRunnerTest(unittest.TestCase):
             cwd=worktree,
         )
         self.assertIn(
-            "after 2 fix attempts",
+            "final verifier requested manual block",
             comment.call_args.args[1],
         )
         self.assertEqual(final_state["status"], "blocked")
@@ -2682,8 +2746,9 @@ class SympohyRunnerTest(unittest.TestCase):
 
             self.assertEqual(result, 2)
             codex_text.assert_not_called()
-            self.assertEqual(attempt_artifact, response)
-            self.assertEqual(compatibility_artifact, response)
+            expected_artifact = {**response, "status": "retry"}
+            self.assertEqual(attempt_artifact, expected_artifact)
+            self.assertEqual(compatibility_artifact, expected_artifact)
             set_issue_state.assert_called_once_with(
                 "#82",
                 current_labels=("sympohy:running", "sympohy:phase:finalize"),
@@ -3681,6 +3746,7 @@ class SympohyRunnerTest(unittest.TestCase):
             review_max_rounds=5,
             retry_max_attempts=3,
             final_verifier_fix_max_attempts=2,
+            stage_gate_command=None,
         )
 
 

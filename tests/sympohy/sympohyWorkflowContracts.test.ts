@@ -18,6 +18,7 @@ describe("sympohy Taskfile and CLI integration", () => {
       "ai:sympohy",
       "ai:sympohy:refine",
       "ai:sympohy:doctor",
+      "ai:sympohy:stage-gate",
       "ai:sympohy:labels:sync",
       "ai:sympohy:migrate",
       "ai:sympohy:watch",
@@ -30,6 +31,7 @@ describe("sympohy Taskfile and CLI integration", () => {
     );
     expect(cli).toContain("resume");
     expect(cli).toContain("migrate");
+    expect(cli).toContain("stage-gate");
   });
 
   it("keeps sympohy outside application runtime dependencies", () => {
@@ -66,6 +68,10 @@ describe("sympohy watcher contract", () => {
     expect(core).toContain("is_candidate_issue");
     expect(core).toContain("inspect_running_issue");
     expect(config).toContain("stale_status_after_minutes: 30");
+    expect(config).toContain("ci_retry_max_attempts: 50");
+    expect(config).toContain("review_max_rounds: 10");
+    expect(config).not.toContain("merge_gate_retry_max_attempts");
+    expect(config).toContain("stage_gate_command: task ai:sympohy:stage-gate");
     expect(core).toContain("DEFAULT_STALE_STATUS_AFTER_MINUTES");
     expect(core).toContain("\"dead pid\"");
     expect(runner).toContain("\"resume\"");
@@ -113,6 +119,12 @@ describe("sympohy automation contract", () => {
     expect(core).toContain("parse_review_json");
     expect(core).toContain("next_retry_action");
     expect(core).toContain("merge_gate_allows_merge");
+    expect(core).toContain("stage_gate_status");
+    expect(runner).toContain("_prepare_document_artifacts");
+    expect(runner).toContain("artifact-decisions.json");
+    expect(runner).toContain("\"requirements\", \"design\", \"wireframes\", \"adr\"");
+    expect(runner).toContain("status set to pass or retry");
+    expect(runner).toContain('"pass", "retry", or "block"');
   });
 
   it("does not disable normal Codex user config or repository rules", () => {
@@ -123,6 +135,8 @@ describe("sympohy automation contract", () => {
 
   it("doctor checks config, labels, systemd templates, hooks, and commit subjects", () => {
     expect(cli).toContain("\"default hook task ci\"");
+    expect(cli).toContain("\"stage gate command configured\"");
+    expect(cli).toContain("\"stage gate task declared\"");
     expect(cli).toContain("\"stale_status_after_minutes > 0\"");
     expect(cli).toContain("\"required labels declared\"");
     expect(cli).toContain("\"systemd service template\"");

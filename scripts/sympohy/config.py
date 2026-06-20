@@ -7,7 +7,7 @@ from pathlib import Path
 DEFAULT_CONFIG_PATH = Path(".sympohy/config.yaml")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class SympohyConfig:
     max_workers: int
     base_branch: str
@@ -16,8 +16,69 @@ class SympohyConfig:
     stale_status_after_minutes: int
     hooks: tuple[str, ...]
     review_max_rounds: int
-    retry_max_attempts: int
-    final_verifier_fix_max_attempts: int
+    ci_retry_max_attempts: int
+    merge_gate_retry_max_attempts: int | None
+    stage_gate_command: str | None
+
+    def __init__(
+        self,
+        *,
+        max_workers: int,
+        base_branch: str,
+        worktree_root: Path,
+        run_log_root: Path,
+        stale_status_after_minutes: int,
+        hooks: tuple[str, ...],
+        review_max_rounds: int,
+        ci_retry_max_attempts: int | None = None,
+        merge_gate_retry_max_attempts: int | None = None,
+        stage_gate_command: str | None = "task ai:sympohy:stage-gate",
+        retry_max_attempts: int | None = None,
+        final_verifier_fix_max_attempts: int | None = None,
+    ) -> None:
+        ci_attempts = (
+            ci_retry_max_attempts
+            if ci_retry_max_attempts is not None
+            else retry_max_attempts
+        )
+        if ci_attempts is None:
+            ci_attempts = 50
+        merge_attempts = (
+            merge_gate_retry_max_attempts
+            if merge_gate_retry_max_attempts is not None
+            else final_verifier_fix_max_attempts
+        )
+        if stale_status_after_minutes <= 0:
+            raise ValueError("stale_status_after_minutes must be positive")
+        if review_max_rounds <= 0:
+            raise ValueError("review_max_rounds must be positive")
+        if ci_attempts <= 0:
+            raise ValueError("ci_retry_max_attempts must be positive")
+        if merge_attempts is not None and merge_attempts < 0:
+            raise ValueError("merge_gate_retry_max_attempts must be non-negative")
+
+        object.__setattr__(self, "max_workers", max_workers)
+        object.__setattr__(self, "base_branch", base_branch)
+        object.__setattr__(self, "worktree_root", worktree_root)
+        object.__setattr__(self, "run_log_root", run_log_root)
+        object.__setattr__(
+            self, "stale_status_after_minutes", stale_status_after_minutes
+        )
+        object.__setattr__(self, "hooks", hooks)
+        object.__setattr__(self, "review_max_rounds", review_max_rounds)
+        object.__setattr__(self, "ci_retry_max_attempts", ci_attempts)
+        object.__setattr__(
+            self, "merge_gate_retry_max_attempts", merge_attempts
+        )
+        object.__setattr__(self, "stage_gate_command", stage_gate_command)
+
+    @property
+    def retry_max_attempts(self) -> int:
+        return self.ci_retry_max_attempts
+
+    @property
+    def final_verifier_fix_max_attempts(self) -> int:
+        return self.merge_gate_retry_max_attempts or 0
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
@@ -26,14 +87,21 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
 
     values = _parse_simple_yaml(path.read_text(encoding="utf-8"))
     stale_status_after_minutes = int(values.get("stale_status_after_minutes", "30"))
-    if stale_status_after_minutes <= 0:
-        raise ValueError("stale_status_after_minutes must be positive")
-
-    final_verifier_fix_max_attempts = int(
-        values.get("final_verifier_fix_max_attempts", "2")
+    ci_retry_max_attempts = int(
+        values.get("ci_retry_max_attempts", values.get("retry_max_attempts", "50"))
     )
-    if final_verifier_fix_max_attempts < 0:
-        raise ValueError("final_verifier_fix_max_attempts must be non-negative")
+    merge_gate_retry_max_attempts = None
+    if "merge_gate_retry_max_attempts" in values:
+        merge_gate_retry_max_attempts = int(values["merge_gate_retry_max_attempts"])
+    elif "final_verifier_fix_max_attempts" in values:
+        merge_gate_retry_max_attempts = int(values["final_verifier_fix_max_attempts"])
+    stage_gate_command_value = values.get(
+        "stage_gate_command",
+        "task ai:sympohy:stage-gate",
+    )
+    stage_gate_command = (
+        str(stage_gate_command_value).strip() if stage_gate_command_value else None
+    )
 
     return SympohyConfig(
         max_workers=int(values.get("max_workers", "10")),
@@ -42,9 +110,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
         run_log_root=Path(str(values.get("run_log_root", ".sympohy/runs"))),
         stale_status_after_minutes=stale_status_after_minutes,
         hooks=tuple(values.get("hooks", ["task ci"])),
-        review_max_rounds=int(values.get("review_max_rounds", "5")),
-        retry_max_attempts=int(values.get("retry_max_attempts", "3")),
-        final_verifier_fix_max_attempts=final_verifier_fix_max_attempts,
+        review_max_rounds=int(values.get("review_max_rounds", "10")),
+        ci_retry_max_attempts=ci_retry_max_attempts,
+        merge_gate_retry_max_attempts=merge_gate_retry_max_attempts,
+        stage_gate_command=stage_gate_command,
     )
 
 
@@ -56,9 +125,10 @@ def default_config() -> SympohyConfig:
         run_log_root=Path(".sympohy/runs"),
         stale_status_after_minutes=30,
         hooks=("task ci",),
-        review_max_rounds=5,
-        retry_max_attempts=3,
-        final_verifier_fix_max_attempts=2,
+        review_max_rounds=10,
+        ci_retry_max_attempts=50,
+        merge_gate_retry_max_attempts=None,
+        stage_gate_command="task ai:sympohy:stage-gate",
     )
 
 

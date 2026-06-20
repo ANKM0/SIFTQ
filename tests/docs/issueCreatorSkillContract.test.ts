@@ -34,6 +34,11 @@ describe("Issue creator skill contract", () => {
     expect(skill).toContain("## 3) Required output format");
 
     expect(issueTemplates).toContain("## Feature Change テンプレート");
+    expect(issueTemplates).toContain("## Scope");
+    expect(issueTemplates).toContain("やること");
+    expect(issueTemplates).toContain("やらないこと");
+    expect(issueTemplates).toContain("## AC");
+    expect(issueTemplates).toContain("## DoD");
     expect(issueTemplates).toContain("## Research テンプレート");
     expect(issueTemplates).toContain("## Bug テンプレート");
 

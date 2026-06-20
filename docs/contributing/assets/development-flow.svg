@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="3580" viewBox="0 0 1300 3580" role="img" aria-labelledby="title desc">
+  <title id="title">開発フロー</title>
+  <desc id="desc">Stage ごとの枠内に番号付き作業ノード、矢印、Gate を配置し、前段成果物の evidence が揃った場合のみ次に進む開発フロー図。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .stage-frame { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.5; rx: 10; }
+      .stage-title { font: 700 17px sans-serif; fill: #0f172a; }
+      .box { fill: #ffffff; stroke: #64748b; stroke-width: 1.5; rx: 8; }
+      .input { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.5; rx: 8; }
+      .gate { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; }
+      .block { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; rx: 8; }
+      .done { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; rx: 8; }
+      .title { font: 700 24px sans-serif; fill: #0f172a; }
+      .label { font: 15px sans-serif; fill: #0f172a; }
+      .small { font: 13px sans-serif; fill: #475569; }
+      .edge { fill: none; stroke: #334155; stroke-width: 1.7; marker-end: url(#arrow); }
+      .edge-loop { fill: none; stroke: #c2410c; stroke-width: 1.7; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+      .edge-block { fill: none; stroke: #c2410c; stroke-width: 1.7; marker-end: url(#arrow); }
+      .tag { font: 13px sans-serif; fill: #334155; }
+    </style>
+  </defs>
+
+  <rect width="1300" height="3580" class="bg"/>
+  <text x="620" y="42" text-anchor="middle" class="title">開発フロー</text>
+
+  <rect x="330" y="75" width="580" height="330" class="stage-frame"/>
+  <text x="360" y="110" class="stage-title">要求具体化</text>
+  <rect x="380" y="135" width="480" height="50" class="box"/>
+  <text x="620" y="165" text-anchor="middle" class="label">1. Issue 作成</text>
+  <rect x="380" y="210" width="480" height="58" class="box"/>
+  <text x="620" y="234" text-anchor="middle" class="label">2. grill-me で AC / DoD を定義</text>
+  <text x="620" y="255" text-anchor="middle" class="small">完了判定に使える粒度まで具体化する</text>
+  <polygon points="620,300 840,355 620,410 400,355" class="gate"/>
+  <text x="620" y="348" text-anchor="middle" class="label">Gate: AC / DoD が揃っているか</text>
+
+  <rect x="940" y="310" width="260" height="90" class="block"/>
+  <text x="1070" y="340" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="364" text-anchor="middle" class="small">AC / DoD を再定義</text>
+
+  <rect x="380" y="445" width="480" height="64" class="input"/>
+  <text x="620" y="471" text-anchor="middle" class="label">Loop input</text>
+  <text x="620" y="493" text-anchor="middle" class="small">Issue（AC / DoD 定義済み）</text>
+
+  <rect x="330" y="550" width="580" height="260" class="stage-frame"/>
+  <text x="360" y="585" class="stage-title">要件文書化</text>
+  <rect x="380" y="610" width="480" height="86" class="box"/>
+  <text x="620" y="635" text-anchor="middle" class="label">3. 要件を文書化</text>
+  <text x="620" y="657" text-anchor="middle" class="small">新規: docs/requirements/&lt;feature&gt;.md</text>
+  <text x="620" y="678" text-anchor="middle" class="small">既存: 既存 requirements を参照または更新</text>
+  <polygon points="620,720 840,775 620,830 400,775" class="gate"/>
+  <text x="620" y="758" text-anchor="middle" class="label">Gate: requirements の扱いが</text>
+  <text x="620" y="778" text-anchor="middle" class="label">記録されているか</text>
+
+  <rect x="940" y="730" width="260" height="90" class="block"/>
+  <text x="1070" y="760" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="784" text-anchor="middle" class="small">requirements の扱い未記録</text>
+
+  <rect x="330" y="850" width="580" height="390" class="stage-frame"/>
+  <text x="360" y="885" class="stage-title">設計文書化</text>
+  <polygon points="620,925 840,980 620,1035 400,980" class="gate"/>
+  <text x="620" y="973" text-anchor="middle" class="label">4. AC / DoD から設計・実装できるか</text>
+  <rect x="380" y="1075" width="480" height="86" class="box"/>
+  <text x="620" y="1100" text-anchor="middle" class="label">5. 設計を文書化</text>
+  <text x="620" y="1122" text-anchor="middle" class="small">新規: docs/design/&lt;feature&gt;.md</text>
+  <text x="620" y="1143" text-anchor="middle" class="small">既存: 既存 design を参照または更新</text>
+  <polygon points="620,1190 840,1245 620,1300 400,1245" class="gate"/>
+  <text x="620" y="1238" text-anchor="middle" class="label">Gate: design の扱いが記録されているか</text>
+
+  <rect x="940" y="935" width="260" height="90" class="block"/>
+  <text x="1070" y="965" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="989" text-anchor="middle" class="small">AC / DoD を再定義</text>
+  <rect x="940" y="1200" width="260" height="90" class="block"/>
+  <text x="1070" y="1230" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="1254" text-anchor="middle" class="small">design の扱い未記録</text>
+
+  <rect x="330" y="1340" width="580" height="235" class="stage-frame"/>
+  <text x="360" y="1375" class="stage-title">wireframes</text>
+  <rect x="380" y="1400" width="480" height="64" class="box"/>
+  <text x="620" y="1426" text-anchor="middle" class="label">6. 必要に応じて wireframes を作成または更新</text>
+  <text x="620" y="1448" text-anchor="middle" class="small">docs/wireframes/</text>
+  <polygon points="620,1495 840,1550 620,1605 400,1550" class="gate"/>
+  <text x="620" y="1533" text-anchor="middle" class="label">Gate: wireframes の要否と</text>
+  <text x="620" y="1553" text-anchor="middle" class="label">扱いが記録されているか</text>
+
+  <rect x="940" y="1505" width="260" height="90" class="block"/>
+  <text x="1070" y="1535" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="1550" text-anchor="middle" class="small">wireframes の要否 /</text>
+  <text x="1070" y="1570" text-anchor="middle" class="small">扱い未記録</text>
+
+  <rect x="330" y="1630" width="580" height="235" class="stage-frame"/>
+  <text x="360" y="1665" class="stage-title">ADR</text>
+  <rect x="380" y="1690" width="480" height="64" class="box"/>
+  <text x="620" y="1716" text-anchor="middle" class="label">7. 必要に応じて ADR を作成または更新</text>
+  <text x="620" y="1738" text-anchor="middle" class="small">docs/adr/</text>
+  <polygon points="620,1785 840,1840 620,1895 400,1840" class="gate"/>
+  <text x="620" y="1823" text-anchor="middle" class="label">Gate: ADR の要否と</text>
+  <text x="620" y="1843" text-anchor="middle" class="label">扱いが記録されているか</text>
+
+  <rect x="940" y="1795" width="260" height="90" class="block"/>
+  <text x="1070" y="1825" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="1840" text-anchor="middle" class="small">ADR の要否 /</text>
+  <text x="1070" y="1860" text-anchor="middle" class="small">扱い未記録</text>
+
+  <rect x="330" y="1920" width="580" height="380" class="stage-frame"/>
+  <text x="360" y="1955" class="stage-title">実装</text>
+  <rect x="380" y="1980" width="480" height="50" class="box"/>
+  <text x="620" y="2010" text-anchor="middle" class="label">8. main 最新を取得</text>
+  <rect x="380" y="2055" width="480" height="58" class="box"/>
+  <text x="620" y="2079" text-anchor="middle" class="label">9. issue branch を作成</text>
+  <text x="620" y="2100" text-anchor="middle" class="small">issue-&lt;issue-number&gt;-&lt;short-kebab-description&gt;</text>
+  <rect x="380" y="2140" width="480" height="50" class="box"/>
+  <text x="620" y="2170" text-anchor="middle" class="label">10. コードとテストを実装</text>
+  <polygon points="620,2220 840,2275 620,2330 400,2275" class="gate"/>
+  <text x="620" y="2268" text-anchor="middle" class="label">Gate: 差分とテストが存在するか</text>
+
+  <rect x="940" y="2230" width="260" height="90" class="block"/>
+  <text x="1070" y="2260" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="2284" text-anchor="middle" class="small">実装証跡不足</text>
+
+  <rect x="330" y="2350" width="580" height="235" class="stage-frame"/>
+  <text x="360" y="2385" class="stage-title">CI</text>
+  <rect x="380" y="2410" width="480" height="50" class="box"/>
+  <text x="620" y="2440" text-anchor="middle" class="label">11. remote に push</text>
+  <polygon points="620,2490 840,2545 620,2600 400,2545" class="gate"/>
+  <text x="620" y="2536" text-anchor="middle" class="label">12. push hook の task ci 成功?</text>
+  <text x="620" y="2557" text-anchor="middle" class="small">evidence: task ci</text>
+
+  <rect x="940" y="2500" width="260" height="90" class="block"/>
+  <text x="1070" y="2530" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="2554" text-anchor="middle" class="small">task ci 50回連続失敗</text>
+
+  <rect x="330" y="2640" width="580" height="360" class="stage-frame"/>
+  <text x="360" y="2675" class="stage-title">Review</text>
+  <rect x="380" y="2700" width="480" height="50" class="box"/>
+  <text x="620" y="2730" text-anchor="middle" class="label">13. main 向け PR を作成</text>
+  <rect x="380" y="2775" width="480" height="70" class="box"/>
+  <text x="620" y="2799" text-anchor="middle" class="label">14. 別 worker が敵対的レビューを実施</text>
+  <text x="620" y="2820" text-anchor="middle" class="small">evidence: review result</text>
+  <polygon points="620,2875 840,2930 620,2985 400,2930" class="gate"/>
+  <text x="620" y="2920" text-anchor="middle" class="label">15. critical / high / medium がないか</text>
+  <rect x="95" y="2901" width="240" height="58" class="box"/>
+  <text x="215" y="2925" text-anchor="middle" class="label">16. 実装 worker が</text>
+  <text x="215" y="2946" text-anchor="middle" class="label">レビュー結果を修正</text>
+
+  <rect x="940" y="2885" width="260" height="90" class="block"/>
+  <text x="1070" y="2915" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="2939" text-anchor="middle" class="small">review 上限超過</text>
+
+  <rect x="330" y="3040" width="580" height="385" class="stage-frame"/>
+  <text x="360" y="3075" class="stage-title">Merge</text>
+  <polygon points="620,3110 840,3165 620,3220 400,3165" class="gate"/>
+  <text x="620" y="3155" text-anchor="middle" class="label">17. merge 条件を満たすか</text>
+  <text x="620" y="3176" text-anchor="middle" class="small">evidence: CI / AC・DoD / Review</text>
+  <rect x="380" y="3260" width="480" height="50" class="done"/>
+  <text x="620" y="3290" text-anchor="middle" class="label">18. merge</text>
+  <rect x="380" y="3335" width="480" height="50" class="done"/>
+  <text x="620" y="3365" text-anchor="middle" class="label">19. 使用した Issue / PR を close</text>
+  <rect x="380" y="3410" width="480" height="50" class="done"/>
+  <text x="620" y="3440" text-anchor="middle" class="label">20. 使用した branch を削除</text>
+  <rect x="380" y="3485" width="480" height="58" class="done"/>
+  <text x="620" y="3509" text-anchor="middle" class="label">success exit</text>
+  <text x="620" y="3530" text-anchor="middle" class="small">merge / cleanup 完了</text>
+
+  <rect x="940" y="3120" width="260" height="90" class="block"/>
+  <text x="1070" y="3150" text-anchor="middle" class="label">block exit</text>
+  <text x="1070" y="3164" text-anchor="middle" class="small">修正不能 / 判断不能</text>
+  <text x="1070" y="3184" text-anchor="middle" class="small">merge 条件未達</text>
+
+  <path d="M620 185 V210" class="edge"/>
+  <path d="M620 268 V300" class="edge"/>
+  <path d="M620 410 V445" class="edge"/>
+  <text x="640" y="433" class="tag">はい</text>
+  <path d="M620 509 V550" class="edge"/>
+  <path d="M620 696 V720" class="edge"/>
+  <path d="M620 830 V850" class="edge"/>
+  <text x="640" y="845" class="tag">はい</text>
+  <path d="M620 1035 V1075" class="edge"/>
+  <text x="640" y="1058" class="tag">はい</text>
+  <path d="M620 1161 V1190" class="edge"/>
+  <path d="M620 1300 V1340" class="edge"/>
+  <text x="640" y="1323" class="tag">はい</text>
+  <path d="M620 1464 V1495" class="edge"/>
+  <path d="M620 1605 V1630" class="edge"/>
+  <text x="640" y="1623" class="tag">はい</text>
+  <path d="M620 1754 V1785" class="edge"/>
+  <path d="M620 1895 V1920" class="edge"/>
+  <text x="640" y="1913" class="tag">はい</text>
+  <path d="M620 2030 V2055" class="edge"/>
+  <path d="M620 2113 V2140" class="edge"/>
+  <path d="M620 2190 V2220" class="edge"/>
+  <path d="M620 2330 V2350" class="edge"/>
+  <text x="640" y="2345" class="tag">はい</text>
+  <path d="M620 2460 V2490" class="edge"/>
+  <path d="M620 2600 V2640" class="edge"/>
+  <text x="640" y="2623" class="tag">はい</text>
+  <path d="M620 2750 V2775" class="edge"/>
+  <path d="M620 2845 V2875" class="edge"/>
+  <path d="M620 2985 V3040" class="edge"/>
+  <text x="640" y="3013" class="tag">はい</text>
+  <path d="M620 3220 V3260" class="edge"/>
+  <text x="640" y="3243" class="tag">はい</text>
+  <path d="M620 3310 V3335" class="edge"/>
+  <path d="M620 3385 V3410" class="edge"/>
+  <path d="M620 3460 V3485" class="edge"/>
+
+  <path d="M840 355 H940" class="edge-block"/>
+  <text x="848" y="343" class="tag">いいえ</text>
+  <path d="M840 775 H940" class="edge-block"/>
+  <text x="848" y="763" class="tag">いいえ</text>
+  <path d="M840 980 H940" class="edge-block"/>
+  <text x="848" y="968" class="tag">いいえ</text>
+  <path d="M840 1245 H940" class="edge-block"/>
+  <text x="848" y="1233" class="tag">いいえ</text>
+  <path d="M840 1550 H940" class="edge-block"/>
+  <text x="848" y="1538" class="tag">いいえ</text>
+  <path d="M840 1840 H940" class="edge-block"/>
+  <text x="848" y="1828" class="tag">いいえ</text>
+  <path d="M840 2275 H940" class="edge-block"/>
+  <text x="848" y="2263" class="tag">いいえ</text>
+  <path d="M400 2545 H215 V2140 H380" class="edge-loop"/>
+  <text x="222" y="2527" class="tag">いいえ / 49回まで</text>
+  <path d="M840 2545 H940" class="edge-block"/>
+  <text x="848" y="2533" class="tag">50回連続失敗</text>
+  <path d="M400 2930 H335" class="edge-loop"/>
+  <text x="342" y="2918" class="tag">いいえ / 10回まで</text>
+  <path d="M215 2901 V2810 H380" class="edge-loop"/>
+  <path d="M840 2930 H940" class="edge-block"/>
+  <text x="848" y="2918" class="tag">11回目</text>
+  <path d="M400 3165 H55 V2140 H380" class="edge-loop"/>
+  <text x="62" y="3128" class="tag">AC / DoD 未達</text>
+  <text x="62" y="3148" class="tag">CI 未達</text>
+  <path d="M400 3165 H35 V610 H380" class="edge-loop"/>
+  <text x="42" y="3092" class="tag">requirements 不足</text>
+  <path d="M400 3165 H15 V925 H400" class="edge-loop"/>
+  <text x="22" y="3056" class="tag">design 不足</text>
+  <path d="M840 3165 H940" class="edge-block"/>
+  <text x="848" y="3153" class="tag">修正不能 / 判断不能</text>
+</svg>

@@ -127,7 +127,24 @@ class ReviewResult:
 
     @property
     def approved(self) -> bool:
+        status = self._raw_stage_gate_status()
+        if status is not None:
+            return status == "pass" and not self.blocking_findings
         return not self.blocking_findings
+
+    @property
+    def stage_gate_status(self) -> str:
+        status = self._raw_stage_gate_status()
+        if status is not None:
+            return status
+        return "pass" if not self.blocking_findings else "retry"
+
+    def _raw_stage_gate_status(self) -> str | None:
+        if isinstance(self.raw, Mapping):
+            status = str(self.raw.get("status", "")).lower()
+            if status in {"pass", "retry", "block"}:
+                return status
+        return None
 
 
 @dataclass(frozen=True)
