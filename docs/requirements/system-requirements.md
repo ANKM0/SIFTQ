@@ -65,6 +65,9 @@ codd:
     - id: design:design-docs-localization-split
       relation: depends_on
       semantic: governance
+    - id: design:design-index
+      relation: depends_on
+      semantic: governance
     - id: req:matrix-mvp-functional
       relation: depends_on
       semantic: product

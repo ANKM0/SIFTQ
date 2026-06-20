@@ -12,24 +12,25 @@ codd:
       semantic: index
 ---
 
-# Design Documents
+# 設計書一覧
 
-This directory contains feature-level design documents for SIFTQ. Design files
-are named by feature or system capability rather than GitHub issue number so
-they remain discoverable after issue-specific work is merged.
+このディレクトリには、SIFTQの機能単位の設計書を配置する。設計書の
+ファイル名はGitHub issue番号ではなく、機能名またはシステム能力に基づいて
+付ける。これにより、issue単位の作業がmergeされた後も設計意図を見つけ
+やすくする。
 
-## Feature Designs
+## 機能設計
 
-| Document | CoDD node | Status |
+| 設計書 | CoDDノード | 状態 |
 | --- | --- | --- |
-| [CI/CD 基盤設計](./ci-cd-foundation.md) | `design:ci-cd-foundation` | Draft |
-| [CoDD 基盤設計](./codd-foundation.md) | `design:codd-foundation` | Draft |
-| [Matrix MVP 技術選定設計](./matrix-mvp-technology-selection.md) | `design:matrix-mvp-technology-selection` | Implemented |
-| [Taskfile コマンドランナー設計](./taskfile-command-runner.md) | `design:taskfile-command-runner` | Draft |
-| [sympohy 実行ライフサイクル・状態設計](./sympohy-run-lifecycle-state.md) | `design:sympohy-run-lifecycle-state` | Draft |
-| [sympohy 停滞実行復旧設計](./sympohy-stale-run-recovery.md) | `design:sympohy-stale-run-recovery` | Draft |
-| [設計書日本語化・機能単位分割設計](./design-docs-localization-split.md) | `design:design-docs-localization-split` | Draft |
+| [CI/CD 基盤設計](./ci-cd-foundation.md) | `design:ci-cd-foundation` | 草案 |
+| [CoDD 基盤設計](./codd-foundation.md) | `design:codd-foundation` | 草案 |
+| [Matrix MVP 技術選定設計](./matrix-mvp-technology-selection.md) | `design:matrix-mvp-technology-selection` | 実装済み |
+| [Taskfile コマンドランナー設計](./taskfile-command-runner.md) | `design:taskfile-command-runner` | 草案 |
+| [sympohy 実行ライフサイクル・状態設計](./sympohy-run-lifecycle-state.md) | `design:sympohy-run-lifecycle-state` | 草案 |
+| [sympohy 停滞実行復旧設計](./sympohy-stale-run-recovery.md) | `design:sympohy-stale-run-recovery` | 草案 |
+| [設計書日本語化・機能単位分割設計](./design-docs-localization-split.md) | `design:design-docs-localization-split` | 草案 |
 
-## Templates
+## テンプレート
 
-- [Design template](./templates/design.md)
+- [設計書テンプレート](./templates/design.md)

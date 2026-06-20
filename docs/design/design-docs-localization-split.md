@@ -7,6 +7,10 @@ codd:
     - id: req:siftq-system
       relation: depends_on
       semantic: governance
+  depended_by:
+    - id: design:design-index
+      relation: depends_on
+      semantic: index
 ---
 
 # 設計書日本語化・機能単位分割設計
