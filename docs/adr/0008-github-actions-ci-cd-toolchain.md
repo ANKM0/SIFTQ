@@ -7,20 +7,20 @@ codd:
     - id: req:siftq-system
       relation: depends_on
       semantic: governance
-    - id: design:issue-6-matrix-mvp-tech-selection
+    - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: tool-selection
     - id: design:pnpm-frontend-package-manager-adr
       relation: depends_on
       semantic: package-management
   depended_by:
-    - id: design:issue-12-ci-cd
+    - id: design:ci-cd-foundation
       relation: depends_on
       semantic: ci
     - id: design:taskfile-command-runner-adr
       relation: depends_on
       semantic: ci
-    - id: design:issue-10-taskfile
+    - id: design:taskfile-command-runner
       relation: depends_on
       semantic: ci
     - id: design:adr-index

@@ -5,7 +5,7 @@ codd:
   status: draft
   depends_on: []
   depended_by:
-    - id: design:codd-adoption
+    - id: design:codd-foundation
       relation: depends_on
       semantic: governance
     - id: design:commit-message-format
@@ -26,7 +26,7 @@ codd:
     - id: design:adr-index
       relation: depends_on
       semantic: governance
-    - id: design:issue-12-ci-cd
+    - id: design:ci-cd-foundation
       relation: depends_on
       semantic: governance
     - id: design:pnpm-frontend-package-manager-adr
@@ -59,10 +59,10 @@ codd:
     - id: design:pytest-as-default-python-test-runner-adr
       relation: depends_on
       semantic: governance
-    - id: design:issue-10-taskfile
+    - id: design:taskfile-command-runner
       relation: depends_on
       semantic: governance
-    - id: design:issue-101-design-docs-localization-split
+    - id: design:design-docs-localization-split
       relation: depends_on
       semantic: governance
     - id: req:matrix-mvp-functional

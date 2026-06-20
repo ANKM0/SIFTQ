@@ -20,7 +20,7 @@ codd:
     - id: design:development-flow
       relation: depends_on
       semantic: automation
-    - id: design:issue-82-stale-running-inspection
+    - id: design:sympohy-run-lifecycle-state
       relation: depends_on
       semantic: automation
 ---

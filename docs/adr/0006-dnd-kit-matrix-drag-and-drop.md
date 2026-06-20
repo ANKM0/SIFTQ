@@ -11,7 +11,7 @@ codd:
       relation: depends_on
       semantic: interaction
   depended_by:
-    - id: design:issue-6-matrix-mvp-tech-selection
+    - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: decision
     - id: design:matrix-mvp-wireframe-layout-adr

@@ -8,7 +8,7 @@ codd:
       relation: depends_on
       semantic: governance
   depended_by:
-    - id: design:issue-12-ci-cd
+    - id: design:ci-cd-foundation
       relation: depends_on
       semantic: workflow
     - id: design:sympohy-issue-execution
