@@ -1,0 +1,4 @@
+interface:
+  display_name: "Merge Readiness"
+  short_description: "Decide if a SIFTQ PR is ready to merge."
+  default_prompt: "Use $merge-readiness to decide whether this SIFTQ PR is ready to merge."
