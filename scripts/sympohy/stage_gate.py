@@ -320,9 +320,9 @@ def _path_exists(workspace: str, relative_path: str) -> bool:
     if Path(relative_path).is_absolute() or ".." in Path(relative_path).parts:
         return False
     workspace_path = Path(workspace)
-    if (workspace_path / relative_path).exists():
-        return True
-    return not workspace_path.is_absolute() and Path(relative_path).exists()
+    if not workspace_path.exists():
+        return False
+    return (workspace_path / relative_path).exists()
 
 
 if __name__ == "__main__":

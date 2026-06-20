@@ -69,7 +69,7 @@ class SympohyStageGateTest(unittest.TestCase):
         self.assertEqual(result["status"], "retry")
         self.assertIn("does not exist", str(result["reason"]))
 
-    def test_artifact_stage_accepts_relative_workspace_when_cwd_is_workspace(
+    def test_artifact_stage_accepts_relative_workspace_from_cwd(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -84,7 +84,7 @@ class SympohyStageGateTest(unittest.TestCase):
 
             original_cwd = Path.cwd()
             try:
-                os.chdir(worktree)
+                os.chdir(root)
                 result = evaluate_stage(
                     "requirements",
                     issue_number=101,
@@ -103,6 +103,39 @@ class SympohyStageGateTest(unittest.TestCase):
                 os.chdir(original_cwd)
 
         self.assertEqual(result["status"], "pass")
+
+    def test_artifact_stage_retries_when_relative_workspace_is_missing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            design = root / "docs" / "design"
+            design.mkdir(parents=True)
+            (design / "codd-foundation.md").write_text(
+                "# Codd Foundation\n",
+                encoding="utf-8",
+            )
+
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(root)
+                result = evaluate_stage(
+                    "design",
+                    issue_number=101,
+                    run_dir=Path(".sympohy/runs/issue-101"),
+                    context={
+                        "workspace": "definitely-missing-workspace",
+                        "artifact_decisions": {
+                            "design": {
+                                "mode": "existing",
+                                "path": "docs/design/codd-foundation.md",
+                            }
+                        },
+                    },
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(result["status"], "retry")
+        self.assertIn("does not exist", str(result["reason"]))
 
     def test_merge_gate_retries_to_implementation_when_evidence_is_missing(self) -> None:
         result = evaluate_stage(
