@@ -1436,6 +1436,10 @@ def _run_issue_locked(
                 _codex_text(
                     [
                         f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
+                        "Before editing or committing, read the relevant "
+                        "docs/contributing documents, including "
+                        "docs/contributing/branch-strategy.md and "
+                        "docs/contributing/commit-message-format.md.",
                         json.dumps(step, ensure_ascii=False),
                         "Use normal Codex user config and repository rules.",
                     ],
