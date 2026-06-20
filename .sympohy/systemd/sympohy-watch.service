@@ -2,7 +2,12 @@
 Description=SIFTQ sympohy issue watcher
 
 [Service]
-Type=oneshot
+Type=simple
 WorkingDirectory=@@REPO_ROOT@@
 Environment="PATH=@@PATH@@"
 ExecStart=/usr/bin/env bash -lc 'cd @@REPO_ROOT@@ && exec task ai:sympohy:watch'
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

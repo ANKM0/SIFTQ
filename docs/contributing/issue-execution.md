@@ -80,6 +80,29 @@ task ai:sympohy:doctor
 `task ai:sympohy:doctor` validates sympohy config, labels, systemd templates,
 Codex availability, hooks, and GitHub prerequisites.
 
+## Codex Model Roles
+
+`sympohy` passes an explicit Codex model and reasoning effort for each automated
+Codex role. The checked-in defaults use only models visible in the current local
+Codex account model catalog: `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, and
+`gpt-5.3-codex-spark`. `gpt-5.5-pro` is intentionally not configured because it
+is not available in that catalog.
+
+| Role | Model | Reasoning | Used for |
+| --- | --- | --- | --- |
+| `default` | `gpt-5.5` | `high` | Fallback for unclassified Codex calls |
+| `triage` | `gpt-5.4-mini` | `medium` | Lightweight issue classification or future triage calls |
+| `planning` | `gpt-5.5` | `high` | Documentation artifact decisions and logical implementation plan |
+| `implementation` | `gpt-5.5` | `high` | Logical-step implementation |
+| `fix` | `gpt-5.5` | `high` | Hook, review, and final-verifier fixes |
+| `review` | `gpt-5.5` | `xhigh` | Adversarial PR review |
+| `merge_readiness` | `gpt-5.5` | `xhigh` | Final verifier and merge recommendation |
+
+Configure these values in `.sympohy/config.yaml` with
+`codex_model_<role>` and `codex_reasoning_<role>` keys. The runner still uses
+normal Codex user config and repository rules; it only adds `--model` and
+`model_reasoning_effort` for the selected role.
+
 The local CI gate also runs the sympohy checks:
 
 ```bash
@@ -127,6 +150,8 @@ task ai:sympohy:migrate -- '#73'
 task ai:sympohy:migrate -- --all
 task ai:sympohy:watch
 task ai:sympohy:systemd:install
+task ai:sympohy:systemd:start
+task ai:sympohy:systemd:stop
 task ai:sympohy:systemd:status
 ```
 
@@ -222,10 +247,17 @@ Run the watcher in the foreground:
 task ai:sympohy:watch
 ```
 
-Install the systemd user timer:
+Install and start the systemd user service:
 
 ```bash
 task ai:sympohy:systemd:install
+```
+
+Start or stop the installed service:
+
+```bash
+task ai:sympohy:systemd:start
+task ai:sympohy:systemd:stop
 ```
 
 Check status and recent logs:
@@ -234,15 +266,20 @@ Check status and recent logs:
 task ai:sympohy:systemd:status
 ```
 
-The timer runs once per minute. It selects open issues that do not have any of
+The watcher is a foreground daemon. When installed under systemd, the service
+keeps the daemon running and restarts it if it exits unexpectedly. The daemon
+polls GitHub once per `watch_poll_interval_seconds` and selects open issues
+that do not have any of
 `sympohy:pending`, `sympohy:running`, `sympohy:blocked`, or `sympohy:done`.
 It also reselects `sympohy:running` issues whose run state is stale because the
 worker pid is missing or dead, the state file is missing, or the heartbeat has
 expired. Fresh issues start through normal triage, while stale running issues
 are routed through resume handling so they are not excluded permanently.
 
-The watcher starts at most ten workers, and each worker uses an independent
-`.sympohy/worktrees/issue-<number>` worktree and issue branch.
+The watcher keeps up to `max_workers` workers active. When a worker exits, the
+next poll reaps it and fills the open slot from the issue queue. Each worker
+uses an independent `.sympohy/worktrees/issue-<number>` worktree and issue
+branch.
 
 During stale-run recovery, `sympohy` reloads the saved implementation plan when
 available and compares it with logical-step commits already present in the issue

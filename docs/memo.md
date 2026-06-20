@@ -47,8 +47,9 @@ SIFTQ/Yoriwake プロジェクト構成と照合した結果を記録する。
 | Command permission CI | 設定済み | `Taskfile.yml` の `ci:lint:codex-task-perms` が Taskfile task と `.codex/rules/siftq.rules` の allow rule を照合する。 |
 | sympohy hooks | 設定済み | `.sympohy/config.yaml` の `hooks` に `task ci` が定義されている。 |
 | sympohy stage gate | 設定済み | `.sympohy/config.yaml` の `stage_gate_command` は `task ai:sympohy:stage-gate`。 |
+| sympohy Codex model roles | 設定済み | `.sympohy/config.yaml` に `codex_model_<role>` / `codex_reasoning_<role>` を定義し、現アカウントで利用可能な `gpt-5.5` と `gpt-5.4-mini` を role ごとに割り当てている。 |
 | sympohy automation commands | 設定済み | `Taskfile.yml` に `ai:sympohy`, `ai:sympohy:refine`, `ai:sympohy:resume`, `ai:sympohy:doctor`, `ai:sympohy:watch`, systemd 関連 task がある。 |
-| sympohy systemd templates | 設定済み | `.sympohy/systemd/sympohy-watch.service` と `.sympohy/systemd/sympohy-watch.timer` がある。 |
+| sympohy systemd template | 設定済み | `.sympohy/systemd/sympohy-watch.service` がある。 |
 | Codex invocation from automation | 設定済み | `scripts/sympohy/runner.py` は `codex exec` を呼び、`--ignore-user-config` や `--ignore-rules` を付けない設計。 |
 | Repository skills under `.agents` | 設定済み | `.agents/skills/adr-authoring`, `feature-docs-planning`, `issue-implementation`, `self-improvement`, `adversarial-review`, `merge-readiness` がある。 |
 | Repository skill under `.codex` | 設定済み | `.codex/skills/issue-creator` がある。 |
@@ -85,7 +86,6 @@ SIFTQ/Yoriwake プロジェクト構成と照合した結果を記録する。
 - `stage gate command configured`
 - `stage gate task declared`
 - `systemd service template`
-- `systemd timer template`
 - `commit hook rejects invalid subject`
 - `commit hook accepts repository subject`
 - `required labels declared`
