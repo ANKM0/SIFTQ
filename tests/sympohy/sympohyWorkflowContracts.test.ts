@@ -138,6 +138,12 @@ describe("sympohy automation contract", () => {
     expect(runner).not.toContain("--ignore-rules");
   });
 
+  it("instructs implementation agents to read contributing workflow docs", () => {
+    expect(runner).toContain("docs/contributing documents");
+    expect(runner).toContain("docs/contributing/branch-strategy.md");
+    expect(runner).toContain("docs/contributing/commit-message-format.md");
+  });
+
   it("doctor checks config, labels, systemd templates, hooks, and commit subjects", () => {
     expect(cli).toContain("\"default hook task ci\"");
     expect(cli).toContain("\"stage gate command configured\"");
