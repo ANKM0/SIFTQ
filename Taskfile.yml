@@ -56,6 +56,7 @@ tasks:
       - task: ci:lint
       - task: ci:test
       - task: ci:build
+      - task: ci:rust
       - task: codd:version
       - task: codd:scan
       - task: codd:validate
@@ -169,7 +170,7 @@ tasks:
   tauri:dev:
     desc: Start the Tauri desktop development app.
     cmds:
-      - cargo tauri dev
+      - cargo-tauri dev
 
   codd:version:
     desc: Check the required CoDD version.

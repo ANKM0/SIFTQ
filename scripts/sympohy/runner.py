@@ -3101,16 +3101,17 @@ def _run_command_with_heartbeat(
     **popen_kwargs: object,
 ) -> int:
     process = subprocess.Popen(args, cwd=cwd, **popen_kwargs)
-    while True:
-        try:
-            return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
-        except subprocess.TimeoutExpired:
-            if heartbeat is not None:
-                try:
+    try:
+        while True:
+            try:
+                return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
+            except subprocess.TimeoutExpired:
+                if heartbeat is not None:
                     heartbeat()
-                except Exception:
-                    _terminate_process(process)
-                    raise
+    except Exception:
+        if process.poll() is None:
+            _terminate_process(process)
+        raise
 
 
 def _check_call_with_heartbeat(

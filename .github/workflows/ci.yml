@@ -72,6 +72,9 @@ jobs:
       - name: Build
         run: task ci:build
 
+      - name: Check Rust workspace
+        run: task ci:rust
+
       - name: Check CoDD version
         run: task codd:version
 
