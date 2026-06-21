@@ -1,7 +1,7 @@
 import { type Modifier } from "@dnd-kit/core";
 
-import { INITIAL_AREAS, type AreaId, type MatrixAreaId, isMatrixArea } from "../domain/area";
-import { type Task, type TaskId } from "../domain/task";
+import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
+import { INITIAL_AREAS, isMatrixArea } from "./taskPresentation";
 
 export type TaskDropOperation =
   | {

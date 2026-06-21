@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -7,60 +7,110 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 
-import { InMemoryTaskRepository } from "../adapters/inMemoryTaskRepository";
 import {
-  createTask,
-  listTasks,
-  moveTask,
-  reorderTask,
-  updateTaskTitle
-} from "../application/taskOperations";
-import {
-  MATRIX_AREAS,
-  TERMINAL_AREAS,
   type MatrixAreaId,
-  type TerminalAreaId
-} from "../domain/area";
-import {
-  isTaskVisibleInMatrix,
-  TASK_TITLE_MAX_LENGTH,
+  type TerminalAreaId,
   type Task
-} from "../domain/task";
-import { type TaskRepository } from "../ports/taskRepository";
+} from "../contracts/task";
+import {
+  getStorageHealth,
+  tauriTaskRepository
+} from "../adapters/tauriTaskRepository";
+import { isTauriRuntimeAvailable } from "../adapters/tauriInvoke";
 import {
   areaDropId,
   restrictDragToWindowEdges,
   resolveTaskDropOperation,
   taskDropId
 } from "./dragDrop";
+import {
+  MATRIX_AREAS,
+  TERMINAL_AREAS,
+  tasksForArea,
+  validateTaskTitleInput
+} from "./taskPresentation";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
 
-type AppProps = {
-  repository?: TaskRepository;
-};
+type RuntimeState =
+  | { readonly status: "checking" }
+  | { readonly status: "ready" }
+  | { readonly status: "unsupported" }
+  | {
+      readonly status: "storage-error";
+      readonly code: string;
+      readonly message: string;
+    };
 
-export function App({ repository }: AppProps) {
-  const ownedRepository = useRef(new InMemoryTaskRepository());
-  const activeRepository = repository ?? ownedRepository.current;
+export function App() {
   const [tasks, setTasks] = useState<readonly Task[]>([]);
+  const [runtimeState, setRuntimeState] = useState<RuntimeState>({
+    status: "checking"
+  });
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refreshTasks(activeRepository, setTasks);
-  }, [activeRepository]);
+    let isCurrent = true;
+
+    async function initialize() {
+      if (!isTauriRuntimeAvailable()) {
+        setRuntimeState({ status: "unsupported" });
+        return;
+      }
+
+      try {
+        const health = await getStorageHealth();
+
+        if (!isCurrent) {
+          return;
+        }
+
+        if (!health.ok) {
+          setRuntimeState({
+            code: health.code,
+            message: health.message,
+            status: "storage-error"
+          });
+          return;
+        }
+
+        const initialTasks = await tauriTaskRepository.listTasks();
+
+        if (isCurrent) {
+          setTasks(initialTasks);
+          setRuntimeState({ status: "ready" });
+        }
+      } catch (error) {
+        if (isCurrent) {
+          setRuntimeState({
+            code: "INTERNAL",
+            message: messageForError(error, "Storage health could not be checked."),
+            status: "storage-error"
+          });
+        }
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   async function handleCreateTask(
     areaId: MatrixAreaId,
     title: string
   ): Promise<string | null> {
     try {
-      await createTask(activeRepository, { areaId, title });
-      await refreshTasks(activeRepository, setTasks);
+      setOperationError(null);
+      await tauriTaskRepository.createTask({ areaId, title });
+      await refreshTasks();
 
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : "Task could not be created.";
+      return messageForError(error, "Task could not be created.");
     }
   }
 
@@ -69,12 +119,13 @@ export function App({ repository }: AppProps) {
     title: string
   ): Promise<string | null> {
     try {
-      await updateTaskTitle(activeRepository, { taskId, title });
-      await refreshTasks(activeRepository, setTasks);
+      setOperationError(null);
+      await tauriTaskRepository.updateTaskTitle({ taskId, title });
+      await refreshTasks();
 
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : "Task could not be updated.";
+      return messageForError(error, "Task could not be updated.");
     }
   }
 
@@ -89,13 +140,45 @@ export function App({ repository }: AppProps) {
       return;
     }
 
-    if (operation.type === "move") {
-      await moveTask(activeRepository, operation);
-    } else {
-      await reorderTask(activeRepository, operation);
-    }
+    try {
+      if (operation.type === "move") {
+        await tauriTaskRepository.moveTask(operation);
+      } else {
+        await tauriTaskRepository.reorderTask(operation);
+      }
 
-    await refreshTasks(activeRepository, setTasks);
+      setOperationError(null);
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task could not be moved."));
+    }
+  }
+
+  async function refreshTasks() {
+    setTasks(await tauriTaskRepository.listTasks());
+  }
+
+  if (runtimeState.status === "checking") {
+    return <RuntimeMessage title="Opening storage" message="Checking task storage." />;
+  }
+
+  if (runtimeState.status === "unsupported") {
+    return (
+      <RuntimeMessage
+        title="Tauri runtime required"
+        message="SIFTQ v2 runs as a desktop app. Browser-only startup is not supported."
+      />
+    );
+  }
+
+  if (runtimeState.status === "storage-error") {
+    return (
+      <RuntimeMessage
+        title="Storage error"
+        message={runtimeState.message}
+        code={runtimeState.code}
+      />
+    );
   }
 
   return (
@@ -106,6 +189,7 @@ export function App({ repository }: AppProps) {
     >
       <MatrixPage
         tasks={tasks}
+        operationError={operationError}
         onCreateTask={handleCreateTask}
         onUpdateTaskTitle={handleUpdateTaskTitle}
       />
@@ -115,6 +199,7 @@ export function App({ repository }: AppProps) {
 
 type MatrixPageProps = {
   readonly tasks: readonly Task[];
+  readonly operationError: string | null;
   readonly onCreateTask: (areaId: MatrixAreaId, title: string) => Promise<string | null>;
   readonly onUpdateTaskTitle: (
     taskId: Task["id"],
@@ -122,7 +207,12 @@ type MatrixPageProps = {
   ) => Promise<string | null>;
 };
 
-function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps) {
+function MatrixPage({
+  tasks,
+  operationError,
+  onCreateTask,
+  onUpdateTaskTitle
+}: MatrixPageProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   async function handleSaveTitle(title: string): Promise<string | null> {
@@ -144,6 +234,11 @@ function MatrixPage({ tasks, onCreateTask, onUpdateTaskTitle }: MatrixPageProps)
       <header className="matrix-page__header">
         <h1>SIFTQ</h1>
       </header>
+      {operationError !== null ? (
+        <p className="matrix-page__error" role="alert">
+          {operationError}
+        </p>
+      ) : null}
       <section aria-label="Matrix workspace" className="matrix-workspace">
         <div className="matrix-workspace__status matrix-workspace__status--skipped">
           {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
@@ -191,9 +286,8 @@ function AreaPanel({ areaId, label, tasks, onCreateTask, onEditTask }: AreaPanel
   const { isOver, setNodeRef } = useDroppable({ id: areaDropId(areaId) });
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const trimmedTitle = title.trim();
-  const isTitleTooLong = title.length > TASK_TITLE_MAX_LENGTH;
-  const canCreateTask = trimmedTitle.length > 0 && !isTitleTooLong;
+  const validationError = validateTaskTitleInput(title);
+  const canCreateTask = validationError === null;
   const panelClassName = [
     "area-panel",
     `area-panel--${areaId}`,
@@ -206,12 +300,8 @@ function AreaPanel({ areaId, label, tasks, onCreateTask, onEditTask }: AreaPanel
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (trimmedTitle.length === 0) {
-      setError("Task title must not be empty.");
-      return;
-    }
-
-    if (isTitleTooLong) {
+    if (validationError !== null) {
+      setError(validationError);
       return;
     }
 
@@ -256,9 +346,9 @@ function AreaPanel({ areaId, label, tasks, onCreateTask, onEditTask }: AreaPanel
           +
         </button>
       </form>
-      {isTitleTooLong ? (
+      {validationError !== null && Array.from(title).length > 0 ? (
         <p className="task-create-form__error" role="alert">
-          Title must be {TASK_TITLE_MAX_LENGTH} characters or less.
+          {validationError}
         </p>
       ) : null}
       {error !== null ? (
@@ -334,14 +424,7 @@ type TaskTitleEditModalProps = {
 function TaskTitleEditModal({ task, onCancel, onSave }: TaskTitleEditModalProps) {
   const [title, setTitle] = useState(task.title);
   const [error, setError] = useState<string | null>(null);
-  const trimmedTitle = title.trim();
-  const isBlank = trimmedTitle.length === 0;
-  const isTitleTooLong = title.length > TASK_TITLE_MAX_LENGTH;
-  const validationError = isBlank
-    ? "Task title must not be empty."
-    : isTitleTooLong
-      ? `Title must be ${TASK_TITLE_MAX_LENGTH} characters or less.`
-      : null;
+  const validationError = validateTaskTitleInput(title);
   const canSave = validationError === null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -424,15 +507,24 @@ function StatusDropArea({ areaId, label }: StatusDropAreaProps) {
   );
 }
 
-async function refreshTasks(
-  repository: TaskRepository,
-  setTasks: (tasks: readonly Task[]) => void
-) {
-  setTasks(await listTasks(repository));
+type RuntimeMessageProps = {
+  readonly title: string;
+  readonly message: string;
+  readonly code?: string;
+};
+
+function RuntimeMessage({ title, message, code }: RuntimeMessageProps) {
+  return (
+    <main className="matrix-page matrix-page--runtime-message">
+      <section className="runtime-message" role="status">
+        <h1>{title}</h1>
+        {code === undefined ? null : <p className="runtime-message__code">{code}</p>}
+        <p>{message}</p>
+      </section>
+    </main>
+  );
 }
 
-function tasksForArea(tasks: readonly Task[], areaId: MatrixAreaId): Task[] {
-  return tasks
-    .filter((task) => task.areaId === areaId && isTaskVisibleInMatrix(task))
-    .sort((left, right) => left.order - right.order);
+function messageForError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

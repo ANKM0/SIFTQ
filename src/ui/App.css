@@ -27,6 +27,59 @@
   line-height: 1.2;
 }
 
+.matrix-page__error {
+  max-width: 1180px;
+  margin: 0 auto 16px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.matrix-page--runtime-message {
+  display: grid;
+  place-items: center;
+}
+
+.runtime-message {
+  width: min(100%, 460px);
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+  padding: 24px;
+}
+
+.runtime-message h1 {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.runtime-message p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.runtime-message__code {
+  display: inline-flex;
+  margin: 0 0 10px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .matrix-workspace {
   display: grid;
   grid-template-columns: minmax(120px, 160px) minmax(0, 860px) minmax(120px, 160px);

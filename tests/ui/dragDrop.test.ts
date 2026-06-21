@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Task } from "../../src/domain/task";
+import { type Task } from "../../src/contracts/task";
 import {
   areaDropId,
   resolveTaskDropOperation,
