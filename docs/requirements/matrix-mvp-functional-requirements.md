@@ -162,25 +162,26 @@ MVP完了判定には、自動チェックだけでなくローカルブラウ�
 
 ## Implementation Traceability
 
-v1 MVPの実装証跡は次の通り。
+現在のMatrix MVP実装証跡は次の通り。
 
-- `src/domain/area.ts`: 4つのmatrix areaとDone / Skippedのarea定義。
-- `src/domain/task.ts`: task title制約、status、matrix表示可否。
-- `src/application/taskOperations.ts`: task作成、一覧、移動、並び替えoperation。
+- `src/contracts/task.ts`: frontend task contract、area、status、command DTO。
+- `crates/core/src/domain.rs`: 4つのmatrix area、Done / Skipped、task title制約、
+  status、matrix表示可否。
+- `crates/core/src/service.rs`: task作成、一覧、移動、並び替え、title更新operation。
 - `src/ports/taskRepository.ts`: UIとadapterを分離するtask repository port。
-- `src/adapters/inMemoryTaskRepository.ts`: 現在のブラウザセッション中だけ保持する
-  in-memory repository。
+- `src/adapters/tauriTaskRepository.ts`: frontend repository portとTauri commandの
+  adapter。
+- `src-tauri/src/lib.rs`: Tauri command surfaceとRust core serviceの接続。
 - `src/ui/App.tsx`: Matrix page、area別作成フォーム、カード表示、DnD接続。
 - `src/ui/dragDrop.ts`: dnd-kitのdrop id解決、move/reorder operation変換、
   操作範囲制限。
 
 自動テスト証跡は次の通り。
 
-- `tests/domain/task.test.ts`: area定義、title正規化、status、表示可否。
-- `tests/application/taskOperations.test.ts`: application operationの作成、
-  入力拒否、重複title、移動、並び替え。
-- `tests/adapters/inMemoryTaskRepository.test.ts`: order、status遷移、terminal
-  area、in-memory repository振る舞い。
+- `crates/core/tests/task_service_sqlite_tests.rs`: area定義、title正規化、status、
+  表示可否、operationの作成、入力拒否、移動、並び替え、永続化repository振る舞い。
+- `tests/adapters/tauriTaskRepository.test.ts`: frontend repository adapterのcommand
+  mapping、title正規化、structured error handling。
 - `tests/ui/App.test.tsx`: area表示、作成フォーム、カード表示、セッション内保持、
   area別表示更新、長いtitle。
 - `tests/ui/dragDrop.test.ts`: DnD drop解決、invalid drop、drag操作範囲制限。

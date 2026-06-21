@@ -2358,6 +2358,11 @@ class SympohyRunnerTest(unittest.TestCase):
                     return 0
                 raise subprocess.TimeoutExpired(["task"], timeout)
 
+            def poll(self) -> int | None:
+                if self.terminated:
+                    return 0
+                return None
+
             def terminate(self) -> None:
                 self.terminated = True
 
