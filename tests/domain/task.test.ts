@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { INITIAL_AREAS } from "../../src/domain/area";
 import {
+  INITIAL_AREAS,
   isTaskVisibleInMatrix,
-  normalizeTaskTitle,
-  statusForArea,
-  TaskValidationError,
+  normalizeTaskTitleInput,
+  validateTaskTitleInput
+} from "../../src/ui/taskPresentation";
+import {
   TASK_TITLE_MAX_LENGTH,
   type Task
-} from "../../src/domain/task";
+} from "../../src/contracts/task";
 
 describe("area domain", () => {
   it("defines the four matrix areas and two terminal areas", () => {
@@ -24,23 +25,19 @@ describe("area domain", () => {
 });
 
 describe("task domain", () => {
-  it("normalizes valid titles without enforcing uniqueness", () => {
-    expect(normalizeTaskTitle("  duplicate title  ")).toBe("duplicate title");
-    expect(normalizeTaskTitle("duplicate title")).toBe("duplicate title");
+  it("normalizes valid title input without enforcing uniqueness", () => {
+    expect(normalizeTaskTitleInput("  duplicate title  ")).toBe("duplicate title");
+    expect(normalizeTaskTitleInput("duplicate title")).toBe("duplicate title");
   });
 
   it("rejects blank and too-long titles", () => {
-    expect(() => normalizeTaskTitle("   ")).toThrow(TaskValidationError);
-    expect(() => normalizeTaskTitle("a".repeat(TASK_TITLE_MAX_LENGTH + 1))).toThrow(
-      TaskValidationError
+    expect(validateTaskTitleInput("   ")).toBe("Task title must not be empty.");
+    expect(validateTaskTitleInput("a".repeat(TASK_TITLE_MAX_LENGTH + 1))).toBe(
+      "Title must be 256 characters or less."
     );
   });
 
-  it("derives status and matrix visibility from the current area", () => {
-    expect(statusForArea("do")).toBe("active");
-    expect(statusForArea("done")).toBe("done");
-    expect(statusForArea("skipped")).toBe("skipped");
-
+  it("derives matrix visibility from task status and current area", () => {
     const activeTask: Task = {
       id: "task-1",
       title: "Visible",
