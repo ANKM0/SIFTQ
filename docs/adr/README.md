@@ -36,3 +36,5 @@ The ADR index contract is covered by `tests/docs/adrIndex.test.ts`.
 | [0012](./0012-matrix-mvp-wireframe-layout.md) | Matrix MVP Wireframe Layout | Accepted |
 | [0013](./0013-sympohy-ticket-driven-ai-runner.md) | sympohy for Ticket-Driven AI Runner | Accepted |
 | [0014](./0014-pytest-as-default-python-test-runner.md) | pytest as the default Python test runner | Accepted |
+| [0015](./0015-sqlite-tauri-rust-backend-boundary.md) | SQLite, Tauri, and Rust Backend Boundary | Accepted |
+| [0016](./0016-real-sqlite-test-strategy.md) | Real SQLite Test Strategy | Accepted |

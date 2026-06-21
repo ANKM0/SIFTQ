@@ -11,6 +11,9 @@ codd:
     - id: req:matrix-mvp-non-functional
       relation: depends_on
       semantic: quality
+    - id: req:matrix-mvp-v2-sqlite-tauri
+      relation: depends_on
+      semantic: product
     - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: product

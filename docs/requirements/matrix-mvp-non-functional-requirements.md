@@ -14,6 +14,9 @@ codd:
     - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: product
+    - id: req:matrix-mvp-v2-sqlite-tauri
+      relation: depends_on
+      semantic: quality
     - id: design:browser-spa-v1-matrix-mvp-adr
       relation: depends_on
       semantic: scope

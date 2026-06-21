@@ -26,6 +26,7 @@ codd:
 | [CI/CD 基盤設計](./ci-cd-foundation.md) | `design:ci-cd-foundation` | 草案 |
 | [CoDD 基盤設計](./codd-foundation.md) | `design:codd-foundation` | 草案 |
 | [Matrix MVP 技術選定設計](./matrix-mvp-technology-selection.md) | `design:matrix-mvp-technology-selection` | 実装済み |
+| [Matrix MVP v2 SQLite/Tauri Design](./matrix-mvp-v2-sqlite-tauri-design.md) | `design:matrix-mvp-v2-sqlite-tauri` | 草案 |
 | [Taskfile コマンドランナー設計](./taskfile-command-runner.md) | `design:taskfile-command-runner` | 草案 |
 | [sympohy 実行ライフサイクル・状態設計](./sympohy-run-lifecycle-state.md) | `design:sympohy-run-lifecycle-state` | 草案 |
 | [sympohy 停滞実行復旧設計](./sympohy-stale-run-recovery.md) | `design:sympohy-stale-run-recovery` | 草案 |
