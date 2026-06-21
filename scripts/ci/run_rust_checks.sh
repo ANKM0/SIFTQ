@@ -32,5 +32,5 @@ if ! command -v cargo >/dev/null 2>&1 || ! cargo --version >/dev/null 2>&1; then
 fi
 
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace

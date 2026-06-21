@@ -9,7 +9,7 @@ codd:
       semantic: governance
 ---
 
-# ADR 0015: SQLite, Tauri, and Rust Backend Boundary
+# ADR 0016: SQLite, Tauri, and Rust Backend Boundary
 
 ## Status
 

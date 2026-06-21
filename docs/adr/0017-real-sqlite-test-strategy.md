@@ -9,7 +9,7 @@ codd:
       semantic: governance
 ---
 
-# ADR 0016: Real SQLite Test Strategy
+# ADR 0017: Real SQLite Test Strategy
 
 ## Status
 

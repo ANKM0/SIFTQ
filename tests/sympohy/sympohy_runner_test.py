@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -2533,58 +2534,106 @@ class SympohyRunnerTest(unittest.TestCase):
             ) -> None:
                 events.append(f"comment:{pull_request_number}")
 
-            with (
-                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
-                patch("scripts.sympohy.runner._branch_exists", return_value=False),
-                patch("scripts.sympohy.runner._remote_branch_exists", return_value=False),
-                patch(
-                    "scripts.sympohy.runner.ensure_worktree",
-                    side_effect=ensure_worktree,
-                ),
-                patch(
-                    "scripts.sympohy.runner._current_branch",
-                    return_value="issue-82-sympohy",
-                ),
-                patch(
-                    "scripts.sympohy.runner.subprocess.check_output",
-                    return_value="issue-82-sympohy\n",
-                ),
-                patch("scripts.sympohy.runner._codex_json", side_effect=codex_json),
-                patch("scripts.sympohy.runner._codex_text", side_effect=codex_text),
-                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
-                patch("scripts.sympohy.runner._branch_has_commits", return_value=False),
-                patch("scripts.sympohy.runner._run_hooks", side_effect=run_hooks),
-                patch(
-                    "scripts.sympohy.runner._commit_all_if_new",
-                    side_effect=commit_all_if_new,
-                ),
-                patch(
-                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
-                    side_effect=push_pr,
-                ),
-                patch(
-                    "scripts.sympohy.runner._review_fix_loop",
-                    side_effect=review_fix_loop,
-                ),
-                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
-                patch(
-                    "scripts.sympohy.runner._resolve_pull_request_number",
-                    return_value="99",
-                ),
-                patch(
-                    "scripts.sympohy.runner.comment",
-                    side_effect=final_verifier_comment,
-                ) as comment,
-                patch(
-                    "scripts.sympohy.runner._check_call_with_heartbeat",
-                    side_effect=check_call_with_heartbeat,
-                ),
-                patch(
-                    "scripts.sympohy.runner.subprocess.check_call",
-                    side_effect=check_call,
-                ),
-                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-            ):
+            with ExitStack() as stack:
+                stack.enter_context(
+                    patch("scripts.sympohy.runner.fetch_issue", return_value=issue)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._branch_exists", return_value=False)
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._remote_branch_exists",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.ensure_worktree",
+                        side_effect=ensure_worktree,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-82-sympohy",
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.subprocess.check_output",
+                        return_value="issue-82-sympohy\n",
+                    )
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._codex_json", side_effect=codex_json)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._codex_text", side_effect=codex_text)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._commit_subjects", return_value=[])
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._branch_has_commits",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._run_hooks", side_effect=run_hooks)
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._commit_all_if_new",
+                        side_effect=commit_all_if_new,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
+                        side_effect=push_pr,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._review_fix_loop",
+                        side_effect=review_fix_loop,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._pull_request_merged",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._resolve_pull_request_number",
+                        return_value="99",
+                    )
+                )
+                comment = stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.comment",
+                        side_effect=final_verifier_comment,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._check_call_with_heartbeat",
+                        side_effect=check_call_with_heartbeat,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.subprocess.check_call",
+                        side_effect=check_call,
+                    )
+                )
+                set_issue_state = stack.enter_context(
+                    patch("scripts.sympohy.runner.set_issue_state")
+                )
                 result = run_issue("#82", config)
 
             log_dir = config.run_log_root / "issue-82"
