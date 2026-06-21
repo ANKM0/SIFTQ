@@ -104,6 +104,10 @@ describe("App", () => {
     expect(screen.queryByText("Hidden")).toBeNull();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
+    expect(commands.calls).toEqual([
+      { command: "get_storage_health" },
+      { command: "list_tasks" }
+    ]);
   });
 
   it("creates task cards through Tauri commands and refreshes the matrix", async () => {
@@ -113,15 +117,32 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByLabelText("Task matrix");
-    createTaskInArea("Do", "First");
-    expect(await screen.findByText("First")).toBeTruthy();
+    commands.clearCalls();
 
+    createTaskInArea("Do", "  First  ");
+    expect(await screen.findByText("First")).toBeTruthy();
+    expect(commands.calls).toEqual([
+      {
+        command: "create_task",
+        args: { input: { areaId: "do", title: "First" } }
+      },
+      { command: "list_tasks" }
+    ]);
+
+    commands.clearCalls();
     createTaskInArea("Schedule", "Planned");
     expect(await screen.findByText("Planned")).toBeTruthy();
 
     expect(taskTitlesIn("Do tasks")).toEqual(["First"]);
     expect(taskTitlesIn("Schedule tasks")).toEqual(["Planned"]);
     expect(screen.getByLabelText("Do task count").textContent).toBe("1 cards");
+    expect(commands.calls).toEqual([
+      {
+        command: "create_task",
+        args: { input: { areaId: "schedule", title: "Planned" } }
+      },
+      { command: "list_tasks" }
+    ]);
   });
 
   it("updates a task title through Tauri commands", async () => {
@@ -132,6 +153,8 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText("Original title")).toBeTruthy();
+    commands.clearCalls();
+
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Task title"), {
       target: { value: "  Updated title  " }
@@ -141,24 +164,99 @@ describe("App", () => {
     expect(await screen.findByText("Updated title")).toBeTruthy();
     expect(screen.queryByText("Original title")).toBeNull();
     expect(commands.tasks[0]).toMatchObject({ title: "Updated title" });
+    expect(commands.calls).toEqual([
+      {
+        command: "update_task_title",
+        args: { input: { taskId: "task-1", title: "Updated title" } }
+      },
+      { command: "list_tasks" }
+    ]);
   });
 
-  it("hides active tasks from the matrix after dropping them on terminal areas", async () => {
+  it("reorders and moves task cards through Tauri commands", async () => {
     const commands = new FakeTauriCommands();
 
-    commands.seed(task({ id: "task-1", title: "Done task", areaId: "do" }));
+    commands.seed(
+      task({ id: "task-1", title: "First task", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Second task", areaId: "do", order: 1 }),
+      task({
+        id: "task-3",
+        title: "Scheduled task",
+        areaId: "schedule",
+        order: 0
+      })
+    );
     installTauriInvoke(commands.invoke);
     render(<App />);
 
-    expect(await screen.findByText("Done task")).toBeTruthy();
-    dragTaskOverArea("task-1", "done");
+    expect(await screen.findByText("First task")).toBeTruthy();
+    commands.clearCalls();
 
-    await waitFor(() => expect(screen.queryByText("Done task")).toBeNull());
-    expect(commands.tasks[0]).toMatchObject({
-      areaId: "done",
-      status: "done"
-    });
+    dragTaskOverTask("task-2", "task-1");
+    await waitFor(() =>
+      expect(taskTitlesIn("Do tasks")).toEqual(["Second task", "First task"])
+    );
+    expect(commands.calls).toEqual([
+      {
+        command: "reorder_task",
+        args: { input: { taskId: "task-2", toIndex: 0 } }
+      },
+      { command: "list_tasks" }
+    ]);
+
+    commands.clearCalls();
+    dragTaskOverTask("task-1", "task-3");
+    await waitFor(() =>
+      expect(taskTitlesIn("Schedule tasks")).toEqual([
+        "First task",
+        "Scheduled task"
+      ])
+    );
+    expect(commands.calls).toEqual([
+      {
+        command: "move_task",
+        args: {
+          input: { taskId: "task-1", toAreaId: "schedule", insertAt: 0 }
+        }
+      },
+      { command: "list_tasks" }
+    ]);
   });
+
+  it.each(["done", "skipped"] as const)(
+    "hides active tasks from the matrix after dropping them on the %s area",
+    async (terminalAreaId) => {
+      const commands = new FakeTauriCommands();
+
+      commands.seed(
+        task({ id: "task-1", title: `${terminalAreaId} task`, areaId: "do" })
+      );
+      installTauriInvoke(commands.invoke);
+      render(<App />);
+
+      expect(await screen.findByText(`${terminalAreaId} task`)).toBeTruthy();
+      commands.clearCalls();
+
+      dragTaskOverArea("task-1", terminalAreaId);
+
+      await waitFor(() =>
+        expect(screen.queryByText(`${terminalAreaId} task`)).toBeNull()
+      );
+      expect(commands.tasks[0]).toMatchObject({
+        areaId: terminalAreaId,
+        status: terminalAreaId
+      });
+      expect(commands.calls).toEqual([
+        {
+          command: "move_task",
+          args: {
+            input: { taskId: "task-1", toAreaId: terminalAreaId, insertAt: 0 }
+          }
+        },
+        { command: "list_tasks" }
+      ]);
+    }
+  );
 });
 
 function installTauriInvoke(invoke: Invoke | undefined) {
@@ -197,10 +295,27 @@ function dragTaskOverArea(taskId: string, areaId: AreaId) {
   });
 }
 
+function dragTaskOverTask(taskId: string, overTaskId: TaskId) {
+  dndKitMock.onDragEnd?.({
+    active: { id: taskDropId(taskId) },
+    over: { id: taskDropId(overTaskId) }
+  });
+}
+
+type TauriCall = {
+  readonly command: string;
+  readonly args?: InvokeArgs;
+};
+
 class FakeTauriCommands {
+  readonly calls: TauriCall[] = [];
   readonly tasks: Task[] = [];
 
   private nextId = 1;
+
+  clearCalls() {
+    this.calls.splice(0, this.calls.length);
+  }
 
   seed(...tasks: Task[]) {
     this.tasks.splice(0, this.tasks.length, ...tasks);
@@ -208,6 +323,15 @@ class FakeTauriCommands {
   }
 
   readonly invoke = async <T,>(command: string, args?: InvokeArgs): Promise<T> => {
+    this.calls.push(
+      args === undefined
+        ? { command }
+        : {
+            args,
+            command
+          }
+    );
+
     switch (command) {
       case "get_storage_health":
         return { ok: true } as T;

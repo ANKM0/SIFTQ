@@ -14,9 +14,9 @@ describe("tauriTaskRepository", () => {
     const returnedTask = task({ id: "task-1", title: "First" });
     const repository = createTauriTaskRepository(
       async <T,>(command: string, args?: InvokeArgs) => {
-      calls.push({ command, args });
+        calls.push({ command, args });
 
-      return returnedTask as T;
+        return returnedTask as T;
       }
     );
 
