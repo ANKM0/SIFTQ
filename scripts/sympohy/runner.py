@@ -382,6 +382,7 @@ def _prepare_document_artifacts(
             },
         )
         decisions = _request_artifact_decisions(
+            config=config,
             issue=issue,
             acceptance=acceptance,
             worktree=worktree,
@@ -449,6 +450,7 @@ def _prepare_document_artifacts(
                 },
             )
             decisions = _request_artifact_decisions(
+                config=config,
                 issue=issue,
                 acceptance=acceptance,
                 worktree=worktree,
@@ -475,6 +477,7 @@ def _prepare_document_artifacts(
 
 def _request_artifact_decisions(
     *,
+    config: SympohyConfig,
     issue: Issue,
     acceptance: AcceptanceSet,
     worktree: Path,

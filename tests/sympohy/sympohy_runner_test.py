@@ -11,7 +11,11 @@ from unittest.mock import patch
 
 from scripts.sympohy.config import CodexModelConfig, SympohyConfig
 from scripts.sympohy.github import Issue
-from scripts.sympohy.core import parse_final_verifier_block_findings, parse_review_json
+from scripts.sympohy.core import (
+    AcceptanceSet,
+    parse_final_verifier_block_findings,
+    parse_review_json,
+)
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
@@ -23,6 +27,7 @@ from scripts.sympohy.runner import (
     _codex_exec_args,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
+    _prepare_document_artifacts,
     _pull_request_exists,
     _resume_fix_phase,
     _resume_late_phase,
@@ -123,6 +128,74 @@ class SympohyRunnerTest(unittest.TestCase):
                 os.chdir(original_cwd)
 
         self.assertEqual(result["status"], "pass")
+
+    def test_prepare_document_artifacts_passes_planning_config(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=1,
+                stage_gate_command="task ai:sympohy:stage-gate",
+            )
+            worktree = root / "worktree"
+            log_dir = root / "runs" / "issue-59"
+            worktree.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=59,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=worktree,
+            )
+            issue = Issue(
+                number=59,
+                title="Persist matrix UI to SQLite",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={
+                        "artifact_decisions": {
+                            "requirements": {"mode": "not_needed", "reason": "covered"},
+                            "design": {"mode": "not_needed", "reason": "covered"},
+                            "wireframes": {"mode": "not_needed", "reason": "covered"},
+                            "adr": {"mode": "not_needed", "reason": "covered"},
+                        }
+                    },
+                ) as codex_json,
+                patch(
+                    "scripts.sympohy.runner._run_stage_gate",
+                    return_value={"status": "pass"},
+                ) as run_stage_gate,
+            ):
+                result = _prepare_document_artifacts(
+                    config=config,
+                    issue_ref="#59",
+                    issue=issue,
+                    acceptance=AcceptanceSet(
+                        acceptance_criteria=("AC",),
+                        definition_of_done=("DoD",),
+                        source="test",
+                    ),
+                    worktree=worktree,
+                    log_dir=log_dir,
+                    state=state,
+                )
+
+        self.assertTrue(result)
+        codex_json.assert_called_once()
+        self.assertIs(codex_json.call_args.kwargs["config"], config)
+        self.assertEqual(codex_json.call_args.kwargs["role"], "planning")
+        self.assertEqual(run_stage_gate.call_count, 4)
 
     def test_run_review_fix_round_comments_approved_review(self) -> None:
         with TemporaryDirectory() as tmp:
