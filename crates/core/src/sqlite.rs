@@ -72,22 +72,17 @@ impl TaskRepository for SqliteTaskRepository {
     where
         F: FnOnce(Vec<Task>) -> SiftqResult<(Vec<Task>, T)>,
     {
-        let transaction = self
-            .connection
-            .transaction()
-            .map_err(|error| {
-                SiftqError::storage(format!("Failed to start transaction: {error}"))
-            })?;
+        let transaction = self.connection.transaction().map_err(|error| {
+            SiftqError::storage(format!("Failed to start transaction: {error}"))
+        })?;
         let tasks = read_tasks(&transaction)?;
         let (mut next_tasks, output) = operation(tasks)?;
 
         next_tasks.sort_by(compare_tasks);
         replace_tasks(&transaction, &next_tasks)?;
-        transaction
-            .commit()
-            .map_err(|error| {
-                SiftqError::storage(format!("Failed to commit transaction: {error}"))
-            })?;
+        transaction.commit().map_err(|error| {
+            SiftqError::storage(format!("Failed to commit transaction: {error}"))
+        })?;
 
         Ok(output)
     }
@@ -96,9 +91,7 @@ impl TaskRepository for SqliteTaskRepository {
 fn user_version(connection: &Connection) -> SiftqResult<i64> {
     connection
         .query_row("PRAGMA user_version", [], |row| row.get(0))
-        .map_err(|error| {
-            SiftqError::migration(format!("Failed to read schema version: {error}"))
-        })
+        .map_err(|error| SiftqError::migration(format!("Failed to read schema version: {error}")))
 }
 
 fn read_tasks(connection: &Connection) -> SiftqResult<Vec<Task>> {
@@ -134,8 +127,8 @@ fn read_tasks(connection: &Connection) -> SiftqResult<Vec<Task>> {
 
     let mut tasks = Vec::new();
     for row in rows {
-        let (id, title, area_id, status, order_index) = row
-            .map_err(|error| SiftqError::storage(format!("Failed to read task row: {error}")))?;
+        let (id, title, area_id, status, order_index) =
+            row.map_err(|error| SiftqError::storage(format!("Failed to read task row: {error}")))?;
         tasks.push(Task {
             id,
             title,

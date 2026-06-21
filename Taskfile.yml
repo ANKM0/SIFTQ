@@ -56,7 +56,6 @@ tasks:
       - task: ci:lint
       - task: ci:test
       - task: ci:build
-      - task: ci:rust
       - task: codd:version
       - task: codd:scan
       - task: codd:validate
@@ -160,9 +159,7 @@ tasks:
   ci:rust:
     desc: Run Rust formatting, linting, and tests.
     cmds:
-      - cargo fmt --all --check
-      - cargo clippy --workspace --all-targets -- -D warnings
-      - cargo test --workspace
+      - bash scripts/ci/run_rust_checks.sh
 
   frontend:dev:
     desc: Start the Vite development server.

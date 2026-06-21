@@ -103,8 +103,12 @@ where
                 .into_iter()
                 .filter(|candidate| candidate.id != input.task_id)
                 .collect::<Vec<_>>();
-            let normalized_tasks =
-                insert_task_at(remaining_tasks, moved_task, input.to_area_id, input.insert_at);
+            let normalized_tasks = insert_task_at(
+                remaining_tasks,
+                moved_task,
+                input.to_area_id,
+                input.insert_at,
+            );
             let moved_task = find_task_in(&normalized_tasks, &input.task_id)?.clone();
 
             Ok((normalized_tasks, moved_task))
@@ -116,7 +120,9 @@ where
             let task = find_task_in(&tasks, &input.task_id)?.clone();
 
             if !task.area_id.is_matrix() {
-                return Err(SiftqError::validation("Only matrix tasks can be reordered."));
+                return Err(SiftqError::validation(
+                    "Only matrix tasks can be reordered.",
+                ));
             }
 
             let area_id = task.area_id;

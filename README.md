@@ -39,15 +39,15 @@ template, install the tools managed by `aqua.yaml` first, then run the same
 
 ## Development
 
-Start the frontend development server:
+Start the desktop development app:
 
 ```bash
-task frontend:dev
+task tauri:dev
 ```
 
-Manual Matrix MVP smoke check:
+Manual Matrix MVP v2 smoke check:
 
-- Open the local Vite URL printed by `task frontend:dev`.
+- Open the Tauri app window started by `task tauri:dev`.
 - Confirm `Do`, `Schedule`, `Delegate`, `Eliminate`, `Done`, and `Skipped`
   are visible.
 - Create cards from multiple matrix area forms and confirm each card appears
@@ -55,11 +55,19 @@ Manual Matrix MVP smoke check:
 - Confirm blank titles cannot be submitted, duplicate titles are allowed, and
   titles over 256 characters are blocked without truncation.
 - Drag cards within an area and between matrix areas, then confirm the visible
-  order stays stable in the current browser session.
+  order stays stable after each drop.
 - Drop a card on `Done` and `Skipped`, then confirm it disappears from the
   matrix display.
 - Confirm a long 256-character title wraps inside the card without overlapping
   nearby controls or changing the page into an unusable layout.
+- Reload the WebView with F5 or the platform reload shortcut, then confirm the
+  same active task titles, areas, statuses, and order are restored from SQLite.
+- Stop `task tauri:dev`, start `task tauri:dev` again, then confirm the same
+  task titles, areas, statuses, and order are restored after app restart.
+
+Automated coverage includes mutation-time `list_tasks` refreshes in the React
+tests and SQLite reopen persistence in the Rust tests. The WebView reload and
+full app restart checks above remain manual smoke evidence for the PR or issue.
 
 Common frontend checks:
 
@@ -68,6 +76,12 @@ task ci:typecheck
 task ci:lint
 task ci:test
 task ci:build
+```
+
+Rust/Tauri checks require a local Rust and C compiler toolchain:
+
+```bash
+task ci:rust
 ```
 
 Common CoDD commands:

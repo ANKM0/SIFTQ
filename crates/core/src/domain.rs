@@ -132,9 +132,7 @@ pub fn status_for_area(area_id: AreaId) -> TaskStatus {
     match area_id {
         AreaId::Done => TaskStatus::Done,
         AreaId::Skipped => TaskStatus::Skipped,
-        AreaId::Do | AreaId::Schedule | AreaId::Delegate | AreaId::Eliminate => {
-            TaskStatus::Active
-        }
+        AreaId::Do | AreaId::Schedule | AreaId::Delegate | AreaId::Eliminate => TaskStatus::Active,
     }
 }
 

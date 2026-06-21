@@ -1,7 +1,6 @@
 use app_core::{
-    AreaId, CreateTaskInput, ErrorCode, IdGenerator, MoveTaskInput, ReorderTaskInput,
-    SiftqResult, SqliteTaskRepository, Task, TaskRepository, TaskService, TaskStatus,
-    UpdateTaskTitleInput,
+    AreaId, CreateTaskInput, ErrorCode, IdGenerator, MoveTaskInput, ReorderTaskInput, SiftqResult,
+    SqliteTaskRepository, Task, TaskRepository, TaskService, TaskStatus, UpdateTaskTitleInput,
 };
 use rusqlite::{params, Connection};
 use tempfile::tempdir;
@@ -112,13 +111,7 @@ fn move_and_reorder_clamp_indexes_and_normalize_affected_areas() {
     assert_task_shape(
         service.list_tasks().expect("tasks should list"),
         [
-            (
-                "task-1",
-                "First",
-                AreaId::Schedule,
-                TaskStatus::Active,
-                0,
-            ),
+            ("task-1", "First", AreaId::Schedule, TaskStatus::Active, 0),
             (
                 "task-3",
                 "Target top",
@@ -126,13 +119,7 @@ fn move_and_reorder_clamp_indexes_and_normalize_affected_areas() {
                 TaskStatus::Active,
                 1,
             ),
-            (
-                "task-2",
-                "Second",
-                AreaId::Schedule,
-                TaskStatus::Active,
-                2,
-            ),
+            ("task-2", "Second", AreaId::Schedule, TaskStatus::Active, 2),
             (
                 "task-4",
                 "Target bottom",
@@ -172,13 +159,7 @@ fn done_and_skipped_tasks_are_retained_but_cannot_be_restored_to_matrix() {
     assert_task_shape(
         service.list_tasks().expect("terminal tasks should list"),
         [
-            (
-                "task-2",
-                "Drop",
-                AreaId::Skipped,
-                TaskStatus::Skipped,
-                0,
-            ),
+            ("task-2", "Drop", AreaId::Skipped, TaskStatus::Skipped, 0),
             ("task-1", "Finish", AreaId::Done, TaskStatus::Done, 0),
         ],
     );
@@ -281,8 +262,7 @@ fn sqlite_file_reopen_restores_task_area_status_and_order() {
     {
         let repository =
             SqliteTaskRepository::open(&database_path).expect("file repository should open");
-        let mut service =
-            TaskService::new(repository, FixedIdGenerator::new(["task-1", "task-2"]));
+        let mut service = TaskService::new(repository, FixedIdGenerator::new(["task-1", "task-2"]));
         service
             .create_task(create_input("First", AreaId::Do))
             .expect("task should be created");
@@ -306,13 +286,7 @@ fn sqlite_file_reopen_restores_task_area_status_and_order() {
         service.list_tasks().expect("persisted tasks should list"),
         [
             ("task-1", "First", AreaId::Do, TaskStatus::Active, 0),
-            (
-                "task-2",
-                "Second",
-                AreaId::Skipped,
-                TaskStatus::Skipped,
-                0,
-            ),
+            ("task-2", "Second", AreaId::Skipped, TaskStatus::Skipped, 0),
         ],
     );
 }
@@ -433,11 +407,7 @@ fn assert_task_shape<const N: usize>(
     assert_eq!(actual, expected.to_vec());
 }
 
-fn assert_error_code<T>(
-    result: SiftqResult<T>,
-    expected_code: ErrorCode,
-    expected_message: &str,
-) {
+fn assert_error_code<T>(result: SiftqResult<T>, expected_code: ErrorCode, expected_message: &str) {
     let error = match result {
         Ok(_) => panic!("operation should fail"),
         Err(error) => error,

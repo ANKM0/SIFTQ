@@ -4,9 +4,8 @@ use std::str::FromStr;
 use std::sync::Mutex;
 
 use app_core::{
-    AreaId, CreateTaskInput, ErrorCode, MoveTaskInput, ReorderTaskInput, SiftqError,
-    SiftqResult, SqliteTaskRepository, Task, TaskService, UpdateTaskTitleInput,
-    UuidGenerator,
+    AreaId, CreateTaskInput, ErrorCode, MoveTaskInput, ReorderTaskInput, SiftqError, SiftqResult,
+    SqliteTaskRepository, Task, TaskService, UpdateTaskTitleInput, UuidGenerator,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
