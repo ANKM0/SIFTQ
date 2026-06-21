@@ -1,0 +1,22 @@
+[package]
+name = "desktop-app"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "desktop_app_lib"
+path = "src/lib.rs"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+app-core.workspace = true
+serde.workspace = true
+tauri.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -42,6 +42,13 @@ workspace は `crates/core` と `src-tauri` を持つ。
   repository trait、SQLite repository、migration、ID generator を持つ。
 - `desktop-app` は Tauri shell と command adapter のみを持ち、SQLite 詳細や
   migration 詳細に直接依存しない。
+- `desktop-app` は startup 後の storage 状態を `StorageState` として保持する。
+  ready state は `TaskService<SqliteTaskRepository, UuidGenerator>` を `Mutex`
+  付きで持ち、failed state は frontend 向けの `code` / `message` error DTO を
+  保持する。failed state でも Tauri app は起動を継続し、task command は同じ
+  structured error を返す。
+- `get_storage_health` は storage が使えるかだけを返し、DB path や diagnostics
+  は返さない。
 - 手書き contract は `src/contracts/*` に置き、将来 Rust 型から TypeScript 型
   を生成する方針へ置き換えるための `MEMO` を contract 近辺に残す。
 - Tauri DTO は `serde(rename_all = "camelCase")` を使って FE contract と対応
