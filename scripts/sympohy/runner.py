@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -68,6 +70,10 @@ class _UnsafeRecoveryError(RuntimeError):
 
 
 class _AmbiguousPullRequestError(RuntimeError):
+    pass
+
+
+class _RunInterrupted(RuntimeError):
     pass
 
 
@@ -218,6 +224,61 @@ class _RunStateWriter:
         with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
         self.write(progress=self.last_known_progress)
+
+
+_ACTIVE_RUN_STATE: _RunStateWriter | None = None
+
+
+class _RunInterruptScope:
+    def __init__(self) -> None:
+        self._previous_handlers: dict[int, signal.Handlers] = {}
+
+    def __enter__(self) -> _RunInterruptScope:
+        for signum in _interrupt_signal_numbers():
+            self._previous_handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, _handle_run_interrupt)
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _tb: object) -> None:
+        global _ACTIVE_RUN_STATE
+        _ACTIVE_RUN_STATE = None
+        for signum, handler in self._previous_handlers.items():
+            signal.signal(signum, handler)
+
+
+def _interrupt_signal_numbers() -> tuple[int, ...]:
+    numbers: list[int] = []
+    for name in ("SIGTERM", "SIGINT", "SIGHUP"):
+        signum = getattr(signal, name, None)
+        if signum is not None:
+            numbers.append(signum)
+    return tuple(numbers)
+
+
+def _handle_run_interrupt(signum: int, _frame: object) -> None:
+    state = _ACTIVE_RUN_STATE
+    if state is not None:
+        _record_run_interrupted(state, signum)
+    raise _RunInterrupted(f"sympohy interrupted by {_signal_name(signum)}")
+
+
+def _record_run_interrupted(state: _RunStateWriter, signum: int) -> None:
+    progress = dict(state.last_known_progress)
+    progress.update(
+        {
+            "message": "interrupted by signal",
+            "signal": _signal_name(signum),
+            "resume_action": "resume_interrupted_run",
+        }
+    )
+    state.write(status="interrupted", progress=progress)
+
+
+def _signal_name(signum: int) -> str:
+    try:
+        return signal.Signals(signum).name
+    except ValueError:
+        return str(signum)
 
 
 def _run_stage_gate(
@@ -1068,16 +1129,20 @@ def run_issue(
     except _RunLockedError:
         return 0
     try:
-        return _run_issue_locked(
-            issue_ref,
-            config,
-            issue=issue,
-            recover=recover,
-            from_resume=from_resume,
-            resume_point=resume_point,
-            run_id=run_id,
-            lock_path=lock.path,
-        )
+        with _RunInterruptScope():
+            try:
+                return _run_issue_locked(
+                    issue_ref,
+                    config,
+                    issue=issue,
+                    recover=recover,
+                    from_resume=from_resume,
+                    resume_point=resume_point,
+                    run_id=run_id,
+                    lock_path=lock.path,
+                )
+            except _RunInterrupted:
+                return 130
     finally:
         lock.release()
 
@@ -1107,6 +1172,8 @@ def _run_issue_locked(
         lock_path=lock_path,
         refresh_lock=True,
     )
+    global _ACTIVE_RUN_STATE
+    _ACTIVE_RUN_STATE = state
     if not recover and not from_resume:
         existing_run_reason = _existing_run_refusal_reason(issue, config, log_dir)
         if existing_run_reason is not None:
@@ -1264,6 +1331,38 @@ def _run_issue_locked(
         status="sympohy:running",
         phase="implement",
     )
+    initial_pull_request_ensured = False
+    if not recover:
+        state.write(
+            phase="implement",
+            branch=branch,
+            progress={
+                "message": "pushing initial issue branch and opening draft pull request",
+                "pull_request_timing": "after_branch_creation",
+            },
+        )
+        try:
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=worktree,
+                branch=branch,
+                heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
+            )
+        except _AmbiguousPullRequestError as exc:
+            _block(
+                issue_ref,
+                phase="review",
+                failed_command="pull request safety check",
+                attempts=1,
+                cause=str(exc),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+            )
+            return 2
+        initial_pull_request_ensured = True
 
     if not _prepare_document_artifacts(
         config=config,
@@ -1428,6 +1527,37 @@ def _run_issue_locked(
     ):
         return 2
 
+    if not initial_pull_request_ensured:
+        state.write(
+            phase="implement",
+            branch=branch,
+            progress={
+                "message": "pushing initial issue branch and opening draft pull request",
+                "pull_request_timing": "after_branch_creation",
+            },
+        )
+        try:
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=worktree,
+                branch=branch,
+                heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
+            )
+        except _AmbiguousPullRequestError as exc:
+            _block(
+                issue_ref,
+                phase="review",
+                failed_command="pull request safety check",
+                attempts=1,
+                cause=str(exc),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+            )
+            return 2
+
     if next_logical_step is None:
         state.write(
             phase="implement",
@@ -1580,7 +1710,7 @@ def _run_issue_locked(
         phase="implement",
         branch=branch,
         progress={
-            "message": "pushing branch and opening draft pull request",
+            "message": "pushing branch updates and ensuring draft pull request exists",
             "completed_logical_steps": total_steps,
             "total_logical_steps": total_steps,
         },
@@ -2838,8 +2968,8 @@ def _codex_text(
         _codex_exec_args(prompt, config=config, role=role),
         cwd=cwd,
         heartbeat=heartbeat,
+        log_path=log_path,
     )
-    log_path.write_text(output, encoding="utf-8")
     return output
 
 
@@ -2869,26 +2999,98 @@ def _check_output_with_heartbeat(
     *,
     cwd: Path,
     heartbeat: Callable[[], None] | None = None,
+    log_path: Path | None = None,
 ) -> str:
-    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, text=True)
-    while True:
-        try:
-            output, _ = process.communicate(timeout=HEARTBEAT_INTERVAL_SECONDS)
-        except subprocess.TimeoutExpired:
-            if heartbeat is not None:
-                try:
+    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE)
+    stdout = getattr(process, "stdout", None)
+    if stdout is None:
+        return _communicate_output_with_heartbeat(
+            process,
+            args=args,
+            heartbeat=heartbeat,
+        )
+    chunks: list[bytes] = []
+    log_file = log_path.open("wb") if log_path is not None else None
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(stdout, selectors.EVENT_READ)
+            while True:
+                events = selector.select(timeout=HEARTBEAT_INTERVAL_SECONDS)
+                if not events:
+                    if heartbeat is not None:
+                        heartbeat()
+                    if process.poll() is not None:
+                        while True:
+                            data = os.read(stdout.fileno(), 8192)
+                            if not data:
+                                break
+                            chunks.append(data)
+                            if log_file is not None:
+                                log_file.write(data)
+                                log_file.flush()
+                        process.wait()
+                        output = b"".join(chunks).decode("utf-8", errors="replace")
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(
+                                process.returncode,
+                                args,
+                                output=output,
+                            )
+                        return output
+                    continue
+                for key, _mask in events:
+                    data = os.read(key.fileobj.fileno(), 8192)
+                    if not data:
+                        selector.unregister(key.fileobj)
+                        process.wait()
+                        output = b"".join(chunks).decode("utf-8", errors="replace")
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(
+                                process.returncode,
+                                args,
+                                output=output,
+                            )
+                        return output
+                    chunks.append(data)
+                    if log_file is not None:
+                        log_file.write(data)
+                        log_file.flush()
+    except Exception:
+        _terminate_process(process)
+        raise
+    finally:
+        if log_file is not None:
+            log_file.close()
+
+
+def _communicate_output_with_heartbeat(
+    process: subprocess.Popen[bytes],
+    *,
+    args: Sequence[str],
+    heartbeat: Callable[[], None] | None,
+) -> str:
+    try:
+        while True:
+            try:
+                output, _stderr = process.communicate(
+                    timeout=HEARTBEAT_INTERVAL_SECONDS
+                )
+                break
+            except subprocess.TimeoutExpired:
+                if heartbeat is not None:
                     heartbeat()
-                except Exception:
-                    _terminate_process(process)
-                    raise
-            continue
         if process.returncode != 0:
             raise subprocess.CalledProcessError(
                 process.returncode,
                 args,
                 output=output,
             )
+        if isinstance(output, bytes):
+            return output.decode("utf-8", errors="replace")
         return output
+    except Exception:
+        _terminate_process(process)
+        raise
 
 
 def _run_command_with_heartbeat(
@@ -3494,13 +3696,50 @@ def _push_branch_and_ensure_draft_pull_request(
     cwd: Path,
     branch: str,
     heartbeat: Callable[[], None] | None = None,
+    issue_number: int | None = None,
+    base_branch: str | None = None,
 ) -> None:
+    if issue_number is not None and base_branch is not None:
+        _ensure_initial_pull_request_commit(
+            issue_number=issue_number,
+            cwd=cwd,
+            base_branch=base_branch,
+        )
     _check_call_with_heartbeat(
         ["git", "push", "-u", "origin", branch],
         cwd=cwd,
         heartbeat=heartbeat,
     )
     _ensure_draft_pull_request(cwd=cwd, heartbeat=heartbeat)
+
+
+def _ensure_initial_pull_request_commit(
+    *,
+    issue_number: int,
+    cwd: Path,
+    base_branch: str,
+) -> None:
+    if _branch_has_commits(cwd=cwd, base_branch=base_branch):
+        return
+    subject = f"#{issue_number} chore(sympohy): open draft pull request"
+    if not validate_commit_subject(subject):
+        raise ValueError(f"invalid generated commit subject: {subject}")
+    subprocess.check_call(["git", "commit", "--allow-empty", "-m", subject], cwd=cwd)
+
+
+def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:
+    try:
+        output = subprocess.check_output(
+            ["git", "rev-list", "--count", f"{base_branch}..HEAD"],
+            cwd=cwd,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return True
+    try:
+        return int(output.strip() or "0") > 0
+    except ValueError:
+        return True
 
 
 def _pull_request_merged(*, cwd: Path) -> bool:

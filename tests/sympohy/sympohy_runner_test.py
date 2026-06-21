@@ -4,7 +4,9 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -29,6 +31,8 @@ from scripts.sympohy.runner import (
     _infer_implementation_recovery,
     _prepare_document_artifacts,
     _pull_request_exists,
+    _push_branch_and_ensure_draft_pull_request,
+    _record_run_interrupted,
     _resume_fix_phase,
     _resume_late_phase,
     _run_final_verifier_fix_round,
@@ -861,6 +865,9 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner._codex_text", return_value=""),
                 patch("scripts.sympohy.runner._run_hooks", return_value=1),
                 patch(
+                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request"
+                ),
+                patch(
                     "scripts.sympohy.runner.subprocess.check_output",
                     side_effect=check_output,
                 ),
@@ -1107,6 +1114,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     if status_calls == 1:
                         return ""
                     return " M scripts/sympohy/runner.py\n"
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -1232,6 +1241,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     if status_calls == 1:
                         return ""
                     return " M scripts/sympohy/runner.py\n"
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -1647,6 +1658,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     )
                 if args == ["git", "status", "--porcelain"]:
                     return ""
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -2049,6 +2062,25 @@ class SympohyRunnerTest(unittest.TestCase):
             ]
             self.assertEqual(stdout_names, ["hook-1-1.log", "hook-2-1.log"])
 
+    def test_check_output_with_heartbeat_streams_stdout_to_log(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "codex.log"
+
+            output = _check_output_with_heartbeat(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; print('first'); sys.stdout.flush(); print('second')",
+                ],
+                cwd=root,
+                log_path=log_path,
+            )
+            logged_output = log_path.read_text(encoding="utf-8")
+
+        self.assertEqual(output, "first\nsecond\n")
+        self.assertEqual(logged_output, output)
+
     def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
         with (
             patch(
@@ -2061,6 +2093,52 @@ class SympohyRunnerTest(unittest.TestCase):
             _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
         check_call.assert_not_called()
+
+    def test_push_branch_creates_initial_empty_commit_before_draft_pr(self) -> None:
+        events: list[str] = []
+
+        def check_call(command: list[str], **_kwargs: object) -> None:
+            events.append(" ".join(command))
+
+        def check_call_with_heartbeat(
+            command: list[str],
+            **_kwargs: object,
+        ) -> None:
+            events.append(" ".join(command))
+
+        def ensure_draft_pull_request(**_kwargs: object) -> None:
+            events.append("ensure_draft_pull_request")
+
+        with (
+            patch("scripts.sympohy.runner._branch_has_commits", return_value=False),
+            patch(
+                "scripts.sympohy.runner.subprocess.check_call",
+                side_effect=check_call,
+            ),
+            patch(
+                "scripts.sympohy.runner._check_call_with_heartbeat",
+                side_effect=check_call_with_heartbeat,
+            ),
+            patch(
+                "scripts.sympohy.runner._ensure_draft_pull_request",
+                side_effect=ensure_draft_pull_request,
+            ),
+        ):
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=Path("/tmp/worktree"),
+                branch="issue-82-sympohy",
+                issue_number=82,
+                base_branch="main",
+            )
+
+        self.assertEqual(
+            events,
+            [
+                "git commit --allow-empty -m #82 chore(sympohy): open draft pull request",
+                "git push -u origin issue-82-sympohy",
+                "ensure_draft_pull_request",
+            ],
+        )
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
@@ -2116,6 +2194,37 @@ class SympohyRunnerTest(unittest.TestCase):
             },
         )
         self.assertIsNone(state["last_recovery"])
+
+    def test_run_state_writer_records_interrupted_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(
+                phase="implement",
+                progress={
+                    "message": "implementing logical step",
+                    "current_logical_step": 5,
+                    "completed_logical_steps": 4,
+                    "total_logical_steps": 6,
+                },
+            )
+
+            _record_run_interrupted(writer, signal.SIGTERM)
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "interrupted")
+        self.assertEqual(state["phase"], "implement")
+        self.assertEqual(state["last_known_progress"]["current_logical_step"], 5)
+        self.assertEqual(state["last_known_progress"]["message"], "interrupted by signal")
+        self.assertEqual(state["last_known_progress"]["signal"], "SIGTERM")
+        self.assertEqual(
+            state["last_known_progress"]["resume_action"],
+            "resume_interrupted_run",
+        )
 
     def test_run_state_writer_records_recovery_log(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
@@ -2438,6 +2547,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner._codex_json", side_effect=codex_json),
                 patch("scripts.sympohy.runner._codex_text", side_effect=codex_text),
                 patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
+                patch("scripts.sympohy.runner._branch_has_commits", return_value=False),
                 patch("scripts.sympohy.runner._run_hooks", side_effect=run_hooks),
                 patch(
                     "scripts.sympohy.runner._commit_all_if_new",
@@ -2486,6 +2596,7 @@ class SympohyRunnerTest(unittest.TestCase):
             events,
             [
                 "ensure_worktree",
+                "push_pr",
                 "plan.json",
                 "implement-1.log",
                 "hooks:1",
