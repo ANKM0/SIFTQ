@@ -72,6 +72,33 @@ fn create_rejects_terminal_area_and_invalid_titles() {
 }
 
 #[test]
+fn same_area_reorder_moves_second_task_to_first_index() {
+    let mut service = service_with_ids(["task-1", "task-2"]);
+    service
+        .create_task(create_input("First", AreaId::Do))
+        .expect("first task should be created");
+    service
+        .create_task(create_input("Second", AreaId::Do))
+        .expect("second task should be created");
+
+    let reordered = service
+        .reorder_task(ReorderTaskInput {
+            task_id: "task-2".to_owned(),
+            to_index: 0,
+        })
+        .expect("second task should reorder to the top");
+
+    assert_eq!(reordered.order_index, 0);
+    assert_task_shape(
+        service.list_tasks().expect("tasks should list"),
+        [
+            ("task-2", "Second", AreaId::Do, TaskStatus::Active, 0),
+            ("task-1", "First", AreaId::Do, TaskStatus::Active, 1),
+        ],
+    );
+}
+
+#[test]
 fn move_and_reorder_clamp_indexes_and_normalize_affected_areas() {
     let mut service = service_with_ids(["task-1", "task-2", "task-3", "task-4"]);
     service

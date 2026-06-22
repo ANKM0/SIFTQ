@@ -170,32 +170,31 @@ where
 
 fn insert_task_at(
     tasks: Vec<Task>,
-    task: Task,
+    mut task: Task,
     area_id: AreaId,
     insert_at: Option<i64>,
 ) -> Vec<Task> {
     let ordered_tasks = normalize_orders(tasks);
-    let area_tasks = ordered_tasks
-        .iter()
-        .filter(|candidate| candidate.area_id == area_id)
-        .collect::<Vec<_>>();
-    let clamped_index = clamp_index(insert_at, area_tasks.len());
-    let before_task_id = area_tasks.get(clamped_index).map(|task| task.id.clone());
-    let mut result = Vec::with_capacity(ordered_tasks.len() + 1);
+    let mut tasks_by_area: [Vec<Task>; 6] = std::array::from_fn(|_| Vec::new());
 
-    for candidate in ordered_tasks {
-        if before_task_id.as_deref() == Some(candidate.id.as_str()) {
-            result.push(task.clone());
+    for task in ordered_tasks {
+        tasks_by_area[task.area_id.sort_index()].push(task);
+    }
+
+    task.area_id = area_id;
+    let target_tasks = &mut tasks_by_area[area_id.sort_index()];
+    let clamped_index = clamp_index(insert_at, target_tasks.len());
+    target_tasks.insert(clamped_index, task);
+
+    let mut result = Vec::with_capacity(tasks_by_area.iter().map(Vec::len).sum());
+    for area_tasks in tasks_by_area {
+        for (order_index, mut task) in area_tasks.into_iter().enumerate() {
+            task.order_index = order_index as u32;
+            result.push(task);
         }
-
-        result.push(candidate);
     }
 
-    if before_task_id.is_none() {
-        result.push(task);
-    }
-
-    normalize_orders(result)
+    result
 }
 
 fn clamp_index(index: Option<i64>, len: usize) -> usize {

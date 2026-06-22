@@ -3034,11 +3034,16 @@ def _check_output_with_heartbeat(
     try:
         with selectors.DefaultSelector() as selector:
             selector.register(stdout, selectors.EVENT_READ)
+            next_heartbeat_at = time.monotonic() + HEARTBEAT_INTERVAL_SECONDS
             while True:
-                events = selector.select(timeout=HEARTBEAT_INTERVAL_SECONDS)
+                timeout = max(0.0, next_heartbeat_at - time.monotonic())
+                events = selector.select(timeout=timeout)
+                now = time.monotonic()
+                if heartbeat is not None and now >= next_heartbeat_at:
+                    heartbeat()
+                    next_heartbeat_at = now + HEARTBEAT_INTERVAL_SECONDS
+
                 if not events:
-                    if heartbeat is not None:
-                        heartbeat()
                     if process.poll() is not None:
                         while True:
                             data = os.read(stdout.fileno(), 8192)

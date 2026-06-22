@@ -2093,6 +2093,30 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(output, "first\nsecond\n")
         self.assertEqual(logged_output, output)
 
+    def test_check_output_with_heartbeat_refreshes_during_chatty_stdout(self) -> None:
+        heartbeats: list[object] = []
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with patch("scripts.sympohy.runner.HEARTBEAT_INTERVAL_SECONDS", 0.05):
+                _check_output_with_heartbeat(
+                    [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import sys, time\n"
+                            "for index in range(20):\n"
+                            "    print(index)\n"
+                            "    sys.stdout.flush()\n"
+                            "    time.sleep(0.01)\n"
+                        ),
+                    ],
+                    cwd=root,
+                    heartbeat=lambda: heartbeats.append(object()),
+                )
+
+        self.assertGreaterEqual(len(heartbeats), 2)
+
     def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
         with (
             patch(
