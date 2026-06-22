@@ -124,22 +124,26 @@ interaction layer、対応テストへtraceできる構成にする。
 
 ## 完了トレーサビリティ
 
-Matrix MVP v1は、browser SPA、React/TypeScript/Vite、dnd-kit、in-memory
-repository port/adapterの構成で実装済みである。完了範囲は次の実装単位に
-対応する。
+Matrix MVP v1で検証したbrowser SPA、React/TypeScript/Vite、dnd-kit、
+repository port/adapterの構成は、v2 migrationでSQLite/Tauri構成へ移行した。
+現在の完了範囲は次の実装単位に対応する。
 
-- domain model: `src/domain/area.ts`、`src/domain/task.ts`
-- application operations: `src/application/taskOperations.ts`
-- port/adapter boundary: `src/ports/taskRepository.ts`、
-  `src/adapters/inMemoryTaskRepository.ts`
+- Rust domain/application/storage: `crates/core/src/domain.rs`、
+  `crates/core/src/service.rs`、`crates/core/src/repository.rs`、
+  `crates/core/src/sqlite.rs`、`crates/core/src/id.rs`、
+  `crates/core/src/error.rs`
+- Tauri command boundary: `src-tauri/src/lib.rs`、`src-tauri/src/main.rs`
+- frontend contract and adapter boundary: `src/contracts/task.ts`、
+  `src/ports/taskRepository.ts`、`src/adapters/tauriTaskRepository.ts`、
+  `src/adapters/tauriInvoke.ts`
 - UI and interaction layer: `src/ui/App.tsx`、`src/ui/App.css`、
-  `src/ui/dragDrop.ts`
+  `src/ui/taskPresentation.ts`、`src/ui/dragDrop.ts`
 - entrypoint and Vite types: `src/main.tsx`、`src/vite-env.d.ts`
-- tests: `tests/domain/task.test.ts`、`tests/application/taskOperations.test.ts`、
-  `tests/adapters/inMemoryTaskRepository.test.ts`、`tests/ui/App.test.tsx`、
+- tests: `crates/core/tests/task_service_sqlite_tests.rs`、
+  `src-tauri/src/lib.rs` の command/handler tests、
+  `tests/adapters/tauriTaskRepository.test.ts`、`tests/ui/App.test.tsx`、
   `tests/ui/dragDrop.test.ts`
 
-v1 scope外の永続化、GitHub連携、Tauri化、CLI、設定ページ、公開URL、
-PR preview URL、キーボードDnD完成対応、モバイル / タッチDnD最適化は
-実装していない。これらはv2以降の判断対象としてrequirements側のfuture scopeに
-残す。
+GitHub連携、CLI、設定ページ、公開URL、PR preview URL、
+キーボードDnD完成対応、モバイル / タッチDnD最適化は実装していない。
+これらはv2以降の判断対象としてrequirements側のfuture scopeに残す。

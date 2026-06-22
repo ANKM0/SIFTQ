@@ -17,10 +17,14 @@
 ```bash
 ```
 
-Matrix/Tauri manual smoke (該当する場合):
+Matrix/Tauri manual smoke evidence (Matrix/Tauri の永続化に影響する場合は必須):
 
-- [ ] WebView reload/F5 後に task title、area、status、order が SQLite から復元される
-- [ ] `task tauri:dev` を停止して再起動した後に task title、area、status、order が復元される
+- WebView reload/F5 result:
+  - [ ] task title、area、status、order が SQLite から復元される
+  - Result / environment / notes:
+- `task tauri:dev` app restart result:
+  - [ ] task title、area、status、order が SQLite から復元される
+  - Result / environment / notes:
 
 ## 影響範囲
 <!-- 影響を受ける画面、API、運用フローなどを記載してください -->
