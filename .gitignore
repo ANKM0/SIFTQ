@@ -8,6 +8,9 @@ node_modules/
 dist/
 coverage/
 
+# Rust generated artifacts
+target/
+
 # CoDD generated artifacts
 .codd/scan/
 .codd/reports/
