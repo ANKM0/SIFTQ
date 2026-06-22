@@ -14,7 +14,7 @@ class SympohyConfigTest(unittest.TestCase):
         self.assertEqual(config.review_max_rounds, 10)
         self.assertEqual(config.ci_retry_max_attempts, 50)
         self.assertEqual(config.watch_poll_interval_seconds, 60)
-        self.assertIsNone(config.merge_gate_retry_max_attempts)
+        self.assertEqual(config.final_verifier_fix_max_attempts, 2)
         self.assertEqual(config.stage_gate_command, "task ai:sympohy:stage-gate")
         self.assertEqual(
             config.codex_model_for("implementation"),
@@ -38,7 +38,7 @@ stale_status_after_minutes: 15
 watch_poll_interval_seconds: 30
 review_max_rounds: 7
 ci_retry_max_attempts: 40
-merge_gate_retry_max_attempts: 5
+final_verifier_fix_max_attempts: 5
 stage_gate_command: task ai:sympohy:stage-gate
 codex_model_triage: gpt-5.4-mini
 codex_reasoning_triage: medium
@@ -55,7 +55,7 @@ hooks:
 
         self.assertEqual(config.ci_retry_max_attempts, 40)
         self.assertEqual(config.watch_poll_interval_seconds, 30)
-        self.assertEqual(config.merge_gate_retry_max_attempts, 5)
+        self.assertEqual(config.final_verifier_fix_max_attempts, 5)
         self.assertEqual(config.stage_gate_command, "task ai:sympohy:stage-gate")
         self.assertEqual(config.hooks, ("task test", "task lint"))
         self.assertEqual(
@@ -67,17 +67,17 @@ hooks:
             CodexModelConfig("gpt-5.5", "xhigh"),
         )
 
-    def test_load_config_rejects_negative_merge_gate_retry_limit(self) -> None:
+    def test_load_config_rejects_negative_final_verifier_fix_limit(self) -> None:
         with TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "config.yaml"
             config_path.write_text(
-                "merge_gate_retry_max_attempts: -1\n",
+                "final_verifier_fix_max_attempts: -1\n",
                 encoding="utf-8",
             )
 
             with self.assertRaisesRegex(
                 ValueError,
-                "merge_gate_retry_max_attempts must be non-negative",
+                "final_verifier_fix_max_attempts must be non-negative",
             ):
                 load_config(config_path)
 

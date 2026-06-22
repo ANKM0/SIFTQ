@@ -10,6 +10,9 @@ codd:
     - id: design:design-docs-localization-split
       relation: depends_on
       semantic: index
+    - id: design:contributing-workflow-source-of-truth
+      relation: depends_on
+      semantic: index
 ---
 
 # 設計書一覧
@@ -25,6 +28,7 @@ codd:
 | --- | --- | --- |
 | [CI/CD 基盤設計](./ci-cd-foundation.md) | `design:ci-cd-foundation` | 草案 |
 | [CoDD 基盤設計](./codd-foundation.md) | `design:codd-foundation` | 草案 |
+| [Contributing Workflow Source of Truth Design](./contributing-workflow-source-of-truth.md) | `design:contributing-workflow-source-of-truth` | 草案 |
 | [Matrix MVP 技術選定設計](./matrix-mvp-technology-selection.md) | `design:matrix-mvp-technology-selection` | 実装済み |
 | [Matrix MVP v2 SQLite/Tauri Design](./matrix-mvp-v2-sqlite-tauri-design.md) | `design:matrix-mvp-v2-sqlite-tauri` | 草案 |
 | [Taskfile コマンドランナー設計](./taskfile-command-runner.md) | `design:taskfile-command-runner` | 草案 |

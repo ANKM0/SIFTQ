@@ -50,6 +50,12 @@ codd:
     - id: design:development-flow
       relation: depends_on
       semantic: governance
+    - id: design:contributing-workflow-source-of-truth-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:contributing-workflow-source-of-truth
+      relation: depends_on
+      semantic: workflow
     - id: design:requirements-template
       relation: depends_on
       semantic: governance

@@ -1626,6 +1626,10 @@ def _run_issue_locked(
                 _codex_text(
                     [
                         f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
+                        "Before editing or committing, read the relevant "
+                        "docs/contributing documents, including "
+                        "docs/contributing/branch-strategy.md and "
+                        "docs/contributing/commit-message-format.md.",
                         json.dumps(step, ensure_ascii=False),
                         "Use normal Codex user config and repository rules.",
                     ],
@@ -2415,6 +2419,22 @@ def _run_final_verifier_and_merge(
             )
             return 2
         fix_attempt = verifier_attempt
+        if fix_attempt > config.final_verifier_fix_max_attempts:
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=fix_attempt,
+                cause=(
+                    "final verifier findings exceeded "
+                    "final_verifier_fix_max_attempts "
+                    f"({config.final_verifier_fix_max_attempts})"
+                ),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
         fix_result = _run_final_verifier_fix_round(
             issue_ref,
             issue,
@@ -3686,7 +3706,15 @@ def _ensure_draft_pull_request(
     if _pull_request_exists(branch=branch, cwd=cwd):
         return
     _check_call_with_heartbeat(
-        ["gh", "pr", "create", "--draft", "--fill"],
+        [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--fill",
+            "--template",
+            ".github/pull_request_template.md",
+        ],
         cwd=cwd,
         heartbeat=heartbeat,
     )
