@@ -44,6 +44,9 @@ codd:
     - id: design:sympohy-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
+    - id: design:contributing-workflow-source-of-truth-adr
+      relation: depends_on
+      semantic: governance
     - id: design:development-flow
       relation: depends_on
       semantic: governance

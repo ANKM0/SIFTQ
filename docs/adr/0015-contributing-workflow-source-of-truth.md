@@ -7,10 +7,6 @@ codd:
     - id: req:siftq-system
       relation: depends_on
       semantic: governance
-  depended_by:
-    - id: design:contributing-workflow-source-of-truth
-      relation: depends_on
-      semantic: decision
 ---
 
 # ADR 0015: Contributing Workflow Source of Truth
