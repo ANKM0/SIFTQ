@@ -287,6 +287,75 @@ class SympohyRunnerTest(unittest.TestCase):
         set_issue_state.assert_called_once()
         self.assertIn("blocking findings remained", comment.call_args.args[1])
 
+    def test_review_fix_without_local_changes_reruns_review(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            worktree = root / "worktree"
+            log_dir.mkdir(parents=True)
+            worktree.mkdir()
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=worktree,
+            )
+            issue = Issue(
+                number=82,
+                title="Review metadata-only fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch(
+                    "scripts.sympohy.runner._worktree_has_changes",
+                    side_effect=(False, False),
+                ),
+                patch("scripts.sympohy.runner._commit_all_if_new") as commit_all,
+            ):
+                result = _run_review_fix_round(
+                    "#82",
+                    issue,
+                    config,
+                    worktree,
+                    log_dir,
+                    state,
+                    round_index=2,
+                    review=parse_review_json(
+                        '{"findings":[{"severity":"medium","summary":"metadata"}]}'
+                    ),
+                    review_json=(
+                        '{"findings":[{"severity":"medium","summary":"metadata"}]}'
+                    ),
+                    review_pull_request="99",
+                    comment_review=False,
+                    existing_fix_subjects=set(),
+                )
+            saved_state = json.loads(
+                (log_dir / "state.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result, 1)
+        codex_text.assert_called_once()
+        commit_all.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:review"),
+            status="sympohy:running",
+            phase="fix",
+            cwd=worktree,
+        )
+        self.assertEqual(saved_state["phase"], "review")
+        self.assertEqual(
+            saved_state["last_known_progress"]["message"],
+            "review fix produced no local changes; rerunning review",
+        )
+
     def test_watch_starts_new_candidate_at_pending_triage(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))

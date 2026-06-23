@@ -2095,6 +2095,17 @@ def _run_review_fix_round(
         config=config,
         role="fix",
     )
+    if not _worktree_has_changes(cwd):
+        state.write(
+            phase="review",
+            progress={
+                "message": "review fix produced no local changes; rerunning review",
+                "review_round": round_index,
+                "commit_subject": subject,
+            },
+        )
+        return 1
+
     committed = _commit_all_if_new(
         subject,
         cwd=cwd,
