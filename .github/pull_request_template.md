@@ -12,9 +12,18 @@
 - ローカルでの確認
 - テスト / lint / 手動確認
 - UI 変更がある場合は wireframe HTML を更新し、`tests/docs/wireframeContract.test.ts` の確認結果を記載する
+- Matrix browser storage の永続化に影響する変更では、browser reload 後の復元結果を記載する
 
 ```bash
 ```
+
+Matrix browser storage manual smoke evidence (browser storage の永続化に影響する場合は必須):
+
+- Browser-only scope note:
+  - Tauri WebView reload / F5 and `task tauri:dev` app restart persistence checks are not applicable when the change follows ADR 0018. If stale issue history adds those result lines, mark them N/A instead of leaving them pending.
+- Browser reload result:
+  - [ ] task title、area、status、order が browser storage から復元される
+  - Result / environment / notes:
 
 ## 影響範囲
 <!-- 影響を受ける画面、API、運用フローなどを記載してください -->

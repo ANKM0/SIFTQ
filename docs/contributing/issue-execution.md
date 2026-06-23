@@ -286,7 +286,16 @@ During stale-run recovery, `sympohy` reloads the saved implementation plan when
 available and compares it with logical-step commits already present in the issue
 worktree. A clean recovered worktree continues from the next missing logical
 step. If all logical steps are already committed, recovery skips implementation
-and proceeds to branch push and draft PR creation.
+and proceeds to branch update push, existing draft PR verification, review, and
+merge readiness.
+
+If the runner receives `SIGTERM`, `SIGINT`, or `SIGHUP`, it records the current
+phase, logical step progress, and signal name in `state.json` with status
+`interrupted` before exiting when possible. The next watcher or manual resume
+treats that state as resumable work rather than leaving a misleading fresh
+`running` state behind. If the interrupted Codex step left uncommitted changes,
+implementation recovery reuses those worktree changes for the recorded logical
+step instead of starting from scratch.
 
 ## Hooks, Review, and Merge
 
@@ -304,15 +313,31 @@ compatibility values remain `ci_retry_max_attempts: 50` and
 budget.
 
 Hook failures trigger a Codex fix attempt and rerun, up to
-`ci_retry_max_attempts`. If
-the hook still fails, `sympohy` blocks the issue and comments with the phase,
-failed command, attempts, cause summary, and run log path.
+`ci_retry_max_attempts`. If the hook still fails, `sympohy` blocks the issue
+and comments with the phase, failed command, attempts, cause summary, and run
+log path.
 
-After `task ci` succeeds, `sympohy` creates a draft PR, runs an adversarial
-review Codex pass that must return machine-readable JSON, and repeats fix/review
-up to `review_max_rounds` until there are no `critical`, `high`, or `medium`
-findings. Review results are posted to the PR so blocking findings and fix
-status are traceable.
+After branch creation, `sympohy` pushes the issue branch and creates the main
+target draft PR before implementation work continues. When the branch has no
+diff yet, the runner may create an empty traceability commit using the repository
+commit message format so GitHub can open the draft PR. Later implementation,
+hook fix, review fix, and final verifier fix commits are pushed to the same PR
+branch.
+
+The draft PR body must start from `.github/pull_request_template.md` so required
+verification prompts, including Matrix browser storage reload smoke evidence,
+remain visible on automation-created PRs.
+For #59 browser-only work governed by ADR 0018, Tauri WebView reload / F5 and
+`task tauri:dev` app restart persistence checks are not applicable; if stale
+issue history or review text adds those result lines, the PR body must mark them
+N/A with an ADR 0018 note instead of leaving them pending.
+
+After `task ci` succeeds, `sympohy` verifies that the draft PR still exists,
+runs an adversarial review Codex pass that must return machine-readable JSON,
+and repeats fix/review up to `review_max_rounds` until there are no `critical`,
+`high`, or `medium` findings.
+Review results are posted to the PR so blocking findings and fix status are
+traceable.
 
 Before merge, a final verifier Codex pass must return JSON confirming AC/DoD
 satisfaction and recommending `merge` or `block`. `merge` responses must include

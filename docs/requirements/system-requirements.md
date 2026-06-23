@@ -44,6 +44,9 @@ codd:
     - id: design:sympohy-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
+    - id: design:contributing-workflow-source-of-truth-adr
+      relation: depends_on
+      semantic: governance
     - id: design:development-flow
       relation: depends_on
       semantic: governance
@@ -75,6 +78,21 @@ codd:
       relation: depends_on
       semantic: governance
     - id: design:codex-configuration-memo
+      relation: depends_on
+      semantic: governance
+    - id: design:rust-tauri-v2-local-application-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:sqlite-tauri-rust-backend-boundary-adr
+      relation: depends_on
+      semantic: governance
+    - id: design:real-sqlite-test-strategy-adr
+      relation: depends_on
+      semantic: governance
+    - id: req:matrix-mvp-v2-browser-storage
+      relation: depends_on
+      semantic: product
+    - id: design:browser-only-matrix-runtime-storage-adr
       relation: depends_on
       semantic: governance
     - id: req:matrix-mvp-functional

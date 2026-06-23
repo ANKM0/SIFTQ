@@ -37,9 +37,8 @@ Accepted.
 ## Context
 
 Issue #12では、SIFTQにCI/CDを追加し、選定したツールをADRへ記録する
-必要がある。Issue #6では、v1 MVPをReact、TypeScript、Vite、dnd-kitに
-よるBrowser SPAとして実装し、v2以降でRustとTauriへ拡張する方針を決定
-している。
+必要がある。Issue #6では、MVPをReact、TypeScript、Vite、dnd-kitによる
+Browser SPAとして実装する方針を決定している。
 
 CIは、現在のCoDD検証と`sympohy` automation設定検証を維持しつつ、v1
 frontendのtypecheck、lint、test、buildを検証する必要がある。CDは、`v*`
@@ -65,9 +64,8 @@ CDでは、`v*`タグpushまたは手動実行からGitHub Releaseを作成す�
 - Ruff、mypy、pytestを必須CIにする: v1 MVPの主要実装はReact/TypeScript/
   Viteであり、Python application codeはまだない。Python製support scripts
   が増えた段階で追加判断する。
-- Rust/Tauriチェックを今すぐ必須CIにする: Rust workspaceや`src-tauri/`が
-  まだ存在しないため、v2以降の実装追加時に`cargo fmt`、`cargo clippy`、
-  `cargo test`、Tauri buildを有効化する。
+- Rust/Tauriチェックを必須CIにする: 現行MVPはbrowser-only runtimeであり、
+  Rust workspaceやTauri appを持たないため、不要なnative toolchain依存になる。
 
 ## Consequences
 
@@ -75,4 +73,4 @@ CDでは、`v*`タグpushまたは手動実行からGitHub Releaseを作成す�
 - GitHub Releasesによる最小CDを、追加の外部サービスなしで運用できる。
 - frontend実装が追加された時点から、TypeScript/ESLint/Vitest/Vite buildを
   CIゲートとして使える。
-- Rust/TauriのCIゲートは、v2以降の実装追加時に別PRで拡張する必要がある。
+- Native appやRust workspaceを追加する場合は、別ADR/PRでCIゲートを拡張する。

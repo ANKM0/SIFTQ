@@ -50,17 +50,18 @@ flowchart TD
   subgraph IMPLEMENT[実装]
     I[8. main 最新を取得]
     J[9. issue branch を作成]
-    K[10. コードとテストを実装]
+    JP[10. branch を remote に push し<br/>main 向け draft PR を作成]
+    K[11. コードとテストを実装]
     G6{Gate: 差分とテストが存在するか}
-    I --> J --> K --> G6
+    I --> J --> JP --> K --> G6
   end
 
   G5 -- はい --> I
   G6 -- いいえ --> B7[block exit<br/>実装証跡不足]
 
   subgraph CI[CI]
-    L[11. remote に push]
-    M{12. push hook の task ci 成功?<br/>evidence: task ci}
+    L[12. 既存 PR branch に push]
+    M{13. push hook の task ci 成功?<br/>evidence: task ci}
     L --> M
   end
 
@@ -69,10 +70,10 @@ flowchart TD
   M -- 50回連続失敗 --> B8[block exit<br/>task ci 50回連続失敗]
 
   subgraph REVIEW[Review]
-    N[13. main 向け PR を作成]
-    O[14. 別 worker が敵対的レビューを実施<br/>evidence: review result]
-    P{15. critical / high / medium がないか}
-    Q[16. 実装 worker がレビュー結果を修正]
+    N[14. draft PR を review 対象にする]
+    O[15. 別 worker が敵対的レビューを実施<br/>evidence: review result]
+    P{16. critical / high / medium がないか}
+    Q[17. 実装 worker がレビュー結果を修正]
     N --> O --> P
     P -- いいえ / 10回まで --> Q --> O
   end
@@ -81,10 +82,10 @@ flowchart TD
   P -- 11回目 --> B9[block exit<br/>review 上限超過]
 
   subgraph MERGE[Merge]
-    R{17. merge 条件を満たすか<br/>evidence: CI / AC・DoD / Review}
-    S[18. merge]
-    T[19. 使用した Issue / PR を close]
-    U[20. 使用した branch を削除]
+    R{18. merge 条件を満たすか<br/>evidence: CI / AC・DoD / Review}
+    S[19. merge]
+    T[20. 使用した Issue / PR を close]
+    U[21. 使用した branch を削除]
     SX[success exit<br/>merge / cleanup 完了]
     R -- はい --> S --> T --> U --> SX
   end

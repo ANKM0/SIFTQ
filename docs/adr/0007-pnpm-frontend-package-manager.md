@@ -30,14 +30,13 @@ Accepted.
 
 ## Context
 
-Issue #6では、v1 MVPをReact、TypeScript、Vite、dnd-kitによるBrowser SPA
-として実装し、v2以降でRustとTauriによるローカルアプリケーションへ進める
-方針を決定している。Issue #12では、この技術選定に合わせてCI/CDで使用する
+Issue #6では、MVPをReact、TypeScript、Vite、dnd-kitによるBrowser SPA
+として実装する方針を決定している。Issue #12では、この技術選定に合わせてCI/CDで使用する
 frontend toolchainを定義する必要がある。
 
 frontend dependenciesは、ローカル開発とCIの両方で再現性を保つ必要がある。
-また、将来`frontend/`、`src-tauri/`、shared packagesのように構成が分かれる
-可能性があるため、workspace運用にも対応しやすいpackage managerを選ぶ。
+また、将来shared packagesや追加frontendが必要になる可能性があるため、
+workspace運用にも対応しやすいpackage managerを選ぶ。
 
 ## Decision
 
@@ -56,8 +55,8 @@ CIでは`pnpm-lock.yaml`を正とし、依存関係のinstallはlockfileに従�
   このリポジトリでは新しいfrontend基盤を小さく始めたいので、追加の運用判断
   が少ないpnpmを優先する。
 - Bun: install速度は魅力だが、現時点ではBun runtimeやBun testを採用する
-  要件がない。v1 MVPはVite/Reactの標準的なNode.js ecosystemで十分であり、
-  CIの安定性と一般的なTauri frontend運用を優先する。
+  要件がない。MVPはVite/Reactの標準的なNode.js ecosystemで十分であり、
+  CIの安定性を優先する。
 
 ## Consequences
 
