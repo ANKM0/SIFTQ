@@ -23,6 +23,20 @@ describe("dragDrop", () => {
     ).toEqual({ type: "reorder", taskId: "third", toIndex: 0 });
   });
 
+  it("resolves downward same-area drops to post-removal reorder indexes", () => {
+    expect(
+      resolveTaskDropOperation(
+        [
+          task({ id: "first", areaId: "do", order: 0 }),
+          task({ id: "second", areaId: "do", order: 1 }),
+          task({ id: "third", areaId: "do", order: 2 })
+        ],
+        taskDropId("first"),
+        taskDropId("third")
+      )
+    ).toEqual({ type: "reorder", taskId: "first", toIndex: 1 });
+  });
+
   it("resolves cross-area drops over a task to move operations with insertion", () => {
     expect(
       resolveTaskDropOperation(

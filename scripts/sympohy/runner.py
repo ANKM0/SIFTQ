@@ -948,19 +948,11 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         and resume_point.name == "planning"
         and inspection.state is None
     ):
-        if _issue_branch_exists(issue):
-            return run_issue(
-                issue_ref,
-                config,
-                recover=True,
-                from_resume=True,
-                resume_point="implement",
-            )
         return run_issue(
             issue_ref,
             config,
             recover=False,
-            from_resume=False,
+            from_resume=_issue_branch_exists(issue),
             resume_point=resume_point.name,
         )
 
@@ -1274,7 +1266,11 @@ def _run_issue_locked(
         return 2
 
     try:
-        worktree = ensure_worktree(issue, config, recover=recover)
+        worktree = ensure_worktree(
+            issue,
+            config,
+            recover=recover or (from_resume and _issue_branch_exists(issue)),
+        )
     except (_ExistingRunError, _UnsafeRecoveryError) as exc:
         phase = resume_from if resume_from != "planning" else "implement"
         state.write(

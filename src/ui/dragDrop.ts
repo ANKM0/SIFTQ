@@ -80,9 +80,14 @@ export function resolveTaskDropOperation(
     return null;
   }
 
-  const insertAt = tasksInArea(tasks, targetTask.areaId).findIndex(
-    (task) => task.id === targetTask.id
-  );
+  const targetAreaTasks = tasksInArea(tasks, targetTask.areaId);
+  const targetIndex = targetAreaTasks.findIndex((task) => task.id === targetTask.id);
+  const activeIndex =
+    activeTask.areaId === targetTask.areaId
+      ? targetAreaTasks.findIndex((task) => task.id === activeTask.id)
+      : -1;
+  const insertAt =
+    activeIndex >= 0 && activeIndex < targetIndex ? targetIndex - 1 : targetIndex;
 
   return operationForTarget(taskId, activeTask.areaId, targetTask.areaId, insertAt);
 }

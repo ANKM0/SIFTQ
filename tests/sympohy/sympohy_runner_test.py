@@ -954,6 +954,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 ) as ensure_worktree,
                 patch("scripts.sympohy.runner.set_issue_state"),
                 patch("scripts.sympohy.runner.comment"),
+                patch("scripts.sympohy.runner._issue_branch_exists", return_value=False),
                 patch(
                     "scripts.sympohy.runner._codex_json",
                     return_value={"logical_steps": [{"name": "one"}]},
@@ -978,6 +979,70 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 2)
         ensure_worktree.assert_called_once_with(issue, config, recover=False)
+
+    def test_resumed_planning_run_reuses_existing_branch_without_plan_recovery(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            issue = Issue(
+                number=82,
+                title="Restart stale pending branch",
+                body="""
+## AC
+- [ ] resume planning after PR creation
+
+## DoD
+- [ ] generate the missing implementation plan
+""",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return ""
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.ensure_worktree",
+                    return_value=worktree,
+                ) as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner.comment"),
+                patch("scripts.sympohy.runner._issue_branch_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={"logical_steps": [{"name": "one"}]},
+                ) as codex_json,
+                patch("scripts.sympohy.runner._codex_text", return_value=""),
+                patch("scripts.sympohy.runner._run_hooks", return_value=1),
+                patch(
+                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request"
+                ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+            ):
+                result = run_issue(
+                    "#82",
+                    config,
+                    recover=False,
+                    from_resume=True,
+                    resume_point="planning",
+                )
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_called_once_with(issue, config, recover=True)
+        codex_json.assert_called_once()
 
     def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1012,7 +1077,7 @@ class SympohyRunnerTest(unittest.TestCase):
         set_issue_state.assert_not_called()
         comment.assert_not_called()
 
-    def test_resume_issue_recovers_stale_pending_with_existing_branch(
+    def test_resume_issue_restarts_stale_pending_planning_with_existing_branch(
         self,
     ) -> None:
         with TemporaryDirectory() as tmp:
@@ -1045,9 +1110,9 @@ class SympohyRunnerTest(unittest.TestCase):
         run_issue.assert_called_once_with(
             "#82",
             config,
-            recover=True,
+            recover=False,
             from_resume=True,
-            resume_point="implement",
+            resume_point="planning",
         )
         set_issue_state.assert_not_called()
         comment.assert_not_called()
