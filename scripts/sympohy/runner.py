@@ -1040,12 +1040,22 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     finally:
         lock.release()
 
+    recover = resume_point.name != "planning"
+    resume_from = resume_point.name
+    if _should_resume_missing_plan_as_planning(
+        resume_point=resume_point.name,
+        state=state_payload,
+        plan_path=log_dir / "plan.json",
+    ):
+        recover = False
+        resume_from = "planning"
+
     return run_issue(
         issue_ref,
         config,
-        recover=resume_point.name != "planning",
+        recover=recover,
         from_resume=True,
-        resume_point=resume_point.name,
+        resume_point=resume_from,
     )
 
 
@@ -3731,6 +3741,32 @@ def _resolve_resume_point_for_issue(
         ):
             state = {**state, "status": "running"}
     return resolve_resume_point(labels, state=state)
+
+
+def _should_resume_missing_plan_as_planning(
+    *,
+    resume_point: str,
+    state: Mapping[str, object] | None,
+    plan_path: Path,
+) -> bool:
+    if resume_point != "implement":
+        return False
+    if _load_existing_plan(plan_path) is not None:
+        return False
+    message = _last_progress(state).get("message")
+    if message not in {
+        "starting implementation planning",
+        "pushing initial issue branch and opening draft pull request",
+        "preparing feature documentation artifacts",
+        "running stage gate",
+        "repairing feature documentation artifact evidence",
+    }:
+        return False
+    return (
+        _progress_int(state, "current_logical_step") is None
+        and _progress_int(state, "completed_logical_steps") is None
+        and _progress_int(state, "total_logical_steps") is None
+    )
 
 
 def _issue_branch_exists(issue: Issue) -> bool:
