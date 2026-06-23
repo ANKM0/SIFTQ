@@ -80,13 +80,19 @@ codd:
     - id: design:codex-configuration-memo
       relation: depends_on
       semantic: governance
-    - id: req:matrix-mvp-v2-sqlite-tauri
+    - id: design:rust-tauri-v2-local-application-adr
       relation: depends_on
-      semantic: product
+      semantic: governance
     - id: design:sqlite-tauri-rust-backend-boundary-adr
       relation: depends_on
       semantic: governance
     - id: design:real-sqlite-test-strategy-adr
+      relation: depends_on
+      semantic: governance
+    - id: req:matrix-mvp-v2-browser-storage
+      relation: depends_on
+      semantic: product
+    - id: design:browser-only-matrix-runtime-storage-adr
       relation: depends_on
       semantic: governance
     - id: req:matrix-mvp-functional

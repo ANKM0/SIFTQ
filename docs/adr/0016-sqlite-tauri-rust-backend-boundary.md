@@ -13,7 +13,13 @@ codd:
 
 ## Status
 
-Accepted.
+Superseded by ADR 0018.
+
+## Supersession Note
+
+#59 の現行方針では、React UI は browser-only runtime で動作し、保存先は
+browser storage adapter が担当する。SQLite、Tauri command、Rust backend boundary
+は #59 の実装対象から外れ、`ADR 0018` が現在のruntime/storage決定を定義する。
 
 ## Context
 

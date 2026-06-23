@@ -34,7 +34,7 @@ codd:
 CI/CD基盤では、SIFTQにCIとCDを定義し、選定したツールをADRに記録することが求められている。現在のリポジトリには、CoDDのみを実行するGitHub
 Actionsワークフロー、uvで管理するPython依存関係、aquaで管理するCLIインストール、コミットメッセージ形式の規約、ADR作成ルールが既に存在する。
 Matrix MVP技術選定では、v1 MVPをReact、TypeScript、Vite、dnd-kitによるBrowser
-SPAとして実装し、v2以降でRustとTauriによるローカルアプリケーションへ進める方針を決定している。
+SPAとして実装し、browser-only runtimeとして継続する方針を決定している。
 
 ## 概要
 
@@ -46,7 +46,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - 現在のCoDD専用ワークフローを、`push`と`pull_request`で実行されるCIワークフローに置き換える。
 - ツールのインストール方法は、既存のaqua、uvに加え、frontend用のNode.js package managerに合わせる。
 - コミットメッセージ形式、Markdown、TypeScript、ESLint、Vitest、Vite build、CoDDのチェックを追加する。
-- v2以降でRust/Tauri実装が追加された段階で、`cargo fmt`、`cargo clippy`、`cargo test`、Tauri build検証を追加する。
+- native appやRust workspaceを追加する段階で、必要なnative toolchain検証を別途追加する。
 - `v*`タグからGitHub Releaseを作成するリリースワークフローを追加する。
 - 手動実行時に注釈付きの`v*`タグを作成し、そのタグからリリースを公開できるようにする。
 - CI/CDツール選定の判断を記録するADRを追加する。
@@ -64,7 +64,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 
 - `.github/workflows/`配下にCIワークフローが存在し、`push`と`pull_request`で実行されること。
 - CIに`sympohy` project configuration、コミットメッセージlint、Markdown lint、TypeScript typecheck、ESLint、Vitest、Vite build、CoDD検証が含まれていること。
-- Rust/TauriのCIチェックは、v2以降でRust workspaceまたはTauri appが追加された段階で有効化できる設計になっていること。
+- native appやRust workspaceのCIチェックは、それらが追加された段階で有効化できる設計になっていること。
 - `.github/workflows/`配下にCDワークフローが存在し、`v*`タグからGitHub Releaseを公開できること。
 - CDワークフローが手動実行時にリリースタグを作成できること。
 - `docs/adr/`配下のADRに、GitHub Actions、aqua、uv、選定したlint/type/testツールを使う理由が記録されていること。
@@ -102,7 +102,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - `src/`
 - `tests/`
 - `frontend/`
-- `src-tauri/`
+- future native app directory if introduced
 - `docs/adr/`
 - `docs/adr/README.md`
 - `docs/requirements/system-requirements.md`
@@ -119,7 +119,7 @@ Requestの検証とバージョンタグからのGitHub Release作成を行え�
 - TypeScript typecheck、ESLint、Vitest、Vite buildは`package.json`のscriptsに集約する。
 - コミットメッセージとMarkdownのチェックは、frontend依存に強く結合させず、リポジトリ全体の運用チェックとして実行する。
 - Ruff、mypy、pytestはv1 MVPの主要スタックではないため、Python製のapplication codeまたはsupport scriptsが追加されるまで必須CIにはしない。
-- Rust/Tauriのチェックはv2以降で`src-tauri/`またはRust workspaceが追加された段階で有効化する。
+- native appやRust workspaceのチェックは、それらが追加された段階で有効化する。
 - パッケージやイメージ公開の要件が出るまでは、リリースワークフローの対象をGitHub Releasesに限定する。
 - CIでは`contents: read`を使い、`contents: write`はリリースワークフローだけで使う。
 - CIでは`task ci:sympohy`をfrontend checksより前に実行し、`.sympohy/config.yaml`、runner entrypoint、labels、systemd templates、Codex command shapeを検証する。

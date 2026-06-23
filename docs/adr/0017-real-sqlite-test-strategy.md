@@ -13,7 +13,14 @@ codd:
 
 ## Status
 
-Accepted.
+Superseded by ADR 0018.
+
+## Supersession Note
+
+#59 は SQLite を使わない browser-only persistence へ変更されたため、このADRの
+real SQLite test strategy は現行 #59 のテスト方針ではない。browser storage の
+repository / UI tests は `ADR 0018` と
+`docs/design/matrix-mvp-v2-browser-storage-design.md` に従う。
 
 ## Context
 

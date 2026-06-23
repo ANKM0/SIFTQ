@@ -325,8 +325,8 @@ hook fix, review fix, and final verifier fix commits are pushed to the same PR
 branch.
 
 The draft PR body must start from `.github/pull_request_template.md` so required
-verification prompts, including Matrix/Tauri WebView reload and app restart
-smoke evidence, remain visible on automation-created PRs.
+verification prompts, including Matrix browser storage reload smoke evidence,
+remain visible on automation-created PRs.
 
 After `task ci` succeeds, `sympohy` verifies that the draft PR still exists,
 runs an adversarial review Codex pass that must return machine-readable JSON,

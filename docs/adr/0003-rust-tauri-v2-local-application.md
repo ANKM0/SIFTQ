@@ -4,23 +4,22 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:matrix-mvp-functional
+    - id: req:siftq-system
       relation: depends_on
-      semantic: target-architecture
-    - id: req:matrix-mvp-non-functional
-      relation: depends_on
-      semantic: target-architecture
-  depended_by:
-    - id: design:matrix-mvp-technology-selection
-      relation: depends_on
-      semantic: decision
+      semantic: governance
 ---
 
 # ADR 0003: Rust and Tauri for v2 Local Application
 
 ## Status
 
-Accepted.
+Superseded by ADR 0018.
+
+## Supersession Note
+
+#59 の現行方針では、CLIは追加コンテンツとして後続に送り、Matrix MVP v2は
+browser-only runtime と browser storage を採用する。Rust/Tauri local app 方針は
+`ADR 0018` により #59 の target architecture ではなくなった。
 
 ## Context
 

@@ -56,7 +56,6 @@ tasks:
       - task: ci:lint
       - task: ci:test
       - task: ci:build
-      - task: ci:rust
       - task: codd:version
       - task: codd:scan
       - task: codd:validate
@@ -157,20 +156,10 @@ tasks:
     cmds:
       - pnpm build
 
-  ci:rust:
-    desc: Run Rust formatting, linting, and tests.
-    cmds:
-      - bash scripts/ci/run_rust_checks.sh
-
   frontend:dev:
     desc: Start the Vite development server.
     cmds:
       - pnpm dev
-
-  tauri:dev:
-    desc: Start the Tauri desktop development app.
-    cmds:
-      - cargo-tauri dev
 
   codd:version:
     desc: Check the required CoDD version.

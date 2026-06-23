@@ -1,9 +1,9 @@
 # SIFTQ
 
-SIFTQ is a local-first task matrix application. The v1 MVP is a browser
-SPA built with React, TypeScript, Vite, and dnd-kit so the project can validate
-the task creation and drag-and-drop matrix workflow before adding the planned
-Tauri desktop shell.
+SIFTQ is a local-first task matrix application. The current MVP is a browser
+SPA built with React, TypeScript, Vite, and dnd-kit. Task state is persisted in
+browser storage so the matrix can be used in a browser without a native app
+shell.
 
 The repository also uses CoDD (Coherence-Driven Development) to keep
 requirements, design notes, implementation, and tests traceable.
@@ -39,15 +39,15 @@ template, install the tools managed by `aqua.yaml` first, then run the same
 
 ## Development
 
-Start the desktop development app:
+Start the browser development app:
 
 ```bash
-task tauri:dev
+task frontend:dev
 ```
 
-Manual Matrix MVP v2 smoke check:
+Manual Matrix MVP browser smoke check:
 
-- Open the Tauri app window started by `task tauri:dev`.
+- Open the local Vite URL printed by `task frontend:dev`.
 - Confirm `Do`, `Schedule`, `Delegate`, `Eliminate`, `Done`, and `Skipped`
   are visible.
 - Create cards from multiple matrix area forms and confirm each card appears
@@ -60,14 +60,11 @@ Manual Matrix MVP v2 smoke check:
   matrix display.
 - Confirm a long 256-character title wraps inside the card without overlapping
   nearby controls or changing the page into an unusable layout.
-- Reload the WebView with F5 or the platform reload shortcut, then confirm the
-  same active task titles, areas, statuses, and order are restored from SQLite.
-- Stop `task tauri:dev`, start `task tauri:dev` again, then confirm the same
-  task titles, areas, statuses, and order are restored after app restart.
+- Reload the browser tab, then confirm the same active task titles, areas,
+  statuses, and order are restored from browser storage.
 
-Automated coverage includes mutation-time `list_tasks` refreshes in the React
-tests and SQLite reopen persistence in the Rust tests. The WebView reload and
-full app restart checks above remain manual smoke evidence for the PR or issue.
+Automated coverage includes browser storage persistence, mutation-time task
+refreshes in the React tests, and reload-equivalent remount restoration.
 
 Common frontend checks:
 
@@ -76,12 +73,6 @@ task ci:typecheck
 task ci:lint
 task ci:test
 task ci:build
-```
-
-Rust/Tauri checks require a local Rust and C compiler toolchain:
-
-```bash
-task ci:rust
 ```
 
 Common CoDD commands:

@@ -12,11 +12,7 @@ import {
   type TerminalAreaId,
   type Task
 } from "../contracts/task";
-import {
-  getStorageHealth,
-  tauriTaskRepository
-} from "../adapters/tauriTaskRepository";
-import { isTauriRuntimeAvailable } from "../adapters/tauriInvoke";
+import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
   areaDropId,
   restrictDragToWindowEdges,
@@ -36,7 +32,6 @@ const dragModifiers = [restrictDragToWindowEdges];
 type RuntimeState =
   | { readonly status: "checking" }
   | { readonly status: "ready" }
-  | { readonly status: "unsupported" }
   | {
       readonly status: "storage-error";
       readonly code: string;
@@ -54,38 +49,20 @@ export function App() {
     let isCurrent = true;
 
     async function initialize() {
-      if (!isTauriRuntimeAvailable()) {
-        setRuntimeState({ status: "unsupported" });
-        return;
-      }
-
       try {
-        const health = await getStorageHealth();
+        const initialTasks = await browserTaskRepository.listTasks();
 
         if (!isCurrent) {
           return;
         }
 
-        if (!health.ok) {
-          setRuntimeState({
-            code: health.code,
-            message: health.message,
-            status: "storage-error"
-          });
-          return;
-        }
-
-        const initialTasks = await tauriTaskRepository.listTasks();
-
-        if (isCurrent) {
-          setTasks(initialTasks);
-          setRuntimeState({ status: "ready" });
-        }
+        setTasks(initialTasks);
+        setRuntimeState({ status: "ready" });
       } catch (error) {
         if (isCurrent) {
           setRuntimeState({
-            code: "INTERNAL",
-            message: messageForError(error, "Storage health could not be checked."),
+            code: codeForError(error),
+            message: messageForError(error, "Browser task storage could not be opened."),
             status: "storage-error"
           });
         }
@@ -105,7 +82,7 @@ export function App() {
   ): Promise<string | null> {
     try {
       setOperationError(null);
-      await tauriTaskRepository.createTask({ areaId, title });
+      await browserTaskRepository.createTask({ areaId, title });
       await refreshTasks();
 
       return null;
@@ -120,7 +97,7 @@ export function App() {
   ): Promise<string | null> {
     try {
       setOperationError(null);
-      await tauriTaskRepository.updateTaskTitle({ taskId, title });
+      await browserTaskRepository.updateTaskTitle({ taskId, title });
       await refreshTasks();
 
       return null;
@@ -142,9 +119,9 @@ export function App() {
 
     try {
       if (operation.type === "move") {
-        await tauriTaskRepository.moveTask(operation);
+        await browserTaskRepository.moveTask(operation);
       } else {
-        await tauriTaskRepository.reorderTask(operation);
+        await browserTaskRepository.reorderTask(operation);
       }
 
       setOperationError(null);
@@ -155,20 +132,11 @@ export function App() {
   }
 
   async function refreshTasks() {
-    setTasks(await tauriTaskRepository.listTasks());
+    setTasks(await browserTaskRepository.listTasks());
   }
 
   if (runtimeState.status === "checking") {
     return <RuntimeMessage title="Opening storage" message="Checking task storage." />;
-  }
-
-  if (runtimeState.status === "unsupported") {
-    return (
-      <RuntimeMessage
-        title="Tauri runtime required"
-        message="SIFTQ v2 runs as a desktop app. Browser-only startup is not supported."
-      />
-    );
   }
 
   if (runtimeState.status === "storage-error") {
@@ -527,4 +495,13 @@ function RuntimeMessage({ title, message, code }: RuntimeMessageProps) {
 
 function messageForError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function codeForError(error: unknown): string {
+  return typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+    ? error.code
+    : "STORAGE";
 }

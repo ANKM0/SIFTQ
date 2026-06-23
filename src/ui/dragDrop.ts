@@ -1,7 +1,7 @@
 import { type Modifier } from "@dnd-kit/core";
 
 import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
-import { INITIAL_AREAS, isMatrixArea } from "./taskPresentation";
+import { isAreaId as isKnownAreaId, isMatrixArea } from "../domain/taskRules";
 
 export type TaskDropOperation =
   | {
@@ -121,7 +121,7 @@ function areaIdFromDropId(dropId: string): AreaId | null {
 }
 
 function isAreaId(areaId: string): areaId is AreaId {
-  return INITIAL_AREAS.some((area) => area.id === areaId);
+  return isKnownAreaId(areaId);
 }
 
 function clamp(value: number, min: number, max: number): number {

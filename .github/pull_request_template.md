@@ -12,18 +12,15 @@
 - ローカルでの確認
 - テスト / lint / 手動確認
 - UI 変更がある場合は wireframe HTML を更新し、`tests/docs/wireframeContract.test.ts` の確認結果を記載する
-- Matrix/Tauri の永続化に影響する変更では、WebView reload/F5 と app restart 後の復元結果を記載する
+- Matrix browser storage の永続化に影響する変更では、browser reload 後の復元結果を記載する
 
 ```bash
 ```
 
-Matrix/Tauri manual smoke evidence (Matrix/Tauri の永続化に影響する場合は必須):
+Matrix browser storage manual smoke evidence (browser storage の永続化に影響する場合は必須):
 
-- WebView reload/F5 result:
-  - [ ] task title、area、status、order が SQLite から復元される
-  - Result / environment / notes:
-- `task tauri:dev` app restart result:
-  - [ ] task title、area、status、order が SQLite から復元される
+- Browser reload result:
+  - [ ] task title、area、status、order が browser storage から復元される
   - Result / environment / notes:
 
 ## 影響範囲

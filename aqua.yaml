@@ -18,6 +18,3 @@ packages:
 - name: pnpm/pnpm@v11.6.0
 - name: go-task/task@v3.51.1
 - name: BurntSushi/ripgrep@14.1.1
-- name: tauri-apps/tauri/cargo-tauri@tauri-cli-v2.10.1
-- name: rust-lang/rustup
-  version: "1.28.2"
