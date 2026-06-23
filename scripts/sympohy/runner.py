@@ -731,6 +731,9 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
             raise _ExistingRunError(
                 f"existing branch found for issue #{issue.number}: {branch}; use resume"
             )
+        existing_worktree = _worktree_for_branch(branch)
+        if existing_worktree is not None:
+            return existing_worktree
         subprocess.check_call(["git", "worktree", "add", str(worktree), branch])
     elif recover and _remote_branch_exists(branch):
         subprocess.check_call(
@@ -3900,6 +3903,26 @@ def _remote_branch_exists(branch: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def _worktree_for_branch(branch: str) -> Path | None:
+    try:
+        output = subprocess.check_output(
+            ["git", "worktree", "list", "--porcelain"],
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    current_path: Path | None = None
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            current_path = Path(line.removeprefix("worktree "))
+        elif line == f"branch refs/heads/{branch}" and current_path is not None:
+            return current_path
+        elif line == "":
+            current_path = None
+    return None
 
 
 def _label_names(labels: object) -> list[str]:

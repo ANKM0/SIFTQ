@@ -591,6 +591,32 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
 
+    def test_ensure_worktree_reuses_existing_branch_worktree_on_recovery(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            existing_worktree = root / "external-worktree"
+            issue = Issue(
+                number=82,
+                title="Reuse branch worktree",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._worktree_for_branch",
+                    return_value=existing_worktree,
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = ensure_worktree(issue, config, recover=True)
+
+        self.assertEqual(result, existing_worktree)
+        check_call.assert_not_called()
+
     def test_resume_issue_blocks_invalid_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
