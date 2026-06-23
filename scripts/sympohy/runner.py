@@ -875,7 +875,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     log_dir = config.run_log_root / f"issue-{issue.number}"
     state_path = log_dir / "state.json"
     state_payload = read_run_state(state_path)
-    resume_point = resolve_resume_point(labels, state=state_payload)
+    resume_point = _resolve_resume_point_for_issue(labels, state_payload)
 
     if resume_point.terminal:
         terminal_phase = resume_point.phase or (
@@ -945,6 +945,14 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         and resume_point.name == "planning"
         and inspection.state is None
     ):
+        if _issue_branch_exists(issue):
+            return run_issue(
+                issue_ref,
+                config,
+                recover=True,
+                from_resume=True,
+                resume_point="implement",
+            )
         return run_issue(
             issue_ref,
             config,
@@ -966,7 +974,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         return 0
     try:
         state_payload = read_run_state(state_path)
-        resume_point = resolve_resume_point(labels, state=state_payload)
+        resume_point = _resolve_resume_point_for_issue(labels, state_payload)
         if resume_point.terminal:
             return 0
 
@@ -989,7 +997,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 run_id=run_id,
                 lock_path=lock.path,
             )
-            resume_point = resolve_resume_point(labels, state=state_payload)
+            resume_point = _resolve_resume_point_for_issue(labels, state_payload)
         elif inspection.reason == "invalid state":
             phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
             state = _RunStateWriter(
@@ -3700,6 +3708,24 @@ def _existing_run_refusal_reason(
     if _remote_branch_exists(branch):
         return f"existing remote branch found at origin/{branch}; use resume"
     return None
+
+
+def _resolve_resume_point_for_issue(
+    labels: object,
+    state: Mapping[str, object] | None,
+):
+    if state is not None and state.get("status") == "blocked":
+        names = set(_label_names(labels))
+        if "sympohy:blocked" not in names and (
+            "sympohy:running" in names or "sympohy:pending" in names
+        ):
+            state = {**state, "status": "running"}
+    return resolve_resume_point(labels, state=state)
+
+
+def _issue_branch_exists(issue: Issue) -> bool:
+    branch = f"issue-{issue.number}-sympohy"
+    return _branch_exists(branch) or _remote_branch_exists(branch)
 
 
 def _ensure_draft_pull_request(
