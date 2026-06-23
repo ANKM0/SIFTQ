@@ -327,6 +327,10 @@ branch.
 The draft PR body must start from `.github/pull_request_template.md` so required
 verification prompts, including Matrix browser storage reload smoke evidence,
 remain visible on automation-created PRs.
+For #59 browser-only work governed by ADR 0018, Tauri WebView reload / F5 and
+`task tauri:dev` app restart persistence checks are not applicable; if stale
+issue history or review text adds those result lines, the PR body must mark them
+N/A with an ADR 0018 note instead of leaving them pending.
 
 After `task ci` succeeds, `sympohy` verifies that the draft PR still exists,
 runs an adversarial review Codex pass that must return machine-readable JSON,
