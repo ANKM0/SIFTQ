@@ -24,6 +24,11 @@ v2では、React Matrix UI はブラウザSPAとして動作する。ユーザ�
 Matrixを表示し、storageが壊れている場合はstorage errorを表示する。
 Tauri runtime、desktop app shell、SQLite databaseは起動条件にしない。
 
+Issue #68 以降は task list page と task detail page が追加され、
+browser storage の task contract には `description`, `createdAt`,
+`updatedAt`, `listOrder` が加わる。Matrix の `areaId` / `order` と
+task list の `listOrder` は別の順序軸として扱う。
+
 ## Internal Design（内部設計）
 
 frontend は次の境界を持つ。
@@ -34,8 +39,11 @@ frontend は次の境界を持つ。
 - `src/adapters/browserTaskRepository.ts`: browser storage を使う本番adapter。
 - `src/ui/*`: React component、presentation、dnd-kit interaction。
 
-`browserTaskRepository` は `siftq.tasks.v1` key に `{ version, tasks }` を保存する。
-`version = 1` のみを受け入れ、予期しないshapeや壊れたJSONは `STORAGE` errorにする。
+`browserTaskRepository` は `siftq.tasks.v1` key を継続利用し、`{ version, tasks }`
+を保存する。`version = 1` のみを受け入れ、予期しないshapeや壊れたJSONは
+`STORAGE` errorにする。task は `description`, `createdAt`, `updatedAt`,
+`listOrder` を含む拡張 shape で読み書きし、欠落 field は初回読み込み時に
+互換補完する。
 
 mutationは repository operation 内でtask配列を読み込み、domain ruleを適用し、
 areaごとの `order` を正規化してから保存する。UIはmutation後に `listTasks` を
@@ -45,7 +53,9 @@ IDはbrowser側で `crypto.randomUUID()` を優先し、利用できない場合
 使うfallbackを使う。ID形式を外部contractにはしない。
 
 Done / Skipped は #59 では既存v1挙動どおり `areaId` も `done` / `skipped` に
-変更する。terminal task はstorageに保持するが、Matrix通常表示からは除外する。
+変更する。Issue #68 では、task list 側の status 変更は `areaId` を保持したまま
+行い、active に戻したときに保持 area へ再表示する。terminal task はstorageに
+保持するが、Matrix通常表示からは除外する。
 
 ## Test Viewpoints（テスト観点）
 

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Task List</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; background: #f6f4ef; color: #1f1f1f; }
+      .shell { max-width: 1100px; margin: 0 auto; padding: 24px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
+      nav a { margin-left: 12px; color: #0b4f6c; text-decoration: none; font-weight: 700; }
+      .list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px; }
+      .card { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 12px; align-items: start; padding: 16px; background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
+      .handle { display: grid; gap: 6px; place-items: center; border: 1px dashed #a79f93; border-radius: 12px; min-height: 64px; padding: 10px 8px; font-weight: 700; color: #5a5145; text-align: center; }
+      .handle__icon { font-size: 1.1rem; line-height: 1; }
+      .handle__area { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+      .title { margin: 0; font-size: 1.05rem; }
+      .desc { margin: 6px 0 0; color: #4f4a43; max-width: 620px; }
+      .button { border: 1px solid #8b857a; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; text-decoration: none; color: #1f1f1f; }
+      .status { min-width: 108px; }
+      .actions { display: flex; gap: 8px; }
+      .muted { color: #6c655d; }
+      .toplinks { display: flex; gap: 12px; align-items: center; }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div>
+          <h1>タスク一覧</h1>
+          <p class="muted">State: all tasks in draggable list cards</p>
+        </div>
+        <nav class="toplinks" aria-label="page navigation">
+          <a href="./matrix-mvp.html">マトリックス</a>
+          <a href="./task-detail.html">詳細</a>
+        </nav>
+      </header>
+      <ul class="list" aria-label="task list">
+        <li class="card">
+          <div class="handle" aria-label="Do のドラッグハンドル">
+            <span class="handle__icon">↕</span>
+            <span class="handle__area">Do</span>
+          </div>
+          <div>
+            <h2 class="title">Fix browser storage migration</h2>
+            <p class="desc">description is truncated in list view but editable in detail.</p>
+          </div>
+          <button class="button status">active</button>
+          <div class="actions">
+            <a class="button" href="./task-detail.html">詳細</a>
+            <a class="button" href="./task-delete-confirm.html">削除</a>
+          </div>
+        </li>
+        <li class="card">
+          <div class="handle" aria-label="Schedule のドラッグハンドル">
+            <span class="handle__icon">↕</span>
+            <span class="handle__area">Schedule</span>
+          </div>
+          <div>
+            <h2 class="title">Ship task list page</h2>
+            <p class="desc">説明なし</p>
+          </div>
+          <button class="button status">done</button>
+          <div class="actions">
+            <a class="button" href="./task-detail.html">詳細</a>
+            <a class="button" href="./task-delete-confirm.html">削除</a>
+          </div>
+        </li>
+        <li class="card">
+          <div class="handle" aria-label="Delegate のドラッグハンドル">
+            <span class="handle__icon">↕</span>
+            <span class="handle__area">Delegate</span>
+          </div>
+          <div>
+            <h2 class="title">Review skipped task behavior</h2>
+            <p class="desc">Task remains in list while status is skipped.</p>
+          </div>
+          <button class="button status">skipped</button>
+          <div class="actions">
+            <a class="button" href="./task-detail.html">詳細</a>
+            <a class="button" href="./task-delete-confirm.html">削除</a>
+          </div>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

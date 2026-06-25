@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Delete Confirm</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; background: #f6f4ef; color: #1f1f1f; }
+      .shell { max-width: 960px; margin: 0 auto; padding: 24px; }
+      header, .dialog { background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; }
+      .dialog { margin-top: 16px; padding: 20px; max-width: 520px; }
+      .actions { display: flex; gap: 8px; margin-top: 16px; }
+      .button { border: 1px solid #8b857a; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; text-decoration: none; color: #1f1f1f; }
+      .danger { background: #a11f1f; color: #fff; border-color: #a11f1f; }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div>
+          <h1>タスク削除確認</h1>
+          <p>State: confirm physical delete</p>
+        </div>
+        <nav aria-label="page navigation">
+          <a href="./task-list.html">タスク一覧</a>
+          <a href="./task-detail.html">詳細</a>
+        </nav>
+      </header>
+
+      <section class="dialog" role="dialog" aria-labelledby="delete-title">
+        <h2 id="delete-title">"Fix browser storage migration" を削除しますか?</h2>
+        <p>削除すると browser storage から完全に消えます。復元操作はありません。</p>
+        <div class="actions">
+          <a class="button" href="./task-detail.html">キャンセル</a>
+          <a class="button danger" href="./task-list-deleted.html">削除する</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

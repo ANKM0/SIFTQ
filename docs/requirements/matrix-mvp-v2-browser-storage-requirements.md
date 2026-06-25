@@ -40,6 +40,11 @@ React / TypeScript / Vite のbrowser appとして、自分のPCのブラウザ�
 v2では、React frontendの `TaskRepository` port の背後に browser storage
 adapter を置き、task の `id`, `title`, `areaId`, `status`, `order` を保存する。
 
+Issue #68 以降は、この基盤の上で task contract が `description`,
+`createdAt`, `updatedAt`, `listOrder` を含むように拡張される。Matrix
+用の `areaId` / `order` は引き続き保持され、task list 用の順序は
+`listOrder` で別管理する。
+
 保存データは browser storage に格納する。UIはmutation後に全件再取得し、
 browser reload 後も同じtask、area、status、orderを復元できる必要がある。
 
@@ -50,6 +55,7 @@ browser reload 後も同じtask、area、status、orderを復元できる必要�
 - browser storage が空の場合は空のMatrixとして起動する。
 - browser storage が読めない場合は storage error を表示する。
 - task の `id`, `title`, `areaId`, `status`, `order` を browser storage に保存できる。
+- task の `description`, `createdAt`, `updatedAt`, `listOrder` を browser storage で扱える。
 - `createTask` は matrix area にだけ task を作成できる。
 - `listTasks` は Done / Skipped を含む全taskを返す。
 - `listTasks` の返却順は area 表示順、次に `order` 昇順で安定している。
@@ -58,6 +64,7 @@ browser reload 後も同じtask、area、status、orderを復元できる必要�
 - FEの即時validationは `Array.from(title).length` で行う。
 - task は areaごとに `order` が `0..n-1` へ正規化される。
 - create、move、reorder、title update は1操作ごとに保存される。
+- task list の並び順は `listOrder` として保存される。
 - Done / Skipped へ移動した task は browser storage に保持され、通常 matrix 表示からは消える。
 - Done / Skipped から matrix area へ戻す操作は validation error とする。
 - browser reload 後も task title、area、status、order が復元される。

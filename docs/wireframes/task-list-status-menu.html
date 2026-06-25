@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Task List Status Menu</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; background: #f6f4ef; color: #1f1f1f; }
+      .shell { max-width: 960px; margin: 0 auto; padding: 24px; }
+      header, .card { background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; }
+      .card { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 12px; align-items: start; padding: 16px; margin-top: 16px; position: relative; }
+      .handle { display: grid; gap: 6px; place-items: center; border: 1px dashed #a79f93; border-radius: 12px; min-height: 64px; padding: 10px 8px; font-weight: 700; text-align: center; }
+      .handle__icon { font-size: 1.1rem; line-height: 1; }
+      .handle__area { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+      .menu { position: absolute; right: 190px; top: 74px; min-width: 160px; background: #fff; border: 1px solid #8b857a; border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+      .menu button { display: block; width: 100%; padding: 10px 12px; border: 0; background: transparent; text-align: left; font-weight: 700; }
+      .menu button:hover { background: #f2ead7; }
+      .button { border: 1px solid #8b857a; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; text-decoration: none; color: #1f1f1f; }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div>
+          <h1>タスク一覧</h1>
+          <p>State: status menu open</p>
+        </div>
+        <nav aria-label="page navigation">
+          <a href="./matrix-mvp.html">マトリックス</a>
+          <a href="./task-list.html">タスク一覧</a>
+        </nav>
+      </header>
+
+      <article class="card">
+        <div class="handle" aria-label="Do のドラッグハンドル">
+          <span class="handle__icon">↕</span>
+          <span class="handle__area">Do</span>
+        </div>
+        <div>
+          <h2>Fix browser storage migration</h2>
+          <p>description preview</p>
+        </div>
+        <button class="button">active</button>
+        <div>
+          <a class="button" href="./task-detail.html">詳細</a>
+          <a class="button" href="./task-delete-confirm.html">削除</a>
+        </div>
+        <div class="menu" role="menu" aria-label="status menu">
+          <button>active</button>
+          <button>done</button>
+          <button>skipped</button>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>
