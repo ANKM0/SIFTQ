@@ -299,6 +299,14 @@ Hook failures trigger a Codex fix attempt and rerun, up to three attempts. If
 the hook still fails, `sympohy` blocks the issue and comments with the phase,
 failed command, attempts, cause summary, and run log path.
 
+The checked-in conservative profile uses `ci_retry_max_attempts: 10`,
+`review_max_rounds: 5`, and `final_verifier_fix_max_attempts: 2` to keep local
+watcher operation bounded while allowing an extra review/fix pass for findings
+that only appear after conflict or verifier fixes. The development-flow
+compatibility values remain `ci_retry_max_attempts: 50` and
+`review_max_rounds: 10` for operators that intentionally want the full loop
+budget.
+
 After `task ci` succeeds, `sympohy` creates a draft PR, runs an adversarial
 review Codex pass that must return machine-readable JSON, and repeats fix/review
 up to five rounds until there are no `critical`, `high`, or `medium` findings.
