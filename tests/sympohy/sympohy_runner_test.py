@@ -285,6 +285,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     comment_review=False,
                 )
 
+            state_payload = json.loads(
+                (log_dir / "state.json").read_text(encoding="utf-8")
+            )
+
         self.assertEqual(result, 2)
         set_issue_state.assert_called_once()
         body = comment.call_args.args[1]
@@ -292,6 +296,11 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertIn(
             "- remaining blocking findings: high: still broken; medium: tests still failing",
             body,
+        )
+        self.assertEqual(state_payload["status"], "blocked")
+        self.assertEqual(
+            state_payload["last_known_progress"]["remaining blocking findings"],
+            "high: still broken; medium: tests still failing",
         )
 
     def test_review_fix_loop_blocks_conflicted_pull_request_before_finalize_review(self) -> None:
@@ -2245,6 +2254,53 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
 
+    def test_resume_issue_closes_open_completed_issue_and_restores_done_finalize_labels(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "state.json").write_text(
+                json.dumps({"issue": 82, "phase": "hooks", "status": "blocked"}),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Completed but still open",
+                body="",
+                labels=("sympohy:done", "sympohy:phase:hooks"),
+                comments=(),
+                state="OPEN",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:done", "sympohy:phase:hooks"),
+            status="sympohy:done",
+            phase="finalize",
+        )
+        check_call.assert_called_once_with(["gh", "issue", "close", "#82"])
+        self.assertEqual(state["phase"], "finalize")
+        self.assertEqual(state["status"], "done")
+        self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
+
     def test_resume_issue_reconciles_completed_issue_over_stale_blocked_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -2682,6 +2738,26 @@ class SympohyRunnerTest(unittest.TestCase):
                 _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
         self.assertIn("existing pull request #91 body is empty", str(context.exception))
+
+    def test_ensure_draft_pull_request_blocks_invalid_existing_pr_metadata(self) -> None:
+        with (
+            patch(
+                "scripts.sympohy.runner._current_branch",
+                return_value="issue-82-sympohy",
+            ),
+            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+            patch(
+                "scripts.sympohy.runner.subprocess.check_output",
+                return_value="[]",
+            ),
+        ):
+            with self.assertRaises(_PullRequestMetadataError) as context:
+                _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+
+        self.assertIn(
+            "could not inspect existing pull request metadata",
+            str(context.exception),
+        )
 
     def test_ensure_draft_pull_request_creates_body_with_traceability_and_template(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -4366,6 +4442,87 @@ class SympohyRunnerTest(unittest.TestCase):
                 comment.call_args.args[1],
             )
             self.assertEqual(final_state["status"], "blocked")
+
+    def test_review_resume_blocks_empty_existing_pull_request_body(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Resume review with empty PR body",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._worktree_status", return_value=""),
+                patch(
+                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
+                    side_effect=_PullRequestMetadataError(
+                        "existing pull request #91 body is empty; restore issue traceability, summary, and validation details before resuming"
+                    ),
+                ),
+                patch("scripts.sympohy.runner._review_fix_loop") as review_fix_loop,
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_and_merge"
+                ) as final_merge,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _resume_late_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    log_dir,
+                    state,
+                    previous_state={"last_known_progress": {"review_round": 2}},
+                    resume_from="review",
+                )
+
+            final_state = json.loads(
+                (log_dir / "state.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result, 2)
+        review_fix_loop.assert_not_called()
+        final_merge.assert_not_called()
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:review"),
+            status="sympohy:running",
+            phase="review",
+            cwd=worktree,
+        )
+        set_issue_state.assert_any_call(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:review"),
+            status="sympohy:blocked",
+            phase="review",
+            cwd=worktree,
+        )
+        self.assertIn("pull request safety check", comment.call_args.args[1])
+        self.assertIn("existing pull request #91 body is empty", comment.call_args.args[1])
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(
+            final_state["last_known_progress"]["failed_command"],
+            "pull request safety check",
+        )
 
     def test_fix_resume_blocks_existing_fix_commit_with_dirty_worktree(self) -> None:
         with TemporaryDirectory() as tmp:
