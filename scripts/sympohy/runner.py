@@ -105,6 +105,24 @@ class _ImplementationRecovery:
         return self.worktree_logical_step == index
 
 
+@dataclass(frozen=True)
+class _PullRequestMergeability:
+    number: str
+    base_ref: str
+    head_ref: str
+    merge_state_status: str
+    mergeable: str
+
+    def is_conflicted(self) -> bool:
+        return self.merge_state_status == "DIRTY" or self.mergeable == "CONFLICTING"
+
+    def conflict_summary(self) -> str:
+        details = [f"mergeStateStatus={self.merge_state_status}"]
+        if self.mergeable:
+            details.append(f"mergeable={self.mergeable}")
+        return "GitHub reports " + ", ".join(details) + "."
+
+
 class _RunStateWriter:
     def __init__(
         self,
@@ -2296,6 +2314,7 @@ def _resume_final_verifier_fix_phase(
                 log_dir,
                 max_review_rounds=config.review_max_rounds,
             ),
+            block_phase="finalize",
         )
     return fix_result
 
@@ -2499,6 +2518,7 @@ def _run_final_verifier_and_merge(
                 log_dir,
                 max_review_rounds=config.review_max_rounds,
             ),
+            block_phase="finalize",
         )
         if review_result != 0:
             return review_result
@@ -2872,11 +2892,21 @@ def _review_fix_loop(
     start_round: int = 1,
     pull_request_number: str | None = None,
     existing_fix_subjects: set[str] | None = None,
+    block_phase: str = "review",
 ) -> int:
     if start_round > config.review_max_rounds + 1:
         return 0
     if pull_request_number is None:
-        pull_request_number = _resolve_pull_request_number(cwd)
+        pull_request_number = _ensure_review_mergeability(
+            issue_ref,
+            issue,
+            cwd,
+            log_dir,
+            state,
+            phase=block_phase,
+        )
+        if pull_request_number is None:
+            return 2
     if existing_fix_subjects is None:
         existing_fix_subjects = set(
             _commit_subjects(cwd=cwd, base_branch=config.base_branch)
@@ -2937,6 +2967,62 @@ def _review_fix_loop(
     return 2
 
 
+def _ensure_review_mergeability(
+    issue_ref: str,
+    issue: Issue,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    phase: str,
+) -> str | None:
+    mergeability = _pull_request_mergeability(cwd)
+    if not mergeability.is_conflicted():
+        return mergeability.number
+
+    recommended_action = (
+        f"Update `{mergeability.head_ref}` with the latest `{mergeability.base_ref}`, "
+        "resolve the merge conflicts, push the branch, and rerun "
+        f"`task ai:sympohy:resume -- '#{issue.number}'`."
+    )
+    _block_mergeability_conflict(
+        issue_ref,
+        phase=phase,
+        issue_number=issue.number,
+        pull_request=mergeability,
+        run_log_path=log_dir,
+        cwd=cwd,
+        state=state,
+        recommended_action=recommended_action,
+    )
+    return None
+
+
+def _pull_request_mergeability(cwd: Path) -> _PullRequestMergeability:
+    payload = json.loads(
+        subprocess.check_output(
+            [
+                "gh",
+                "pr",
+                "view",
+                "--json",
+                "number,baseRefName,headRefName,mergeStateStatus,mergeable",
+            ],
+            cwd=cwd,
+            text=True,
+        )
+    )
+    if not isinstance(payload, Mapping):
+        raise ValueError("gh pr view returned non-object JSON")
+    return _PullRequestMergeability(
+        number=str(payload.get("number", "")).strip(),
+        base_ref=str(payload.get("baseRefName", "")).strip(),
+        head_ref=str(payload.get("headRefName", "")).strip(),
+        merge_state_status=str(payload.get("mergeStateStatus", "UNKNOWN")).strip().upper(),
+        mergeable=str(payload.get("mergeable", "UNKNOWN")).strip().upper(),
+    )
+
+
 def _review_json_with_stage_status(review: ReviewResult) -> str:
     if isinstance(review.raw, Mapping):
         payload: dict[str, object] = dict(review.raw)
@@ -2985,6 +3071,61 @@ def _block(
             f"- failed command: {failed_command}\n"
             f"- attempts: {attempts}\n"
             f"- cause: {cause}\n"
+            f"- run log path: {run_log_path}\n"
+        ),
+        cwd=cwd,
+    )
+
+
+def _block_mergeability_conflict(
+    issue_ref: str,
+    *,
+    phase: str,
+    issue_number: int,
+    pull_request: _PullRequestMergeability,
+    run_log_path: Path,
+    cwd: Path | None,
+    state: _RunStateWriter | None,
+    recommended_action: str,
+) -> None:
+    cause = f"pull request conflicts with base branch {pull_request.base_ref}"
+    if state is not None:
+        state.write(
+            phase=phase,
+            status="blocked",
+            progress={
+                "message": "blocked",
+                "failed_command": "mergeability gate",
+                "attempts": 1,
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+                "pull_request_number": pull_request.number,
+                "base_ref": pull_request.base_ref,
+                "head_ref": pull_request.head_ref,
+                "conflict_summary": pull_request.conflict_summary(),
+                "recommended_action": recommended_action,
+            },
+        )
+    set_issue_state(
+        issue_ref,
+        current_labels=("sympohy:running", f"sympohy:phase:{phase}"),
+        status="sympohy:blocked",
+        phase=phase,
+        cwd=cwd,
+    )
+    comment(
+        issue_ref,
+        (
+            "sympohy blocked this run.\n\n"
+            f"- phase: {phase}\n"
+            "- failed command: mergeability gate\n"
+            "- attempts: 1\n"
+            f"- cause: {cause}\n"
+            f"- pr number: {pull_request.number}\n"
+            f"- base ref: {pull_request.base_ref}\n"
+            f"- head ref: {pull_request.head_ref}\n"
+            f"- conflict summary: {pull_request.conflict_summary()}\n"
+            f"- recommended next action: {recommended_action}\n"
             f"- run log path: {run_log_path}\n"
         ),
         cwd=cwd,

@@ -126,6 +126,8 @@ describe("sympohy automation contract", () => {
     expect(core).toContain("next_retry_action");
     expect(core).toContain("merge_gate_allows_merge");
     expect(core).toContain("stage_gate_status");
+    expect(runner).toContain("mergeability gate");
+    expect(runner).toContain("recommended next action");
     expect(runner).toContain("_prepare_document_artifacts");
     expect(runner).toContain("artifact-decisions.json");
     expect(runner).toContain("\"requirements\", \"design\", \"wireframes\", \"adr\"");

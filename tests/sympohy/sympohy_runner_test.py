@@ -36,6 +36,7 @@ from scripts.sympohy.runner import (
     _record_run_interrupted,
     _resume_fix_phase,
     _resume_late_phase,
+    _review_fix_loop,
     _run_final_verifier_fix_round,
     _run_final_verifier_and_merge,
     _run_stage_gate,
@@ -286,6 +287,84 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 2)
         set_issue_state.assert_called_once()
         self.assertIn("blocking findings remained", comment.call_args.args[1])
+
+    def test_review_fix_loop_blocks_conflicted_pull_request_before_finalize_review(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=cwd,
+            )
+            issue = Issue(
+                number=82,
+                title="Block conflicted PR before finalize review",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    return_value=json.dumps(
+                        {
+                            "number": 91,
+                            "baseRefName": "main",
+                            "headRefName": "issue-82-sympohy",
+                            "mergeStateStatus": "DIRTY",
+                            "mergeable": "CONFLICTING",
+                        }
+                    ),
+                ),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+            ):
+                result = _review_fix_loop(
+                    "#82",
+                    issue,
+                    config,
+                    cwd,
+                    log_dir,
+                    state,
+                    block_phase="finalize",
+                )
+
+            self.assertEqual(result, 2)
+            codex_text.assert_not_called()
+            set_issue_state.assert_called_once_with(
+                "#82",
+                current_labels=("sympohy:running", "sympohy:phase:finalize"),
+                status="sympohy:blocked",
+                phase="finalize",
+                cwd=cwd,
+            )
+            comment.assert_called_once()
+            self.assertEqual(comment.call_args.args[0], "#82")
+            body = comment.call_args.args[1]
+            self.assertIn("- failed command: mergeability gate", body)
+            self.assertIn("- pr number: 91", body)
+            self.assertIn("- base ref: main", body)
+            self.assertIn("- head ref: issue-82-sympohy", body)
+            self.assertIn(
+                "- conflict summary: GitHub reports mergeStateStatus=DIRTY, mergeable=CONFLICTING.",
+                body,
+            )
+            self.assertIn("- recommended next action: Update `issue-82-sympohy`", body)
+            state_path = log_dir / "state.json"
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["phase"], "finalize")
+            self.assertEqual(payload["status"], "blocked")
+            progress = payload["last_known_progress"]
+            self.assertEqual(progress["failed_command"], "mergeability gate")
+            self.assertEqual(progress["pull_request_number"], "91")
 
     def test_review_fix_without_local_changes_reruns_review(self) -> None:
         with TemporaryDirectory() as tmp:
