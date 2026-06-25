@@ -56,6 +56,12 @@ watcherは、新規issue開始と停滞実行復旧を分離する。新規open 
 停滞した`sympohy:running` issueは、既存のrunning labelとphase contextを保ったまま
 `resume` entrypointへdispatchする。
 
+merged済みPRが紐づくlate resumeは、final verifierを再実行しない。watcherは
+`_pull_request_merged()`でmerged状態を判定し、mergedが確定したissueだけを
+`_finish_merged_issue()`へ渡してissue state、labels、worktreeをreconcileする。
+openまたは未mergeのPRはこの経路に入れず、ghのfield非対応によるfalse negativeで
+merged issueを見逃さないよう、利用可能なJSON fieldのみを使う。
+
 ## 再開地点解決
 
 `resume`は、run stateが存在する場合は`state.json.phase`から粗いresume pointを
@@ -91,7 +97,8 @@ inspection、candidate selection、`transition_labels`によるstatus/phase置�
 coverする。
 
 `tests/sympohy/sympohy_runner_test.py`は、新規issueとstaleな`sympohy:running` issue
-それぞれのwatcher dispatch、dirty/clean implementation resume decisionをcoverする。
+それぞれのwatcher dispatch、dirty/clean implementation resume decision、
+merged / unmerged / gh failureのPR判定回帰をcoverする。
 
 `tests/sympohy/sympohyWorkflowContracts.test.ts`は、stale-running inspection、
 run state persistence、resume entrypointに関するstring-level watcher contractを

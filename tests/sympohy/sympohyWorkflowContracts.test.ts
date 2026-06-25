@@ -72,7 +72,7 @@ describe("sympohy watcher contract", () => {
     expect(config).toContain("stale_status_after_minutes: 30");
     expect(config).toContain("watch_poll_interval_seconds: 60");
     expect(config).toContain("ci_retry_max_attempts: 10");
-    expect(config).toContain("review_max_rounds: 3");
+    expect(config).toContain("review_max_rounds: 5");
     expect(config).toContain("final_verifier_fix_max_attempts: 2");
     expect(config).not.toContain(["merge_gate", "retry_max_attempts"].join("_"));
     expect(config).toContain("stage_gate_command: task ai:sympohy:stage-gate");

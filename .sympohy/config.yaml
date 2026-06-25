@@ -4,7 +4,7 @@ base_branch: main
 worktree_root: .sympohy/worktrees
 run_log_root: .sympohy/runs
 stale_status_after_minutes: 30
-review_max_rounds: 3
+review_max_rounds: 5
 ci_retry_max_attempts: 10
 final_verifier_fix_max_attempts: 2
 stage_gate_command: task ai:sympohy:stage-gate

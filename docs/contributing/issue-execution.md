@@ -306,8 +306,9 @@ task ci
 ```
 
 The checked-in conservative profile uses `ci_retry_max_attempts: 10`,
-`review_max_rounds: 3`, and `final_verifier_fix_max_attempts: 2` to avoid
-long blind retry loops during local watcher operation. The development-flow
+`review_max_rounds: 5`, and `final_verifier_fix_max_attempts: 2` to keep local
+watcher operation bounded while allowing an extra review/fix pass for findings
+that only appear after conflict or verifier fixes. The development-flow
 compatibility values remain `ci_retry_max_attempts: 50` and
 `review_max_rounds: 10` for operators that intentionally want the full loop
 budget.
