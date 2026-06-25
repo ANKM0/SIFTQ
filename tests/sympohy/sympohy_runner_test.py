@@ -1639,7 +1639,16 @@ class SympohyRunnerTest(unittest.TestCase):
             ["git", "push", "-u", "origin", "issue-82-sympohy"],
             heartbeat_commands,
         )
-        self.assertIn(["gh", "pr", "create", "--draft", "--fill"], heartbeat_commands)
+        create_commands = [
+            command
+            for command in heartbeat_commands
+            if command[:4] == ["gh", "pr", "create", "--draft"]
+        ]
+        self.assertEqual(len(create_commands), 1)
+        self.assertEqual(create_commands[0][4], "--title")
+        self.assertTrue(create_commands[0][5].startswith("#82 "))
+        self.assertEqual(create_commands[0][6], "--body")
+        self.assertIn("## Validation", create_commands[0][7])
         commands = [call.args[0] for call in check_call.call_args_list]
         self.assertNotIn(["git", "add", "-A"], commands)
         self.assertFalse(any(command[:2] == ["git", "commit"] for command in commands))
@@ -1986,9 +1995,61 @@ class SympohyRunnerTest(unittest.TestCase):
             patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
             patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
         ):
-            _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+            _ensure_draft_pull_request(
+                issue=Issue(
+                    number=82,
+                    title="Implement merged PR recovery",
+                    body="",
+                    labels=(),
+                    comments=(),
+                ),
+                cwd=Path("/tmp/worktree"),
+            )
 
         check_call.assert_not_called()
+
+    def test_ensure_draft_pull_request_creates_descriptive_pr_metadata(self) -> None:
+        issue = Issue(
+            number=114,
+            title="fix(sympohy): detect merged pull requests during late resume",
+            body="",
+            labels=(),
+            comments=(),
+        )
+
+        with (
+            patch(
+                "scripts.sympohy.runner._current_branch",
+                return_value="issue-114-sympohy",
+            ),
+            patch("scripts.sympohy.runner._pull_request_exists", return_value=False),
+            patch(
+                "scripts.sympohy.runner._check_call_with_heartbeat"
+            ) as check_call_with_heartbeat,
+        ):
+            _ensure_draft_pull_request(issue=issue, cwd=Path("/tmp/worktree"))
+
+        check_call_with_heartbeat.assert_called_once()
+        command = check_call_with_heartbeat.call_args.args[0]
+        self.assertEqual(
+            command[:6],
+            [
+                "gh",
+                "pr",
+                "create",
+                "--draft",
+                "--title",
+                "#114 fix(sympohy): detect merged pull requests during late resume",
+            ],
+        )
+        self.assertEqual(command[6], "--body")
+        self.assertIn("## Summary", command[7])
+        self.assertIn("- Addresses #114", command[7])
+        self.assertIn("- [ ] uv run python -m pytest tests/sympohy -q", command[7])
+        self.assertIn("- [ ] task ci:sympohy", command[7])
+        self.assertIn("- [ ] task ci:markdown", command[7])
+        self.assertIn("- [ ] task codd:validate", command[7])
+        self.assertIn("- [ ] GitHub checks are passing", command[7])
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
