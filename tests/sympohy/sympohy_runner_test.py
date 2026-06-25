@@ -3467,6 +3467,73 @@ class SympohyRunnerTest(unittest.TestCase):
                 "reconciled already-merged pull request",
             )
 
+    def test_finalize_resume_on_merged_pull_request_skips_final_verifier(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Resume merged finalize flow",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.ensure_worktree", return_value=worktree),
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=True),
+                patch("scripts.sympohy.runner._codex_json") as codex_json,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = _resume_late_phase(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    log_dir,
+                    state,
+                    previous_state={
+                        "last_known_progress": {"total_logical_steps": 3}
+                    },
+                    resume_from="finalize",
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 0)
+        codex_json.assert_not_called()
+        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
+        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            status="sympohy:done",
+            phase="finalize",
+        )
+        self.assertEqual(final_state["status"], "done")
+        self.assertEqual(
+            final_state["last_known_progress"]["message"],
+            "reconciled already-merged pull request",
+        )
+        self.assertEqual(
+            final_state["last_known_progress"]["completed_logical_steps"],
+            3,
+        )
+
     def test_late_phase_resume_blocks_dirty_review_and_merge_worktrees(self) -> None:
         for phase in ("review", "finalize"):
             with self.subTest(phase=phase), TemporaryDirectory() as tmp:
