@@ -1,5 +1,4 @@
 import {
-  type AreaId,
   type MatrixAreaId,
   type Task,
   type TaskId,
@@ -45,7 +44,7 @@ export type UpdateTaskDetailsInput = {
   readonly taskId: TaskId;
   readonly title: string;
   readonly description: string;
-  readonly areaId: AreaId;
+  readonly areaId: MatrixAreaId;
   readonly status: TaskStatus;
 };
 

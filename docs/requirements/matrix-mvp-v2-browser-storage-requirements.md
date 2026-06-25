@@ -20,6 +20,12 @@ codd:
     - id: design:matrix-mvp-v2-browser-storage
       relation: depends_on
       semantic: product
+    - id: req:task-list-v3
+      relation: depends_on
+      semantic: storage
+    - id: design:task-list-v3
+      relation: depends_on
+      semantic: storage
 ---
 
 # Matrix MVP v2 Browser Storage Requirements

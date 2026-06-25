@@ -7,6 +7,10 @@ codd:
     - id: design:task-list-v3
       relation: depends_on
       semantic: ui
+  depended_by:
+    - id: design:matrix-mvp-wireframe
+      relation: depends_on
+      semantic: ui
 ---
 
 # Task List v3 Wireframe

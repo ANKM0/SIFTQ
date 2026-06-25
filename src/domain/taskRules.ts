@@ -6,6 +6,8 @@ import {
   type TaskStatus
 } from "../contracts/task";
 
+export const LEGACY_TERMINAL_AREA_FALLBACK = "do" as const satisfies MatrixAreaId;
+
 export const MATRIX_AREA_IDS = [
   "do",
   "schedule",
@@ -45,6 +47,10 @@ export function statusForArea(areaId: AreaId): TaskStatus {
 
 export function isTaskVisibleInMatrix(task: Task): boolean {
   return task.status === "active" && isMatrixArea(task.areaId);
+}
+
+export function normalizeTaskAreaId(areaId: AreaId): MatrixAreaId {
+  return isMatrixArea(areaId) ? areaId : LEGACY_TERMINAL_AREA_FALLBACK;
 }
 
 export function normalizeTaskTitleInput(rawTitle: string): string {

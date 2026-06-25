@@ -8,7 +8,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import {
-  type AreaId,
   type MatrixAreaId,
   type TerminalAreaId,
   type Task
@@ -29,7 +28,7 @@ import {
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
-import { isMatrixArea } from "../domain/taskRules";
+import { normalizeTaskAreaId } from "../domain/taskRules";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
@@ -209,7 +208,7 @@ export function App() {
     details: {
       title: Task["title"];
       description: Task["description"];
-      areaId: AreaId;
+      areaId: MatrixAreaId;
       status: Task["status"];
     }
   ): Promise<string | null> {
@@ -478,9 +477,7 @@ function TaskListCard({
   const style = {
     transform: CSS.Translate.toString(draggable.transform)
   };
-  const availableStatuses = isMatrixArea(task.areaId)
-    ? (["active", "done", "skipped"] as const)
-    : ([task.status, task.status === "done" ? "skipped" : "done"] as const);
+  const availableStatuses = ["active", "done", "skipped"] as const;
 
   async function handleStatusChange(status: Task["status"]) {
     onCloseMenu();
@@ -562,7 +559,7 @@ type TaskDetailPageProps = {
     details: {
       title: Task["title"];
       description: Task["description"];
-      areaId: AreaId;
+      areaId: MatrixAreaId;
       status: Task["status"];
     }
   ) => Promise<string | null>;
@@ -577,7 +574,7 @@ function TaskDetailPage({
 }: TaskDetailPageProps) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [areaId, setAreaId] = useState<AreaId>(detailAreaId(task));
+  const [areaId, setAreaId] = useState<MatrixAreaId>(detailAreaId(task));
   const [status, setStatus] = useState<Task["status"]>(task?.status ?? "active");
   const [saveError, setSaveError] = useState<string | null>(null);
   const validationError = validateTaskTitleInput(title);
@@ -677,15 +674,10 @@ function TaskDetailPage({
                     name="area"
                     value={areaId}
                     onChange={(event) => {
-                      setAreaId(event.target.value as AreaId);
+                      setAreaId(event.target.value as MatrixAreaId);
                       setSaveError(null);
                     }}
                   >
-                    {!isMatrixArea(task.areaId) ? (
-                      <option value={task.areaId}>
-                        {findArea(task.areaId).label} (legacy preserved area)
-                      </option>
-                    ) : null}
                     {MATRIX_AREAS.map((area) => (
                       <option key={area.id} value={area.id}>
                         {area.label}
@@ -758,9 +750,9 @@ function TaskDetailPage({
   );
 }
 
-function detailAreaId(task: Task | null): AreaId {
+function detailAreaId(task: Task | null): MatrixAreaId {
   if (task !== null) {
-    return task.areaId;
+    return normalizeTaskAreaId(task.areaId);
   }
 
   return "do";

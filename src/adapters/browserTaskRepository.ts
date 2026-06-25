@@ -12,6 +12,7 @@ import {
   isAreaId,
   isMatrixArea,
   isTaskVisibleInMatrix,
+  normalizeTaskAreaId,
   normalizeTaskTitleInput,
   statusForArea,
   validateTaskTitleInput
@@ -441,7 +442,7 @@ function migrateStoredTasks(tasks: readonly unknown[]): LoadedTasksResult {
   let didMigrate = false;
 
   const tasksWithMetadata = parsedTasks.map((task) => {
-    const areaId = task.areaId;
+    const areaId = normalizeTaskAreaId(task.areaId);
     const description = typeof task.description === "string" ? task.description : "";
     const createdAt = isTimestamp(task.createdAt)
       ? task.createdAt
@@ -673,10 +674,10 @@ function updateTaskDetails(
   const nextAreaId = input.areaId;
   const nextStatus = input.status;
 
-  if (nextStatus === "active" && !isMatrixArea(nextAreaId)) {
+  if (!isMatrixArea(nextAreaId)) {
     throw new BrowserTaskRepositoryError(
       "VALIDATION",
-      "Active tasks must belong to a matrix area."
+      "Task detail area must belong to a matrix area."
     );
   }
 

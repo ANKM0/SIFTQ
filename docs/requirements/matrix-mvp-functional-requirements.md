@@ -14,6 +14,9 @@ codd:
     - id: req:matrix-mvp-v2-browser-storage
       relation: depends_on
       semantic: product
+    - id: req:task-list-v3
+      relation: depends_on
+      semantic: product
     - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: product

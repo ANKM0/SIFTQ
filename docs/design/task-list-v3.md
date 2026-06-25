@@ -16,6 +16,10 @@ codd:
     - id: design:browser-only-matrix-runtime-storage-adr
       relation: depends_on
       semantic: decision
+  depended_by:
+    - id: design:task-list-v3-wireframe
+      relation: depends_on
+      semantic: ui
 ---
 
 # Task List v3 Design

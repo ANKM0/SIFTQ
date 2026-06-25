@@ -17,6 +17,9 @@ codd:
     - id: design:matrix-mvp-v2-browser-storage
       relation: depends_on
       semantic: decision
+    - id: design:task-list-v3
+      relation: depends_on
+      semantic: decision
 ---
 
 # ADR 0018: Browser-Only Matrix Runtime and Storage

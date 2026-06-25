@@ -224,7 +224,7 @@ describe("browserTaskRepository", () => {
     });
   });
 
-  it("migrates legacy terminal-area tasks without reassigning their preserved area", async () => {
+  it("migrates legacy terminal-area tasks onto the fallback matrix area", async () => {
     const repository = repositoryForTest();
 
     storage.setItem(
@@ -242,7 +242,7 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-1",
         title: "Finished",
-        areaId: "done",
+        areaId: "do",
         order: 0,
         status: "done",
         createdAt: timestampAt(0),
@@ -252,7 +252,7 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-2",
         title: "Skipped",
-        areaId: "skipped",
+        areaId: "do",
         order: 1,
         status: "skipped",
         createdAt: timestampAt(1),
@@ -263,9 +263,9 @@ describe("browserTaskRepository", () => {
 
     await expect(
       repository.updateTaskStatus({ taskId: "task-1", status: "active" })
-    ).rejects.toMatchObject({
-      code: "VALIDATION",
-      message: "Active tasks must belong to a matrix area."
+    ).resolves.toMatchObject({
+      areaId: "do",
+      status: "active"
     });
 
     expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
@@ -273,17 +273,17 @@ describe("browserTaskRepository", () => {
         task({
           id: "task-1",
           title: "Finished",
-          areaId: "done",
+          areaId: "do",
           order: 0,
-          status: "done",
+          status: "active",
           createdAt: timestampAt(0),
-          updatedAt: timestampAt(0),
+          updatedAt: timestampAt(2),
           listOrder: 0
         }),
         task({
           id: "task-2",
           title: "Skipped",
-          areaId: "skipped",
+          areaId: "do",
           order: 1,
           status: "skipped",
           createdAt: timestampAt(1),
@@ -478,6 +478,25 @@ describe("browserTaskRepository", () => {
         status: "done"
       })
     ]);
+  });
+
+  it("rejects terminal areas when detail updates bypass the matrix-area type", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+
+    await expect(
+      repository.updateTaskDetails({
+        taskId: "task-1",
+        title: "First",
+        description: "",
+        areaId: "done" as never,
+        status: "done"
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION",
+      message: "Task detail area must belong to a matrix area."
+    });
   });
 
   it("preserves active task order when only details change", async () => {

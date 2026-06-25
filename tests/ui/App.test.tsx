@@ -150,14 +150,14 @@ describe("App", () => {
     );
   });
 
-  it("keeps legacy terminal tasks in their preserved area until a matrix area is chosen", async () => {
+  it("normalizes legacy terminal tasks to the fallback matrix area in detail", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
     window.location.hash = "#/tasks/task-1";
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
-    expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("done");
+    expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("do");
 
     fireEvent.change(screen.getByLabelText("title"), {
       target: { value: "Finished updated" }
@@ -166,7 +166,7 @@ describe("App", () => {
 
     await waitFor(() =>
       expect(storedTasks()[0]).toMatchObject({
-        areaId: "done",
+        areaId: "do",
         status: "done",
         title: "Finished updated"
       })
@@ -275,7 +275,7 @@ describe("App", () => {
     expect(storedTasks()).toMatchObject([
       { id: "task-3", areaId: "delegate", order: 0, listOrder: 0 },
       { id: "task-1", areaId: "do", order: 0, listOrder: 1 },
-      { id: "task-2", areaId: "done", order: 1, listOrder: 2 }
+      { id: "task-2", areaId: "do", order: 1, listOrder: 2 }
     ]);
   });
 
@@ -322,7 +322,7 @@ describe("App", () => {
     expect(taskTitlesIn("Do tasks")).toEqual(["Visible"]);
   });
 
-  it("hides the active status action for legacy terminal tasks in the task list", async () => {
+  it("shows the full status menu for migrated legacy terminal tasks in the task list", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
     window.location.hash = "#/tasks";
 
@@ -332,7 +332,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "done" }));
 
-    expect(screen.queryByRole("menuitem", { name: "active" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "active" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "done" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "skipped" })).toBeTruthy();
   });

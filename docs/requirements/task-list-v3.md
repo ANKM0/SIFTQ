@@ -13,6 +13,10 @@ codd:
     - id: req:matrix-mvp-v2-browser-storage
       relation: depends_on
       semantic: storage
+  depended_by:
+    - id: design:task-list-v3
+      relation: depends_on
+      semantic: product
 ---
 
 # Task List v3 Requirements
