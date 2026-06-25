@@ -275,10 +275,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     state,
                     round_index=config.review_max_rounds + 1,
                     review=parse_review_json(
-                        '{"findings":[{"severity":"high","summary":"still broken"}]}'
+                        '{"findings":[{"severity":"high","summary":"still broken"},{"severity":"medium","summary":"tests still failing"}]}'
                     ),
                     review_json=(
-                        '{"findings":[{"severity":"high","summary":"still broken"}]}'
+                        '{"findings":[{"severity":"high","summary":"still broken"},{"severity":"medium","summary":"tests still failing"}]}'
                     ),
                     review_pull_request="99",
                     comment_review=False,
@@ -286,7 +286,12 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 2)
         set_issue_state.assert_called_once()
-        self.assertIn("blocking findings remained", comment.call_args.args[1])
+        body = comment.call_args.args[1]
+        self.assertIn("blocking findings remained", body)
+        self.assertIn(
+            "- remaining blocking findings: high: still broken; medium: tests still failing",
+            body,
+        )
 
     def test_review_fix_loop_blocks_conflicted_pull_request_before_finalize_review(self) -> None:
         with TemporaryDirectory() as tmp:

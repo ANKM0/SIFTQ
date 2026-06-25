@@ -20,6 +20,7 @@ from .core import (
     AcceptanceSet,
     FinalVerifierFinding,
     PHASE_ALIASES,
+    ReviewFinding,
     extract_acceptance_set,
     inspect_running_issue,
     merge_gate_allows_merge,
@@ -2057,6 +2058,11 @@ def _run_review_fix_round(
             run_log_path=log_dir,
             cwd=cwd,
             state=state,
+            details={
+                "remaining blocking findings": _summarize_review_findings(
+                    review.blocking_findings
+                )
+            },
         )
         return 2
 
@@ -3043,19 +3049,26 @@ def _block(
     cwd: Path | None,
     state: _RunStateWriter | None = None,
     current_labels: Sequence[str] | None = None,
+    details: Mapping[str, object] | None = None,
 ) -> None:
+    progress: dict[str, object] = {
+        "message": "blocked",
+        "failed_command": failed_command,
+        "attempts": attempts,
+        "cause": cause,
+        "run_log_path": str(run_log_path),
+    }
+    if details:
+        progress.update(details)
     if state is not None:
         state.write(
             phase=phase,
             status="blocked",
-            progress={
-                "message": "blocked",
-                "failed_command": failed_command,
-                "attempts": attempts,
-                "cause": cause,
-                "run_log_path": str(run_log_path),
-            },
+            progress=progress,
         )
+    detail_lines = ""
+    if details:
+        detail_lines = "".join(f"- {key}: {value}\n" for key, value in details.items())
     set_issue_state(
         issue_ref,
         current_labels=current_labels or ("sympohy:running", f"sympohy:phase:{phase}"),
@@ -3071,6 +3084,7 @@ def _block(
             f"- failed command: {failed_command}\n"
             f"- attempts: {attempts}\n"
             f"- cause: {cause}\n"
+            f"{detail_lines}"
             f"- run log path: {run_log_path}\n"
         ),
         cwd=cwd,
@@ -3721,6 +3735,20 @@ def _summarize_status(status: str, *, limit: int = 5) -> str:
     lines = [line.strip() for line in status.splitlines() if line.strip()]
     if not lines:
         return "no changes reported"
+    summary = "; ".join(lines[:limit])
+    if len(lines) > limit:
+        summary += f"; and {len(lines) - limit} more"
+    return summary
+
+
+def _summarize_review_findings(
+    findings: Sequence[ReviewFinding],
+    *,
+    limit: int = 3,
+) -> str:
+    lines = [f"{finding.severity}: {finding.summary}" for finding in findings]
+    if not lines:
+        return "none"
     summary = "; ".join(lines[:limit])
     if len(lines) > limit:
         summary += f"; and {len(lines) - limit} more"
