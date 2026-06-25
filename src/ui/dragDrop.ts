@@ -16,6 +16,8 @@ export type TaskDropOperation =
       readonly toIndex: number;
     };
 
+export const TASK_LIST_DROP_ID = "task-list";
+
 export function areaDropId(areaId: AreaId): string {
   return `area:${areaId}`;
 }
@@ -90,6 +92,43 @@ export function resolveTaskDropOperation(
     activeIndex >= 0 && activeIndex < targetIndex ? targetIndex - 1 : targetIndex;
 
   return operationForTarget(taskId, activeTask.areaId, targetTask.areaId, insertAt);
+}
+
+export function resolveTaskListDropIndex(
+  tasks: readonly Task[],
+  activeDropId: string,
+  overDropId: string | null
+): number | null {
+  const taskId = taskIdFromDropId(activeDropId);
+
+  if (taskId === null || overDropId === null) {
+    return null;
+  }
+
+  const orderedTasks = [...tasks].sort(
+    (left, right) =>
+      left.listOrder - right.listOrder ||
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.id.localeCompare(right.id)
+  );
+  const activeIndex = orderedTasks.findIndex((task) => task.id === taskId);
+
+  if (activeIndex < 0) {
+    return null;
+  }
+
+  if (overDropId === TASK_LIST_DROP_ID) {
+    return orderedTasks.length - 1;
+  }
+
+  const targetTaskId = taskIdFromDropId(overDropId);
+  const targetIndex = orderedTasks.findIndex((task) => task.id === targetTaskId);
+
+  if (targetIndex < 0) {
+    return null;
+  }
+
+  return activeIndex < targetIndex ? targetIndex - 1 : targetIndex;
 }
 
 function operationForTarget(

@@ -27,6 +27,10 @@ export type ReorderTaskListInput = {
   readonly toIndex: number;
 };
 
+export type DeleteTaskInput = {
+  readonly taskId: TaskId;
+};
+
 export type UpdateTaskTitleInput = {
   readonly taskId: TaskId;
   readonly title: string;
@@ -47,6 +51,7 @@ export type UpdateTaskDetailsInput = {
 
 export type TaskRepository = {
   createTask(input: CreateTaskInput): Promise<Task>;
+  deleteTask(input: DeleteTaskInput): Promise<void>;
   listTasks(): Promise<Task[]>;
   moveTask(input: MoveTaskInput): Promise<Task>;
   reorderTask(input: ReorderTaskInput): Promise<Task>;

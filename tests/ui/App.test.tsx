@@ -55,11 +55,13 @@ beforeEach(() => {
   });
   window.localStorage.clear();
   window.location.hash = "";
+  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
   dndKitMock.droppableIds = [];
   dndKitMock.onDragEnd = undefined;
+  vi.restoreAllMocks();
   cleanup();
 });
 
@@ -87,7 +89,12 @@ describe("App", () => {
 
   it("routes to the task list page from #/tasks and shows mutual header links", async () => {
     seedStoredTasks(
-      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({
+        id: "task-1",
+        title: "Visible",
+        areaId: "do",
+        description: "This description should stay visible in the list."
+      }),
       task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
     );
     window.location.hash = "#/tasks";
@@ -101,8 +108,12 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "タスク一覧" }).getAttribute("href")).toBe(
       "#/tasks"
     );
+    expect(screen.getByRole("button", { name: "Do のドラッグハンドル" })).toBeTruthy();
     expect(screen.getByText("Visible")).toBeTruthy();
     expect(screen.getByText("Hidden")).toBeTruthy();
+    expect(screen.getByText("説明なし")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "削除" })).toHaveLength(2);
+    expect(screen.queryByText("1970-01-01T00:00:00.000Z")).toBeNull();
     expect(screen.queryByLabelText("Task matrix")).toBeNull();
   });
 
@@ -118,6 +129,65 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "タスク一覧へ戻る" }).getAttribute("href")).toBe(
       "#/tasks"
     );
+  });
+
+  it("reorders task cards from the task list page", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "First", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Second", areaId: "done", status: "done", order: 1 }),
+      task({ id: "task-3", title: "Third", areaId: "delegate", order: 2 })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    dragTaskOverTask("task-3", "task-1");
+
+    await waitFor(() => expect(taskListTitles()).toEqual(["Third", "First", "Second"]));
+    expect(storedTasks()).toMatchObject([
+      { id: "task-1", listOrder: 1 },
+      { id: "task-3", listOrder: 0 },
+      { id: "task-2", listOrder: 2 }
+    ]);
+  });
+
+  it("updates task status from the task list status menu", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "active" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "done" }));
+
+    await waitFor(() =>
+      expect(storedTasks()[0]).toMatchObject({ areaId: "do", status: "done" })
+    );
+    expect(screen.getByRole("button", { name: "done" })).toBeTruthy();
+  });
+
+  it("deletes a task from the task list and shows a notice", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "削除" })[0]);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("タスクを削除しました")
+    );
+    expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?');
+    expect(taskListTitles()).toEqual(["Hidden"]);
   });
 
   it("renders a storage error when browser storage is corrupt", async () => {
@@ -318,6 +388,12 @@ function taskTitlesIn(listName: string): string[] {
   return Array.from(
     screen.getByRole("list", { name: listName }).querySelectorAll(".task-card__title")
   ).map((item) => item.textContent ?? "");
+}
+
+function taskListTitles(): string[] {
+  return Array.from(screen.getAllByRole("heading", { level: 3 })).map(
+    (item) => item.textContent ?? ""
+  );
 }
 
 function createTaskInArea(areaLabel: string, title: string) {

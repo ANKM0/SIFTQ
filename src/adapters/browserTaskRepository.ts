@@ -18,6 +18,7 @@ import {
 } from "../domain/taskRules";
 import {
   type CreateTaskInput,
+  type DeleteTaskInput,
   type MoveTaskInput,
   type ReorderTaskInput,
   type ReorderTaskListInput,
@@ -107,6 +108,25 @@ export function createBrowserTaskRepository(
       saveTasks(storage, storageKey, nextTasks);
 
       return taskById(nextTasks, task.id);
+    },
+
+    async deleteTask(input: DeleteTaskInput): Promise<void> {
+      const tasks = loadPersistedTasks();
+      const task = taskById(tasks, input.taskId);
+      const withoutTask = tasks.filter((candidate) => candidate.id !== task.id);
+      const normalizedTasks =
+        task.status === "active" && isMatrixArea(task.areaId)
+          ? normalizeArea(withoutTask, task.areaId)
+          : withoutTask;
+      const updatedAt = nowFactory();
+      const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
+      const nextTasks = orderedTasks.map((candidate, index) =>
+        candidate.listOrder === index
+          ? candidate
+          : ({ ...candidate, listOrder: index, updatedAt } satisfies Task)
+      );
+
+      saveTasks(storage, storageKey, nextTasks);
     },
 
     async listTasks(): Promise<Task[]> {
@@ -263,6 +283,9 @@ export function createBrowserTaskRepository(
 export const browserTaskRepository: TaskRepository = {
   createTask(input) {
     return getDefaultRepository().createTask(input);
+  },
+  deleteTask(input) {
+    return getDefaultRepository().deleteTask(input);
   },
   listTasks() {
     return getDefaultRepository().listTasks();

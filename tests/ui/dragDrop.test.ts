@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { type Task } from "../../src/contracts/task";
 import {
+  TASK_LIST_DROP_ID,
   areaDropId,
+  resolveTaskListDropIndex,
   resolveTaskDropOperation,
   restrictDragToWindowEdges,
   taskDropId
@@ -106,6 +108,44 @@ describe("dragDrop", () => {
         "task:missing"
       )
     ).toBeNull();
+  });
+
+  it("resolves task list drops to reordered list indexes", () => {
+    expect(
+      resolveTaskListDropIndex(
+        [
+          task({ id: "first", areaId: "do", order: 0 }),
+          task({ id: "second", areaId: "done", order: 1 }),
+          task({ id: "third", areaId: "delegate", order: 2 })
+        ],
+        taskDropId("third"),
+        taskDropId("first")
+      )
+    ).toBe(0);
+
+    expect(
+      resolveTaskListDropIndex(
+        [
+          task({ id: "first", areaId: "do", order: 0 }),
+          task({ id: "second", areaId: "done", order: 1 }),
+          task({ id: "third", areaId: "delegate", order: 2 })
+        ],
+        taskDropId("first"),
+        taskDropId("third")
+      )
+    ).toBe(1);
+
+    expect(
+      resolveTaskListDropIndex(
+        [
+          task({ id: "first", areaId: "do", order: 0 }),
+          task({ id: "second", areaId: "done", order: 1 }),
+          task({ id: "third", areaId: "delegate", order: 2 })
+        ],
+        taskDropId("first"),
+        TASK_LIST_DROP_ID
+      )
+    ).toBe(2);
   });
 
   it("clamps drag movement to the current window edges", () => {

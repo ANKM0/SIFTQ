@@ -15,13 +15,16 @@ import {
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
   areaDropId,
+  TASK_LIST_DROP_ID,
   restrictDragToWindowEdges,
+  resolveTaskListDropIndex,
   resolveTaskDropOperation,
   taskDropId
 } from "./dragDrop";
 import {
   MATRIX_AREAS,
   TERMINAL_AREAS,
+  findArea,
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
@@ -46,6 +49,7 @@ type AppRoute =
 
 export function App() {
   const [tasks, setTasks] = useState<readonly Task[]>([]);
+  const [taskListNotice, setTaskListNotice] = useState<string | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>({
     status: "checking"
   });
@@ -150,6 +154,58 @@ export function App() {
     }
   }
 
+  async function handleTaskListDragEnd(event: DragEndEvent) {
+    const toIndex = resolveTaskListDropIndex(
+      tasks,
+      String(event.active.id),
+      event.over === null ? null : String(event.over.id)
+    );
+
+    if (toIndex === null) {
+      return;
+    }
+
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.reorderTaskList({
+        taskId: String(event.active.id).replace(/^task:/, ""),
+        toIndex
+      });
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task list order could not be updated."));
+    }
+  }
+
+  async function handleUpdateTaskStatus(taskId: Task["id"], status: Task["status"]) {
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.updateTaskStatus({ taskId, status });
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task status could not be updated."));
+    }
+  }
+
+  async function handleDeleteTask(task: Task) {
+    const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      setOperationError(null);
+      await browserTaskRepository.deleteTask({ taskId: task.id });
+      setTaskListNotice("タスクを削除しました");
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task could not be deleted."));
+    }
+  }
+
   async function refreshTasks() {
     setTasks(await browserTaskRepository.listTasks());
   }
@@ -184,7 +240,19 @@ export function App() {
           />
         </DndContext>
       ) : route.name === "tasks" ? (
-        <TasksPage tasks={tasks} />
+        <DndContext
+          autoScroll={false}
+          modifiers={dragModifiers}
+          onDragEnd={(event) => void handleTaskListDragEnd(event)}
+        >
+          <TasksPage
+            tasks={tasks}
+            notice={taskListNotice}
+            operationError={operationError}
+            onDeleteTask={handleDeleteTask}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+          />
+        </DndContext>
       ) : (
         <TaskDetailPage
           task={tasks.find((candidate) => candidate.id === route.taskId) ?? null}
@@ -271,9 +339,22 @@ function MatrixPage({
 
 type TasksPageProps = {
   readonly tasks: readonly Task[];
+  readonly notice: string | null;
+  readonly operationError: string | null;
+  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
 };
 
-function TasksPage({ tasks }: TasksPageProps) {
+function TasksPage({
+  tasks,
+  notice,
+  operationError,
+  onDeleteTask,
+  onUpdateTaskStatus
+}: TasksPageProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: TASK_LIST_DROP_ID });
+  const [menuTaskId, setMenuTaskId] = useState<Task["id"] | null>(null);
+
   return (
     <main className="matrix-page">
       <AppHeader currentPage="tasks" />
@@ -282,20 +363,141 @@ function TasksPage({ tasks }: TasksPageProps) {
           <h2 id="tasks-page-title">タスク一覧</h2>
           <p>{tasks.length} tasks</p>
         </header>
-        <ul aria-label="Task list" className="tasks-page__list">
+        {notice !== null ? (
+          <p className="tasks-page__notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {operationError !== null ? (
+          <p className="matrix-page__error tasks-page__error" role="alert">
+            {operationError}
+          </p>
+        ) : null}
+        <ul
+          ref={setNodeRef}
+          aria-label="Task list"
+          className={`tasks-page__list${isOver ? " tasks-page__list--drop-target" : ""}`}
+        >
           {tasks.map((task) => (
-            <li key={task.id} className="tasks-page__item">
-              <a className="tasks-page__link" href={`#/tasks/${task.id}`}>
-                <span className="tasks-page__title">{task.title}</span>
-                <span className="tasks-page__meta">
-                  {task.areaId} / {task.status}
-                </span>
-              </a>
-            </li>
+            <TaskListCard
+              key={task.id}
+              isMenuOpen={menuTaskId === task.id}
+              onCloseMenu={() => setMenuTaskId(null)}
+              onDeleteTask={onDeleteTask}
+              onOpenMenu={() => setMenuTaskId(task.id)}
+              onUpdateTaskStatus={onUpdateTaskStatus}
+              task={task}
+            />
           ))}
         </ul>
       </section>
     </main>
+  );
+}
+
+type TaskListCardProps = {
+  readonly isMenuOpen: boolean;
+  readonly onCloseMenu: () => void;
+  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onOpenMenu: () => void;
+  readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
+  readonly task: Task;
+};
+
+function TaskListCard({
+  isMenuOpen,
+  onCloseMenu,
+  onDeleteTask,
+  onOpenMenu,
+  onUpdateTaskStatus,
+  task
+}: TaskListCardProps) {
+  const draggable = useDraggable({ id: taskDropId(task.id) });
+  const droppable = useDroppable({ id: taskDropId(task.id) });
+  const area = findArea(task.areaId);
+  const description =
+    task.description.trim().length > 0 ? task.description.trim() : "説明なし";
+  const className = [
+    "tasks-page__card",
+    `tasks-page__card--${task.status}`,
+    draggable.isDragging ? "tasks-page__card--dragging" : "",
+    droppable.isOver ? "tasks-page__card--drop-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const style = {
+    transform: CSS.Translate.toString(draggable.transform)
+  };
+
+  async function handleStatusChange(status: Task["status"]) {
+    onCloseMenu();
+    await onUpdateTaskStatus(task.id, status);
+  }
+
+  return (
+    <li
+      className={className}
+      ref={(node) => {
+        draggable.setNodeRef(node);
+        droppable.setNodeRef(node);
+      }}
+      style={style}
+    >
+      <button
+        aria-label={`${area.label} のドラッグハンドル`}
+        className="tasks-page__handle"
+        type="button"
+        {...draggable.listeners}
+        {...draggable.attributes}
+      >
+        <span aria-hidden="true" className="tasks-page__handle-icon">
+          ↕
+        </span>
+        <span className="tasks-page__handle-area">{area.label}</span>
+      </button>
+      <div className="tasks-page__body">
+        <h3 className="tasks-page__card-title">{task.title}</h3>
+        <p className="tasks-page__description">{description}</p>
+      </div>
+      <div className="tasks-page__controls">
+        <div className="tasks-page__status">
+          <button
+            aria-expanded={isMenuOpen}
+            aria-haspopup="menu"
+            className="tasks-page__button tasks-page__button--status"
+            type="button"
+            onClick={() => (isMenuOpen ? onCloseMenu() : onOpenMenu())}
+          >
+            {task.status}
+          </button>
+          {isMenuOpen ? (
+            <div className="tasks-page__status-menu" role="menu" aria-label="status menu">
+              {(["active", "done", "skipped"] as const).map((status) => (
+                <button
+                  key={status}
+                  className="tasks-page__status-option"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => void handleStatusChange(status)}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <a className="tasks-page__button" href={`#/tasks/${task.id}`}>
+          詳細
+        </a>
+        <button
+          className="tasks-page__button"
+          type="button"
+          onClick={() => void onDeleteTask(task)}
+        >
+          削除
+        </button>
+      </div>
+    </li>
   );
 }
 

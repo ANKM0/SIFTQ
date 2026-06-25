@@ -303,6 +303,37 @@ describe("browserTaskRepository", () => {
     ]);
   });
 
+  it("physically deletes tasks and compacts list order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "schedule", title: "Second" });
+    await repository.createTask({ areaId: "delegate", title: "Third" });
+
+    await repository.deleteTask({ taskId: "task-2" });
+
+    await expect(repository.listTasks()).resolves.toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      })
+    ]);
+  });
+
   it("changes area only through detail updates while preserving status", async () => {
     const repository = repositoryForTest();
 
