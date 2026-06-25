@@ -224,7 +224,7 @@ describe("browserTaskRepository", () => {
     });
   });
 
-  it("migrates legacy terminal-area tasks to a restorable preserved area", async () => {
+  it("migrates legacy terminal-area tasks without reassigning their preserved area", async () => {
     const repository = repositoryForTest();
 
     storage.setItem(
@@ -242,7 +242,7 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-1",
         title: "Finished",
-        areaId: "do",
+        areaId: "done",
         order: 0,
         status: "done",
         createdAt: timestampAt(0),
@@ -252,7 +252,7 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-2",
         title: "Skipped",
-        areaId: "do",
+        areaId: "skipped",
         order: 1,
         status: "skipped",
         createdAt: timestampAt(1),
@@ -261,23 +261,21 @@ describe("browserTaskRepository", () => {
       })
     ]);
 
-    await expect(repository.updateTaskStatus({ taskId: "task-1", status: "active" })).resolves
-      .toMatchObject({
-        areaId: "do",
-        id: "task-1",
-        order: 0,
-        status: "active",
-        updatedAt: timestampAt(0)
-      });
+    await expect(
+      repository.updateTaskStatus({ taskId: "task-1", status: "active" })
+    ).rejects.toMatchObject({
+      code: "VALIDATION",
+      message: "Active tasks must belong to a matrix area."
+    });
 
     expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
       tasks: [
         task({
           id: "task-1",
           title: "Finished",
-          areaId: "do",
+          areaId: "done",
           order: 0,
-          status: "active",
+          status: "done",
           createdAt: timestampAt(0),
           updatedAt: timestampAt(0),
           listOrder: 0
@@ -285,7 +283,7 @@ describe("browserTaskRepository", () => {
         task({
           id: "task-2",
           title: "Skipped",
-          areaId: "do",
+          areaId: "skipped",
           order: 1,
           status: "skipped",
           createdAt: timestampAt(1),

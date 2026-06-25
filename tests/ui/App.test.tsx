@@ -150,6 +150,29 @@ describe("App", () => {
     );
   });
 
+  it("keeps legacy terminal tasks in their preserved area until a matrix area is chosen", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+    expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("done");
+
+    fireEvent.change(screen.getByLabelText("title"), {
+      target: { value: "Finished updated" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() =>
+      expect(storedTasks()[0]).toMatchObject({
+        areaId: "done",
+        status: "done",
+        title: "Finished updated"
+      })
+    );
+  });
+
   it("updates task details from the task detail page", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
     window.location.hash = "#/tasks/task-1";

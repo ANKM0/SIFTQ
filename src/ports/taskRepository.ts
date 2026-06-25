@@ -45,7 +45,7 @@ export type UpdateTaskDetailsInput = {
   readonly taskId: TaskId;
   readonly title: string;
   readonly description: string;
-  readonly areaId: MatrixAreaId;
+  readonly areaId: AreaId;
   readonly status: TaskStatus;
 };
 

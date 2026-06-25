@@ -30,7 +30,6 @@ import {
 
 export const BROWSER_TASK_STORAGE_KEY = "siftq.tasks.v1";
 const STORE_VERSION = 1;
-const LEGACY_TERMINAL_FALLBACK_AREA_ID: MatrixAreaId = "do";
 
 type BrowserTaskStore = {
   readonly version: typeof STORE_VERSION;
@@ -441,7 +440,7 @@ function migrateStoredTasks(tasks: readonly unknown[]): LoadedTasksResult {
   let didMigrate = false;
 
   const tasksWithMetadata = parsedTasks.map((task) => {
-    const areaId = migrateLegacyStoredAreaId(task.areaId);
+    const areaId = task.areaId;
     const description = typeof task.description === "string" ? task.description : "";
     const createdAt = isTimestamp(task.createdAt)
       ? task.createdAt
@@ -512,14 +511,6 @@ function isTimestamp(value: unknown): value is string {
 
 function legacyTimestampFor(index: number): string {
   return new Date(index).toISOString();
-}
-
-function migrateLegacyStoredAreaId(areaId: AreaId): MatrixAreaId | AreaId {
-  if (isMatrixArea(areaId)) {
-    return areaId;
-  }
-
-  return LEGACY_TERMINAL_FALLBACK_AREA_ID;
 }
 
 function taskById(tasks: readonly Task[], taskId: TaskId): Task {
@@ -693,12 +684,16 @@ function updateTaskDetails(
     isMatrixArea(previousAreaId) && task.status === "active"
       ? normalizeArea(withoutTask, previousAreaId)
       : withoutTask;
-  const nextOrder = visibleTasksInArea(normalizedWithoutPreviousArea, nextAreaId).length;
+  const nextOrder =
+    isMatrixArea(nextAreaId) &&
+    nextStatus === "active"
+      ? visibleTasksInArea(normalizedWithoutPreviousArea, nextAreaId).length
+      : tasksInArea(normalizedWithoutPreviousArea, nextAreaId).length;
   const nextTask = {
     ...task,
     areaId: nextAreaId,
     description: input.description,
-    order: nextStatus === "active" ? nextOrder : nextOrder,
+    order: nextOrder,
     status: nextStatus,
     title: input.title,
     updatedAt
