@@ -3062,32 +3062,49 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertIn("## 動作確認結果", str(captured["body"]))
 
     def test_ensure_draft_pull_request_uses_fill_and_template(self) -> None:
-        with (
-            patch(
-                "scripts.sympohy.runner._current_branch",
-                return_value="issue-114-sympohy",
-            ),
-            patch("scripts.sympohy.runner._pull_request_exists", return_value=False),
-            patch(
-                "scripts.sympohy.runner._check_call_with_heartbeat"
-            ) as check_call_with_heartbeat,
-        ):
-            _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+        captured: dict[str, object] = {}
 
-        check_call_with_heartbeat.assert_called_once()
-        command = check_call_with_heartbeat.call_args.args[0]
+        def check_call_with_heartbeat(command: list[str], **_kwargs: object) -> None:
+            captured["command"] = command
+            body_file = Path(command[command.index("--body-file") + 1])
+            captured["body"] = body_file.read_text(encoding="utf-8")
+
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            template_dir = worktree / ".github"
+            template_dir.mkdir()
+            (template_dir / "pull_request_template.md").write_text(
+                "## 概要\n\n## 動作確認結果\n",
+                encoding="utf-8",
+            )
+            with (
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-114-sympohy",
+                ),
+                patch("scripts.sympohy.runner._pull_request_exists", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+            ):
+                _ensure_draft_pull_request(cwd=worktree, issue_number=114)
+
         self.assertEqual(
-            command,
+            captured["command"][:6],
             [
                 "gh",
                 "pr",
                 "create",
                 "--draft",
                 "--fill",
-                "--template",
-                ".github/pull_request_template.md",
+                "--body-file",
             ],
         )
+        self.assertIn("## Issue Traceability", str(captured["body"]))
+        self.assertIn("- Closes #114", str(captured["body"]))
+        self.assertIn("## 概要", str(captured["body"]))
+        self.assertIn("## 動作確認結果", str(captured["body"]))
 
     def test_push_branch_creates_initial_empty_commit_before_draft_pr(self) -> None:
         events: list[str] = []

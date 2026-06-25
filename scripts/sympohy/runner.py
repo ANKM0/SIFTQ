@@ -1781,7 +1781,6 @@ def _run_issue_locked(
             branch=branch,
             issue_number=issue.number,
             heartbeat=state.heartbeat,
-            issue_number=issue.number,
             base_branch=config.base_branch,
         )
     except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
@@ -1977,7 +1976,6 @@ def _resume_late_phase(
                 branch=branch,
                 issue_number=issue.number,
                 heartbeat=state.heartbeat,
-                issue_number=issue.number,
                 base_branch=config.base_branch,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
