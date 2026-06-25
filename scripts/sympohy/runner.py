@@ -382,6 +382,7 @@ def _prepare_document_artifacts(
             },
         )
         decisions = _request_artifact_decisions(
+            config=config,
             issue=issue,
             acceptance=acceptance,
             worktree=worktree,
@@ -449,6 +450,7 @@ def _prepare_document_artifacts(
                 },
             )
             decisions = _request_artifact_decisions(
+                config=config,
                 issue=issue,
                 acceptance=acceptance,
                 worktree=worktree,
@@ -475,6 +477,7 @@ def _prepare_document_artifacts(
 
 def _request_artifact_decisions(
     *,
+    config: SympohyConfig,
     issue: Issue,
     acceptance: AcceptanceSet,
     worktree: Path,
@@ -1584,7 +1587,6 @@ def _run_issue_locked(
     )
     try:
         _push_branch_and_ensure_draft_pull_request(
-            issue=issue,
             cwd=worktree,
             branch=branch,
             heartbeat=state.heartbeat,
@@ -1780,7 +1782,6 @@ def _resume_late_phase(
         )
         try:
             _push_branch_and_ensure_draft_pull_request(
-                issue=issue,
                 cwd=worktree,
                 branch=branch,
                 heartbeat=state.heartbeat,
@@ -3487,25 +3488,19 @@ def _existing_run_refusal_reason(
 
 def _ensure_draft_pull_request(
     *,
-    issue: Issue,
     cwd: Path,
     heartbeat: Callable[[], None] | None = None,
 ) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
         return
-    title = _draft_pull_request_title(issue)
-    body = _draft_pull_request_body(issue)
     _check_call_with_heartbeat(
         [
             "gh",
             "pr",
             "create",
             "--draft",
-            "--title",
-            title,
-            "--body",
-            body,
+            "--fill",
             "--template",
             ".github/pull_request_template.md",
         ],
@@ -3516,7 +3511,6 @@ def _ensure_draft_pull_request(
 
 def _push_branch_and_ensure_draft_pull_request(
     *,
-    issue: Issue,
     cwd: Path,
     branch: str,
     heartbeat: Callable[[], None] | None = None,
@@ -3534,7 +3528,7 @@ def _push_branch_and_ensure_draft_pull_request(
         cwd=cwd,
         heartbeat=heartbeat,
     )
-    _ensure_draft_pull_request(issue=issue, cwd=cwd, heartbeat=heartbeat)
+    _ensure_draft_pull_request(cwd=cwd, heartbeat=heartbeat)
 
 
 def _ensure_initial_pull_request_commit(
@@ -3564,27 +3558,6 @@ def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:
         return int(output.strip() or "0") > 0
     except ValueError:
         return True
-
-
-def _draft_pull_request_title(issue: Issue) -> str:
-    return f"#{issue.number} {issue.title.strip()}".strip()
-
-
-def _draft_pull_request_body(issue: Issue) -> str:
-    return "\n".join(
-        [
-            "## Summary",
-            f"- Addresses #{issue.number}",
-            f"- {issue.title.strip() or f'Implement #{issue.number}'}",
-            "",
-            "## Validation",
-            "- [ ] uv run python -m pytest tests/sympohy -q",
-            "- [ ] task ci:sympohy",
-            "- [ ] task ci:markdown",
-            "- [ ] task codd:validate",
-            "- [ ] GitHub checks are passing",
-        ]
-    )
 
 
 def _pull_request_merged(*, cwd: Path) -> bool:

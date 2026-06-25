@@ -11,7 +11,11 @@ from unittest.mock import patch
 
 from scripts.sympohy.config import CodexModelConfig, SympohyConfig
 from scripts.sympohy.github import Issue
-from scripts.sympohy.core import parse_final_verifier_block_findings, parse_review_json
+from scripts.sympohy.core import (
+    AcceptanceSet,
+    parse_final_verifier_block_findings,
+    parse_review_json,
+)
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
@@ -23,6 +27,7 @@ from scripts.sympohy.runner import (
     _codex_exec_args,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
+    _prepare_document_artifacts,
     _pull_request_exists,
     _pull_request_merged,
     _push_branch_and_ensure_draft_pull_request,
@@ -125,6 +130,74 @@ class SympohyRunnerTest(unittest.TestCase):
                 os.chdir(original_cwd)
 
         self.assertEqual(result["status"], "pass")
+
+    def test_prepare_document_artifacts_passes_planning_config(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=1,
+                stage_gate_command="task ai:sympohy:stage-gate",
+            )
+            worktree = root / "worktree"
+            log_dir = root / "runs" / "issue-59"
+            worktree.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=59,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=worktree,
+            )
+            issue = Issue(
+                number=59,
+                title="Persist matrix UI to SQLite",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={
+                        "artifact_decisions": {
+                            "requirements": {"mode": "not_needed", "reason": "covered"},
+                            "design": {"mode": "not_needed", "reason": "covered"},
+                            "wireframes": {"mode": "not_needed", "reason": "covered"},
+                            "adr": {"mode": "not_needed", "reason": "covered"},
+                        }
+                    },
+                ) as codex_json,
+                patch(
+                    "scripts.sympohy.runner._run_stage_gate",
+                    return_value={"status": "pass"},
+                ) as run_stage_gate,
+            ):
+                result = _prepare_document_artifacts(
+                    config=config,
+                    issue_ref="#59",
+                    issue=issue,
+                    acceptance=AcceptanceSet(
+                        acceptance_criteria=("AC",),
+                        definition_of_done=("DoD",),
+                        source="test",
+                    ),
+                    worktree=worktree,
+                    log_dir=log_dir,
+                    state=state,
+                )
+
+        self.assertTrue(result)
+        codex_json.assert_called_once()
+        self.assertIs(codex_json.call_args.kwargs["config"], config)
+        self.assertEqual(codex_json.call_args.kwargs["role"], "planning")
+        self.assertEqual(run_stage_gate.call_count, 4)
 
     def test_run_review_fix_round_comments_approved_review(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1036,6 +1109,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     if status_calls == 1:
                         return ""
                     return " M scripts/sympohy/runner.py\n"
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -1161,6 +1236,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     if status_calls == 1:
                         return ""
                     return " M scripts/sympohy/runner.py\n"
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -1576,6 +1653,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     )
                 if args == ["git", "status", "--porcelain"]:
                     return ""
+                if args == ["git", "rev-list", "--count", "main..HEAD"]:
+                    return "2\n"
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 raise AssertionError(f"unexpected check_output: {args}")
@@ -1646,10 +1725,18 @@ class SympohyRunnerTest(unittest.TestCase):
             if command[:4] == ["gh", "pr", "create", "--draft"]
         ]
         self.assertEqual(len(create_commands), 1)
-        self.assertEqual(create_commands[0][4], "--title")
-        self.assertTrue(create_commands[0][5].startswith("#82 "))
-        self.assertEqual(create_commands[0][6], "--body")
-        self.assertIn("## Validation", create_commands[0][7])
+        self.assertEqual(
+            create_commands[0],
+            [
+                "gh",
+                "pr",
+                "create",
+                "--draft",
+                "--fill",
+                "--template",
+                ".github/pull_request_template.md",
+            ],
+        )
         commands = [call.args[0] for call in check_call.call_args_list]
         self.assertNotIn(["git", "add", "-A"], commands)
         self.assertFalse(any(command[:2] == ["git", "commit"] for command in commands))
@@ -1996,28 +2083,11 @@ class SympohyRunnerTest(unittest.TestCase):
             patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
             patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
         ):
-            _ensure_draft_pull_request(
-                issue=Issue(
-                    number=82,
-                    title="Implement merged PR recovery",
-                    body="",
-                    labels=(),
-                    comments=(),
-                ),
-                cwd=Path("/tmp/worktree"),
-            )
+            _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
         check_call.assert_not_called()
 
-    def test_ensure_draft_pull_request_creates_descriptive_pr_metadata(self) -> None:
-        issue = Issue(
-            number=114,
-            title="fix(sympohy): detect merged pull requests during late resume",
-            body="",
-            labels=(),
-            comments=(),
-        )
-
+    def test_ensure_draft_pull_request_uses_fill_and_template(self) -> None:
         with (
             patch(
                 "scripts.sympohy.runner._current_branch",
@@ -2028,31 +2098,22 @@ class SympohyRunnerTest(unittest.TestCase):
                 "scripts.sympohy.runner._check_call_with_heartbeat"
             ) as check_call_with_heartbeat,
         ):
-            _ensure_draft_pull_request(issue=issue, cwd=Path("/tmp/worktree"))
+            _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
         check_call_with_heartbeat.assert_called_once()
         command = check_call_with_heartbeat.call_args.args[0]
         self.assertEqual(
-            command[:6],
+            command,
             [
                 "gh",
                 "pr",
                 "create",
                 "--draft",
-                "--title",
-                "#114 fix(sympohy): detect merged pull requests during late resume",
+                "--fill",
+                "--template",
+                ".github/pull_request_template.md",
             ],
         )
-        self.assertEqual(command[6], "--body")
-        self.assertIn("## Summary", command[7])
-        self.assertIn("- Addresses #114", command[7])
-        self.assertIn("- [ ] uv run python -m pytest tests/sympohy -q", command[7])
-        self.assertIn("- [ ] task ci:sympohy", command[7])
-        self.assertIn("- [ ] task ci:markdown", command[7])
-        self.assertIn("- [ ] task codd:validate", command[7])
-        self.assertIn("- [ ] GitHub checks are passing", command[7])
-        self.assertEqual(command[8], "--template")
-        self.assertEqual(command[9], ".github/pull_request_template.md")
 
     def test_push_branch_creates_initial_empty_commit_before_draft_pr(self) -> None:
         events: list[str] = []
@@ -2085,13 +2146,6 @@ class SympohyRunnerTest(unittest.TestCase):
             ),
         ):
             _push_branch_and_ensure_draft_pull_request(
-                issue=Issue(
-                    number=82,
-                    title="Open draft pull request",
-                    body="",
-                    labels=(),
-                    comments=(),
-                ),
                 cwd=Path("/tmp/worktree"),
                 branch="issue-82-sympohy",
                 issue_number=82,
