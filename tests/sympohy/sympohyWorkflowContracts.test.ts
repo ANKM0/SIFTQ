@@ -133,6 +133,8 @@ describe("sympohy automation contract", () => {
     expect(runner).toContain("\"requirements\", \"design\", \"wireframes\", \"adr\"");
     expect(runner).toContain("status set to pass or retry");
     expect(runner).toContain('"pass", "retry", or "block"');
+    expect(runner).toContain("## Issue Traceability");
+    expect(runner).toContain("body is empty; restore issue traceability");
   });
 
   it("does not disable normal Codex user config or repository rules", () => {

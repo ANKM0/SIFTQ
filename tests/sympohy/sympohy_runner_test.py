@@ -22,6 +22,7 @@ from scripts.sympohy.core import (
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
+    _PullRequestMetadataError,
     _RunLockedError,
     _RunStateWriter,
     _UnsafeRecoveryError,
@@ -2167,17 +2168,19 @@ class SympohyRunnerTest(unittest.TestCase):
             ["git", "push", "-u", "origin", "issue-82-sympohy"],
             heartbeat_commands,
         )
-        self.assertIn(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--draft",
-                "--fill",
-                "--template",
-                ".github/pull_request_template.md",
-            ],
-            heartbeat_commands,
+        self.assertTrue(
+            any(
+                command[:6]
+                == [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--draft",
+                    "--fill",
+                    "--body-file",
+                ]
+                for command in heartbeat_commands
+            )
         )
         commands = [call.args[0] for call in check_call.call_args_list]
         self.assertNotIn(["git", "add", "-A"], commands)
@@ -2639,18 +2642,94 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertGreaterEqual(len(heartbeats), 2)
 
-    def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
+    def test_ensure_draft_pull_request_skips_existing_pr_with_non_empty_body(self) -> None:
         with (
             patch(
                 "scripts.sympohy.runner._current_branch",
                 return_value="issue-82-sympohy",
             ),
             patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
-            patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            patch(
+                "scripts.sympohy.runner.subprocess.check_output",
+                return_value=json.dumps({"number": 91, "body": "## Issue Traceability\n- Closes #82\n"}),
+            ) as check_output,
+            patch(
+                "scripts.sympohy.runner._check_call_with_heartbeat"
+            ) as check_call_with_heartbeat,
         ):
             _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
-        check_call.assert_not_called()
+        check_output.assert_called_once_with(
+            ["gh", "pr", "view", "--json", "number,body"],
+            cwd=Path("/tmp/worktree"),
+            text=True,
+        )
+        check_call_with_heartbeat.assert_not_called()
+
+    def test_ensure_draft_pull_request_blocks_empty_existing_pr_body(self) -> None:
+        with (
+            patch(
+                "scripts.sympohy.runner._current_branch",
+                return_value="issue-82-sympohy",
+            ),
+            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+            patch(
+                "scripts.sympohy.runner.subprocess.check_output",
+                return_value=json.dumps({"number": 91, "body": " \n"}),
+            ),
+        ):
+            with self.assertRaises(_PullRequestMetadataError) as context:
+                _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+
+        self.assertIn("existing pull request #91 body is empty", str(context.exception))
+
+    def test_ensure_draft_pull_request_creates_body_with_traceability_and_template(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            template_dir = worktree / ".github"
+            template_dir.mkdir()
+            (template_dir / "pull_request_template.md").write_text(
+                "## 概要\n\n## 動作確認結果\n",
+                encoding="utf-8",
+            )
+            captured: dict[str, object] = {}
+
+            def check_call_with_heartbeat(
+                command: list[str],
+                **_kwargs: object,
+            ) -> None:
+                captured["command"] = command
+                body_file = Path(command[command.index("--body-file") + 1])
+                captured["body"] = body_file.read_text(encoding="utf-8")
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._pull_request_exists", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+            ):
+                _ensure_draft_pull_request(cwd=worktree, issue_number=82)
+
+        self.assertEqual(
+            list(captured["command"][:6]),
+            [
+                "gh",
+                "pr",
+                "create",
+                "--draft",
+                "--fill",
+                "--body-file",
+            ],
+        )
+        self.assertIn("## Issue Traceability", str(captured["body"]))
+        self.assertIn("- Closes #82", str(captured["body"]))
+        self.assertIn("## 概要", str(captured["body"]))
+        self.assertIn("## 動作確認結果", str(captured["body"]))
 
     def test_push_branch_creates_initial_empty_commit_before_draft_pr(self) -> None:
         events: list[str] = []
@@ -2664,9 +2743,6 @@ class SympohyRunnerTest(unittest.TestCase):
         ) -> None:
             events.append(" ".join(command))
 
-        def ensure_draft_pull_request(**_kwargs: object) -> None:
-            events.append("ensure_draft_pull_request")
-
         with (
             patch("scripts.sympohy.runner._branch_has_commits", return_value=False),
             patch(
@@ -2677,10 +2753,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 "scripts.sympohy.runner._check_call_with_heartbeat",
                 side_effect=check_call_with_heartbeat,
             ),
-            patch(
-                "scripts.sympohy.runner._ensure_draft_pull_request",
-                side_effect=ensure_draft_pull_request,
-            ),
+            patch("scripts.sympohy.runner._ensure_draft_pull_request") as ensure_draft_pull_request,
         ):
             _push_branch_and_ensure_draft_pull_request(
                 cwd=Path("/tmp/worktree"),
@@ -2694,8 +2767,12 @@ class SympohyRunnerTest(unittest.TestCase):
             [
                 "git commit --allow-empty -m #82 chore(sympohy): open draft pull request",
                 "git push -u origin issue-82-sympohy",
-                "ensure_draft_pull_request",
             ],
+        )
+        ensure_draft_pull_request.assert_called_once_with(
+            cwd=Path("/tmp/worktree"),
+            issue_number=82,
+            heartbeat=None,
         )
 
     def test_run_state_writer_persists_required_metadata(self) -> None:

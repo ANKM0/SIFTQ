@@ -11,6 +11,7 @@ import shlex
 import signal
 import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import time
 import uuid
 from typing import Callable, Iterable, Mapping, Sequence
@@ -71,6 +72,10 @@ class _UnsafeRecoveryError(RuntimeError):
 
 
 class _AmbiguousPullRequestError(RuntimeError):
+    pass
+
+
+class _PullRequestMetadataError(RuntimeError):
     pass
 
 
@@ -1397,7 +1402,7 @@ def _run_issue_locked(
                 issue_number=issue.number,
                 base_branch=config.base_branch,
             )
-        except _AmbiguousPullRequestError as exc:
+        except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
                 issue_ref,
                 phase="review",
@@ -1592,7 +1597,7 @@ def _run_issue_locked(
                 issue_number=issue.number,
                 base_branch=config.base_branch,
             )
-        except _AmbiguousPullRequestError as exc:
+        except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
                 issue_ref,
                 phase="review",
@@ -1771,9 +1776,10 @@ def _run_issue_locked(
         _push_branch_and_ensure_draft_pull_request(
             cwd=worktree,
             branch=branch,
+            issue_number=issue.number,
             heartbeat=state.heartbeat,
         )
-    except _AmbiguousPullRequestError as exc:
+    except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
         _block(
             issue_ref,
             phase="review",
@@ -1956,9 +1962,10 @@ def _resume_late_phase(
             _push_branch_and_ensure_draft_pull_request(
                 cwd=worktree,
                 branch=branch,
+                issue_number=issue.number,
                 heartbeat=state.heartbeat,
             )
-        except _AmbiguousPullRequestError as exc:
+        except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
                 issue_ref,
                 phase="review",
@@ -3969,24 +3976,44 @@ def _issue_branch_exists(issue: Issue) -> bool:
 def _ensure_draft_pull_request(
     *,
     cwd: Path,
+    issue_number: int | None = None,
     heartbeat: Callable[[], None] | None = None,
 ) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
+        _ensure_existing_pull_request_metadata(cwd=cwd)
         return
-    _check_call_with_heartbeat(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--draft",
-            "--fill",
-            "--template",
-            ".github/pull_request_template.md",
-        ],
-        cwd=cwd,
-        heartbeat=heartbeat,
-    )
+    if issue_number is None:
+        raise ValueError("issue_number is required when creating a draft pull request")
+    body = _render_pull_request_body(issue_number=issue_number, cwd=cwd)
+    body_file_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=cwd,
+            prefix="sympohy-pr-body-",
+            suffix=".md",
+            delete=False,
+        ) as handle:
+            handle.write(body)
+            body_file_path = Path(handle.name)
+        _check_call_with_heartbeat(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--draft",
+                "--fill",
+                "--body-file",
+                str(body_file_path),
+            ],
+            cwd=cwd,
+            heartbeat=heartbeat,
+        )
+    finally:
+        if body_file_path is not None:
+            body_file_path.unlink(missing_ok=True)
 
 
 def _push_branch_and_ensure_draft_pull_request(
@@ -4008,7 +4035,11 @@ def _push_branch_and_ensure_draft_pull_request(
         cwd=cwd,
         heartbeat=heartbeat,
     )
-    _ensure_draft_pull_request(cwd=cwd, heartbeat=heartbeat)
+    _ensure_draft_pull_request(
+        cwd=cwd,
+        issue_number=issue_number,
+        heartbeat=heartbeat,
+    )
 
 
 def _ensure_initial_pull_request_commit(
@@ -4023,6 +4054,41 @@ def _ensure_initial_pull_request_commit(
     if not validate_commit_subject(subject):
         raise ValueError(f"invalid generated commit subject: {subject}")
     subprocess.check_call(["git", "commit", "--allow-empty", "-m", subject], cwd=cwd)
+
+
+def _render_pull_request_body(*, issue_number: int, cwd: Path) -> str:
+    template_path = cwd / ".github" / "pull_request_template.md"
+    if not template_path.exists():
+        template_path = Path(__file__).resolve().parents[2] / ".github" / "pull_request_template.md"
+    template_body = template_path.read_text(encoding="utf-8").rstrip()
+    return (
+        "## Issue Traceability\n"
+        f"- Closes #{issue_number}\n\n"
+        f"{template_body}\n"
+    )
+
+
+def _ensure_existing_pull_request_metadata(*, cwd: Path) -> None:
+    payload = json.loads(
+        subprocess.check_output(
+            ["gh", "pr", "view", "--json", "number,body"],
+            cwd=cwd,
+            text=True,
+        )
+    )
+    if not isinstance(payload, Mapping):
+        raise _PullRequestMetadataError(
+            "could not inspect existing pull request metadata"
+        )
+    pull_request_number = payload.get("number")
+    body = payload.get("body")
+    if not isinstance(body, str) or not body.strip():
+        raise _PullRequestMetadataError(
+            "existing pull request "
+            f"#{pull_request_number if pull_request_number is not None else 'unknown'} "
+            "body is empty; restore issue traceability, summary, and validation "
+            "details before resuming"
+        )
 
 
 def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:
