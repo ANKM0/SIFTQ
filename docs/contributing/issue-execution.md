@@ -26,6 +26,9 @@ codd:
     - id: design:sympohy-stale-run-recovery
       relation: depends_on
       semantic: automation
+    - id: design:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: automation
     - id: design:codex-configuration-memo
       relation: depends_on
       semantic: automation
@@ -339,6 +342,20 @@ and repeats fix/review up to `review_max_rounds` until there are no `critical`,
 `high`, or `medium` findings.
 Review results are posted to the PR so blocking findings and fix status are
 traceable.
+
+Before adversarial review starts, `sympohy` runs a dedicated mergeability gate
+against the PR base branch. If the PR conflicts with `main`, the runner may
+attempt one pre-review auto-fix before consuming review or fix rounds. This
+attempt includes taking the base branch, using Codex to resolve conflicts when
+needed, confirming no conflict markers remain, running `task ci`, and pushing
+the repaired branch. Only when this pre-review auto-fix fails does the runner
+block the issue. The resulting block comment includes the PR number, base/head,
+a concise conflict summary, and the recommended next step.
+
+Automation-created PRs must include issue traceability, summary, and validation
+sections in the PR body. If an existing PR body is empty, or those required
+metadata sections are missing, `sympohy` backfills the minimum metadata from
+the PR template before review continues instead of blocking immediately.
 
 Before merge, a final verifier Codex pass must return JSON confirming AC/DoD
 satisfaction and recommending `merge` or `block`. `merge` responses must include

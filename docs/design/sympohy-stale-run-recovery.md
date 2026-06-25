@@ -13,6 +13,10 @@ codd:
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: automation
+  depended_by:
+    - id: design:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: recovery
 ---
 
 # sympohy 停滞実行復旧設計

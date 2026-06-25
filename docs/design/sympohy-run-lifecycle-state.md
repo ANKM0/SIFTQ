@@ -14,6 +14,9 @@ codd:
     - id: design:sympohy-stale-run-recovery
       relation: depends_on
       semantic: lifecycle
+    - id: design:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: lifecycle
 ---
 
 # sympohy 実行ライフサイクル・状態設計

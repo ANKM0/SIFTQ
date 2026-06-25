@@ -126,11 +126,16 @@ describe("sympohy automation contract", () => {
     expect(core).toContain("next_retry_action");
     expect(core).toContain("merge_gate_allows_merge");
     expect(core).toContain("stage_gate_status");
+    expect(runner).toContain("mergeability gate");
+    expect(runner).toContain("recommended next action");
+    expect(runner).toContain("pre-review auto-merge/auto-fix pass");
     expect(runner).toContain("_prepare_document_artifacts");
     expect(runner).toContain("artifact-decisions.json");
     expect(runner).toContain("\"requirements\", \"design\", \"wireframes\", \"adr\"");
     expect(runner).toContain("status set to pass or retry");
     expect(runner).toContain('"pass", "retry", or "block"');
+    expect(runner).toContain("## Issue Traceability");
+    expect(runner).toContain("\"gh\", \"pr\", \"edit\"");
   });
 
   it("does not disable normal Codex user config or repository rules", () => {
