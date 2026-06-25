@@ -303,7 +303,7 @@ class SympohyRunnerTest(unittest.TestCase):
             "high: still broken; medium: tests still failing",
         )
 
-    def test_review_fix_loop_blocks_conflicted_pull_request_before_finalize_review(self) -> None:
+    def test_review_fix_loop_blocks_conflicted_pull_request_after_single_autofix_attempt(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             config = self._config(root)
@@ -337,6 +337,10 @@ class SympohyRunnerTest(unittest.TestCase):
                             "mergeable": "CONFLICTING",
                         }
                     ),
+                ),
+                patch(
+                    "scripts.sympohy.runner._attempt_pre_review_mergeability_autofix",
+                    return_value="unmerged paths remain after automatic conflict fix",
                 ),
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
                 patch("scripts.sympohy.runner.comment") as comment,
@@ -372,7 +376,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 "- conflict summary: GitHub reports mergeStateStatus=DIRTY, mergeable=CONFLICTING.",
                 body,
             )
-            self.assertIn("- recommended next action: Update `issue-82-sympohy`", body)
+            self.assertIn(
+                "- recommended next action: sympohy attempted one pre-review auto-merge/auto-fix pass",
+                body,
+            )
             state_path = log_dir / "state.json"
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["phase"], "finalize")
@@ -2731,44 +2738,70 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         check_call_with_heartbeat.assert_not_called()
 
-    def test_ensure_draft_pull_request_blocks_empty_existing_pr_body(self) -> None:
-        with (
-            patch(
-                "scripts.sympohy.runner._current_branch",
-                return_value="issue-82-sympohy",
-            ),
-            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
-            patch(
-                "scripts.sympohy.runner.subprocess.check_output",
-                return_value=json.dumps({"number": 91, "body": " \n"}),
-            ),
-        ):
-            with self.assertRaises(_PullRequestMetadataError) as context:
-                _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+    def test_ensure_draft_pull_request_backfills_empty_existing_pr_body(self) -> None:
+        captured: dict[str, object] = {}
 
-        self.assertIn("existing pull request #91 body is empty", str(context.exception))
+        def check_call_with_heartbeat(command: list[str], **_kwargs: object) -> None:
+            captured["command"] = command
+            body_file = Path(command[command.index("--body-file") + 1])
+            captured["body"] = body_file.read_text(encoding="utf-8")
 
-    def test_ensure_draft_pull_request_blocks_existing_pr_missing_required_metadata(self) -> None:
-        with (
-            patch(
-                "scripts.sympohy.runner._current_branch",
-                return_value="issue-82-sympohy",
-            ),
-            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
-            patch(
-                "scripts.sympohy.runner.subprocess.check_output",
-                return_value=json.dumps({"number": 91, "body": "## Issue Traceability\n- Closes #82\n"}),
-            ),
-        ):
-            with self.assertRaises(_PullRequestMetadataError) as context:
-                _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            with (
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    return_value=json.dumps({"number": 91, "body": " \n"}),
+                ),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+            ):
+                _ensure_draft_pull_request(cwd=worktree)
 
-        self.assertIn(
-            "existing pull request #91 body is missing required metadata sections",
-            str(context.exception),
-        )
-        self.assertIn("Summary", str(context.exception))
-        self.assertIn("Validation", str(context.exception))
+        self.assertEqual(captured["command"][:4], ["gh", "pr", "edit", "91"])
+        self.assertIn("## Issue Traceability", str(captured["body"]))
+        self.assertIn("- Closes #82", str(captured["body"]))
+        self.assertIn("## 概要", str(captured["body"]))
+        self.assertIn("## 動作確認結果", str(captured["body"]))
+
+    def test_ensure_draft_pull_request_backfills_existing_pr_missing_required_metadata(self) -> None:
+        captured: dict[str, object] = {}
+
+        def check_call_with_heartbeat(command: list[str], **_kwargs: object) -> None:
+            captured["command"] = command
+            body_file = Path(command[command.index("--body-file") + 1])
+            captured["body"] = body_file.read_text(encoding="utf-8")
+
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            with (
+                patch(
+                    "scripts.sympohy.runner._current_branch",
+                    return_value="issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    return_value=json.dumps({"number": 91, "body": "## Issue Traceability\n- Closes #82\n"}),
+                ),
+                patch(
+                    "scripts.sympohy.runner._check_call_with_heartbeat",
+                    side_effect=check_call_with_heartbeat,
+                ),
+            ):
+                _ensure_draft_pull_request(cwd=worktree)
+
+        self.assertEqual(captured["command"][:4], ["gh", "pr", "edit", "91"])
+        self.assertIn("## Issue Traceability", str(captured["body"]))
+        self.assertIn("## 概要", str(captured["body"]))
+        self.assertIn("## 動作確認結果", str(captured["body"]))
 
     def test_ensure_draft_pull_request_blocks_invalid_existing_pr_metadata(self) -> None:
         with (

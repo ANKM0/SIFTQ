@@ -2913,6 +2913,7 @@ def _review_fix_loop(
         pull_request_number = _ensure_review_mergeability(
             issue_ref,
             issue,
+            config,
             cwd,
             log_dir,
             state,
@@ -2983,6 +2984,7 @@ def _review_fix_loop(
 def _ensure_review_mergeability(
     issue_ref: str,
     issue: Issue,
+    config: SympohyConfig,
     cwd: Path,
     log_dir: Path,
     state: _RunStateWriter,
@@ -2993,22 +2995,158 @@ def _ensure_review_mergeability(
     if not mergeability.is_conflicted():
         return mergeability.number
 
+    autofix_log_path = log_dir / "mergeability-autofix.log"
+    auto_fix_error = _attempt_pre_review_mergeability_autofix(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        phase=phase,
+        pull_request=mergeability,
+        log_path=autofix_log_path,
+    )
+    if auto_fix_error is None:
+        mergeability = _pull_request_mergeability(cwd)
+        if not mergeability.is_conflicted():
+            return mergeability.number
+
     recommended_action = (
-        f"Update `{mergeability.head_ref}` with the latest `{mergeability.base_ref}`, "
-        "resolve the merge conflicts, push the branch, and rerun "
+        "sympohy attempted one pre-review auto-merge/auto-fix pass but the pull "
+        "request still conflicts. Update "
+        f"`{mergeability.head_ref}` with the latest `{mergeability.base_ref}`, "
+        "resolve the merge conflicts, run `task ci`, push the branch, and rerun "
         f"`task ai:sympohy:resume -- '#{issue.number}'`."
     )
+    if auto_fix_error is not None:
+        recommended_action += f" Last automatic attempt failed: {auto_fix_error}."
     _block_mergeability_conflict(
         issue_ref,
         phase=phase,
         issue_number=issue.number,
         pull_request=mergeability,
-        run_log_path=log_dir,
+        run_log_path=autofix_log_path,
         cwd=cwd,
         state=state,
         recommended_action=recommended_action,
     )
     return None
+
+
+def _attempt_pre_review_mergeability_autofix(
+    issue_ref: str,
+    issue: Issue,
+    config: SympohyConfig,
+    cwd: Path,
+    log_dir: Path,
+    state: _RunStateWriter,
+    *,
+    phase: str,
+    pull_request: _PullRequestMergeability,
+    log_path: Path,
+) -> str | None:
+    merge_target = f"origin/{pull_request.base_ref}"
+    merge_subject = _mergeability_autofix_subject(
+        issue_number=issue.number,
+        base_ref=pull_request.base_ref,
+    )
+    state.write(
+        phase=phase,
+        progress={
+            "message": "attempting pre-review mergeability auto-fix",
+            "failed_command": "mergeability gate",
+            "attempts": 1,
+            "pull_request_number": pull_request.number,
+            "base_ref": pull_request.base_ref,
+            "head_ref": pull_request.head_ref,
+            "log_path": str(log_path),
+        },
+    )
+    try:
+        _check_call_with_heartbeat(
+            ["git", "fetch", "origin", pull_request.base_ref],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+        )
+    except subprocess.CalledProcessError as exc:
+        return f"git fetch failed with exit code {exc.returncode}"
+
+    merge_returncode = _run_command_with_heartbeat(
+        ["git", "merge", "--no-ff", "--no-commit", merge_target],
+        cwd=cwd,
+        heartbeat=state.heartbeat,
+    )
+    if merge_returncode not in {0, 1}:
+        return f"git merge exited with unexpected status {merge_returncode}"
+
+    if _merge_has_unmerged_paths(cwd):
+        _codex_text(
+            [
+                "Resolve this pre-review merge conflict introduced by syncing the "
+                f"current branch with `{merge_target}`.",
+                "Remove all conflict markers, keep the branch mergeable, and stop "
+                "after edits.",
+                f"Issue #{issue.number}",
+            ],
+            cwd=cwd,
+            log_path=log_path,
+            heartbeat=state.heartbeat,
+            config=config,
+            role="fix",
+        )
+
+    if _merge_has_unmerged_paths(cwd):
+        return "unmerged paths remain after automatic conflict fix"
+    if _worktree_has_conflict_markers(cwd):
+        return "conflict markers remain after automatic conflict fix"
+    if _run_hooks(
+        config.hooks,
+        config.ci_retry_max_attempts,
+        cwd,
+        log_dir,
+        config=config,
+        state=state,
+    ) != 0:
+        return "task ci failed after automatic conflict fix"
+
+    subprocess.check_call(["git", "add", "-A"], cwd=cwd)
+    if _merge_has_unmerged_paths(cwd):
+        return "unmerged paths remain after staging automatic conflict fix"
+    if _worktree_has_conflict_markers(cwd):
+        return "conflict markers remain after staging automatic conflict fix"
+    try:
+        subprocess.check_call(["git", "commit", "-m", merge_subject], cwd=cwd)
+    except subprocess.CalledProcessError as exc:
+        return f"git commit failed with exit code {exc.returncode}"
+    try:
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+        )
+    except subprocess.CalledProcessError as exc:
+        return f"git push failed with exit code {exc.returncode}"
+
+    state.write(
+        phase=phase,
+        progress={
+            "message": "completed pre-review mergeability auto-fix",
+            "pull_request_number": pull_request.number,
+            "base_ref": pull_request.base_ref,
+            "head_ref": pull_request.head_ref,
+            "commit_subject": merge_subject,
+            "log_path": str(log_path),
+        },
+    )
+    return None
+
+
+def _mergeability_autofix_subject(*, issue_number: int, base_ref: str) -> str:
+    subject = f"#{issue_number} fix(sympohy): sync {base_ref} before review"
+    if not validate_commit_subject(subject):
+        raise ValueError(f"invalid generated commit subject: {subject}")
+    return subject
 
 
 def _pull_request_mergeability(cwd: Path) -> _PullRequestMergeability:
@@ -3738,6 +3876,44 @@ def _worktree_status(cwd: Path) -> str:
     return output
 
 
+def _merge_has_unmerged_paths(cwd: Path) -> bool:
+    output = subprocess.check_output(
+        ["git", "diff", "--name-only", "--diff-filter=U"],
+        cwd=cwd,
+        text=True,
+    )
+    return bool(output.strip())
+
+
+def _worktree_has_conflict_markers(cwd: Path) -> bool:
+    for path in _worktree_changed_paths(cwd):
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if (
+            "<<<<<<< " in content
+            or "\n=======\n" in content
+            or ">>>>>>> " in content
+        ):
+            return True
+    return False
+
+
+def _worktree_changed_paths(cwd: Path) -> list[Path]:
+    paths: list[Path] = []
+    for line in _worktree_status(cwd).splitlines():
+        if len(line) < 4:
+            continue
+        path_text = line[3:]
+        if " -> " in path_text:
+            path_text = path_text.split(" -> ", 1)[1]
+        path = cwd / path_text
+        if path.exists() and path.is_file():
+            paths.append(path)
+    return paths
+
+
 def _summarize_status(status: str, *, limit: int = 5) -> str:
     lines = [line.strip() for line in status.splitlines() if line.strip()]
     if not lines:
@@ -3981,7 +4157,11 @@ def _ensure_draft_pull_request(
 ) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
-        _ensure_existing_pull_request_metadata(cwd=cwd)
+        _ensure_existing_pull_request_metadata(
+            cwd=cwd,
+            issue_number=issue_number or _issue_number_from_branch(branch),
+            heartbeat=heartbeat,
+        )
         return
     if issue_number is None:
         raise ValueError("issue_number is required when creating a draft pull request")
@@ -4068,7 +4248,12 @@ def _render_pull_request_body(*, issue_number: int, cwd: Path) -> str:
     )
 
 
-def _ensure_existing_pull_request_metadata(*, cwd: Path) -> None:
+def _ensure_existing_pull_request_metadata(
+    *,
+    cwd: Path,
+    issue_number: int | None,
+    heartbeat: Callable[[], None] | None = None,
+) -> None:
     payload = json.loads(
         subprocess.check_output(
             ["gh", "pr", "view", "--json", "number,body"],
@@ -4082,23 +4267,29 @@ def _ensure_existing_pull_request_metadata(*, cwd: Path) -> None:
         )
     pull_request_number = payload.get("number")
     body = payload.get("body")
-    if not isinstance(body, str) or not body.strip():
+    if not isinstance(body, str):
+        raise _PullRequestMetadataError(
+            "existing pull request metadata returned a non-string body"
+        )
+    if issue_number is None:
         raise _PullRequestMetadataError(
             "existing pull request "
             f"#{pull_request_number if pull_request_number is not None else 'unknown'} "
-            "body is empty; restore issue traceability, summary, and validation "
-            "details before resuming"
+            "issue number could not be derived for metadata backfill"
         )
-    missing_sections = _missing_pull_request_metadata_sections(body)
-    if missing_sections:
-        missing = ", ".join(missing_sections)
-        raise _PullRequestMetadataError(
-            "existing pull request "
-            f"#{pull_request_number if pull_request_number is not None else 'unknown'} "
-            "body is missing required metadata sections "
-            f"({missing}); restore issue traceability, summary, and validation "
-            "details before resuming"
-        )
+    updated_body = _supplement_pull_request_metadata(
+        body,
+        issue_number=issue_number,
+        cwd=cwd,
+    )
+    if updated_body == body:
+        return
+    _update_pull_request_body(
+        cwd=cwd,
+        pull_request_number=pull_request_number,
+        body=updated_body,
+        heartbeat=heartbeat,
+    )
 
 
 def _missing_pull_request_metadata_sections(body: str) -> list[str]:
@@ -4108,6 +4299,93 @@ def _missing_pull_request_metadata_sections(body: str) -> list[str]:
         ("Validation", "## 動作確認結果"),
     )
     return [label for label, marker in required_sections if marker not in body]
+
+
+def _issue_number_from_branch(branch: str) -> int | None:
+    match = re.match(r"^issue-(?P<issue>\d+)-", branch.strip())
+    if match is None:
+        return None
+    return int(match.group("issue"))
+
+
+def _supplement_pull_request_metadata(
+    body: str,
+    *,
+    issue_number: int,
+    cwd: Path,
+) -> str:
+    canonical_body = _render_pull_request_body(issue_number=issue_number, cwd=cwd)
+    if not body.strip():
+        return canonical_body
+
+    updated = body.rstrip() + "\n"
+    missing_sections = _missing_pull_request_metadata_sections(updated)
+    if not missing_sections:
+        return body
+    for label in missing_sections:
+        marker = _pull_request_metadata_marker(label)
+        section = _extract_markdown_section(canonical_body, marker)
+        if section is None:
+            raise _PullRequestMetadataError(
+                f"pull request template missing required section: {label}"
+            )
+        if marker == "## Issue Traceability":
+            updated = section.rstrip() + "\n\n" + updated.lstrip()
+        else:
+            updated = updated.rstrip() + "\n\n" + section.rstrip() + "\n"
+    return updated
+
+
+def _pull_request_metadata_marker(label: str) -> str:
+    markers = {
+        "Issue Traceability": "## Issue Traceability",
+        "Summary": "## 概要",
+        "Validation": "## 動作確認結果",
+    }
+    return markers[label]
+
+
+def _extract_markdown_section(body: str, marker: str) -> str | None:
+    start = body.find(marker)
+    if start == -1:
+        return None
+    next_heading = body.find("\n## ", start + len(marker))
+    if next_heading == -1:
+        return body[start:].rstrip() + "\n"
+    return body[start:next_heading].rstrip() + "\n"
+
+
+def _update_pull_request_body(
+    *,
+    cwd: Path,
+    pull_request_number: object,
+    body: str,
+    heartbeat: Callable[[], None] | None = None,
+) -> None:
+    body_file_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=cwd,
+            prefix="sympohy-pr-body-",
+            suffix=".md",
+            delete=False,
+        ) as handle:
+            handle.write(body)
+            body_file_path = Path(handle.name)
+        command = ["gh", "pr", "edit"]
+        if pull_request_number is not None:
+            command.append(str(pull_request_number))
+        command.extend(["--body-file", str(body_file_path)])
+        _check_call_with_heartbeat(
+            command,
+            cwd=cwd,
+            heartbeat=heartbeat,
+        )
+    finally:
+        if body_file_path is not None:
+            body_file_path.unlink(missing_ok=True)
 
 
 def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:

@@ -26,6 +26,16 @@ branch を `origin` へ push し、`main` 向け draft PR を作成する。
 fix commit、final verifier fix commit は、すべて同じ PR branch に追加 push
 する。
 
+review に進める前には、PR mergeability を確認する。`main` との conflict がある
+場合、automation は 1 回だけ pre-review auto-fix を試行してよい。この試行は、
+base branch の取り込み、必要なら Codex による conflict 解消、conflict marker
+が残っていないことの確認、`task ci`、push を含む。これで mergeability を回復
+できない場合に限り、review round を消費せず block する。
+
+既存 draft PR の body が空、または issue traceability / summary / validation
+metadata が不足している場合、automation は review 継続前に minimum metadata
+を backfill してよい。
+
 branch 作成直後に差分がまだ無い場合、automation は PR 作成用の空 commit を
 許可してよい。ただし commit message は
 [`commit-message-format.md`](commit-message-format.md) に従い、関連 issue

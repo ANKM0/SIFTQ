@@ -31,13 +31,18 @@ hardening するための外部振る舞いを定義する。
 - local の `state.json` が `blocked` を示していても、GitHub issue が completed
   なら completed terminal state として reconcile する。
 - `main` と conflict している PR は、adversarial review / fix loop に入る前に
-  dedicated mergeability gate で block する。
+  dedicated mergeability gate で 1 回だけ auto-merge / auto-fix を試行する。
+- pre-review mergeability auto-fix は、base branch の取り込み、Codex による
+  conflict fix、conflict-marker check、`task ci`、push までを含む。
+- pre-review mergeability auto-fix が失敗した場合だけ、mergeability gate で
+  block する。
 - mergeability block comment には、PR number、base/head、conflict summary、
   recommended action を含める。
 - review loop が上限に到達して block される場合、block comment には最後に残った
   blocking findings の summary を含める。
 - automation-created PR は issue traceability、summary、validation 欄を持つ。
-- 既存 PR body が空の場合は、template 回復ではなく explicit block として扱う。
+- automation-created PR の body が空、または既存 PR body に required metadata が
+  足りない場合は、resume 時に minimum metadata を backfill する。
 
 ## 非機能要件
 
