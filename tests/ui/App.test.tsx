@@ -1,7 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BROWSER_TASK_STORAGE_KEY } from "../../src/adapters/browserTaskRepository";
+import {
+  BROWSER_TASK_STORAGE_KEY,
+  browserTaskRepository
+} from "../../src/adapters/browserTaskRepository";
 import {
   type AreaId,
   type Task,
@@ -188,6 +191,24 @@ describe("App", () => {
     expect(window.location.hash).toBe("#/tasks");
   });
 
+  it("stays on the detail page when deleting a task fails", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+    vi.spyOn(browserTaskRepository, "deleteTask").mockRejectedValueOnce(new Error("boom"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("boom"));
+    expect(screen.getByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+    expect(window.location.hash).toBe("#/tasks/task-1");
+    expect(storedTasks()).toHaveLength(1);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("renders a not-found state for a missing detail task", async () => {
     window.location.hash = "#/tasks/missing-task";
 
@@ -283,6 +304,28 @@ describe("App", () => {
     );
     expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?');
     expect(taskListTitles()).toEqual(["Hidden"]);
+  });
+
+  it("clears the delete notice after leaving the task list", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("タスクを削除しました")
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "マトリックス" }));
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("link", { name: "タスク一覧" }));
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("renders a storage error when browser storage is corrupt", async () => {

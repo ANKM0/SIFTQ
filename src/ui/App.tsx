@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -56,6 +56,7 @@ export function App() {
   });
   const [operationError, setOperationError] = useState<string | null>(null);
   const [route, setRoute] = useState<AppRoute>(() => routeFromHash(window.location.hash));
+  const previousRouteRef = useRef<AppRoute>(route);
 
   useEffect(() => {
     let isCurrent = true;
@@ -99,6 +100,18 @@ export function App() {
       window.removeEventListener("hashchange", syncRouteFromHash);
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      previousRouteRef.current.name === "tasks" &&
+      route.name !== "tasks" &&
+      taskListNotice !== null
+    ) {
+      setTaskListNotice(null);
+    }
+
+    previousRouteRef.current = route;
+  }, [route, taskListNotice]);
 
   async function handleCreateTask(
     areaId: MatrixAreaId,
@@ -217,11 +230,11 @@ export function App() {
     }
   }
 
-  async function handleDeleteTask(task: Task) {
+  async function handleDeleteTask(task: Task): Promise<boolean> {
     const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
 
     if (!shouldDelete) {
-      return;
+      return false;
     }
 
     try {
@@ -229,8 +242,13 @@ export function App() {
       await browserTaskRepository.deleteTask({ taskId: task.id });
       setTaskListNotice("タスクを削除しました");
       await refreshTasks();
+      window.location.hash = "#/tasks";
+
+      return true;
     } catch (error) {
       setOperationError(messageForError(error, "Task could not be deleted."));
+
+      return false;
     }
   }
 
@@ -372,7 +390,7 @@ type TasksPageProps = {
   readonly tasks: readonly Task[];
   readonly notice: string | null;
   readonly operationError: string | null;
-  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
 };
 
@@ -429,7 +447,7 @@ function TasksPage({
 type TaskListCardProps = {
   readonly isMenuOpen: boolean;
   readonly onCloseMenu: () => void;
-  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onOpenMenu: () => void;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
   readonly task: Task;
@@ -534,7 +552,7 @@ function TaskListCard({
 
 type TaskDetailPageProps = {
   readonly operationError: string | null;
-  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onUpdateTaskDetails: (
     taskId: Task["id"],
     details: {
@@ -608,7 +626,6 @@ function TaskDetailPage({
     }
 
     await onDeleteTask(task);
-    window.location.hash = "#/tasks";
   }
 
   return (
