@@ -380,8 +380,9 @@ function saveTasks(
   storageKey: string,
   tasks: readonly Task[]
 ) {
+  const normalizedTasks = normalizeAllAreas([...tasks]).sort(compareTasksByListOrder);
   const store = {
-    tasks: normalizeAllAreas([...tasks]),
+    tasks: normalizedTasks,
     version: STORE_VERSION
   } satisfies BrowserTaskStore;
 

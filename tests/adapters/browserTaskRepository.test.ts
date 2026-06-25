@@ -202,15 +202,6 @@ describe("browserTaskRepository", () => {
     expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
       tasks: [
         task({
-          id: "task-1",
-          title: "First",
-          areaId: "do",
-          order: 0,
-          createdAt: timestampAt(1),
-          updatedAt: timestampAt(1),
-          listOrder: 1
-        }),
-        task({
           id: "task-2",
           title: "Second",
           areaId: "schedule",
@@ -218,6 +209,15 @@ describe("browserTaskRepository", () => {
           createdAt: timestampAt(0),
           updatedAt: timestampAt(0),
           listOrder: 0
+        }),
+        task({
+          id: "task-1",
+          title: "First",
+          areaId: "do",
+          order: 0,
+          createdAt: timestampAt(1),
+          updatedAt: timestampAt(1),
+          listOrder: 1
         })
       ],
       version: 1

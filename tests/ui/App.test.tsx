@@ -273,8 +273,8 @@ describe("App", () => {
 
     await waitFor(() => expect(taskListTitles()).toEqual(["Third", "First", "Second"]));
     expect(storedTasks()).toMatchObject([
-      { id: "task-1", areaId: "do", order: 0, listOrder: 1 },
       { id: "task-3", areaId: "delegate", order: 0, listOrder: 0 },
+      { id: "task-1", areaId: "do", order: 0, listOrder: 1 },
       { id: "task-2", areaId: "done", order: 1, listOrder: 2 }
     ]);
   });
@@ -320,6 +320,21 @@ describe("App", () => {
 
     expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
     expect(taskTitlesIn("Do tasks")).toEqual(["Visible"]);
+  });
+
+  it("hides the active status action for legacy terminal tasks in the task list", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "done" }));
+
+    expect(screen.queryByRole("menuitem", { name: "active" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "done" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "skipped" })).toBeTruthy();
   });
 
   it("deletes a task from the task list and shows a notice", async () => {
@@ -460,19 +475,19 @@ describe("App", () => {
     );
     expect(storedTasks()).toMatchObject([
       {
-        id: "task-2",
-        title: "Second task",
-        areaId: "do",
-        order: 0,
-        listOrder: 1,
-        status: "active"
-      },
-      {
         id: "task-1",
         title: "First task",
         areaId: "schedule",
         order: 0,
         listOrder: 0,
+        status: "active"
+      },
+      {
+        id: "task-2",
+        title: "Second task",
+        areaId: "do",
+        order: 0,
+        listOrder: 1,
         status: "active"
       },
       {

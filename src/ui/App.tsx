@@ -478,6 +478,9 @@ function TaskListCard({
   const style = {
     transform: CSS.Translate.toString(draggable.transform)
   };
+  const availableStatuses = isMatrixArea(task.areaId)
+    ? (["active", "done", "skipped"] as const)
+    : ([task.status, task.status === "done" ? "skipped" : "done"] as const);
 
   async function handleStatusChange(status: Task["status"]) {
     onCloseMenu();
@@ -522,7 +525,7 @@ function TaskListCard({
           </button>
           {isMenuOpen ? (
             <div className="tasks-page__status-menu" role="menu" aria-label="status menu">
-              {(["active", "done", "skipped"] as const).map((status) => (
+              {availableStatuses.map((status) => (
                 <button
                   key={status}
                   className="tasks-page__status-option"
