@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIFTQ Wireframe - Task Not Found</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
+  </head>
+  <body>
+    <main class="app-shell task-page">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>状態: タスク未検出</p></div>
+        <nav class="header-actions" aria-label="Primary">
+          <a class="back-link" href="./matrix-with-cards.html">マトリックス</a>
+          <a class="back-link back-link--active" href="./task-list.html">タスク一覧</a>
+          <a class="back-link" href="./index.html">インデックス</a>
+        </nav>
+      </header>
+
+      <section class="empty-state" aria-labelledby="task-not-found-title">
+        <h2 id="task-not-found-title">タスクが見つかりません</h2>
+        <p>このタスクは削除されたか、browser storage に存在しません。</p>
+        <a class="back-link" href="./task-list.html">タスク一覧へ戻る</a>
+      </section>
+    </main>
+  </body>
+</html>

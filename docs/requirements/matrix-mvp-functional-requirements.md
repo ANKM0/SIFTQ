@@ -38,6 +38,9 @@ codd:
     - id: design:matrix-mvp-wireframe-layout-adr
       relation: depends_on
       semantic: scope
+    - id: design:task-list-v3-wireframe
+      relation: depends_on
+      semantic: ui
 ---
 
 # Matrix MVP Functional Requirements
