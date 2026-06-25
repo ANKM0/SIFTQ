@@ -224,6 +224,79 @@ describe("browserTaskRepository", () => {
     });
   });
 
+  it("migrates legacy terminal-area tasks to a restorable preserved area", async () => {
+    const repository = repositoryForTest();
+
+    storage.setItem(
+      BROWSER_TASK_STORAGE_KEY,
+      JSON.stringify({
+        tasks: [
+          { areaId: "done", id: "task-1", order: 0, status: "done", title: "Finished" },
+          { areaId: "skipped", id: "task-2", order: 1, status: "skipped", title: "Skipped" }
+        ],
+        version: 1
+      })
+    );
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "Finished",
+        areaId: "do",
+        order: 0,
+        status: "done",
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Skipped",
+        areaId: "do",
+        order: 1,
+        status: "skipped",
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+
+    await expect(repository.updateTaskStatus({ taskId: "task-1", status: "active" })).resolves
+      .toMatchObject({
+        areaId: "do",
+        id: "task-1",
+        order: 0,
+        status: "active",
+        updatedAt: timestampAt(0)
+      });
+
+    expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
+      tasks: [
+        task({
+          id: "task-1",
+          title: "Finished",
+          areaId: "do",
+          order: 0,
+          status: "active",
+          createdAt: timestampAt(0),
+          updatedAt: timestampAt(0),
+          listOrder: 0
+        }),
+        task({
+          id: "task-2",
+          title: "Skipped",
+          areaId: "do",
+          order: 1,
+          status: "skipped",
+          createdAt: timestampAt(1),
+          updatedAt: timestampAt(1),
+          listOrder: 1
+        })
+      ],
+      version: 1
+    });
+  });
+
   it("reorders list order independently from matrix area order", async () => {
     const repository = repositoryForTest();
 
