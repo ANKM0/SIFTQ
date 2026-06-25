@@ -1716,6 +1716,14 @@ def _resume_late_phase(
             "worktree": str(worktree),
         },
     )
+    if _pull_request_merged(cwd=worktree):
+        return _finish_merged_issue(
+            issue_ref,
+            worktree,
+            state,
+            total_steps=_progress_int(previous_state, "total_logical_steps"),
+            message="reconciled already-merged pull request",
+        )
     if resume_from in {"review", "finalize"}:
         dirty_result = _block_dirty_late_phase_resume(
             issue_ref,
