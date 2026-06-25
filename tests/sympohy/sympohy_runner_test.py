@@ -23,9 +23,11 @@ from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
     _PullRequestMetadataError,
+    _PullRequestMergeability,
     _RunLockedError,
     _RunStateWriter,
     _UnsafeRecoveryError,
+    _attempt_pre_review_mergeability_autofix,
     _check_output_with_heartbeat,
     _commit_all_if_new,
     _codex_exec_args,
@@ -35,6 +37,7 @@ from scripts.sympohy.runner import (
     _pull_request_exists,
     _push_branch_and_ensure_draft_pull_request,
     _record_run_interrupted,
+    _resolve_resume_point_for_issue,
     _resume_fix_phase,
     _resume_late_phase,
     _review_fix_loop,
@@ -387,6 +390,114 @@ class SympohyRunnerTest(unittest.TestCase):
             progress = payload["last_known_progress"]
             self.assertEqual(progress["failed_command"], "mergeability gate")
             self.assertEqual(progress["pull_request_number"], "91")
+
+    def test_review_fix_loop_rechecks_mergeability_when_pull_request_number_is_supplied(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=cwd,
+            )
+            issue = Issue(
+                number=82,
+                title="Resume fix with conflicted PR",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._ensure_review_mergeability",
+                    return_value=None,
+                ) as ensure_mergeability,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+            ):
+                result = _review_fix_loop(
+                    "#82",
+                    issue,
+                    config,
+                    cwd,
+                    log_dir,
+                    state,
+                    pull_request_number="91",
+                )
+
+        self.assertEqual(result, 2)
+        ensure_mergeability.assert_called_once()
+        codex_text.assert_not_called()
+
+    def test_pre_review_mergeability_autofix_stages_resolution_before_unmerged_check(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=cwd,
+            )
+            issue = Issue(
+                number=82,
+                title="Stage merge resolution before verification",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+            mergeability = _PullRequestMergeability(
+                number="91",
+                base_ref="main",
+                head_ref="issue-82-sympohy",
+                merge_state_status="DIRTY",
+                mergeable="CONFLICTING",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
+                patch("scripts.sympohy.runner._run_command_with_heartbeat", return_value=1),
+                patch("scripts.sympohy.runner._codex_text"),
+                patch("scripts.sympohy.runner._worktree_has_conflict_markers", return_value=False),
+                patch("scripts.sympohy.runner._run_hooks", return_value=0),
+                patch(
+                    "scripts.sympohy.runner._merge_has_unmerged_paths",
+                    side_effect=[True, False, False],
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = _attempt_pre_review_mergeability_autofix(
+                    "#82",
+                    issue,
+                    config,
+                    cwd,
+                    log_dir,
+                    state,
+                    phase="review",
+                    pull_request=mergeability,
+                    log_path=log_dir / "mergeability-autofix.log",
+                )
+
+        self.assertIsNone(result)
+        add_calls = [
+            call_args.args[0]
+            for call_args in check_call.call_args_list
+            if call_args.args and call_args.args[0][:2] == ["git", "add"]
+        ]
+        self.assertEqual(add_calls[0], ["git", "add", "-A"])
 
     def test_review_fix_without_local_changes_reruns_review(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -2324,6 +2435,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 labels=("sympohy:running", "sympohy:phase:hooks"),
                 comments=(),
                 state="CLOSED",
+                state_reason="COMPLETED",
             )
 
             with (
@@ -2352,6 +2464,25 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["phase"], "finalize")
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
+
+    def test_resolve_resume_point_for_issue_requires_completed_state_reason(self) -> None:
+        completed = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:running"}, {"name": "sympohy:phase:hooks"}],
+            {"status": "blocked", "phase": "hooks"},
+            issue_state="CLOSED",
+            issue_state_reason="COMPLETED",
+        )
+        not_planned = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:running"}, {"name": "sympohy:phase:hooks"}],
+            {"status": "blocked", "phase": "hooks"},
+            issue_state="CLOSED",
+            issue_state_reason="NOT_PLANNED",
+        )
+
+        self.assertEqual(completed.name, "completed")
+        self.assertTrue(completed.terminal)
+        self.assertEqual(not_planned.name, "hooks")
+        self.assertFalse(not_planned.terminal)
 
     def test_resume_issue_restores_done_finalize_labels_for_completed_issue(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -8,12 +8,41 @@ from scripts.sympohy.github import (
     migrate_issue_labels,
     migrate_legacy_tasks,
     comment,
+    fetch_issue,
     set_issue_state,
     sync_labels,
 )
 
 
 class SympohyGithubTest(unittest.TestCase):
+    def test_fetch_issue_reads_state_reason(self) -> None:
+        with patch(
+            "scripts.sympohy.github.gh_json",
+            return_value={
+                "number": 82,
+                "title": "Implement feature",
+                "body": "",
+                "state": "CLOSED",
+                "stateReason": "COMPLETED",
+                "labels": [{"name": "sympohy:done"}],
+                "comments": [],
+            },
+        ) as gh_json:
+            issue = fetch_issue("#82")
+
+        gh_json.assert_called_once_with(
+            [
+                "issue",
+                "view",
+                "#82",
+                "--json",
+                "number,title,body,labels,comments,state,stateReason",
+            ],
+            cwd=None,
+        )
+        self.assertEqual(issue.state, "CLOSED")
+        self.assertEqual(issue.state_reason, "COMPLETED")
+
     def test_set_issue_state_refreshes_cached_labels_for_noop_transition(self) -> None:
         with (
             patch(

@@ -906,6 +906,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         labels,
         state_payload,
         issue_state=issue.state,
+        issue_state_reason=issue.state_reason,
     )
 
     if resume_point.terminal:
@@ -1001,6 +1002,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             labels,
             state_payload,
             issue_state=issue.state,
+            issue_state_reason=issue.state_reason,
         )
         if resume_point.terminal:
             return 0
@@ -1028,6 +1030,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 labels,
                 state_payload,
                 issue_state=issue.state,
+                issue_state_reason=issue.state_reason,
             )
         elif inspection.reason == "invalid state":
             phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
@@ -2909,18 +2912,17 @@ def _review_fix_loop(
 ) -> int:
     if start_round > config.review_max_rounds + 1:
         return 0
+    pull_request_number = _ensure_review_mergeability(
+        issue_ref,
+        issue,
+        config,
+        cwd,
+        log_dir,
+        state,
+        phase=block_phase,
+    )
     if pull_request_number is None:
-        pull_request_number = _ensure_review_mergeability(
-            issue_ref,
-            issue,
-            config,
-            cwd,
-            log_dir,
-            state,
-            phase=block_phase,
-        )
-        if pull_request_number is None:
-            return 2
+        return 2
     if existing_fix_subjects is None:
         existing_fix_subjects = set(
             _commit_subjects(cwd=cwd, base_branch=config.base_branch)
@@ -3096,10 +3098,11 @@ def _attempt_pre_review_mergeability_autofix(
             role="fix",
         )
 
-    if _merge_has_unmerged_paths(cwd):
-        return "unmerged paths remain after automatic conflict fix"
     if _worktree_has_conflict_markers(cwd):
         return "conflict markers remain after automatic conflict fix"
+    subprocess.check_call(["git", "add", "-A"], cwd=cwd)
+    if _merge_has_unmerged_paths(cwd):
+        return "unmerged paths remain after staging automatic conflict fix"
     if _run_hooks(
         config.hooks,
         config.ci_retry_max_attempts,
@@ -4099,9 +4102,14 @@ def _resolve_resume_point_for_issue(
     state: Mapping[str, object] | None,
     *,
     issue_state: str | None = None,
+    issue_state_reason: str | None = None,
 ):
     names = set(_label_names(labels))
-    if issue_state in {"CLOSED", "closed"} or "sympohy:done" in names:
+    closed_as_completed = issue_state in {"CLOSED", "closed"} and issue_state_reason in {
+        "COMPLETED",
+        "completed",
+    }
+    if closed_as_completed or "sympohy:done" in names:
         return resolve_resume_point(
             labels,
             state={
