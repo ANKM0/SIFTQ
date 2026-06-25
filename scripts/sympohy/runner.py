@@ -1588,6 +1588,8 @@ def _run_issue_locked(
             cwd=worktree,
             branch=branch,
             heartbeat=state.heartbeat,
+            issue_number=issue.number,
+            base_branch=config.base_branch,
         )
     except _AmbiguousPullRequestError as exc:
         _block(
@@ -1782,6 +1784,8 @@ def _resume_late_phase(
                 cwd=worktree,
                 branch=branch,
                 heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
             )
         except _AmbiguousPullRequestError as exc:
             _block(
@@ -3493,7 +3497,18 @@ def _ensure_draft_pull_request(
     title = _draft_pull_request_title(issue)
     body = _draft_pull_request_body(issue)
     _check_call_with_heartbeat(
-        ["gh", "pr", "create", "--draft", "--title", title, "--body", body],
+        [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--title",
+            title,
+            "--body",
+            body,
+            "--template",
+            ".github/pull_request_template.md",
+        ],
         cwd=cwd,
         heartbeat=heartbeat,
     )
@@ -3505,13 +3520,50 @@ def _push_branch_and_ensure_draft_pull_request(
     cwd: Path,
     branch: str,
     heartbeat: Callable[[], None] | None = None,
+    issue_number: int | None = None,
+    base_branch: str | None = None,
 ) -> None:
+    if issue_number is not None and base_branch is not None:
+        _ensure_initial_pull_request_commit(
+            issue_number=issue_number,
+            cwd=cwd,
+            base_branch=base_branch,
+        )
     _check_call_with_heartbeat(
         ["git", "push", "-u", "origin", branch],
         cwd=cwd,
         heartbeat=heartbeat,
     )
     _ensure_draft_pull_request(issue=issue, cwd=cwd, heartbeat=heartbeat)
+
+
+def _ensure_initial_pull_request_commit(
+    *,
+    issue_number: int,
+    cwd: Path,
+    base_branch: str,
+) -> None:
+    if _branch_has_commits(cwd=cwd, base_branch=base_branch):
+        return
+    subject = f"#{issue_number} chore(sympohy): open draft pull request"
+    if not validate_commit_subject(subject):
+        raise ValueError(f"invalid generated commit subject: {subject}")
+    subprocess.check_call(["git", "commit", "--allow-empty", "-m", subject], cwd=cwd)
+
+
+def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:
+    try:
+        output = subprocess.check_output(
+            ["git", "rev-list", "--count", f"{base_branch}..HEAD"],
+            cwd=cwd,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return True
+    try:
+        return int(output.strip() or "0") > 0
+    except ValueError:
+        return True
 
 
 def _draft_pull_request_title(issue: Issue) -> str:

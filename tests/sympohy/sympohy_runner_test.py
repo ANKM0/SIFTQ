@@ -25,6 +25,7 @@ from scripts.sympohy.runner import (
     _infer_implementation_recovery,
     _pull_request_exists,
     _pull_request_merged,
+    _push_branch_and_ensure_draft_pull_request,
     _resume_fix_phase,
     _resume_late_phase,
     _run_final_verifier_fix_round,
@@ -2050,6 +2051,61 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertIn("- [ ] task ci:markdown", command[7])
         self.assertIn("- [ ] task codd:validate", command[7])
         self.assertIn("- [ ] GitHub checks are passing", command[7])
+        self.assertEqual(command[8], "--template")
+        self.assertEqual(command[9], ".github/pull_request_template.md")
+
+    def test_push_branch_creates_initial_empty_commit_before_draft_pr(self) -> None:
+        events: list[str] = []
+
+        def check_call(command: list[str], **_kwargs: object) -> None:
+            events.append(" ".join(command))
+
+        def check_call_with_heartbeat(
+            command: list[str],
+            **_kwargs: object,
+        ) -> None:
+            events.append(" ".join(command))
+
+        def ensure_draft_pull_request(**_kwargs: object) -> None:
+            events.append("ensure_draft_pull_request")
+
+        with (
+            patch("scripts.sympohy.runner._branch_has_commits", return_value=False),
+            patch(
+                "scripts.sympohy.runner.subprocess.check_call",
+                side_effect=check_call,
+            ),
+            patch(
+                "scripts.sympohy.runner._check_call_with_heartbeat",
+                side_effect=check_call_with_heartbeat,
+            ),
+            patch(
+                "scripts.sympohy.runner._ensure_draft_pull_request",
+                side_effect=ensure_draft_pull_request,
+            ),
+        ):
+            _push_branch_and_ensure_draft_pull_request(
+                issue=Issue(
+                    number=82,
+                    title="Open draft pull request",
+                    body="",
+                    labels=(),
+                    comments=(),
+                ),
+                cwd=Path("/tmp/worktree"),
+                branch="issue-82-sympohy",
+                issue_number=82,
+                base_branch="main",
+            )
+
+        self.assertEqual(
+            events,
+            [
+                "git commit --allow-empty -m #82 chore(sympohy): open draft pull request",
+                "git push -u origin issue-82-sympohy",
+                "ensure_draft_pull_request",
+            ],
+        )
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
