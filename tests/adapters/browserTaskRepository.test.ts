@@ -248,6 +248,37 @@ describe("browserTaskRepository", () => {
     ]);
   });
 
+  it("reorders list order without changing preserved matrix area or area order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+    await repository.reorderTaskList({ taskId: "task-1", toIndex: 1 });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 1,
+        status: "done"
+      })
+    ]);
+  });
+
   it("preserves matrix area when status changes and restores the task to that area", async () => {
     const repository = repositoryForTest();
 

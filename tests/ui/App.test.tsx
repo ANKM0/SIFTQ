@@ -204,7 +204,7 @@ describe("App", () => {
     seedStoredTasks(
       task({ id: "task-1", title: "First", areaId: "do", order: 0 }),
       task({ id: "task-2", title: "Second", areaId: "done", status: "done", order: 1 }),
-      task({ id: "task-3", title: "Third", areaId: "delegate", order: 2 })
+      task({ id: "task-3", title: "Third", areaId: "delegate", order: 0 })
     );
     window.location.hash = "#/tasks";
 
@@ -216,9 +216,9 @@ describe("App", () => {
 
     await waitFor(() => expect(taskListTitles()).toEqual(["Third", "First", "Second"]));
     expect(storedTasks()).toMatchObject([
-      { id: "task-1", listOrder: 1 },
-      { id: "task-3", listOrder: 0 },
-      { id: "task-2", listOrder: 2 }
+      { id: "task-1", areaId: "do", order: 0, listOrder: 1 },
+      { id: "task-3", areaId: "delegate", order: 0, listOrder: 0 },
+      { id: "task-2", areaId: "done", order: 1, listOrder: 2 }
     ]);
   });
 
@@ -237,6 +237,32 @@ describe("App", () => {
       expect(storedTasks()[0]).toMatchObject({ areaId: "do", status: "done" })
     );
     expect(screen.getByRole("button", { name: "done" })).toBeTruthy();
+  });
+
+  it("restores a task to its preserved matrix area when returning it to active", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "active" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "done" }));
+    await waitFor(() =>
+      expect(storedTasks()[0]).toMatchObject({ areaId: "do", status: "done" })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "done" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "active" }));
+    await waitFor(() =>
+      expect(storedTasks()[0]).toMatchObject({ areaId: "do", status: "active" })
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "マトリックス" }));
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(taskTitlesIn("Do tasks")).toEqual(["Visible"]);
   });
 
   it("deletes a task from the task list and shows a notice", async () => {
