@@ -3502,7 +3502,7 @@ def _push_branch_and_ensure_draft_pull_request(
 
 def _pull_request_merged(*, cwd: Path) -> bool:
     result = subprocess.run(
-        ["gh", "pr", "view", "--json", "state,merged"],
+        ["gh", "pr", "view", "--json", "state,mergedAt"],
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -3517,7 +3517,8 @@ def _pull_request_merged(*, cwd: Path) -> bool:
         return False
     if not isinstance(payload, Mapping):
         return False
-    return bool(payload.get("merged")) or payload.get("state") == "MERGED"
+    merged_at = payload.get("mergedAt")
+    return isinstance(merged_at, str) and bool(merged_at)
 
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:

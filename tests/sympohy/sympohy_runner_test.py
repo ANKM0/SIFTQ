@@ -24,6 +24,7 @@ from scripts.sympohy.runner import (
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
     _pull_request_exists,
+    _pull_request_merged,
     _resume_fix_phase,
     _resume_late_phase,
     _run_final_verifier_fix_round,
@@ -2246,6 +2247,47 @@ class SympohyRunnerTest(unittest.TestCase):
             )
 
         self.assertFalse(exists)
+
+    def test_pull_request_merged_detects_non_null_merged_at(self) -> None:
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps(
+                {
+                    "state": "MERGED",
+                    "mergedAt": "2026-06-25T10:00:00Z",
+                }
+            ),
+        )
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertTrue(merged)
+
+    def test_pull_request_merged_returns_false_when_gh_view_fails(self) -> None:
+        result = subprocess.CompletedProcess([], 1, stdout="")
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertFalse(merged)
+
+    def test_pull_request_merged_returns_false_for_invalid_json(self) -> None:
+        result = subprocess.CompletedProcess([], 0, stdout="{not json")
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertFalse(merged)
+
+    def test_pull_request_merged_returns_false_without_merged_at(self) -> None:
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps({"state": "MERGED", "mergedAt": None}),
+        )
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertFalse(merged)
 
     def test_run_issue_progresses_through_hooks_commit_push_review_final_verifier_merge(
         self,
