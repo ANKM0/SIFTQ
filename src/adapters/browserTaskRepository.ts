@@ -680,6 +680,15 @@ function updateTaskDetails(
     );
   }
 
+  if (previousAreaId === nextAreaId && task.status === nextStatus) {
+    return upsertTask(tasks, {
+      ...task,
+      description: input.description,
+      title: input.title,
+      updatedAt
+    });
+  }
+
   const withoutTask = tasks.filter((candidate) => candidate.id !== task.id);
   const normalizedWithoutPreviousArea =
     isMatrixArea(previousAreaId) && task.status === "active"

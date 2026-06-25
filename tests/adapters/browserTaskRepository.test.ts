@@ -480,6 +480,53 @@ describe("browserTaskRepository", () => {
     ]);
   });
 
+  it("preserves active task order when only details change", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+    await repository.createTask({ areaId: "do", title: "Third" });
+
+    await repository.updateTaskDetails({
+      taskId: "task-2",
+      title: "Second updated",
+      description: "Edited in place",
+      areaId: "do",
+      status: "active"
+    });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second updated",
+        description: "Edited in place",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "do",
+        order: 2,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(2),
+        listOrder: 2
+      })
+    ]);
+  });
+
   function repositoryForTest() {
     return createBrowserTaskRepository(
       storage,
