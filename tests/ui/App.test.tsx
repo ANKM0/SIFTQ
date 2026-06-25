@@ -157,15 +157,31 @@ describe("App", () => {
         "Scheduled task"
       ])
     );
-    expect(storedTasks()).toEqual([
-      task({ id: "task-2", title: "Second task", areaId: "do", order: 0 }),
-      task({ id: "task-1", title: "First task", areaId: "schedule", order: 0 }),
-      task({
+    expect(storedTasks()).toMatchObject([
+      {
+        id: "task-2",
+        title: "Second task",
+        areaId: "do",
+        order: 0,
+        listOrder: 1,
+        status: "active"
+      },
+      {
+        id: "task-1",
+        title: "First task",
+        areaId: "schedule",
+        order: 0,
+        listOrder: 0,
+        status: "active"
+      },
+      {
         id: "task-3",
         title: "Scheduled task",
         areaId: "schedule",
-        order: 1
-      })
+        order: 1,
+        listOrder: 2,
+        status: "active"
+      }
     ]);
   });
 
@@ -216,7 +232,10 @@ describe("App", () => {
 function seedStoredTasks(...tasks: Task[]) {
   window.localStorage.setItem(
     BROWSER_TASK_STORAGE_KEY,
-    JSON.stringify({ tasks, version: 1 })
+    JSON.stringify({
+      tasks: tasks.map((task, listOrder) => ({ ...task, listOrder })),
+      version: 1
+    })
   );
 }
 
@@ -245,10 +264,16 @@ class MemoryStorage implements Pick<Storage, "clear" | "getItem" | "setItem"> {
 }
 
 function task(input: Partial<Task> & Pick<Task, "id" | "title">): Task {
+  const areaId = input.areaId ?? "do";
+
   return {
-    areaId: "do",
+    areaId,
+    createdAt: new Date(0).toISOString(),
+    description: "",
+    listOrder: input.order ?? 0,
     order: 0,
-    status: "active",
+    status: areaId === "done" ? "done" : areaId === "skipped" ? "skipped" : "active",
+    updatedAt: new Date(0).toISOString(),
     ...input
   };
 }

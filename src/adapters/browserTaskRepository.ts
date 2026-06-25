@@ -32,6 +32,20 @@ type BrowserTaskStore = {
 type BrowserTaskStorage = Pick<Storage, "getItem" | "setItem">;
 
 type TaskIdFactory = () => TaskId;
+type TimestampFactory = () => string;
+type RawBrowserTaskStore = {
+  readonly version: typeof STORE_VERSION;
+  readonly tasks: readonly unknown[];
+};
+type LoadedTasksResult = {
+  readonly tasks: Task[];
+  readonly didMigrate: boolean;
+};
+type StoredTaskWithOptionalMetadata = Pick<
+  Task,
+  "id" | "title" | "areaId" | "status" | "order"
+> &
+  Partial<Pick<Task, "description" | "createdAt" | "updatedAt" | "listOrder">>;
 
 export class BrowserTaskRepositoryError extends Error {
   readonly code: "VALIDATION" | "NOT_FOUND" | "STORAGE";
@@ -46,8 +60,19 @@ export class BrowserTaskRepositoryError extends Error {
 export function createBrowserTaskRepository(
   storage: BrowserTaskStorage = defaultBrowserStorage(),
   idFactory: TaskIdFactory = createTaskId,
-  storageKey = BROWSER_TASK_STORAGE_KEY
+  storageKey = BROWSER_TASK_STORAGE_KEY,
+  nowFactory: TimestampFactory = createTimestamp
 ): TaskRepository {
+  const loadPersistedTasks = (): Task[] => {
+    const { didMigrate, tasks } = loadTasks(storage, storageKey);
+
+    if (didMigrate) {
+      saveTasks(storage, storageKey, tasks);
+    }
+
+    return tasks;
+  };
+
   return {
     async createTask(input: CreateTaskInput): Promise<Task> {
       if (!isMatrixArea(input.areaId)) {
@@ -58,13 +83,18 @@ export function createBrowserTaskRepository(
       }
 
       const title = validateTitle(input.title);
-      const tasks = loadTasks(storage, storageKey);
+      const tasks = loadPersistedTasks();
+      const timestamp = nowFactory();
       const task = {
         areaId: input.areaId,
+        createdAt: timestamp,
+        description: "",
         id: idFactory(),
+        listOrder: nextListOrder(tasks),
         order: tasksInArea(tasks, input.areaId).length,
         status: "active",
-        title
+        title,
+        updatedAt: timestamp
       } satisfies Task;
       const nextTasks = normalizeAllAreas([...tasks, task]);
 
@@ -74,11 +104,11 @@ export function createBrowserTaskRepository(
     },
 
     async listTasks(): Promise<Task[]> {
-      return [...loadTasks(storage, storageKey)].sort(compareTasksByAreaOrder);
+      return [...loadPersistedTasks()].sort(compareTasksByAreaOrder);
     },
 
     async moveTask(input: MoveTaskInput): Promise<Task> {
-      const tasks = loadTasks(storage, storageKey);
+      const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
 
       if (!isTaskVisibleInMatrix(task)) {
@@ -95,7 +125,8 @@ export function createBrowserTaskRepository(
       const movedTask = {
         ...task,
         areaId: input.toAreaId,
-        status: statusForArea(input.toAreaId)
+        status: statusForArea(input.toAreaId),
+        updatedAt: nowFactory()
       } satisfies Task;
       const targetTasks = tasksInArea(withoutTask, input.toAreaId);
       const insertAt = clamp(input.insertAt ?? targetTasks.length, 0, targetTasks.length);
@@ -113,7 +144,7 @@ export function createBrowserTaskRepository(
     },
 
     async reorderTask(input: ReorderTaskInput): Promise<Task> {
-      const tasks = loadTasks(storage, storageKey);
+      const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
 
       if (!isTaskVisibleInMatrix(task)) {
@@ -128,7 +159,10 @@ export function createBrowserTaskRepository(
       );
       const insertAt = clamp(input.toIndex, 0, areaTasks.length);
 
-      areaTasks.splice(insertAt, 0, task);
+      areaTasks.splice(insertAt, 0, {
+        ...task,
+        updatedAt: nowFactory()
+      } satisfies Task);
 
       const nextTasks = normalizeAreaInCurrentOrder(
         replaceArea(tasks, task.areaId, areaTasks),
@@ -142,10 +176,13 @@ export function createBrowserTaskRepository(
 
     async updateTaskTitle(input: UpdateTaskTitleInput): Promise<Task> {
       const title = validateTitle(input.title);
-      const tasks = loadTasks(storage, storageKey);
+      const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
+      const updatedAt = nowFactory();
       const nextTasks = tasks.map((candidate) =>
-        candidate.id === task.id ? ({ ...candidate, title } satisfies Task) : candidate
+        candidate.id === task.id
+          ? ({ ...candidate, title, updatedAt } satisfies Task)
+          : candidate
       );
 
       saveTasks(storage, storageKey, nextTasks);
@@ -196,6 +233,10 @@ function createTaskId(): TaskId {
   return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+function createTimestamp(): string {
+  return new Date().toISOString();
+}
+
 function validateTitle(rawTitle: string): string {
   const error = validateTaskTitleInput(rawTitle);
 
@@ -206,11 +247,11 @@ function validateTitle(rawTitle: string): string {
   return normalizeTaskTitleInput(rawTitle);
 }
 
-function loadTasks(storage: BrowserTaskStorage, storageKey: string): Task[] {
+function loadTasks(storage: BrowserTaskStorage, storageKey: string): LoadedTasksResult {
   const rawStore = storage.getItem(storageKey);
 
   if (rawStore === null) {
-    return [];
+    return { didMigrate: false, tasks: [] };
   }
 
   try {
@@ -220,7 +261,12 @@ function loadTasks(storage: BrowserTaskStorage, storageKey: string): Task[] {
       throw new Error("Unexpected browser task store shape.");
     }
 
-    return normalizeAllAreas([...store.tasks]);
+    const migratedTasks = migrateStoredTasks(store.tasks);
+
+    return {
+      didMigrate: migratedTasks.didMigrate,
+      tasks: normalizeAllAreas(migratedTasks.tasks)
+    };
   } catch (error) {
     throw new BrowserTaskRepositoryError(
       "STORAGE",
@@ -249,19 +295,18 @@ function saveTasks(
   }
 }
 
-function isBrowserTaskStore(store: unknown): store is BrowserTaskStore {
+function isBrowserTaskStore(store: unknown): store is RawBrowserTaskStore {
   return (
     typeof store === "object" &&
     store !== null &&
     "version" in store &&
     store.version === STORE_VERSION &&
     "tasks" in store &&
-    Array.isArray(store.tasks) &&
-    store.tasks.every(isStoredTask)
+    Array.isArray(store.tasks)
   );
 }
 
-function isStoredTask(task: unknown): task is Task {
+function isStoredTask(task: unknown): task is StoredTaskWithOptionalMetadata {
   return (
     typeof task === "object" &&
     task !== null &&
@@ -279,6 +324,90 @@ function isStoredTask(task: unknown): task is Task {
     Number.isInteger(task.order) &&
     task.order >= 0
   );
+}
+
+function migrateStoredTasks(tasks: readonly unknown[]): LoadedTasksResult {
+  const parsedTasks = tasks.map((task) => {
+    if (!isStoredTask(task)) {
+      throw new Error("Unexpected browser task store shape.");
+    }
+
+    return task;
+  });
+  const fallbackCreatedAtById = new Map(
+    parsedTasks.map((task, index) => [task.id, legacyTimestampFor(index)] as const)
+  );
+  let didMigrate = false;
+
+  const tasksWithMetadata = parsedTasks.map((task) => {
+    const description = typeof task.description === "string" ? task.description : "";
+    const createdAt = isTimestamp(task.createdAt)
+      ? task.createdAt
+      : fallbackCreatedAtById.get(task.id) ?? legacyTimestampFor(0);
+    const updatedAt = isTimestamp(task.updatedAt) ? task.updatedAt : createdAt;
+
+    if (
+      description !== task.description ||
+      createdAt !== task.createdAt ||
+      updatedAt !== task.updatedAt
+    ) {
+      didMigrate = true;
+    }
+
+    return {
+      ...task,
+      createdAt,
+      description,
+      updatedAt
+    } satisfies Omit<Task, "listOrder">;
+  });
+
+  const nextListOrders = deriveListOrders(tasksWithMetadata);
+
+  return {
+    didMigrate:
+      didMigrate ||
+      tasksWithMetadata.some((task) => task.listOrder !== nextListOrders.get(task.id)),
+    tasks: tasksWithMetadata.map((task) => ({
+      ...task,
+      listOrder: nextListOrders.get(task.id) ?? 0
+    }))
+  };
+}
+
+function deriveListOrders(
+  tasks: readonly (Omit<Task, "listOrder"> & Partial<Pick<Task, "listOrder">>)[]
+): Map<TaskId, number> {
+  const hasDistinctListOrders =
+    tasks.every(
+      (task) =>
+        typeof task.listOrder === "number" &&
+        Number.isInteger(task.listOrder) &&
+        task.listOrder >= 0
+    ) &&
+    new Set(tasks.map((task) => task.listOrder)).size === tasks.length;
+
+  const orderedTasks = hasDistinctListOrders
+    ? [...tasks].sort(
+        (left, right) =>
+          (left.listOrder ?? 0) - (right.listOrder ?? 0) || left.id.localeCompare(right.id)
+      )
+    : [...tasks].sort(
+        (left, right) =>
+          left.createdAt.localeCompare(right.createdAt) ||
+          compareByAreaAndOrder(left, right) ||
+          left.id.localeCompare(right.id)
+      );
+
+  return new Map(orderedTasks.map((task, index) => [task.id, index] as const));
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+function legacyTimestampFor(index: number): string {
+  return new Date(index).toISOString();
 }
 
 function taskById(tasks: readonly Task[], taskId: TaskId): Task {
@@ -337,4 +466,19 @@ function normalizeAreaInCurrentOrder(tasks: readonly Task[], areaId: AreaId): Ta
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function nextListOrder(tasks: readonly Task[]): number {
+  return tasks.reduce((maxOrder, task) => Math.max(maxOrder, task.listOrder), -1) + 1;
+}
+
+function compareByAreaAndOrder(
+  left: Pick<Task, "areaId" | "order" | "id">,
+  right: Pick<Task, "areaId" | "order" | "id">
+): number {
+  return (
+    AREA_ORDER.indexOf(left.areaId) - AREA_ORDER.indexOf(right.areaId) ||
+    left.order - right.order ||
+    left.id.localeCompare(right.id)
+  );
 }

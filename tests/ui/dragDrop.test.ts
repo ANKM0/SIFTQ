@@ -144,7 +144,16 @@ describe("dragDrop", () => {
 function task(input: Pick<Task, "id" | "areaId" | "order">): Task {
   return {
     ...input,
+    createdAt: new Date(0).toISOString(),
+    description: "",
+    listOrder: input.order,
     title: input.id,
-    status: input.areaId === "done" ? "done" : "active"
+    status:
+      input.areaId === "done"
+        ? "done"
+        : input.areaId === "skipped"
+          ? "skipped"
+          : "active",
+    updatedAt: new Date(0).toISOString()
   };
 }

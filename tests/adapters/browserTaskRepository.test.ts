@@ -10,10 +10,12 @@ import { type Task } from "../../src/contracts/task";
 describe("browserTaskRepository", () => {
   let storage: MemoryStorage;
   let nextId: number;
+  let nextTimestamp: number;
 
   beforeEach(() => {
     storage = new MemoryStorage();
     nextId = 1;
+    nextTimestamp = 0;
   });
 
   it("creates, trims, lists, and persists browser tasks", async () => {
@@ -23,17 +25,37 @@ describe("browserTaskRepository", () => {
       repository.createTask({ areaId: "do", title: "  First  " })
     ).resolves.toMatchObject({
       areaId: "do",
+      createdAt: timestampAt(0),
+      description: "",
       id: "task-1",
+      listOrder: 0,
       order: 0,
       status: "active",
-      title: "First"
+      title: "First",
+      updatedAt: timestampAt(0)
     });
 
     await repository.createTask({ areaId: "schedule", title: "Second" });
 
     expect(await repository.listTasks()).toEqual([
-      task({ id: "task-1", title: "First", areaId: "do", order: 0 }),
-      task({ id: "task-2", title: "Second", areaId: "schedule", order: 0 })
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
     ]);
 
     expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
@@ -53,9 +75,33 @@ describe("browserTaskRepository", () => {
     await repository.moveTask({ taskId: "task-1", toAreaId: "schedule", insertAt: 0 });
 
     expect(await repository.listTasks()).toEqual([
-      task({ id: "task-2", title: "Second", areaId: "do", order: 0 }),
-      task({ id: "task-1", title: "First", areaId: "schedule", order: 0 }),
-      task({ id: "task-3", title: "Scheduled", areaId: "schedule", order: 1 })
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(4),
+        listOrder: 0
+      }),
+      task({
+        id: "task-3",
+        title: "Scheduled",
+        areaId: "schedule",
+        order: 1,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(2),
+        listOrder: 2
+      })
     ]);
   });
 
@@ -71,8 +117,11 @@ describe("browserTaskRepository", () => {
         id: "task-1",
         title: "Done title",
         areaId: "done",
+        createdAt: timestampAt(0),
         order: 0,
-        status: "done"
+        status: "done",
+        updatedAt: timestampAt(2),
+        listOrder: 0
       })
     ]);
     await expect(
@@ -99,8 +148,73 @@ describe("browserTaskRepository", () => {
     } satisfies Partial<BrowserTaskRepositoryError>);
   });
 
+  it("migrates legacy browser tasks missing description, timestamps, and list order", async () => {
+    const repository = repositoryForTest();
+
+    storage.setItem(
+      BROWSER_TASK_STORAGE_KEY,
+      JSON.stringify({
+        tasks: [
+          { areaId: "schedule", id: "task-2", order: 0, status: "active", title: "Second" },
+          { areaId: "do", id: "task-1", order: 0, status: "active", title: "First" }
+        ],
+        version: 1
+      })
+    );
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      })
+    ]);
+
+    expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
+      tasks: [
+        task({
+          id: "task-1",
+          title: "First",
+          areaId: "do",
+          order: 0,
+          createdAt: timestampAt(1),
+          updatedAt: timestampAt(1),
+          listOrder: 1
+        }),
+        task({
+          id: "task-2",
+          title: "Second",
+          areaId: "schedule",
+          order: 0,
+          createdAt: timestampAt(0),
+          updatedAt: timestampAt(0),
+          listOrder: 0
+        })
+      ],
+      version: 1
+    });
+  });
+
   function repositoryForTest() {
-    return createBrowserTaskRepository(storage, () => `task-${nextId++}`);
+    return createBrowserTaskRepository(
+      storage,
+      () => `task-${nextId++}`,
+      BROWSER_TASK_STORAGE_KEY,
+      () => timestampAt(nextTimestamp++)
+    );
   }
 });
 
@@ -117,10 +231,20 @@ class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
 }
 
 function task(input: Partial<Task> & Pick<Task, "id" | "title">): Task {
+  const areaId = input.areaId ?? "do";
+
   return {
-    areaId: "do",
+    areaId,
+    createdAt: timestampAt(0),
+    description: "",
+    listOrder: input.order ?? 0,
     order: 0,
-    status: "active",
+    status: areaId === "done" ? "done" : areaId === "skipped" ? "skipped" : "active",
+    updatedAt: timestampAt(0),
     ...input
   };
+}
+
+function timestampAt(index: number): string {
+  return new Date(index).toISOString();
 }
