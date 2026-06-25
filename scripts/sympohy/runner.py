@@ -878,11 +878,15 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     log_dir = config.run_log_root / f"issue-{issue.number}"
     state_path = log_dir / "state.json"
     state_payload = read_run_state(state_path)
-    resume_point = _resolve_resume_point_for_issue(labels, state_payload)
+    resume_point = _resolve_resume_point_for_issue(
+        labels,
+        state_payload,
+        issue_state=issue.state,
+    )
 
     if resume_point.terminal:
         terminal_phase = resume_point.phase or (
-            "merge" if resume_point.name == "completed" else "triage"
+            "finalize" if resume_point.name == "completed" else "triage"
         )
         run_id = _new_run_id()
         lock = _IssueRunLock(
@@ -969,7 +973,11 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         return 0
     try:
         state_payload = read_run_state(state_path)
-        resume_point = _resolve_resume_point_for_issue(labels, state_payload)
+        resume_point = _resolve_resume_point_for_issue(
+            labels,
+            state_payload,
+            issue_state=issue.state,
+        )
         if resume_point.terminal:
             return 0
 
@@ -992,7 +1000,11 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 run_id=run_id,
                 lock_path=lock.path,
             )
-            resume_point = _resolve_resume_point_for_issue(labels, state_payload)
+            resume_point = _resolve_resume_point_for_issue(
+                labels,
+                state_payload,
+                issue_state=issue.state,
+            )
         elif inspection.reason == "invalid state":
             phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
             state = _RunStateWriter(
@@ -3733,9 +3745,20 @@ def _existing_run_refusal_reason(
 def _resolve_resume_point_for_issue(
     labels: object,
     state: Mapping[str, object] | None,
+    *,
+    issue_state: str | None = None,
 ):
+    names = set(_label_names(labels))
+    if issue_state in {"CLOSED", "closed"} or "sympohy:done" in names:
+        return resolve_resume_point(
+            labels,
+            state={
+                **(dict(state) if state is not None else {}),
+                "status": "done",
+                "phase": "finalize",
+            },
+        )
     if state is not None and state.get("status") == "blocked":
-        names = set(_label_names(labels))
         if "sympohy:blocked" not in names and (
             "sympohy:running" in names or "sympohy:pending" in names
         ):

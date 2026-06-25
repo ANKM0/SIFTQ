@@ -2158,6 +2158,86 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
 
+    def test_resume_issue_reconciles_completed_issue_over_stale_blocked_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            log_dir = config.run_log_root / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "state.json").write_text(
+                json.dumps({"issue": 82, "phase": "hooks", "status": "blocked"}),
+                encoding="utf-8",
+            )
+            issue = Issue(
+                number=82,
+                title="Completed with stale local blocked state",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:hooks"),
+                comments=(),
+                state="CLOSED",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:hooks"),
+            status="sympohy:done",
+            phase="finalize",
+        )
+        check_call.assert_not_called()
+        self.assertEqual(state["phase"], "finalize")
+        self.assertEqual(state["status"], "done")
+        self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
+
+    def test_resume_issue_restores_done_finalize_labels_for_completed_issue(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Completed with stale finalize labels",
+                body="",
+                labels=("sympohy:done", "sympohy:phase:hooks"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+            state = json.loads(
+                (config.run_log_root / "issue-82" / "state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(result, 0)
+        run_issue.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:done", "sympohy:phase:hooks"),
+            status="sympohy:done",
+            phase="finalize",
+        )
+        self.assertEqual(state["phase"], "finalize")
+        self.assertEqual(state["status"], "done")
+
     def test_direct_run_refuses_existing_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))

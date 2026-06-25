@@ -33,6 +33,7 @@ codd:
 | [Matrix MVP v2 Browser Storage Design](./matrix-mvp-v2-browser-storage-design.md) | `design:matrix-mvp-v2-browser-storage` | 草案 |
 | [Taskfile コマンドランナー設計](./taskfile-command-runner.md) | `design:taskfile-command-runner` | 草案 |
 | [sympohy 実行ライフサイクル・状態設計](./sympohy-run-lifecycle-state.md) | `design:sympohy-run-lifecycle-state` | 草案 |
+| [sympohy Terminal Resume and Review Failure Hardening Design](./sympohy-terminal-resume-review-hardening.md) | `design:sympohy-terminal-resume-review-hardening` | 草案 |
 | [sympohy 停滞実行復旧設計](./sympohy-stale-run-recovery.md) | `design:sympohy-stale-run-recovery` | 草案 |
 | [設計書日本語化・機能単位分割設計](./design-docs-localization-split.md) | `design:design-docs-localization-split` | 草案 |
 

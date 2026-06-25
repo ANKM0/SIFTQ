@@ -44,6 +44,12 @@ codd:
     - id: design:sympohy-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
+    - id: req:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: governance
+    - id: design:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: governance
     - id: design:contributing-workflow-source-of-truth-adr
       relation: depends_on
       semantic: governance
