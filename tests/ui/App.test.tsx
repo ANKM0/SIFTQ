@@ -123,9 +123,78 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Visible" })).toBeTruthy();
-    expect(screen.getByText("Area")).toBeTruthy();
-    expect(screen.getByText("do")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+    expect(screen.getByDisplayValue("Visible")).toBeTruthy();
+    expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("do");
+    expect((screen.getByLabelText("status") as HTMLSelectElement).value).toBe("active");
+    expect(screen.getByText("作成日時")).toBeTruthy();
+    expect(screen.getByText("更新日時")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "タスク一覧へ戻る" }).getAttribute("href")).toBe(
+      "#/tasks"
+    );
+  });
+
+  it("updates task details from the task detail page", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("title"), {
+      target: { value: "  Updated task  " }
+    });
+    fireEvent.change(screen.getByLabelText("description"), {
+      target: { value: "Detail view edits the full description text." }
+    });
+    fireEvent.change(screen.getByLabelText("area"), {
+      target: { value: "delegate" }
+    });
+    fireEvent.change(screen.getByLabelText("status"), {
+      target: { value: "done" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() =>
+      expect(storedTasks()[0]).toMatchObject({
+        title: "Updated task",
+        description: "Detail view edits the full description text.",
+        areaId: "delegate",
+        status: "done"
+      })
+    );
+    expect(screen.getByDisplayValue("Updated task")).toBeTruthy();
+    expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("delegate");
+    expect((screen.getByLabelText("status") as HTMLSelectElement).value).toBe("done");
+  });
+
+  it("deletes a task from the detail page and returns to the task list", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "削除" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "タスク一覧" })).toBeTruthy()
+    );
+    expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?');
+    expect(screen.getByRole("status").textContent).toContain("タスクを削除しました");
+    expect(storedTasks()).toHaveLength(0);
+    expect(window.location.hash).toBe("#/tasks");
+  });
+
+  it("renders a not-found state for a missing detail task", async () => {
+    window.location.hash = "#/tasks/missing-task";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスクが見つかりませんでした" })).toBeTruthy();
+    expect(screen.getByText("指定された taskId は存在しないか、すでに削除されています。")).toBeTruthy();
     expect(screen.getByRole("link", { name: "タスク一覧へ戻る" }).getAttribute("href")).toBe(
       "#/tasks"
     );

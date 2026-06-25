@@ -28,6 +28,7 @@ import {
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
+import { isMatrixArea } from "../domain/taskRules";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
@@ -189,6 +190,33 @@ export function App() {
     }
   }
 
+  async function handleUpdateTaskDetails(
+    taskId: Task["id"],
+    details: {
+      title: Task["title"];
+      description: Task["description"];
+      areaId: MatrixAreaId;
+      status: Task["status"];
+    }
+  ): Promise<string | null> {
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.updateTaskDetails({
+        taskId,
+        title: details.title,
+        description: details.description,
+        areaId: details.areaId,
+        status: details.status
+      });
+      await refreshTasks();
+
+      return null;
+    } catch (error) {
+      return messageForError(error, "Task details could not be updated.");
+    }
+  }
+
   async function handleDeleteTask(task: Task) {
     const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
 
@@ -255,6 +283,9 @@ export function App() {
         </DndContext>
       ) : (
         <TaskDetailPage
+          operationError={operationError}
+          onDeleteTask={handleDeleteTask}
+          onUpdateTaskDetails={handleUpdateTaskDetails}
           task={tasks.find((candidate) => candidate.id === route.taskId) ?? null}
         />
       )}
@@ -502,17 +533,91 @@ function TaskListCard({
 }
 
 type TaskDetailPageProps = {
+  readonly operationError: string | null;
+  readonly onDeleteTask: (task: Task) => Promise<void>;
+  readonly onUpdateTaskDetails: (
+    taskId: Task["id"],
+    details: {
+      title: Task["title"];
+      description: Task["description"];
+      areaId: MatrixAreaId;
+      status: Task["status"];
+    }
+  ) => Promise<string | null>;
   readonly task: Task | null;
 };
 
-function TaskDetailPage({ task }: TaskDetailPageProps) {
+function TaskDetailPage({
+  operationError,
+  onDeleteTask,
+  onUpdateTaskDetails,
+  task
+}: TaskDetailPageProps) {
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [description, setDescription] = useState(task?.description ?? "");
+  const [areaId, setAreaId] = useState<MatrixAreaId>(detailAreaId(task));
+  const [status, setStatus] = useState<Task["status"]>(task?.status ?? "active");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const validationError = validateTaskTitleInput(title);
+  const canSave = task !== null && validationError === null;
+
+  useEffect(() => {
+    if (task === null) {
+      setTitle("");
+      setDescription("");
+      setAreaId("do");
+      setStatus("active");
+      setSaveError(null);
+
+      return;
+    }
+
+    setTitle(task.title);
+    setDescription(task.description);
+    setAreaId(detailAreaId(task));
+    setStatus(task.status);
+    setSaveError(null);
+  }, [task]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (task === null) {
+      return;
+    }
+
+    if (validationError !== null) {
+      setSaveError(validationError);
+
+      return;
+    }
+
+    const error = await onUpdateTaskDetails(task.id, {
+      areaId,
+      description,
+      status,
+      title
+    });
+
+    setSaveError(error);
+  }
+
+  async function handleDelete() {
+    if (task === null) {
+      return;
+    }
+
+    await onDeleteTask(task);
+    window.location.hash = "#/tasks";
+  }
+
   return (
     <main className="matrix-page">
       <AppHeader currentPage="tasks" />
       <section aria-labelledby="task-detail-title" className="task-detail-page">
         {task === null ? (
           <>
-            <h2 id="task-detail-title">Task not found</h2>
+            <h2 id="task-detail-title">タスクが見つかりませんでした</h2>
             <p>指定された taskId は存在しないか、すでに削除されています。</p>
             <a className="tasks-page__back-link" href="#/tasks">
               タスク一覧へ戻る
@@ -521,30 +626,118 @@ function TaskDetailPage({ task }: TaskDetailPageProps) {
         ) : (
           <>
             <header className="task-detail-page__header">
-              <h2 id="task-detail-title">{task.title}</h2>
+              <h2 id="task-detail-title">タスク詳細</h2>
               <a className="tasks-page__back-link" href="#/tasks">
                 タスク一覧へ戻る
               </a>
             </header>
-            <dl className="task-detail-page__meta">
-              <div>
-                <dt>Area</dt>
-                <dd>{task.areaId}</dd>
+            {operationError !== null ? (
+              <p className="matrix-page__error tasks-page__error" role="alert">
+                {operationError}
+              </p>
+            ) : null}
+            <form className="task-detail-form" onSubmit={(event) => void handleSubmit(event)}>
+              <div className="task-detail-form__grid">
+                <label className="task-detail-form__field">
+                  title
+                  <input
+                    name="title"
+                    type="text"
+                    value={title}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      setSaveError(null);
+                    }}
+                  />
+                </label>
+                <label className="task-detail-form__field">
+                  area
+                  <select
+                    name="area"
+                    value={areaId}
+                    onChange={(event) => {
+                      setAreaId(event.target.value as MatrixAreaId);
+                      setSaveError(null);
+                    }}
+                  >
+                    {MATRIX_AREAS.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="task-detail-form__field">
+                  description
+                  <textarea
+                    name="description"
+                    value={description}
+                    onChange={(event) => {
+                      setDescription(event.target.value);
+                      setSaveError(null);
+                    }}
+                  />
+                </label>
+                <div className="task-detail-form__meta">
+                  <div>
+                    <strong>作成日時</strong>
+                    <p>{task.createdAt}</p>
+                  </div>
+                  <div>
+                    <strong>更新日時</strong>
+                    <p>{task.updatedAt}</p>
+                  </div>
+                  <label className="task-detail-form__field">
+                    status
+                    <select
+                      name="status"
+                      value={status}
+                      onChange={(event) => {
+                        setStatus(event.target.value as Task["status"]);
+                        setSaveError(null);
+                      }}
+                    >
+                      {(["active", "done", "skipped"] as const).map((candidate) => (
+                        <option key={candidate} value={candidate}>
+                          {candidate}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
-              <div>
-                <dt>Status</dt>
-                <dd>{task.status}</dd>
+              {validationError !== null ? (
+                <p className="task-edit-form__error" role="alert">
+                  {validationError}
+                </p>
+              ) : null}
+              {saveError !== null ? (
+                <p className="task-edit-form__error" role="alert">
+                  {saveError}
+                </p>
+              ) : null}
+              <div className="task-detail-form__actions">
+                <button className="tasks-page__button" type="button" onClick={() => void handleDelete()}>
+                  削除
+                </button>
+                <button className="tasks-page__button tasks-page__button--primary" disabled={!canSave} type="submit">
+                  保存
+                </button>
               </div>
-              <div>
-                <dt>Description</dt>
-                <dd>{task.description.length > 0 ? task.description : "説明なし"}</dd>
-              </div>
-            </dl>
+            </form>
           </>
         )}
       </section>
     </main>
   );
+}
+
+function detailAreaId(task: Task | null): MatrixAreaId {
+  if (task !== null && isMatrixArea(task.areaId)) {
+    return task.areaId;
+  }
+
+  return "do";
 }
 
 type AppHeaderProps = {
