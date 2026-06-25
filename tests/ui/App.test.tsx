@@ -71,7 +71,13 @@ afterEach(() => {
 describe("App", () => {
   it("renders the matrix quadrants and terminal drop areas in a browser", async () => {
     seedStoredTasks(
-      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({
+        id: "task-1",
+        title: "Visible",
+        areaId: "do",
+        createdAt: "2024-01-02T03:04:05.000Z",
+        updatedAt: "2024-01-03T03:04:05.000Z"
+      }),
       task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
     );
 
@@ -86,6 +92,10 @@ describe("App", () => {
     expect(screen.getByText("Done")).toBeTruthy();
     expect(screen.getByText("Visible")).toBeTruthy();
     expect(screen.queryByText("Hidden")).toBeNull();
+    expect(screen.queryByText("2024-01-02T03:04:05.000Z")).toBeNull();
+    expect(screen.queryByText("2024-01-03T03:04:05.000Z")).toBeNull();
+    expect(screen.queryByText("作成日時")).toBeNull();
+    expect(screen.queryByText("更新日時")).toBeNull();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
   });
@@ -96,6 +106,7 @@ describe("App", () => {
         id: "task-1",
         title: "Visible",
         areaId: "do",
+        createdAt: "2024-01-02T03:04:05.000Z",
         description: "This description should stay visible in the list."
       }),
       task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
@@ -116,7 +127,9 @@ describe("App", () => {
     expect(screen.getByText("Hidden")).toBeTruthy();
     expect(screen.getByText("説明なし")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "削除" })).toHaveLength(2);
-    expect(screen.queryByText("1970-01-01T00:00:00.000Z")).toBeNull();
+    expect(screen.queryByText("2024-01-02T03:04:05.000Z")).toBeNull();
+    expect(screen.queryByText("作成日時")).toBeNull();
+    expect(screen.queryByText("更新日時")).toBeNull();
     expect(screen.queryByLabelText("Task matrix")).toBeNull();
   });
 
@@ -304,6 +317,27 @@ describe("App", () => {
     );
     expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?');
     expect(taskListTitles()).toEqual(["Hidden"]);
+  });
+
+  it("keeps the task list unchanged when delete confirmation is canceled", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "削除" })[0]);
+
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?'));
+    expect(taskListTitles()).toEqual(["Visible", "Hidden"]);
+    expect(storedTasks()).toHaveLength(2);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(window.location.hash).toBe("#/tasks");
   });
 
   it("clears the delete notice after leaving the task list", async () => {

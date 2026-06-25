@@ -148,6 +148,22 @@ describe("browserTaskRepository", () => {
     } satisfies Partial<BrowserTaskRepositoryError>);
   });
 
+  it("returns not-found errors when mutating or deleting a missing task", async () => {
+    const repository = repositoryForTest();
+
+    await expect(repository.deleteTask({ taskId: "missing-task" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
+
+    await expect(
+      repository.updateTaskStatus({ taskId: "missing-task", status: "done" })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
+  });
+
   it("migrates legacy browser tasks missing description, timestamps, and list order", async () => {
     const repository = repositoryForTest();
 
