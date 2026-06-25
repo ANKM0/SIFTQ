@@ -54,6 +54,7 @@ beforeEach(() => {
     value: new MemoryStorage()
   });
   window.localStorage.clear();
+  window.location.hash = "";
 });
 
 afterEach(() => {
@@ -82,6 +83,41 @@ describe("App", () => {
     expect(screen.queryByText("Hidden")).toBeNull();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
+  });
+
+  it("routes to the task list page from #/tasks and shows mutual header links", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "マトリックス" }).getAttribute("href")).toBe(
+      "#/"
+    );
+    expect(screen.getByRole("link", { name: "タスク一覧" }).getAttribute("href")).toBe(
+      "#/tasks"
+    );
+    expect(screen.getByText("Visible")).toBeTruthy();
+    expect(screen.getByText("Hidden")).toBeTruthy();
+    expect(screen.queryByLabelText("Task matrix")).toBeNull();
+  });
+
+  it("routes to the task detail page from #/tasks/:taskId", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Visible" })).toBeTruthy();
+    expect(screen.getByText("Area")).toBeTruthy();
+    expect(screen.getByText("do")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "タスク一覧へ戻る" }).getAttribute("href")).toBe(
+      "#/tasks"
+    );
   });
 
   it("renders a storage error when browser storage is corrupt", async () => {

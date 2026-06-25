@@ -28,6 +28,7 @@ import {
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
+const DEFAULT_ROUTE = "#/";
 
 type RuntimeState =
   | { readonly status: "checking" }
@@ -38,12 +39,18 @@ type RuntimeState =
       readonly message: string;
     };
 
+type AppRoute =
+  | { readonly name: "matrix" }
+  | { readonly name: "tasks" }
+  | { readonly name: "task-detail"; readonly taskId: Task["id"] };
+
 export function App() {
   const [tasks, setTasks] = useState<readonly Task[]>([]);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>({
     status: "checking"
   });
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [route, setRoute] = useState<AppRoute>(() => routeFromHash(window.location.hash));
 
   useEffect(() => {
     let isCurrent = true;
@@ -73,6 +80,18 @@ export function App() {
 
     return () => {
       isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncRouteFromHash() {
+      setRoute(routeFromHash(window.location.hash));
+    }
+
+    window.addEventListener("hashchange", syncRouteFromHash);
+
+    return () => {
+      window.removeEventListener("hashchange", syncRouteFromHash);
     };
   }, []);
 
@@ -150,18 +169,28 @@ export function App() {
   }
 
   return (
-    <DndContext
-      autoScroll={false}
-      modifiers={dragModifiers}
-      onDragEnd={(event) => void handleDragEnd(event)}
-    >
-      <MatrixPage
-        tasks={tasks}
-        operationError={operationError}
-        onCreateTask={handleCreateTask}
-        onUpdateTaskTitle={handleUpdateTaskTitle}
-      />
-    </DndContext>
+    <>
+      {route.name === "matrix" ? (
+        <DndContext
+          autoScroll={false}
+          modifiers={dragModifiers}
+          onDragEnd={(event) => void handleDragEnd(event)}
+        >
+          <MatrixPage
+            tasks={tasks}
+            operationError={operationError}
+            onCreateTask={handleCreateTask}
+            onUpdateTaskTitle={handleUpdateTaskTitle}
+          />
+        </DndContext>
+      ) : route.name === "tasks" ? (
+        <TasksPage tasks={tasks} />
+      ) : (
+        <TaskDetailPage
+          task={tasks.find((candidate) => candidate.id === route.taskId) ?? null}
+        />
+      )}
+    </>
   );
 }
 
@@ -199,9 +228,7 @@ function MatrixPage({
 
   return (
     <main className="matrix-page">
-      <header className="matrix-page__header">
-        <h1>SIFTQ</h1>
-      </header>
+      <AppHeader currentPage="matrix" />
       {operationError !== null ? (
         <p className="matrix-page__error" role="alert">
           {operationError}
@@ -239,6 +266,112 @@ function MatrixPage({
         />
       ) : null}
     </main>
+  );
+}
+
+type TasksPageProps = {
+  readonly tasks: readonly Task[];
+};
+
+function TasksPage({ tasks }: TasksPageProps) {
+  return (
+    <main className="matrix-page">
+      <AppHeader currentPage="tasks" />
+      <section aria-labelledby="tasks-page-title" className="tasks-page">
+        <header className="tasks-page__header">
+          <h2 id="tasks-page-title">タスク一覧</h2>
+          <p>{tasks.length} tasks</p>
+        </header>
+        <ul aria-label="Task list" className="tasks-page__list">
+          {tasks.map((task) => (
+            <li key={task.id} className="tasks-page__item">
+              <a className="tasks-page__link" href={`#/tasks/${task.id}`}>
+                <span className="tasks-page__title">{task.title}</span>
+                <span className="tasks-page__meta">
+                  {task.areaId} / {task.status}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </main>
+  );
+}
+
+type TaskDetailPageProps = {
+  readonly task: Task | null;
+};
+
+function TaskDetailPage({ task }: TaskDetailPageProps) {
+  return (
+    <main className="matrix-page">
+      <AppHeader currentPage="tasks" />
+      <section aria-labelledby="task-detail-title" className="task-detail-page">
+        {task === null ? (
+          <>
+            <h2 id="task-detail-title">Task not found</h2>
+            <p>指定された taskId は存在しないか、すでに削除されています。</p>
+            <a className="tasks-page__back-link" href="#/tasks">
+              タスク一覧へ戻る
+            </a>
+          </>
+        ) : (
+          <>
+            <header className="task-detail-page__header">
+              <h2 id="task-detail-title">{task.title}</h2>
+              <a className="tasks-page__back-link" href="#/tasks">
+                タスク一覧へ戻る
+              </a>
+            </header>
+            <dl className="task-detail-page__meta">
+              <div>
+                <dt>Area</dt>
+                <dd>{task.areaId}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{task.status}</dd>
+              </div>
+              <div>
+                <dt>Description</dt>
+                <dd>{task.description.length > 0 ? task.description : "説明なし"}</dd>
+              </div>
+            </dl>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
+type AppHeaderProps = {
+  readonly currentPage: "matrix" | "tasks";
+};
+
+function AppHeader({ currentPage }: AppHeaderProps) {
+  return (
+    <header className="matrix-page__header">
+      <div className="matrix-page__header-main">
+        <h1>SIFTQ</h1>
+        <nav aria-label="Primary">
+          <a
+            aria-current={currentPage === "matrix" ? "page" : undefined}
+            className="matrix-page__nav-link"
+            href={DEFAULT_ROUTE}
+          >
+            マトリックス
+          </a>
+          <a
+            aria-current={currentPage === "tasks" ? "page" : undefined}
+            className="matrix-page__nav-link"
+            href="#/tasks"
+          >
+            タスク一覧
+          </a>
+        </nav>
+      </div>
+    </header>
   );
 }
 
@@ -504,4 +637,24 @@ function codeForError(error: unknown): string {
     typeof error.code === "string"
     ? error.code
     : "STORAGE";
+}
+
+function routeFromHash(hash: string): AppRoute {
+  const normalizedHash = hash.length > 0 ? hash : DEFAULT_ROUTE;
+
+  if (normalizedHash === DEFAULT_ROUTE || normalizedHash === "#") {
+    return { name: "matrix" };
+  }
+
+  if (normalizedHash === "#/tasks") {
+    return { name: "tasks" };
+  }
+
+  const taskMatch = normalizedHash.match(/^#\/tasks\/(.+)$/u);
+
+  if (taskMatch !== null) {
+    return { name: "task-detail", taskId: decodeURIComponent(taskMatch[1]) };
+  }
+
+  return { name: "matrix" };
 }
