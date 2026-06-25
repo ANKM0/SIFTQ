@@ -4089,6 +4089,25 @@ def _ensure_existing_pull_request_metadata(*, cwd: Path) -> None:
             "body is empty; restore issue traceability, summary, and validation "
             "details before resuming"
         )
+    missing_sections = _missing_pull_request_metadata_sections(body)
+    if missing_sections:
+        missing = ", ".join(missing_sections)
+        raise _PullRequestMetadataError(
+            "existing pull request "
+            f"#{pull_request_number if pull_request_number is not None else 'unknown'} "
+            "body is missing required metadata sections "
+            f"({missing}); restore issue traceability, summary, and validation "
+            "details before resuming"
+        )
+
+
+def _missing_pull_request_metadata_sections(body: str) -> list[str]:
+    required_sections = (
+        ("Issue Traceability", "## Issue Traceability"),
+        ("Summary", "## 概要"),
+        ("Validation", "## 動作確認結果"),
+    )
+    return [label for label, marker in required_sections if marker not in body]
 
 
 def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:

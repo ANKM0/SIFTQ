@@ -2707,7 +2707,16 @@ class SympohyRunnerTest(unittest.TestCase):
             patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
             patch(
                 "scripts.sympohy.runner.subprocess.check_output",
-                return_value=json.dumps({"number": 91, "body": "## Issue Traceability\n- Closes #82\n"}),
+                return_value=json.dumps(
+                    {
+                        "number": 91,
+                        "body": (
+                            "## Issue Traceability\n- Closes #82\n\n"
+                            "## 概要\nsummary\n\n"
+                            "## 動作確認結果\nvalidation\n"
+                        ),
+                    }
+                ),
             ) as check_output,
             patch(
                 "scripts.sympohy.runner._check_call_with_heartbeat"
@@ -2738,6 +2747,28 @@ class SympohyRunnerTest(unittest.TestCase):
                 _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
 
         self.assertIn("existing pull request #91 body is empty", str(context.exception))
+
+    def test_ensure_draft_pull_request_blocks_existing_pr_missing_required_metadata(self) -> None:
+        with (
+            patch(
+                "scripts.sympohy.runner._current_branch",
+                return_value="issue-82-sympohy",
+            ),
+            patch("scripts.sympohy.runner._pull_request_exists", return_value=True),
+            patch(
+                "scripts.sympohy.runner.subprocess.check_output",
+                return_value=json.dumps({"number": 91, "body": "## Issue Traceability\n- Closes #82\n"}),
+            ),
+        ):
+            with self.assertRaises(_PullRequestMetadataError) as context:
+                _ensure_draft_pull_request(cwd=Path("/tmp/worktree"))
+
+        self.assertIn(
+            "existing pull request #91 body is missing required metadata sections",
+            str(context.exception),
+        )
+        self.assertIn("Summary", str(context.exception))
+        self.assertIn("Validation", str(context.exception))
 
     def test_ensure_draft_pull_request_blocks_invalid_existing_pr_metadata(self) -> None:
         with (
