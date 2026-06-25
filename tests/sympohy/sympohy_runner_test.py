@@ -2248,7 +2248,7 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertFalse(exists)
 
-    def test_pull_request_merged_detects_non_null_merged_at(self) -> None:
+    def test_pull_request_merged_detects_merged_pull_request(self) -> None:
         result = subprocess.CompletedProcess(
             [],
             0,
@@ -2259,10 +2259,42 @@ class SympohyRunnerTest(unittest.TestCase):
                 }
             ),
         )
-        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result) as run:
             merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
 
         self.assertTrue(merged)
+        run.assert_called_once_with(
+            ["gh", "pr", "view", "--json", "state,mergedAt"],
+            cwd=Path("/tmp/worktree"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+
+    def test_pull_request_merged_returns_false_for_open_pull_request(self) -> None:
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps({"state": "OPEN", "mergedAt": None}),
+        )
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertFalse(merged)
+
+    def test_pull_request_merged_returns_false_for_closed_unmerged_pull_request(
+        self,
+    ) -> None:
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=json.dumps({"state": "CLOSED", "mergedAt": None}),
+        )
+        with patch("scripts.sympohy.runner.subprocess.run", return_value=result):
+            merged = _pull_request_merged(cwd=Path("/tmp/worktree"))
+
+        self.assertFalse(merged)
 
     def test_pull_request_merged_returns_false_when_gh_view_fails(self) -> None:
         result = subprocess.CompletedProcess([], 1, stdout="")
