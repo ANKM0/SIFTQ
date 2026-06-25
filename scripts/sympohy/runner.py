@@ -1781,6 +1781,8 @@ def _run_issue_locked(
             branch=branch,
             issue_number=issue.number,
             heartbeat=state.heartbeat,
+            issue_number=issue.number,
+            base_branch=config.base_branch,
         )
     except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
         _block(
@@ -1920,6 +1922,14 @@ def _resume_late_phase(
         )
         if dirty_result is not None:
             return dirty_result
+    if _pull_request_merged(cwd=worktree):
+        return _finish_merged_issue(
+            issue_ref,
+            worktree,
+            state,
+            total_steps=_progress_int(previous_state, "total_logical_steps"),
+            message="reconciled already-merged pull request",
+        )
     set_issue_state(
         issue_ref,
         current_labels=issue.labels,
@@ -1967,6 +1977,8 @@ def _resume_late_phase(
                 branch=branch,
                 issue_number=issue.number,
                 heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -4426,7 +4438,7 @@ def _branch_has_commits(*, cwd: Path, base_branch: str) -> bool:
 
 def _pull_request_merged(*, cwd: Path) -> bool:
     result = subprocess.run(
-        ["gh", "pr", "view", "--json", "state,merged"],
+        ["gh", "pr", "view", "--json", "state,mergedAt"],
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -4441,7 +4453,8 @@ def _pull_request_merged(*, cwd: Path) -> bool:
         return False
     if not isinstance(payload, Mapping):
         return False
-    return bool(payload.get("merged")) or payload.get("state") == "MERGED"
+    merged_at = payload.get("mergedAt")
+    return isinstance(merged_at, str) and bool(merged_at)
 
 
 def _pull_request_exists(*, branch: str, cwd: Path) -> bool:
