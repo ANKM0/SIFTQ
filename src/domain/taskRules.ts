@@ -72,3 +72,11 @@ export function compareTasksByAreaOrder(left: Task, right: Task): number {
     left.id.localeCompare(right.id)
   );
 }
+
+export function compareTasksByListOrder(left: Task, right: Task): number {
+  return (
+    left.listOrder - right.listOrder ||
+    left.createdAt.localeCompare(right.createdAt) ||
+    left.id.localeCompare(right.id)
+  );
+}

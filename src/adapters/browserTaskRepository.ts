@@ -1,11 +1,14 @@
 import {
+  type MatrixAreaId,
   type AreaId,
   type Task,
-  type TaskId
+  type TaskId,
+  type TaskStatus
 } from "../contracts/task";
 import {
   AREA_ORDER,
   compareTasksByAreaOrder,
+  compareTasksByListOrder,
   isAreaId,
   isMatrixArea,
   isTaskVisibleInMatrix,
@@ -17,7 +20,10 @@ import {
   type CreateTaskInput,
   type MoveTaskInput,
   type ReorderTaskInput,
+  type ReorderTaskListInput,
   type TaskRepository,
+  type UpdateTaskDetailsInput,
+  type UpdateTaskStatusInput,
   type UpdateTaskTitleInput
 } from "../ports/taskRepository";
 
@@ -91,7 +97,7 @@ export function createBrowserTaskRepository(
         description: "",
         id: idFactory(),
         listOrder: nextListOrder(tasks),
-        order: tasksInArea(tasks, input.areaId).length,
+        order: visibleTasksInArea(tasks, input.areaId).length,
         status: "active",
         title,
         updatedAt: timestamp
@@ -104,39 +110,54 @@ export function createBrowserTaskRepository(
     },
 
     async listTasks(): Promise<Task[]> {
-      return [...loadPersistedTasks()].sort(compareTasksByAreaOrder);
+      return [...loadPersistedTasks()].sort(compareTasksByListOrder);
     },
 
     async moveTask(input: MoveTaskInput): Promise<Task> {
       const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
 
-      if (!isTaskVisibleInMatrix(task)) {
+      if (!isTaskVisibleInMatrix(task) || !isMatrixArea(task.areaId)) {
         throw new BrowserTaskRepositoryError(
           "VALIDATION",
           "Only active matrix tasks can be moved."
         );
       }
+      const sourceAreaId: MatrixAreaId = task.areaId;
 
       const withoutTask = normalizeArea(
         tasks.filter((candidate) => candidate.id !== task.id),
-        task.areaId
+        sourceAreaId
       );
+      const nextStatus = statusForArea(input.toAreaId);
+      const targetAreaId = input.toAreaId;
+      const targetVisibleTasks =
+        nextStatus === "active" && isMatrixArea(targetAreaId)
+          ? visibleTasksInArea(withoutTask, targetAreaId)
+          : [];
       const movedTask = {
         ...task,
-        areaId: input.toAreaId,
-        status: statusForArea(input.toAreaId),
+        areaId: nextStatus === "active" ? targetAreaId : sourceAreaId,
+        order:
+          nextStatus === "active"
+            ? clamp(
+                input.insertAt ?? targetVisibleTasks.length,
+                0,
+                targetVisibleTasks.length
+              )
+            : visibleTasksInArea(withoutTask, sourceAreaId).length,
+        status: nextStatus,
         updatedAt: nowFactory()
       } satisfies Task;
-      const targetTasks = tasksInArea(withoutTask, input.toAreaId);
-      const insertAt = clamp(input.insertAt ?? targetTasks.length, 0, targetTasks.length);
-
-      targetTasks.splice(insertAt, 0, movedTask);
-
-      const nextTasks = normalizeAreaInCurrentOrder(
-        replaceArea(withoutTask, input.toAreaId, targetTasks),
-        input.toAreaId
-      );
+      const nextTasks =
+        nextStatus === "active" && isMatrixArea(targetAreaId)
+          ? insertVisibleTaskIntoArea(
+              withoutTask,
+              targetAreaId,
+              movedTask,
+              movedTask.order
+            )
+          : upsertTask(withoutTask, movedTask);
 
       saveTasks(storage, storageKey, nextTasks);
 
@@ -188,6 +209,53 @@ export function createBrowserTaskRepository(
       saveTasks(storage, storageKey, nextTasks);
 
       return taskById(nextTasks, task.id);
+    },
+
+    async reorderTaskList(input: ReorderTaskListInput): Promise<Task> {
+      const tasks = loadPersistedTasks();
+      const task = taskById(tasks, input.taskId);
+      const orderedTasks = [...tasks].sort(compareTasksByListOrder);
+      const fromIndex = orderedTasks.findIndex((candidate) => candidate.id === task.id);
+      const [movedTask] = orderedTasks.splice(fromIndex, 1);
+      const insertAt = clamp(input.toIndex, 0, orderedTasks.length);
+
+      orderedTasks.splice(insertAt, 0, movedTask);
+
+      const updatedAt = nowFactory();
+      const nextTasks = orderedTasks.map((candidate, index) =>
+        candidate.listOrder === index
+          ? candidate
+          : ({ ...candidate, listOrder: index, updatedAt } satisfies Task)
+      );
+
+      saveTasks(storage, storageKey, nextTasks);
+
+      return taskById(nextTasks, task.id);
+    },
+
+    async updateTaskStatus(input: UpdateTaskStatusInput): Promise<Task> {
+      const tasks = loadPersistedTasks();
+      const task = taskById(tasks, input.taskId);
+      const nextTasks = updateTaskStatus(tasks, task, input.status, nowFactory());
+
+      saveTasks(storage, storageKey, nextTasks);
+
+      return taskById(nextTasks, task.id);
+    },
+
+    async updateTaskDetails(input: UpdateTaskDetailsInput): Promise<Task> {
+      const title = validateTitle(input.title);
+      const tasks = loadPersistedTasks();
+      const task = taskById(tasks, input.taskId);
+      const updatedAt = nowFactory();
+      const nextTasks = updateTaskDetails(tasks, task, {
+        ...input,
+        title
+      }, updatedAt);
+
+      saveTasks(storage, storageKey, nextTasks);
+
+      return taskById(nextTasks, task.id);
     }
   };
 }
@@ -205,8 +273,17 @@ export const browserTaskRepository: TaskRepository = {
   reorderTask(input) {
     return getDefaultRepository().reorderTask(input);
   },
+  reorderTaskList(input) {
+    return getDefaultRepository().reorderTaskList(input);
+  },
   updateTaskTitle(input) {
     return getDefaultRepository().updateTaskTitle(input);
+  },
+  updateTaskStatus(input) {
+    return getDefaultRepository().updateTaskStatus(input);
+  },
+  updateTaskDetails(input) {
+    return getDefaultRepository().updateTaskDetails(input);
   }
 };
 
@@ -426,6 +503,10 @@ function tasksInArea(tasks: readonly Task[], areaId: AreaId): Task[] {
     .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 
+function visibleTasksInArea(tasks: readonly Task[], areaId: MatrixAreaId): Task[] {
+  return tasksInArea(tasks, areaId).filter(isTaskVisibleInMatrix);
+}
+
 function replaceArea(
   tasks: readonly Task[],
   areaId: AreaId,
@@ -437,6 +518,16 @@ function replaceArea(
   ];
 }
 
+function upsertTask(tasks: readonly Task[], nextTask: Task): Task[] {
+  const didReplace = tasks.some((task) => task.id === nextTask.id);
+
+  if (!didReplace) {
+    return [...tasks, nextTask];
+  }
+
+  return tasks.map((task) => (task.id === nextTask.id ? nextTask : task));
+}
+
 function normalizeAllAreas(tasks: readonly Task[]): Task[] {
   return AREA_ORDER.reduce(
     (normalizedTasks, areaId) => normalizeArea(normalizedTasks, areaId),
@@ -445,23 +536,45 @@ function normalizeAllAreas(tasks: readonly Task[]): Task[] {
 }
 
 function normalizeArea(tasks: readonly Task[], areaId: AreaId): Task[] {
-  const normalizedAreaTasks = tasksInArea(tasks, areaId).map((task, order) => ({
-    ...task,
-    order
-  }));
+  const normalizedAreaTasks = normalizeVisibleAreaTasks(tasksInArea(tasks, areaId));
 
   return replaceArea(tasks, areaId, normalizedAreaTasks).sort(compareTasksByAreaOrder);
 }
 
 function normalizeAreaInCurrentOrder(tasks: readonly Task[], areaId: AreaId): Task[] {
-  const normalizedAreaTasks = tasks
-    .filter((task) => task.areaId === areaId)
-    .map((task, order) => ({
-      ...task,
-      order
-    }));
+  const normalizedAreaTasks = normalizeVisibleAreaTasks(
+    tasks.filter((task) => task.areaId === areaId)
+  );
 
   return replaceArea(tasks, areaId, normalizedAreaTasks).sort(compareTasksByAreaOrder);
+}
+
+function normalizeVisibleAreaTasks(tasks: readonly Task[]): Task[] {
+  let nextOrder = 0;
+
+  return tasks.map((task) =>
+    isTaskVisibleInMatrix(task) ? { ...task, order: nextOrder++ } : task
+  );
+}
+
+function insertVisibleTaskIntoArea(
+  tasks: readonly Task[],
+  areaId: MatrixAreaId,
+  task: Task,
+  insertAt: number
+): Task[] {
+  const areaTasks = tasks.filter((candidate) => candidate.areaId === areaId);
+  const visibleTasks = areaTasks.filter(isTaskVisibleInMatrix);
+  const hiddenTasks = areaTasks.filter((candidate) => !isTaskVisibleInMatrix(candidate));
+  const nextVisibleTasks = [...visibleTasks];
+
+  nextVisibleTasks.splice(insertAt, 0, task);
+
+  return replaceArea(
+    tasks,
+    areaId,
+    normalizeVisibleAreaTasks([...nextVisibleTasks, ...hiddenTasks])
+  ).sort(compareTasksByAreaOrder);
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -470,6 +583,98 @@ function clamp(value: number, min: number, max: number): number {
 
 function nextListOrder(tasks: readonly Task[]): number {
   return tasks.reduce((maxOrder, task) => Math.max(maxOrder, task.listOrder), -1) + 1;
+}
+
+function updateTaskStatus(
+  tasks: readonly Task[],
+  task: Task,
+  status: TaskStatus,
+  updatedAt: string
+): Task[] {
+  if (task.status === status) {
+    return [...tasks];
+  }
+
+  if (status === "active" && !isMatrixArea(task.areaId)) {
+    throw new BrowserTaskRepositoryError(
+      "VALIDATION",
+      "Active tasks must belong to a matrix area."
+    );
+  }
+
+  if (task.status === "active" && status !== "active" && isMatrixArea(task.areaId)) {
+    const sourceAreaId = task.areaId;
+    const withoutTask = normalizeArea(
+      tasks.filter((candidate) => candidate.id !== task.id),
+      sourceAreaId
+    );
+    const hiddenTask = {
+      ...task,
+      order: visibleTasksInArea(withoutTask, sourceAreaId).length,
+      status,
+      updatedAt
+    } satisfies Task;
+
+    return upsertTask(withoutTask, hiddenTask);
+  }
+
+  if (task.status !== "active" && status === "active" && isMatrixArea(task.areaId)) {
+    const restoredAreaId = task.areaId;
+    const restoredTask = {
+      ...task,
+      order: visibleTasksInArea(
+        tasks.filter((candidate) => candidate.id !== task.id),
+        restoredAreaId
+      ).length,
+      status,
+      updatedAt
+    } satisfies Task;
+
+    return normalizeAreaInCurrentOrder(upsertTask(tasks, restoredTask), restoredAreaId);
+  }
+
+  return upsertTask(tasks, { ...task, status, updatedAt });
+}
+
+function updateTaskDetails(
+  tasks: readonly Task[],
+  task: Task,
+  input: UpdateTaskDetailsInput,
+  updatedAt: string
+): Task[] {
+  const previousAreaId = task.areaId;
+  const nextAreaId = input.areaId;
+  const nextStatus = input.status;
+
+  if (nextStatus === "active" && !isMatrixArea(nextAreaId)) {
+    throw new BrowserTaskRepositoryError(
+      "VALIDATION",
+      "Active tasks must belong to a matrix area."
+    );
+  }
+
+  const withoutTask = tasks.filter((candidate) => candidate.id !== task.id);
+  const normalizedWithoutPreviousArea =
+    isMatrixArea(previousAreaId) && task.status === "active"
+      ? normalizeArea(withoutTask, previousAreaId)
+      : withoutTask;
+  const nextOrder = visibleTasksInArea(normalizedWithoutPreviousArea, nextAreaId).length;
+  const nextTask = {
+    ...task,
+    areaId: nextAreaId,
+    description: input.description,
+    order: nextStatus === "active" ? nextOrder : nextOrder,
+    status: nextStatus,
+    title: input.title,
+    updatedAt
+  } satisfies Task;
+  const withUpdatedTask = upsertTask(normalizedWithoutPreviousArea, nextTask);
+
+  if (nextStatus === "active") {
+    return normalizeAreaInCurrentOrder(withUpdatedTask, nextAreaId);
+  }
+
+  return withUpdatedTask;
 }
 
 function compareByAreaAndOrder(

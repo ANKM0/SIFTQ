@@ -76,15 +76,6 @@ describe("browserTaskRepository", () => {
 
     expect(await repository.listTasks()).toEqual([
       task({
-        id: "task-2",
-        title: "Second",
-        areaId: "do",
-        order: 0,
-        createdAt: timestampAt(1),
-        updatedAt: timestampAt(3),
-        listOrder: 1
-      }),
-      task({
         id: "task-1",
         title: "First",
         areaId: "schedule",
@@ -92,6 +83,15 @@ describe("browserTaskRepository", () => {
         createdAt: timestampAt(0),
         updatedAt: timestampAt(4),
         listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 1
       }),
       task({
         id: "task-3",
@@ -116,7 +116,7 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-1",
         title: "Done title",
-        areaId: "done",
+        areaId: "do",
         createdAt: timestampAt(0),
         order: 0,
         status: "done",
@@ -164,15 +164,6 @@ describe("browserTaskRepository", () => {
 
     expect(await repository.listTasks()).toEqual([
       task({
-        id: "task-1",
-        title: "First",
-        areaId: "do",
-        order: 0,
-        createdAt: timestampAt(1),
-        updatedAt: timestampAt(1),
-        listOrder: 1
-      }),
-      task({
         id: "task-2",
         title: "Second",
         areaId: "schedule",
@@ -180,6 +171,15 @@ describe("browserTaskRepository", () => {
         createdAt: timestampAt(0),
         updatedAt: timestampAt(0),
         listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
       })
     ]);
 
@@ -206,6 +206,129 @@ describe("browserTaskRepository", () => {
       ],
       version: 1
     });
+  });
+
+  it("reorders list order independently from matrix area order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "schedule", title: "Second" });
+    await repository.createTask({ areaId: "delegate", title: "Third" });
+
+    await repository.reorderTaskList({ taskId: "task-3", toIndex: 0 });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(3),
+        listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 2
+      })
+    ]);
+  });
+
+  it("preserves matrix area when status changes and restores the task to that area", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(2),
+        listOrder: 0,
+        status: "done"
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+
+    await repository.updateTaskStatus({ taskId: "task-1", status: "active" });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 0,
+        status: "active"
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+  });
+
+  it("changes area only through detail updates while preserving status", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+    await repository.updateTaskDetails({
+      taskId: "task-1",
+      title: "First updated",
+      description: "Moved while hidden",
+      areaId: "delegate",
+      status: "done"
+    });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First updated",
+        description: "Moved while hidden",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(2),
+        listOrder: 0,
+        status: "done"
+      })
+    ]);
   });
 
   function repositoryForTest() {

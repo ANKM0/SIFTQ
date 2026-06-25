@@ -201,7 +201,7 @@ describe("App", () => {
         expect(screen.queryByText(`${terminalAreaId} task`)).toBeNull()
       );
       expect(storedTasks()[0]).toMatchObject({
-        areaId: terminalAreaId,
+        areaId: "do",
         status: terminalAreaId
       });
     }
