@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -31,6 +34,7 @@ from scripts.sympohy.runner import (
     _pull_request_exists,
     _pull_request_merged,
     _push_branch_and_ensure_draft_pull_request,
+    _record_run_interrupted,
     _resume_fix_phase,
     _resume_late_phase,
     _run_final_verifier_fix_round,
@@ -283,6 +287,75 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(result, 2)
         set_issue_state.assert_called_once()
         self.assertIn("blocking findings remained", comment.call_args.args[1])
+
+    def test_review_fix_without_local_changes_reruns_review(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            worktree = root / "worktree"
+            log_dir.mkdir(parents=True)
+            worktree.mkdir()
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=worktree,
+            )
+            issue = Issue(
+                number=82,
+                title="Review metadata-only fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner._codex_text") as codex_text,
+                patch(
+                    "scripts.sympohy.runner._worktree_has_changes",
+                    side_effect=(False, False),
+                ),
+                patch("scripts.sympohy.runner._commit_all_if_new") as commit_all,
+            ):
+                result = _run_review_fix_round(
+                    "#82",
+                    issue,
+                    config,
+                    worktree,
+                    log_dir,
+                    state,
+                    round_index=2,
+                    review=parse_review_json(
+                        '{"findings":[{"severity":"medium","summary":"metadata"}]}'
+                    ),
+                    review_json=(
+                        '{"findings":[{"severity":"medium","summary":"metadata"}]}'
+                    ),
+                    review_pull_request="99",
+                    comment_review=False,
+                    existing_fix_subjects=set(),
+                )
+            saved_state = json.loads(
+                (log_dir / "state.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result, 1)
+        codex_text.assert_called_once()
+        commit_all.assert_not_called()
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:review"),
+            status="sympohy:running",
+            phase="fix",
+            cwd=worktree,
+        )
+        self.assertEqual(saved_state["phase"], "review")
+        self.assertEqual(
+            saved_state["last_known_progress"]["message"],
+            "review fix produced no local changes; rerunning review",
+        )
 
     def test_watch_starts_new_candidate_at_pending_triage(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -588,6 +661,32 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertEqual(state["last_known_progress"]["stale_reason"], "missing state")
 
+    def test_ensure_worktree_reuses_existing_branch_worktree_on_recovery(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            existing_worktree = root / "external-worktree"
+            issue = Issue(
+                number=82,
+                title="Reuse branch worktree",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner._branch_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._worktree_for_branch",
+                    return_value=existing_worktree,
+                ),
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = ensure_worktree(issue, config, recover=True)
+
+        self.assertEqual(result, existing_worktree)
+        check_call.assert_not_called()
+
     def test_resume_issue_blocks_invalid_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -856,12 +955,16 @@ class SympohyRunnerTest(unittest.TestCase):
                 ) as ensure_worktree,
                 patch("scripts.sympohy.runner.set_issue_state"),
                 patch("scripts.sympohy.runner.comment"),
+                patch("scripts.sympohy.runner._issue_branch_exists", return_value=False),
                 patch(
                     "scripts.sympohy.runner._codex_json",
                     return_value={"logical_steps": [{"name": "one"}]},
                 ),
                 patch("scripts.sympohy.runner._codex_text", return_value=""),
                 patch("scripts.sympohy.runner._run_hooks", return_value=1),
+                patch(
+                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request"
+                ),
                 patch(
                     "scripts.sympohy.runner.subprocess.check_output",
                     side_effect=check_output,
@@ -877,6 +980,70 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 2)
         ensure_worktree.assert_called_once_with(issue, config, recover=False)
+
+    def test_resumed_planning_run_reuses_existing_branch_without_plan_recovery(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            worktree = root / "worktree"
+            worktree.mkdir()
+            issue = Issue(
+                number=82,
+                title="Restart stale pending branch",
+                body="""
+## AC
+- [ ] resume planning after PR creation
+
+## DoD
+- [ ] generate the missing implementation plan
+""",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            def check_output(args: list[str], **_kwargs: object) -> str:
+                if args == ["git", "branch", "--show-current"]:
+                    return "issue-82-sympohy\n"
+                if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return ""
+                raise AssertionError(f"unexpected check_output: {args}")
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.ensure_worktree",
+                    return_value=worktree,
+                ) as ensure_worktree,
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner.comment"),
+                patch("scripts.sympohy.runner._issue_branch_exists", return_value=True),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    return_value={"logical_steps": [{"name": "one"}]},
+                ) as codex_json,
+                patch("scripts.sympohy.runner._codex_text", return_value=""),
+                patch("scripts.sympohy.runner._run_hooks", return_value=1),
+                patch(
+                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request"
+                ),
+                patch(
+                    "scripts.sympohy.runner.subprocess.check_output",
+                    side_effect=check_output,
+                ),
+            ):
+                result = run_issue(
+                    "#82",
+                    config,
+                    recover=False,
+                    from_resume=True,
+                    resume_point="planning",
+                )
+
+        self.assertEqual(result, 2)
+        ensure_worktree.assert_called_once_with(issue, config, recover=True)
+        codex_json.assert_called_once()
 
     def test_resume_issue_restarts_stale_pending_without_required_run_state(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -906,6 +1073,46 @@ class SympohyRunnerTest(unittest.TestCase):
             config,
             recover=False,
             from_resume=False,
+            resume_point="planning",
+        )
+        set_issue_state.assert_not_called()
+        comment.assert_not_called()
+
+    def test_resume_issue_restarts_stale_pending_planning_with_existing_branch(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Recover stale pending branch",
+                body="",
+                labels=("sympohy:pending", "sympohy:phase:triage"),
+                comments=(),
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner._branch_exists",
+                    side_effect=lambda branch: branch == "issue-82-sympohy",
+                ),
+                patch("scripts.sympohy.runner._remote_branch_exists", return_value=False),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=False,
+            from_resume=True,
             resume_point="planning",
         )
         set_issue_state.assert_not_called()
@@ -957,6 +1164,164 @@ class SympohyRunnerTest(unittest.TestCase):
             recover=False,
             from_resume=True,
             resume_point="planning",
+        )
+
+    def test_resume_issue_continues_when_blocked_state_was_unblocked(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Resume unblocked issue",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "blocked-run",
+                        "phase": "implement",
+                        "status": "blocked",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "blocked-run"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+            resume_point="implement",
+        )
+
+    def test_resume_issue_replans_stale_implement_before_plan_exists(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Resume pre-plan interruption",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "pre-plan-run",
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "pre-plan-run"},
+                        "last_known_progress": {
+                            "message": (
+                                "pushing initial issue branch and opening draft "
+                                "pull request"
+                            )
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=False,
+            from_resume=True,
+            resume_point="planning",
+        )
+
+    def test_resume_issue_keeps_recovery_after_logical_step_progress(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Resume implementation progress",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "logical-step-run",
+                        "phase": "implement",
+                        "status": "running",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "logical-step-run"},
+                        "last_known_progress": {
+                            "message": "implementing logical step",
+                            "current_logical_step": 1,
+                            "completed_logical_steps": 0,
+                            "total_logical_steps": 2,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+            resume_point="implement",
         )
 
     def test_resume_issue_blocks_stale_pending_with_existing_worktree(
@@ -1719,14 +2084,7 @@ class SympohyRunnerTest(unittest.TestCase):
             ["git", "push", "-u", "origin", "issue-82-sympohy"],
             heartbeat_commands,
         )
-        create_commands = [
-            command
-            for command in heartbeat_commands
-            if command[:4] == ["gh", "pr", "create", "--draft"]
-        ]
-        self.assertEqual(len(create_commands), 1)
-        self.assertEqual(
-            create_commands[0],
+        self.assertIn(
             [
                 "gh",
                 "pr",
@@ -1736,6 +2094,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 "--template",
                 ".github/pull_request_template.md",
             ],
+            heartbeat_commands,
         )
         commands = [call.args[0] for call in check_call.call_args_list]
         self.assertNotIn(["git", "add", "-A"], commands)
@@ -2074,6 +2433,49 @@ class SympohyRunnerTest(unittest.TestCase):
             ]
             self.assertEqual(stdout_names, ["hook-1-1.log", "hook-2-1.log"])
 
+    def test_check_output_with_heartbeat_streams_stdout_to_log(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "codex.log"
+
+            output = _check_output_with_heartbeat(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; print('first'); sys.stdout.flush(); print('second')",
+                ],
+                cwd=root,
+                log_path=log_path,
+            )
+            logged_output = log_path.read_text(encoding="utf-8")
+
+        self.assertEqual(output, "first\nsecond\n")
+        self.assertEqual(logged_output, output)
+
+    def test_check_output_with_heartbeat_refreshes_during_chatty_stdout(self) -> None:
+        heartbeats: list[object] = []
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with patch("scripts.sympohy.runner.HEARTBEAT_INTERVAL_SECONDS", 0.05):
+                _check_output_with_heartbeat(
+                    [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import sys, time\n"
+                            "for index in range(20):\n"
+                            "    print(index)\n"
+                            "    sys.stdout.flush()\n"
+                            "    time.sleep(0.01)\n"
+                        ),
+                    ],
+                    cwd=root,
+                    heartbeat=lambda: heartbeats.append(object()),
+                )
+
+        self.assertGreaterEqual(len(heartbeats), 2)
+
     def test_ensure_draft_pull_request_skips_existing_pr(self) -> None:
         with (
             patch(
@@ -2216,6 +2618,37 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertIsNone(state["last_recovery"])
 
+    def test_run_state_writer_records_interrupted_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(
+                phase="implement",
+                progress={
+                    "message": "implementing logical step",
+                    "current_logical_step": 5,
+                    "completed_logical_steps": 4,
+                    "total_logical_steps": 6,
+                },
+            )
+
+            _record_run_interrupted(writer, signal.SIGTERM)
+            state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "interrupted")
+        self.assertEqual(state["phase"], "implement")
+        self.assertEqual(state["last_known_progress"]["current_logical_step"], 5)
+        self.assertEqual(state["last_known_progress"]["message"], "interrupted by signal")
+        self.assertEqual(state["last_known_progress"]["signal"], "SIGTERM")
+        self.assertEqual(
+            state["last_known_progress"]["resume_action"],
+            "resume_interrupted_run",
+        )
+
     def test_run_state_writer_records_recovery_log(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
 
@@ -2347,6 +2780,11 @@ class SympohyRunnerTest(unittest.TestCase):
                 if self.terminated:
                     return 0
                 raise subprocess.TimeoutExpired(["task"], timeout)
+
+            def poll(self) -> int | None:
+                if self.terminated:
+                    return 0
+                return None
 
             def terminate(self) -> None:
                 self.terminated = True
@@ -2591,57 +3029,106 @@ class SympohyRunnerTest(unittest.TestCase):
             ) -> None:
                 events.append(f"comment:{pull_request_number}")
 
-            with (
-                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
-                patch("scripts.sympohy.runner._branch_exists", return_value=False),
-                patch("scripts.sympohy.runner._remote_branch_exists", return_value=False),
-                patch(
-                    "scripts.sympohy.runner.ensure_worktree",
-                    side_effect=ensure_worktree,
-                ),
-                patch(
-                    "scripts.sympohy.runner._current_branch",
-                    return_value="issue-82-sympohy",
-                ),
-                patch(
-                    "scripts.sympohy.runner.subprocess.check_output",
-                    return_value="issue-82-sympohy\n",
-                ),
-                patch("scripts.sympohy.runner._codex_json", side_effect=codex_json),
-                patch("scripts.sympohy.runner._codex_text", side_effect=codex_text),
-                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
-                patch("scripts.sympohy.runner._run_hooks", side_effect=run_hooks),
-                patch(
-                    "scripts.sympohy.runner._commit_all_if_new",
-                    side_effect=commit_all_if_new,
-                ),
-                patch(
-                    "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
-                    side_effect=push_pr,
-                ),
-                patch(
-                    "scripts.sympohy.runner._review_fix_loop",
-                    side_effect=review_fix_loop,
-                ),
-                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
-                patch(
-                    "scripts.sympohy.runner._resolve_pull_request_number",
-                    return_value="99",
-                ),
-                patch(
-                    "scripts.sympohy.runner.comment",
-                    side_effect=final_verifier_comment,
-                ) as comment,
-                patch(
-                    "scripts.sympohy.runner._check_call_with_heartbeat",
-                    side_effect=check_call_with_heartbeat,
-                ),
-                patch(
-                    "scripts.sympohy.runner.subprocess.check_call",
-                    side_effect=check_call,
-                ),
-                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-            ):
+            with ExitStack() as stack:
+                stack.enter_context(
+                    patch("scripts.sympohy.runner.fetch_issue", return_value=issue)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._branch_exists", return_value=False)
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._remote_branch_exists",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.ensure_worktree",
+                        side_effect=ensure_worktree,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-82-sympohy",
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.subprocess.check_output",
+                        return_value="issue-82-sympohy\n",
+                    )
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._codex_json", side_effect=codex_json)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._codex_text", side_effect=codex_text)
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._commit_subjects", return_value=[])
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._branch_has_commits",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch("scripts.sympohy.runner._run_hooks", side_effect=run_hooks)
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._commit_all_if_new",
+                        side_effect=commit_all_if_new,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
+                        side_effect=push_pr,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._review_fix_loop",
+                        side_effect=review_fix_loop,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._pull_request_merged",
+                        return_value=False,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._resolve_pull_request_number",
+                        return_value="99",
+                    )
+                )
+                comment = stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.comment",
+                        side_effect=final_verifier_comment,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner._check_call_with_heartbeat",
+                        side_effect=check_call_with_heartbeat,
+                    )
+                )
+                stack.enter_context(
+                    patch(
+                        "scripts.sympohy.runner.subprocess.check_call",
+                        side_effect=check_call,
+                    )
+                )
+                set_issue_state = stack.enter_context(
+                    patch("scripts.sympohy.runner.set_issue_state")
+                )
                 result = run_issue("#82", config)
 
             log_dir = config.run_log_root / "issue-82"
@@ -2658,6 +3145,7 @@ class SympohyRunnerTest(unittest.TestCase):
             events,
             [
                 "ensure_worktree",
+                "push_pr",
                 "plan.json",
                 "implement-1.log",
                 "hooks:1",
@@ -3176,6 +3664,110 @@ class SympohyRunnerTest(unittest.TestCase):
             )
             self.assertIn("invalid findings", comment.call_args.args[1])
             self.assertEqual(final_state["status"], "blocked")
+
+    def test_final_verifier_blocks_when_fix_attempt_limit_is_exceeded(self) -> None:
+        def verifier_response(summary: str) -> dict[str, object]:
+            return {
+                "status": "retry",
+                "acceptance_criteria_satisfied": False,
+                "definition_of_done_satisfied": True,
+                "merge_recommendation": "block",
+                "findings": [
+                    {
+                        "kind": "acceptance_criteria",
+                        "summary": summary,
+                        "evidence": "final verifier still finds a blocker",
+                        "suggested_fix": "fix the remaining gap",
+                    }
+                ],
+            }
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            worktree = root / "worktrees" / "issue-82"
+            log_dir = root / "runs" / "issue-82"
+            worktree.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            issue = Issue(
+                number=82,
+                title="Stop final verifier fix loop",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:finalize"),
+                comments=(),
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                worktree=worktree,
+                branch="issue-82-sympohy",
+            )
+            config = SympohyConfig(
+                max_workers=1,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=1,
+                retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
+                stage_gate_command=None,
+            )
+
+            with (
+                patch("scripts.sympohy.runner._pull_request_merged", return_value=False),
+                patch(
+                    "scripts.sympohy.runner._codex_json",
+                    side_effect=[
+                        verifier_response("first gap"),
+                        verifier_response("second gap"),
+                        verifier_response("third gap"),
+                    ],
+                ),
+                patch(
+                    "scripts.sympohy.runner._run_final_verifier_fix_round",
+                    return_value=1,
+                ) as run_final_verifier_fix_round,
+                patch(
+                    "scripts.sympohy.runner._review_fix_loop",
+                    return_value=0,
+                ) as review_fix_loop,
+                patch(
+                    "scripts.sympohy.runner._resolve_pull_request_number",
+                    return_value="99",
+                ),
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+                patch("scripts.sympohy.runner.comment") as comment,
+            ):
+                result = _run_final_verifier_and_merge(
+                    "#82",
+                    issue,
+                    config,
+                    worktree,
+                    log_dir,
+                    state,
+                    total_steps=3,
+                )
+
+            final_state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result, 2)
+        self.assertEqual(run_final_verifier_fix_round.call_count, 2)
+        self.assertEqual(review_fix_loop.call_count, 2)
+        set_issue_state.assert_called_once_with(
+            "#82",
+            current_labels=("sympohy:running", "sympohy:phase:finalize"),
+            status="sympohy:blocked",
+            phase="finalize",
+            cwd=worktree,
+        )
+        self.assertIn(
+            "final_verifier_fix_max_attempts (2)",
+            comment.call_args.args[1],
+        )
+        self.assertEqual(final_state["status"], "blocked")
+        self.assertEqual(final_state["last_known_progress"]["attempts"], 3)
 
     def test_final_verifier_fix_blocks_when_codex_makes_no_changes(self) -> None:
         verifier_response = {

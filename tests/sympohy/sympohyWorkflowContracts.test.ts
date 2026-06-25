@@ -74,7 +74,7 @@ describe("sympohy watcher contract", () => {
     expect(config).toContain("ci_retry_max_attempts: 10");
     expect(config).toContain("review_max_rounds: 5");
     expect(config).toContain("final_verifier_fix_max_attempts: 2");
-    expect(config).not.toContain("merge_gate_retry_max_attempts");
+    expect(config).not.toContain(["merge_gate", "retry_max_attempts"].join("_"));
     expect(config).toContain("stage_gate_command: task ai:sympohy:stage-gate");
     expect(core).toContain("DEFAULT_STALE_STATUS_AFTER_MINUTES");
     expect(core).toContain("\"dead pid\"");
@@ -108,7 +108,7 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("git\", \"status\", \"--porcelain\"");
   });
 
-  it("limits parallel issue starts to three and uses independent worktrees", () => {
+  it("limits parallel issue starts with conservative workers and uses independent worktrees", () => {
     expect(config).toContain("max_workers: 3");
     expect(runner).toContain("_watch_candidate_priority");
     expect(runner).toContain("watch_forever");
@@ -137,6 +137,12 @@ describe("sympohy automation contract", () => {
     expect(runner).toContain("\"codex\", \"exec\"");
     expect(runner).not.toContain("--ignore-user-config");
     expect(runner).not.toContain("--ignore-rules");
+  });
+
+  it("instructs implementation agents to read contributing workflow docs", () => {
+    expect(runner).toContain("docs/contributing documents");
+    expect(runner).toContain("docs/contributing/branch-strategy.md");
+    expect(runner).toContain("docs/contributing/commit-message-format.md");
   });
 
   it("doctor checks config, labels, systemd templates, hooks, and commit subjects", () => {

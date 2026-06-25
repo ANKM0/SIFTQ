@@ -15,6 +15,7 @@ CODEX_MODEL_ROLES = (
     "merge_readiness",
 )
 CODEX_REASONING_EFFORTS = ("low", "medium", "high", "xhigh")
+DEFAULT_FINAL_VERIFIER_FIX_MAX_ATTEMPTS = 2
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,7 @@ class SympohyConfig:
     hooks: tuple[str, ...]
     review_max_rounds: int
     ci_retry_max_attempts: int
-    merge_gate_retry_max_attempts: int | None
+    final_verifier_fix_max_attempts: int
     stage_gate_command: str | None
     codex_models: dict[str, CodexModelConfig]
 
@@ -60,7 +61,6 @@ class SympohyConfig:
         hooks: tuple[str, ...],
         review_max_rounds: int,
         ci_retry_max_attempts: int | None = None,
-        merge_gate_retry_max_attempts: int | None = None,
         stage_gate_command: str | None = "task ai:sympohy:stage-gate",
         retry_max_attempts: int | None = None,
         final_verifier_fix_max_attempts: int | None = None,
@@ -74,9 +74,9 @@ class SympohyConfig:
         )
         if ci_attempts is None:
             ci_attempts = 50
-        merge_attempts = (
-            merge_gate_retry_max_attempts
-            if merge_gate_retry_max_attempts is not None
+        final_verifier_attempts = (
+            DEFAULT_FINAL_VERIFIER_FIX_MAX_ATTEMPTS
+            if final_verifier_fix_max_attempts is None
             else final_verifier_fix_max_attempts
         )
         if stale_status_after_minutes <= 0:
@@ -87,8 +87,8 @@ class SympohyConfig:
             raise ValueError("review_max_rounds must be positive")
         if ci_attempts <= 0:
             raise ValueError("ci_retry_max_attempts must be positive")
-        if merge_attempts is not None and merge_attempts < 0:
-            raise ValueError("merge_gate_retry_max_attempts must be non-negative")
+        if final_verifier_attempts < 0:
+            raise ValueError("final_verifier_fix_max_attempts must be non-negative")
         resolved_codex_models = _merge_codex_models(codex_models or {})
 
         object.__setattr__(self, "max_workers", max_workers)
@@ -105,7 +105,7 @@ class SympohyConfig:
         object.__setattr__(self, "review_max_rounds", review_max_rounds)
         object.__setattr__(self, "ci_retry_max_attempts", ci_attempts)
         object.__setattr__(
-            self, "merge_gate_retry_max_attempts", merge_attempts
+            self, "final_verifier_fix_max_attempts", final_verifier_attempts
         )
         object.__setattr__(self, "stage_gate_command", stage_gate_command)
         object.__setattr__(self, "codex_models", resolved_codex_models)
@@ -113,10 +113,6 @@ class SympohyConfig:
     @property
     def retry_max_attempts(self) -> int:
         return self.ci_retry_max_attempts
-
-    @property
-    def final_verifier_fix_max_attempts(self) -> int:
-        return self.merge_gate_retry_max_attempts or 0
 
     def codex_model_for(self, role: str) -> CodexModelConfig:
         return self.codex_models.get(role, self.codex_models["default"])
@@ -131,11 +127,12 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
     ci_retry_max_attempts = int(
         values.get("ci_retry_max_attempts", values.get("retry_max_attempts", "50"))
     )
-    merge_gate_retry_max_attempts = None
-    if "merge_gate_retry_max_attempts" in values:
-        merge_gate_retry_max_attempts = int(values["merge_gate_retry_max_attempts"])
-    elif "final_verifier_fix_max_attempts" in values:
-        merge_gate_retry_max_attempts = int(values["final_verifier_fix_max_attempts"])
+    final_verifier_fix_max_attempts = int(
+        values.get(
+            "final_verifier_fix_max_attempts",
+            str(DEFAULT_FINAL_VERIFIER_FIX_MAX_ATTEMPTS),
+        )
+    )
     stage_gate_command_value = values.get(
         "stage_gate_command",
         "task ai:sympohy:stage-gate",
@@ -156,7 +153,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> SympohyConfig:
         hooks=tuple(values.get("hooks", ["task ci"])),
         review_max_rounds=int(values.get("review_max_rounds", "10")),
         ci_retry_max_attempts=ci_retry_max_attempts,
-        merge_gate_retry_max_attempts=merge_gate_retry_max_attempts,
+        final_verifier_fix_max_attempts=final_verifier_fix_max_attempts,
         stage_gate_command=stage_gate_command,
         codex_models=_load_codex_models(values),
     )
@@ -173,7 +170,7 @@ def default_config() -> SympohyConfig:
         hooks=("task ci",),
         review_max_rounds=10,
         ci_retry_max_attempts=50,
-        merge_gate_retry_max_attempts=None,
+        final_verifier_fix_max_attempts=DEFAULT_FINAL_VERIFIER_FIX_MAX_ATTEMPTS,
         stage_gate_command="task ai:sympohy:stage-gate",
         codex_models=DEFAULT_CODEX_MODELS,
     )

@@ -1,9 +1,9 @@
 # SIFTQ
 
-SIFTQ is a local-first task matrix application. The v1 MVP is a browser
-SPA built with React, TypeScript, Vite, and dnd-kit so the project can validate
-the task creation and drag-and-drop matrix workflow before adding the planned
-Tauri desktop shell.
+SIFTQ is a local-first task matrix application. The current MVP is a browser
+SPA built with React, TypeScript, Vite, and dnd-kit. Task state is persisted in
+browser storage so the matrix can be used in a browser without a native app
+shell.
 
 The repository also uses CoDD (Coherence-Driven Development) to keep
 requirements, design notes, implementation, and tests traceable.
@@ -39,13 +39,13 @@ template, install the tools managed by `aqua.yaml` first, then run the same
 
 ## Development
 
-Start the frontend development server:
+Start the browser development app:
 
 ```bash
 task frontend:dev
 ```
 
-Manual Matrix MVP smoke check:
+Manual Matrix MVP browser smoke check:
 
 - Open the local Vite URL printed by `task frontend:dev`.
 - Confirm `Do`, `Schedule`, `Delegate`, `Eliminate`, `Done`, and `Skipped`
@@ -55,11 +55,16 @@ Manual Matrix MVP smoke check:
 - Confirm blank titles cannot be submitted, duplicate titles are allowed, and
   titles over 256 characters are blocked without truncation.
 - Drag cards within an area and between matrix areas, then confirm the visible
-  order stays stable in the current browser session.
+  order stays stable after each drop.
 - Drop a card on `Done` and `Skipped`, then confirm it disappears from the
   matrix display.
 - Confirm a long 256-character title wraps inside the card without overlapping
   nearby controls or changing the page into an unusable layout.
+- Reload the browser tab, then confirm the same active task titles, areas,
+  statuses, and order are restored from browser storage.
+
+Automated coverage includes browser storage persistence, mutation-time task
+refreshes in the React tests, and reload-equivalent remount restoration.
 
 Common frontend checks:
 

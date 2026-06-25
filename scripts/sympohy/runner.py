@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -68,6 +70,10 @@ class _UnsafeRecoveryError(RuntimeError):
 
 
 class _AmbiguousPullRequestError(RuntimeError):
+    pass
+
+
+class _RunInterrupted(RuntimeError):
     pass
 
 
@@ -218,6 +224,61 @@ class _RunStateWriter:
         with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
         self.write(progress=self.last_known_progress)
+
+
+_ACTIVE_RUN_STATE: _RunStateWriter | None = None
+
+
+class _RunInterruptScope:
+    def __init__(self) -> None:
+        self._previous_handlers: dict[int, signal.Handlers] = {}
+
+    def __enter__(self) -> _RunInterruptScope:
+        for signum in _interrupt_signal_numbers():
+            self._previous_handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, _handle_run_interrupt)
+        return self
+
+    def __exit__(self, _exc_type: object, _exc: object, _tb: object) -> None:
+        global _ACTIVE_RUN_STATE
+        _ACTIVE_RUN_STATE = None
+        for signum, handler in self._previous_handlers.items():
+            signal.signal(signum, handler)
+
+
+def _interrupt_signal_numbers() -> tuple[int, ...]:
+    numbers: list[int] = []
+    for name in ("SIGTERM", "SIGINT", "SIGHUP"):
+        signum = getattr(signal, name, None)
+        if signum is not None:
+            numbers.append(signum)
+    return tuple(numbers)
+
+
+def _handle_run_interrupt(signum: int, _frame: object) -> None:
+    state = _ACTIVE_RUN_STATE
+    if state is not None:
+        _record_run_interrupted(state, signum)
+    raise _RunInterrupted(f"sympohy interrupted by {_signal_name(signum)}")
+
+
+def _record_run_interrupted(state: _RunStateWriter, signum: int) -> None:
+    progress = dict(state.last_known_progress)
+    progress.update(
+        {
+            "message": "interrupted by signal",
+            "signal": _signal_name(signum),
+            "resume_action": "resume_interrupted_run",
+        }
+    )
+    state.write(status="interrupted", progress=progress)
+
+
+def _signal_name(signum: int) -> str:
+    try:
+        return signal.Signals(signum).name
+    except ValueError:
+        return str(signum)
 
 
 def _run_stage_gate(
@@ -670,6 +731,9 @@ def ensure_worktree(issue: Issue, config: SympohyConfig, *, recover: bool = Fals
             raise _ExistingRunError(
                 f"existing branch found for issue #{issue.number}: {branch}; use resume"
             )
+        existing_worktree = _worktree_for_branch(branch)
+        if existing_worktree is not None:
+            return existing_worktree
         subprocess.check_call(["git", "worktree", "add", str(worktree), branch])
     elif recover and _remote_branch_exists(branch):
         subprocess.check_call(
@@ -814,7 +878,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     log_dir = config.run_log_root / f"issue-{issue.number}"
     state_path = log_dir / "state.json"
     state_payload = read_run_state(state_path)
-    resume_point = resolve_resume_point(labels, state=state_payload)
+    resume_point = _resolve_resume_point_for_issue(labels, state_payload)
 
     if resume_point.terminal:
         terminal_phase = resume_point.phase or (
@@ -888,7 +952,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
             issue_ref,
             config,
             recover=False,
-            from_resume=False,
+            from_resume=_issue_branch_exists(issue),
             resume_point=resume_point.name,
         )
 
@@ -905,7 +969,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
         return 0
     try:
         state_payload = read_run_state(state_path)
-        resume_point = resolve_resume_point(labels, state=state_payload)
+        resume_point = _resolve_resume_point_for_issue(labels, state_payload)
         if resume_point.terminal:
             return 0
 
@@ -928,7 +992,7 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 run_id=run_id,
                 lock_path=lock.path,
             )
-            resume_point = resolve_resume_point(labels, state=state_payload)
+            resume_point = _resolve_resume_point_for_issue(labels, state_payload)
         elif inspection.reason == "invalid state":
             phase = inspection.phase or _phase_from_labels(issue.labels) or "triage"
             state = _RunStateWriter(
@@ -976,12 +1040,22 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
     finally:
         lock.release()
 
+    recover = resume_point.name != "planning"
+    resume_from = resume_point.name
+    if _should_resume_missing_plan_as_planning(
+        resume_point=resume_point.name,
+        state=state_payload,
+        plan_path=log_dir / "plan.json",
+    ):
+        recover = False
+        resume_from = "planning"
+
     return run_issue(
         issue_ref,
         config,
-        recover=resume_point.name != "planning",
+        recover=recover,
         from_resume=True,
-        resume_point=resume_point.name,
+        resume_point=resume_from,
     )
 
 
@@ -1068,16 +1142,20 @@ def run_issue(
     except _RunLockedError:
         return 0
     try:
-        return _run_issue_locked(
-            issue_ref,
-            config,
-            issue=issue,
-            recover=recover,
-            from_resume=from_resume,
-            resume_point=resume_point,
-            run_id=run_id,
-            lock_path=lock.path,
-        )
+        with _RunInterruptScope():
+            try:
+                return _run_issue_locked(
+                    issue_ref,
+                    config,
+                    issue=issue,
+                    recover=recover,
+                    from_resume=from_resume,
+                    resume_point=resume_point,
+                    run_id=run_id,
+                    lock_path=lock.path,
+                )
+            except _RunInterrupted:
+                return 130
     finally:
         lock.release()
 
@@ -1107,6 +1185,8 @@ def _run_issue_locked(
         lock_path=lock_path,
         refresh_lock=True,
     )
+    global _ACTIVE_RUN_STATE
+    _ACTIVE_RUN_STATE = state
     if not recover and not from_resume:
         existing_run_reason = _existing_run_refusal_reason(issue, config, log_dir)
         if existing_run_reason is not None:
@@ -1196,7 +1276,11 @@ def _run_issue_locked(
         return 2
 
     try:
-        worktree = ensure_worktree(issue, config, recover=recover)
+        worktree = ensure_worktree(
+            issue,
+            config,
+            recover=recover or (from_resume and _issue_branch_exists(issue)),
+        )
     except (_ExistingRunError, _UnsafeRecoveryError) as exc:
         phase = resume_from if resume_from != "planning" else "implement"
         state.write(
@@ -1264,6 +1348,38 @@ def _run_issue_locked(
         status="sympohy:running",
         phase="implement",
     )
+    initial_pull_request_ensured = False
+    if not recover:
+        state.write(
+            phase="implement",
+            branch=branch,
+            progress={
+                "message": "pushing initial issue branch and opening draft pull request",
+                "pull_request_timing": "after_branch_creation",
+            },
+        )
+        try:
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=worktree,
+                branch=branch,
+                heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
+            )
+        except _AmbiguousPullRequestError as exc:
+            _block(
+                issue_ref,
+                phase="review",
+                failed_command="pull request safety check",
+                attempts=1,
+                cause=str(exc),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+            )
+            return 2
+        initial_pull_request_ensured = True
 
     if not _prepare_document_artifacts(
         config=config,
@@ -1428,6 +1544,37 @@ def _run_issue_locked(
     ):
         return 2
 
+    if not initial_pull_request_ensured:
+        state.write(
+            phase="implement",
+            branch=branch,
+            progress={
+                "message": "pushing initial issue branch and opening draft pull request",
+                "pull_request_timing": "after_branch_creation",
+            },
+        )
+        try:
+            _push_branch_and_ensure_draft_pull_request(
+                cwd=worktree,
+                branch=branch,
+                heartbeat=state.heartbeat,
+                issue_number=issue.number,
+                base_branch=config.base_branch,
+            )
+        except _AmbiguousPullRequestError as exc:
+            _block(
+                issue_ref,
+                phase="review",
+                failed_command="pull request safety check",
+                attempts=1,
+                cause=str(exc),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+                current_labels=("sympohy:running", "sympohy:phase:implement"),
+            )
+            return 2
+
     if next_logical_step is None:
         state.write(
             phase="implement",
@@ -1496,6 +1643,10 @@ def _run_issue_locked(
                 _codex_text(
                     [
                         f"Implement logical step {index} for SIFTQ issue #{issue.number}.",
+                        "Before editing or committing, read the relevant "
+                        "docs/contributing documents, including "
+                        "docs/contributing/branch-strategy.md and "
+                        "docs/contributing/commit-message-format.md.",
                         json.dumps(step, ensure_ascii=False),
                         "Use normal Codex user config and repository rules.",
                     ],
@@ -1580,7 +1731,7 @@ def _run_issue_locked(
         phase="implement",
         branch=branch,
         progress={
-            "message": "pushing branch and opening draft pull request",
+            "message": "pushing branch updates and ensuring draft pull request exists",
             "completed_logical_steps": total_steps,
             "total_logical_steps": total_steps,
         },
@@ -1962,6 +2113,17 @@ def _run_review_fix_round(
         config=config,
         role="fix",
     )
+    if not _worktree_has_changes(cwd):
+        state.write(
+            phase="review",
+            progress={
+                "message": "review fix produced no local changes; rerunning review",
+                "review_round": round_index,
+                "commit_subject": subject,
+            },
+        )
+        return 1
+
     committed = _commit_all_if_new(
         subject,
         cwd=cwd,
@@ -2297,6 +2459,22 @@ def _run_final_verifier_and_merge(
             )
             return 2
         fix_attempt = verifier_attempt
+        if fix_attempt > config.final_verifier_fix_max_attempts:
+            _block(
+                issue_ref,
+                phase="finalize",
+                failed_command="final verifier",
+                attempts=fix_attempt,
+                cause=(
+                    "final verifier findings exceeded "
+                    "final_verifier_fix_max_attempts "
+                    f"({config.final_verifier_fix_max_attempts})"
+                ),
+                run_log_path=log_dir,
+                cwd=worktree,
+                state=state,
+            )
+            return 2
         fix_result = _run_final_verifier_fix_round(
             issue_ref,
             issue,
@@ -2850,8 +3028,8 @@ def _codex_text(
         _codex_exec_args(prompt, config=config, role=role),
         cwd=cwd,
         heartbeat=heartbeat,
+        log_path=log_path,
     )
-    log_path.write_text(output, encoding="utf-8")
     return output
 
 
@@ -2881,26 +3059,103 @@ def _check_output_with_heartbeat(
     *,
     cwd: Path,
     heartbeat: Callable[[], None] | None = None,
+    log_path: Path | None = None,
 ) -> str:
-    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, text=True)
-    while True:
-        try:
-            output, _ = process.communicate(timeout=HEARTBEAT_INTERVAL_SECONDS)
-        except subprocess.TimeoutExpired:
-            if heartbeat is not None:
-                try:
+    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE)
+    stdout = getattr(process, "stdout", None)
+    if stdout is None:
+        return _communicate_output_with_heartbeat(
+            process,
+            args=args,
+            heartbeat=heartbeat,
+        )
+    chunks: list[bytes] = []
+    log_file = log_path.open("wb") if log_path is not None else None
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(stdout, selectors.EVENT_READ)
+            next_heartbeat_at = time.monotonic() + HEARTBEAT_INTERVAL_SECONDS
+            while True:
+                timeout = max(0.0, next_heartbeat_at - time.monotonic())
+                events = selector.select(timeout=timeout)
+                now = time.monotonic()
+                if heartbeat is not None and now >= next_heartbeat_at:
                     heartbeat()
-                except Exception:
-                    _terminate_process(process)
-                    raise
-            continue
+                    next_heartbeat_at = now + HEARTBEAT_INTERVAL_SECONDS
+
+                if not events:
+                    if process.poll() is not None:
+                        while True:
+                            data = os.read(stdout.fileno(), 8192)
+                            if not data:
+                                break
+                            chunks.append(data)
+                            if log_file is not None:
+                                log_file.write(data)
+                                log_file.flush()
+                        process.wait()
+                        output = b"".join(chunks).decode("utf-8", errors="replace")
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(
+                                process.returncode,
+                                args,
+                                output=output,
+                            )
+                        return output
+                    continue
+                for key, _mask in events:
+                    data = os.read(key.fileobj.fileno(), 8192)
+                    if not data:
+                        selector.unregister(key.fileobj)
+                        process.wait()
+                        output = b"".join(chunks).decode("utf-8", errors="replace")
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(
+                                process.returncode,
+                                args,
+                                output=output,
+                            )
+                        return output
+                    chunks.append(data)
+                    if log_file is not None:
+                        log_file.write(data)
+                        log_file.flush()
+    except Exception:
+        _terminate_process(process)
+        raise
+    finally:
+        if log_file is not None:
+            log_file.close()
+
+
+def _communicate_output_with_heartbeat(
+    process: subprocess.Popen[bytes],
+    *,
+    args: Sequence[str],
+    heartbeat: Callable[[], None] | None,
+) -> str:
+    try:
+        while True:
+            try:
+                output, _stderr = process.communicate(
+                    timeout=HEARTBEAT_INTERVAL_SECONDS
+                )
+                break
+            except subprocess.TimeoutExpired:
+                if heartbeat is not None:
+                    heartbeat()
         if process.returncode != 0:
             raise subprocess.CalledProcessError(
                 process.returncode,
                 args,
                 output=output,
             )
+        if isinstance(output, bytes):
+            return output.decode("utf-8", errors="replace")
         return output
+    except Exception:
+        _terminate_process(process)
+        raise
 
 
 def _run_command_with_heartbeat(
@@ -2911,16 +3166,17 @@ def _run_command_with_heartbeat(
     **popen_kwargs: object,
 ) -> int:
     process = subprocess.Popen(args, cwd=cwd, **popen_kwargs)
-    while True:
-        try:
-            return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
-        except subprocess.TimeoutExpired:
-            if heartbeat is not None:
-                try:
+    try:
+        while True:
+            try:
+                return process.wait(timeout=HEARTBEAT_INTERVAL_SECONDS)
+            except subprocess.TimeoutExpired:
+                if heartbeat is not None:
                     heartbeat()
-                except Exception:
-                    _terminate_process(process)
-                    raise
+    except Exception:
+        if process.poll() is None:
+            _terminate_process(process)
+        raise
 
 
 def _check_call_with_heartbeat(
@@ -3486,6 +3742,50 @@ def _existing_run_refusal_reason(
     return None
 
 
+def _resolve_resume_point_for_issue(
+    labels: object,
+    state: Mapping[str, object] | None,
+):
+    if state is not None and state.get("status") == "blocked":
+        names = set(_label_names(labels))
+        if "sympohy:blocked" not in names and (
+            "sympohy:running" in names or "sympohy:pending" in names
+        ):
+            state = {**state, "status": "running"}
+    return resolve_resume_point(labels, state=state)
+
+
+def _should_resume_missing_plan_as_planning(
+    *,
+    resume_point: str,
+    state: Mapping[str, object] | None,
+    plan_path: Path,
+) -> bool:
+    if resume_point != "implement":
+        return False
+    if _load_existing_plan(plan_path) is not None:
+        return False
+    message = _last_progress(state).get("message")
+    if message not in {
+        "starting implementation planning",
+        "pushing initial issue branch and opening draft pull request",
+        "preparing feature documentation artifacts",
+        "running stage gate",
+        "repairing feature documentation artifact evidence",
+    }:
+        return False
+    return (
+        _progress_int(state, "current_logical_step") is None
+        and _progress_int(state, "completed_logical_steps") is None
+        and _progress_int(state, "total_logical_steps") is None
+    )
+
+
+def _issue_branch_exists(issue: Issue) -> bool:
+    branch = f"issue-{issue.number}-sympohy"
+    return _branch_exists(branch) or _remote_branch_exists(branch)
+
+
 def _ensure_draft_pull_request(
     *,
     cwd: Path,
@@ -3659,6 +3959,26 @@ def _remote_branch_exists(branch: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def _worktree_for_branch(branch: str) -> Path | None:
+    try:
+        output = subprocess.check_output(
+            ["git", "worktree", "list", "--porcelain"],
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+    current_path: Path | None = None
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            current_path = Path(line.removeprefix("worktree "))
+        elif line == f"branch refs/heads/{branch}" and current_path is not None:
+            return current_path
+        elif line == "":
+            current_path = None
+    return None
 
 
 def _label_names(labels: object) -> list[str]:

@@ -1,7 +1,7 @@
 import { type Modifier } from "@dnd-kit/core";
 
-import { INITIAL_AREAS, type AreaId, type MatrixAreaId, isMatrixArea } from "../domain/area";
-import { type Task, type TaskId } from "../domain/task";
+import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
+import { isAreaId as isKnownAreaId, isMatrixArea } from "../domain/taskRules";
 
 export type TaskDropOperation =
   | {
@@ -80,9 +80,14 @@ export function resolveTaskDropOperation(
     return null;
   }
 
-  const insertAt = tasksInArea(tasks, targetTask.areaId).findIndex(
-    (task) => task.id === targetTask.id
-  );
+  const targetAreaTasks = tasksInArea(tasks, targetTask.areaId);
+  const targetIndex = targetAreaTasks.findIndex((task) => task.id === targetTask.id);
+  const activeIndex =
+    activeTask.areaId === targetTask.areaId
+      ? targetAreaTasks.findIndex((task) => task.id === activeTask.id)
+      : -1;
+  const insertAt =
+    activeIndex >= 0 && activeIndex < targetIndex ? targetIndex - 1 : targetIndex;
 
   return operationForTarget(taskId, activeTask.areaId, targetTask.areaId, insertAt);
 }
@@ -121,7 +126,7 @@ function areaIdFromDropId(dropId: string): AreaId | null {
 }
 
 function isAreaId(areaId: string): areaId is AreaId {
-  return INITIAL_AREAS.some((area) => area.id === areaId);
+  return isKnownAreaId(areaId);
 }
 
 function clamp(value: number, min: number, max: number): number {

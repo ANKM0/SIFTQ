@@ -7,6 +7,10 @@ __pycache__/
 node_modules/
 dist/
 coverage/
+tmp/
+
+# Rust generated artifacts
+target/
 
 # CoDD generated artifacts
 .codd/scan/

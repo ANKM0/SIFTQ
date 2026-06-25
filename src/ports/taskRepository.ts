@@ -1,5 +1,9 @@
-import { type AreaId, type MatrixAreaId } from "../domain/area";
-import { type Task, type TaskId } from "../domain/task";
+import {
+  type AreaId,
+  type MatrixAreaId,
+  type Task,
+  type TaskId
+} from "../contracts/task";
 
 export type CreateTaskInput = {
   readonly title: string;
