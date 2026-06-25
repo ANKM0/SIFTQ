@@ -471,6 +471,7 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner._check_call_with_heartbeat"),
                 patch("scripts.sympohy.runner._run_command_with_heartbeat", return_value=1),
                 patch("scripts.sympohy.runner._codex_text"),
+                patch("scripts.sympohy.runner._worktree_status", return_value=""),
                 patch("scripts.sympohy.runner._worktree_has_conflict_markers", return_value=False),
                 patch("scripts.sympohy.runner._run_hooks", return_value=0),
                 patch(
@@ -498,6 +499,63 @@ class SympohyRunnerTest(unittest.TestCase):
             if call_args.args and call_args.args[0][:2] == ["git", "add"]
         ]
         self.assertEqual(add_calls[0], ["git", "add", "-A"])
+
+    def test_pre_review_mergeability_autofix_blocks_dirty_worktree_before_fetch(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = self._config(root)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch=config.base_branch,
+                worktree=cwd,
+            )
+            issue = Issue(
+                number=82,
+                title="Block dirty mergeability auto-fix",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+            mergeability = _PullRequestMergeability(
+                number="91",
+                base_ref="main",
+                head_ref="issue-82-sympohy",
+                merge_state_status="DIRTY",
+                mergeable="CONFLICTING",
+            )
+
+            with (
+                patch("scripts.sympohy.runner._worktree_status", return_value=" M docs/example.md\n"),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat") as check_call_with_heartbeat,
+                patch("scripts.sympohy.runner._run_command_with_heartbeat") as run_command,
+                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+            ):
+                result = _attempt_pre_review_mergeability_autofix(
+                    "#82",
+                    issue,
+                    config,
+                    cwd,
+                    log_dir,
+                    state,
+                    phase="review",
+                    pull_request=mergeability,
+                    log_path=log_dir / "mergeability-autofix.log",
+                )
+
+        self.assertEqual(
+            result,
+            "worktree has uncommitted changes before automatic conflict fix: M docs/example.md",
+        )
+        check_call_with_heartbeat.assert_not_called()
+        run_command.assert_not_called()
+        check_call.assert_not_called()
 
     def test_review_fix_without_local_changes_reruns_review(self) -> None:
         with TemporaryDirectory() as tmp:

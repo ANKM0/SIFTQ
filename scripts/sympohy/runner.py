@@ -3048,6 +3048,19 @@ def _attempt_pre_review_mergeability_autofix(
     pull_request: _PullRequestMergeability,
     log_path: Path,
 ) -> str | None:
+    try:
+        status = _worktree_status(cwd)
+    except subprocess.CalledProcessError as exc:
+        return (
+            "could not inspect worktree status before automatic conflict fix: "
+            f"exit code {exc.returncode}"
+        )
+    if status.strip():
+        return (
+            "worktree has uncommitted changes before automatic conflict fix: "
+            f"{_summarize_status(status)}"
+        )
+
     merge_target = f"origin/{pull_request.base_ref}"
     merge_subject = _mergeability_autofix_subject(
         issue_number=issue.number,
