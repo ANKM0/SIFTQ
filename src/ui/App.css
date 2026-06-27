@@ -131,6 +131,11 @@
   display: flex;
 }
 
+.status-drop-area-shell {
+  flex: 1;
+  align-self: stretch;
+}
+
 .tasks-page,
 .task-detail-page {
   max-width: 860px;

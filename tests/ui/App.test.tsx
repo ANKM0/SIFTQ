@@ -134,20 +134,28 @@ describe("App", () => {
     ]);
   });
 
-  it("attaches terminal droppable refs to the full side-column wrappers", async () => {
+  it("attaches terminal droppable refs to the visible full-height side-column shells", async () => {
     render(<App />);
 
     expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
 
     const skippedNode = dndKitMock.droppableNodes.get(areaDropId("skipped"));
     const doneNode = dndKitMock.droppableNodes.get(areaDropId("done"));
+    const skippedHeading = screen.getByRole("heading", { name: "Skipped" });
+    const doneHeading = screen.getByRole("heading", { name: "Done" });
 
     expect(skippedNode?.className).toContain("matrix-workspace__status");
     expect(skippedNode?.className).toContain("matrix-workspace__status--skipped");
+    expect(skippedNode?.className).toContain("status-drop-area-shell");
+    expect(skippedNode?.childElementCount).toBe(1);
     expect(skippedNode?.firstElementChild?.className).toContain("status-drop-area");
+    expect(skippedHeading.closest(".status-drop-area-shell")).toBe(skippedNode);
     expect(doneNode?.className).toContain("matrix-workspace__status");
     expect(doneNode?.className).toContain("matrix-workspace__status--done");
+    expect(doneNode?.className).toContain("status-drop-area-shell");
+    expect(doneNode?.childElementCount).toBe(1);
     expect(doneNode?.firstElementChild?.className).toContain("status-drop-area");
+    expect(doneHeading.closest(".status-drop-area-shell")).toBe(doneNode);
   });
 
   it("uses the custom matrix collision ranking on the matrix page", async () => {
