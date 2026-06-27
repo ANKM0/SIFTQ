@@ -15,6 +15,7 @@ import {
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
   areaDropId,
+  matrixCollisionDetection,
   TASK_LIST_DROP_ID,
   restrictDragToWindowEdges,
   resolveTaskListDropIndex,
@@ -275,6 +276,7 @@ export function App() {
       {route.name === "matrix" ? (
         <DndContext
           autoScroll={false}
+          collisionDetection={matrixCollisionDetection}
           modifiers={dragModifiers}
           onDragEnd={(event) => void handleDragEnd(event)}
         >

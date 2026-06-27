@@ -1,4 +1,9 @@
-import { type Modifier } from "@dnd-kit/core";
+import {
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
+  type Modifier
+} from "@dnd-kit/core";
 
 import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
 import { isAreaId as isKnownAreaId, isMatrixArea } from "../domain/taskRules";
@@ -25,6 +30,18 @@ export function areaDropId(areaId: AreaId): string {
 export function taskDropId(taskId: TaskId): string {
   return `task:${taskId}`;
 }
+
+export const matrixCollisionDetection: CollisionDetection = (args) => {
+  const terminalPointerCollisions = pointerWithin(args).filter(({ id }) =>
+    isTerminalAreaDropId(String(id))
+  );
+
+  if (terminalPointerCollisions.length > 0) {
+    return terminalPointerCollisions;
+  }
+
+  return rectIntersection(args);
+};
 
 export const restrictDragToWindowEdges: Modifier = ({
   draggingNodeRect,
@@ -166,6 +183,12 @@ function areaIdFromDropId(dropId: string): AreaId | null {
 
 function isAreaId(areaId: string): areaId is AreaId {
   return isKnownAreaId(areaId);
+}
+
+function isTerminalAreaDropId(dropId: string): boolean {
+  const areaId = areaIdFromDropId(dropId);
+
+  return areaId === "done" || areaId === "skipped";
 }
 
 function clamp(value: number, min: number, max: number): number {

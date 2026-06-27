@@ -11,7 +11,11 @@ import {
   type TaskId
 } from "../../src/contracts/task";
 import { App } from "../../src/ui/App";
-import { areaDropId, taskDropId } from "../../src/ui/dragDrop";
+import {
+  areaDropId,
+  matrixCollisionDetection,
+  taskDropId
+} from "../../src/ui/dragDrop";
 
 const dndKitMock = vi.hoisted(() => ({
   collisionDetection: undefined as unknown,
@@ -126,11 +130,11 @@ describe("App", () => {
     ]);
   });
 
-  it("relies on the default dnd-kit collision ranking on the matrix page", async () => {
+  it("uses the custom matrix collision ranking on the matrix page", async () => {
     render(<App />);
 
     expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
-    expect(dndKitMock.collisionDetection).toBeUndefined();
+    expect(dndKitMock.collisionDetection).toBe(matrixCollisionDetection);
   });
 
   it("routes to the task list page from #/tasks and shows mutual header links", async () => {
