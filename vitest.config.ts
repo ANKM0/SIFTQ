@@ -10,6 +10,6 @@ export default defineConfig({
         url: "http://localhost/"
       }
     },
-    exclude: ["**/.sympohy/**", "**/node_modules/**", "**/dist/**"]
+    exclude: ["**/.sympohy/**", "**/node_modules/**", "**/dist/**", "**/tests/e2e/**"]
   }
 });

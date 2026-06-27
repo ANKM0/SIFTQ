@@ -62,7 +62,7 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 | `task ci:markdown` | `uv run python scripts/ci/check_markdown.py` |
 | `task ci:typecheck` | `pnpm typecheck` |
 | `task ci:lint` | `pnpm lint` |
-| `task ci:test` | `pnpm test`, `task pytest`, and `pnpm test:e2e` |
+| `task ci:test` | `pnpm exec playwright install chromium`, `pnpm test`, `task pytest`, and a Playwright E2E preflight that skips locally when Chromium runtime libs are unavailable while still failing in CI |
 | `task ci:build` | `pnpm build` |
 | `task frontend:dev` | `pnpm dev` |
 | `task codd:version` | `uv run codd version --check` |
