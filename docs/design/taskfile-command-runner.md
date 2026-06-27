@@ -62,7 +62,7 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 | `task ci:markdown` | `uv run python scripts/ci/check_markdown.py` |
 | `task ci:typecheck` | `pnpm typecheck` |
 | `task ci:lint` | `pnpm lint` |
-| `task ci:test` | `pnpm test` |
+| `task ci:test` | `pnpm test`, `task pytest`, and `pnpm test:e2e` |
 | `task ci:build` | `pnpm build` |
 | `task frontend:dev` | `pnpm dev` |
 | `task codd:version` | `uv run codd version --check` |

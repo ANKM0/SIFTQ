@@ -150,6 +150,7 @@ tasks:
     cmds:
       - pnpm test
       - task pytest
+      - pnpm test:e2e
 
   ci:build:
     desc: Build the frontend.

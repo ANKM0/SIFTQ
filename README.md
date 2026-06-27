@@ -64,7 +64,10 @@ Manual Matrix MVP browser smoke check:
   statuses, and order are restored from browser storage.
 
 Automated coverage includes browser storage persistence, mutation-time task
-refreshes in the React tests, and reload-equivalent remount restoration.
+refreshes in the React tests, reload-equivalent remount restoration, and the
+Playwright terminal-drop regression checks. Install the browser once with
+`pnpm exec playwright install chromium` before running the E2E-enabled CI test
+task locally.
 
 Common frontend checks:
 
