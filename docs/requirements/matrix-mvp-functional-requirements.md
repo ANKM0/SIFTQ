@@ -44,6 +44,9 @@ codd:
     - id: design:task-list-v3-wireframe
       relation: depends_on
       semantic: ui
+    - id: design:matrix-terminal-drop-hitbox-fix
+      relation: depends_on
+      semantic: product
 ---
 
 # Matrix MVP Functional Requirements

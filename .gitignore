@@ -8,6 +8,8 @@ node_modules/
 dist/
 coverage/
 tmp/
+playwright-report/
+test-results/
 
 # Rust generated artifacts
 target/
