@@ -180,20 +180,26 @@ describe("dragDrop", () => {
     ).toEqual({ x: 280, y: 180, scaleX: 1, scaleY: 1 });
   });
 
-  it("prefers terminal droppables when the pointer is inside a terminal area", () => {
-    const collisions = matrixCollisionDetection(
-      collisionArgs({
-        collisionRect: rect({ left: 260, top: 40, width: 60, height: 60 }),
-        droppableRects: [
-          [areaDropId("done"), rect({ left: 240, top: 0, width: 120, height: 300 })],
-          [areaDropId("do"), rect({ left: 80, top: 0, width: 180, height: 300 })],
-          [taskDropId("task-1"), rect({ left: 250, top: 30, width: 70, height: 70 })]
-        ],
-        pointerCoordinates: { x: 280, y: 120 }
-      })
-    );
+  it("prefers terminal droppables over task and matrix-area candidates", () => {
+    for (const [terminalAreaId, x] of [
+      ["skipped", 40],
+      ["done", 280]
+    ] as const) {
+      const collisions = matrixCollisionDetection(
+        collisionArgs({
+          collisionRect: rect({ left: x - 20, top: 40, width: 60, height: 60 }),
+          droppableRects: [
+            [areaDropId("skipped"), rect({ left: 0, top: 0, width: 80, height: 300 })],
+            [areaDropId("do"), rect({ left: 80, top: 0, width: 180, height: 300 })],
+            [areaDropId("done"), rect({ left: 240, top: 0, width: 120, height: 300 })],
+            [taskDropId("task-1"), rect({ left: x - 30, top: 30, width: 70, height: 70 })]
+          ],
+          pointerCoordinates: { x, y: 120 }
+        })
+      );
 
-    expect(collisions.map(({ id }) => id)).toEqual([areaDropId("done")]);
+      expect(collisions.map(({ id }) => id)).toEqual([areaDropId(terminalAreaId)]);
+    }
   });
 
   it("treats the full terminal column as a single drop target", () => {
