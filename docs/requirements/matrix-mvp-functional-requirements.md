@@ -14,6 +14,9 @@ codd:
     - id: req:matrix-mvp-v2-browser-storage
       relation: depends_on
       semantic: product
+    - id: req:task-list-v3
+      relation: depends_on
+      semantic: product
     - id: design:matrix-mvp-technology-selection
       relation: depends_on
       semantic: product
@@ -38,6 +41,9 @@ codd:
     - id: design:matrix-mvp-wireframe-layout-adr
       relation: depends_on
       semantic: scope
+    - id: design:task-list-v3-wireframe
+      relation: depends_on
+      semantic: ui
 ---
 
 # Matrix MVP Functional Requirements

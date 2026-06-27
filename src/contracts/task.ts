@@ -12,7 +12,11 @@ export type TaskStatus = "active" | "done" | "skipped";
 export type Task = {
   readonly id: TaskId;
   readonly title: string;
+  readonly description: string;
   readonly areaId: AreaId;
   readonly status: TaskStatus;
   readonly order: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly listOrder: number;
 };

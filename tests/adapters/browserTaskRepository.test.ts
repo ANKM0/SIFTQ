@@ -10,10 +10,12 @@ import { type Task } from "../../src/contracts/task";
 describe("browserTaskRepository", () => {
   let storage: MemoryStorage;
   let nextId: number;
+  let nextTimestamp: number;
 
   beforeEach(() => {
     storage = new MemoryStorage();
     nextId = 1;
+    nextTimestamp = 0;
   });
 
   it("creates, trims, lists, and persists browser tasks", async () => {
@@ -23,17 +25,37 @@ describe("browserTaskRepository", () => {
       repository.createTask({ areaId: "do", title: "  First  " })
     ).resolves.toMatchObject({
       areaId: "do",
+      createdAt: timestampAt(0),
+      description: "",
       id: "task-1",
+      listOrder: 0,
       order: 0,
       status: "active",
-      title: "First"
+      title: "First",
+      updatedAt: timestampAt(0)
     });
 
     await repository.createTask({ areaId: "schedule", title: "Second" });
 
     expect(await repository.listTasks()).toEqual([
-      task({ id: "task-1", title: "First", areaId: "do", order: 0 }),
-      task({ id: "task-2", title: "Second", areaId: "schedule", order: 0 })
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
     ]);
 
     expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
@@ -53,9 +75,33 @@ describe("browserTaskRepository", () => {
     await repository.moveTask({ taskId: "task-1", toAreaId: "schedule", insertAt: 0 });
 
     expect(await repository.listTasks()).toEqual([
-      task({ id: "task-2", title: "Second", areaId: "do", order: 0 }),
-      task({ id: "task-1", title: "First", areaId: "schedule", order: 0 }),
-      task({ id: "task-3", title: "Scheduled", areaId: "schedule", order: 1 })
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(4),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-3",
+        title: "Scheduled",
+        areaId: "schedule",
+        order: 1,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(2),
+        listOrder: 2
+      })
     ]);
   });
 
@@ -70,9 +116,12 @@ describe("browserTaskRepository", () => {
       task({
         id: "task-1",
         title: "Done title",
-        areaId: "done",
+        areaId: "do",
+        createdAt: timestampAt(0),
         order: 0,
-        status: "done"
+        status: "done",
+        updatedAt: timestampAt(2),
+        listOrder: 0
       })
     ]);
     await expect(
@@ -99,8 +148,411 @@ describe("browserTaskRepository", () => {
     } satisfies Partial<BrowserTaskRepositoryError>);
   });
 
+  it("returns not-found errors when mutating or deleting a missing task", async () => {
+    const repository = repositoryForTest();
+
+    await expect(repository.deleteTask({ taskId: "missing-task" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
+
+    await expect(
+      repository.updateTaskStatus({ taskId: "missing-task", status: "done" })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
+  });
+
+  it("migrates legacy browser tasks missing description, timestamps, and list order", async () => {
+    const repository = repositoryForTest();
+
+    storage.setItem(
+      BROWSER_TASK_STORAGE_KEY,
+      JSON.stringify({
+        tasks: [
+          { areaId: "schedule", id: "task-2", order: 0, status: "active", title: "Second" },
+          { areaId: "do", id: "task-1", order: 0, status: "active", title: "First" }
+        ],
+        version: 1
+      })
+    );
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+
+    expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
+      tasks: [
+        task({
+          id: "task-2",
+          title: "Second",
+          areaId: "schedule",
+          order: 0,
+          createdAt: timestampAt(0),
+          updatedAt: timestampAt(0),
+          listOrder: 0
+        }),
+        task({
+          id: "task-1",
+          title: "First",
+          areaId: "do",
+          order: 0,
+          createdAt: timestampAt(1),
+          updatedAt: timestampAt(1),
+          listOrder: 1
+        })
+      ],
+      version: 1
+    });
+  });
+
+  it("migrates legacy terminal-area tasks onto the fallback matrix area", async () => {
+    const repository = repositoryForTest();
+
+    storage.setItem(
+      BROWSER_TASK_STORAGE_KEY,
+      JSON.stringify({
+        tasks: [
+          { areaId: "done", id: "task-1", order: 0, status: "done", title: "Finished" },
+          { areaId: "skipped", id: "task-2", order: 1, status: "skipped", title: "Skipped" }
+        ],
+        version: 1
+      })
+    );
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "Finished",
+        areaId: "do",
+        order: 0,
+        status: "done",
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Skipped",
+        areaId: "do",
+        order: 1,
+        status: "skipped",
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+
+    await expect(
+      repository.updateTaskStatus({ taskId: "task-1", status: "active" })
+    ).resolves.toMatchObject({
+      areaId: "do",
+      status: "active"
+    });
+
+    expect(JSON.parse(storage.getItem(BROWSER_TASK_STORAGE_KEY) ?? "{}")).toEqual({
+      tasks: [
+        task({
+          id: "task-1",
+          title: "Finished",
+          areaId: "do",
+          order: 0,
+          status: "active",
+          createdAt: timestampAt(0),
+          updatedAt: timestampAt(0),
+          listOrder: 0
+        }),
+        task({
+          id: "task-2",
+          title: "Skipped",
+          areaId: "do",
+          order: 1,
+          status: "skipped",
+          createdAt: timestampAt(1),
+          updatedAt: timestampAt(1),
+          listOrder: 1
+        })
+      ],
+      version: 1
+    });
+  });
+
+  it("reorders list order independently from matrix area order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "schedule", title: "Second" });
+    await repository.createTask({ areaId: "delegate", title: "Third" });
+
+    await repository.reorderTaskList({ taskId: "task-3", toIndex: 0 });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(3),
+        listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 2
+      })
+    ]);
+  });
+
+  it("reorders list order without changing preserved matrix area or area order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+    await repository.reorderTaskList({ taskId: "task-1", toIndex: 1 });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 0
+      }),
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 1,
+        status: "done"
+      })
+    ]);
+  });
+
+  it("preserves matrix area when status changes and restores the task to that area", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(2),
+        listOrder: 0,
+        status: "done"
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+
+    await repository.updateTaskStatus({ taskId: "task-1", status: "active" });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 0,
+        status: "active"
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
+        listOrder: 1
+      })
+    ]);
+  });
+
+  it("physically deletes tasks and compacts list order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "schedule", title: "Second" });
+    await repository.createTask({ areaId: "delegate", title: "Third" });
+
+    await repository.deleteTask({ taskId: "task-2" });
+
+    await expect(repository.listTasks()).resolves.toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      })
+    ]);
+  });
+
+  it("changes area only through detail updates while preserving status", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.updateTaskStatus({ taskId: "task-1", status: "done" });
+    await repository.updateTaskDetails({
+      taskId: "task-1",
+      title: "First updated",
+      description: "Moved while hidden",
+      areaId: "delegate",
+      status: "done"
+    });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First updated",
+        description: "Moved while hidden",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(2),
+        listOrder: 0,
+        status: "done"
+      })
+    ]);
+  });
+
+  it("rejects terminal areas when detail updates bypass the matrix-area type", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+
+    await expect(
+      repository.updateTaskDetails({
+        taskId: "task-1",
+        title: "First",
+        description: "",
+        areaId: "done" as never,
+        status: "done"
+      })
+    ).rejects.toMatchObject({
+      code: "VALIDATION",
+      message: "Task detail area must belong to a matrix area."
+    });
+  });
+
+  it("preserves active task order when only details change", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "do", title: "Second" });
+    await repository.createTask({ areaId: "do", title: "Third" });
+
+    await repository.updateTaskDetails({
+      taskId: "task-2",
+      title: "Second updated",
+      description: "Edited in place",
+      areaId: "do",
+      status: "active"
+    });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second updated",
+        description: "Edited in place",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(3),
+        listOrder: 1
+      }),
+      task({
+        id: "task-3",
+        title: "Third",
+        areaId: "do",
+        order: 2,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(2),
+        listOrder: 2
+      })
+    ]);
+  });
+
   function repositoryForTest() {
-    return createBrowserTaskRepository(storage, () => `task-${nextId++}`);
+    return createBrowserTaskRepository(
+      storage,
+      () => `task-${nextId++}`,
+      BROWSER_TASK_STORAGE_KEY,
+      () => timestampAt(nextTimestamp++)
+    );
   }
 });
 
@@ -117,10 +569,20 @@ class MemoryStorage implements Pick<Storage, "getItem" | "setItem"> {
 }
 
 function task(input: Partial<Task> & Pick<Task, "id" | "title">): Task {
+  const areaId = input.areaId ?? "do";
+
   return {
-    areaId: "do",
+    areaId,
+    createdAt: timestampAt(0),
+    description: "",
+    listOrder: input.order ?? 0,
     order: 0,
-    status: "active",
+    status: areaId === "done" ? "done" : areaId === "skipped" ? "skipped" : "active",
+    updatedAt: timestampAt(0),
     ...input
   };
+}
+
+function timestampAt(index: number): string {
+  return new Date(index).toISOString();
 }

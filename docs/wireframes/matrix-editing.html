@@ -9,8 +9,12 @@
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <div><h1>SIFTQ</h1><p>State: Editing task title</p></div>
-        <a class="back-link" href="./index.html">Index</a>
+        <div><h1>SIFTQ</h1><p>State: Editing task</p></div>
+        <nav class="header-actions" aria-label="Primary">
+          <a class="back-link back-link--active" href="./matrix-editing.html">マトリックス</a>
+          <a class="back-link" href="./task-list.html">タスク一覧</a>
+          <a class="back-link" href="./index.html">インデックス</a>
+        </nav>
       </header>
       <section class="workspace">
         <aside class="terminal-drop terminal-drop--skipped"><h2>Skipped</h2><p>Drop to hide</p></aside>
@@ -59,12 +63,13 @@
     </main>
     <div class="modal-backdrop">
       <section class="modal" role="dialog" aria-labelledby="edit-title">
-        <h2 id="edit-title">Edit task title</h2>
+        <h2 id="edit-title">Edit task</h2>
         <label>Title <input value="Fix terminal drop" /></label>
+        <label>Description <textarea>Keep dropped Done and Skipped tasks hidden from the matrix while preserving their original area.</textarea></label>
         <p class="form-error">Save is disabled when the trimmed title is empty or over 256 characters.</p>
         <div class="modal__actions">
-          <button>Cancel</button>
-          <button class="button-primary">Save</button>
+          <button type="button" onclick="location.href='./matrix-with-cards.html'">Cancel</button>
+          <button class="button-primary" type="button" onclick="location.href='./matrix-with-cards.html'">Save</button>
         </div>
       </section>
     </div>

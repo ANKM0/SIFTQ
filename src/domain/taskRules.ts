@@ -6,6 +6,8 @@ import {
   type TaskStatus
 } from "../contracts/task";
 
+export const LEGACY_TERMINAL_AREA_FALLBACK = "do" as const satisfies MatrixAreaId;
+
 export const MATRIX_AREA_IDS = [
   "do",
   "schedule",
@@ -47,6 +49,10 @@ export function isTaskVisibleInMatrix(task: Task): boolean {
   return task.status === "active" && isMatrixArea(task.areaId);
 }
 
+export function normalizeTaskAreaId(areaId: AreaId): MatrixAreaId {
+  return isMatrixArea(areaId) ? areaId : LEGACY_TERMINAL_AREA_FALLBACK;
+}
+
 export function normalizeTaskTitleInput(rawTitle: string): string {
   return rawTitle.trim();
 }
@@ -69,6 +75,14 @@ export function compareTasksByAreaOrder(left: Task, right: Task): number {
   return (
     AREA_ORDER.indexOf(left.areaId) - AREA_ORDER.indexOf(right.areaId) ||
     left.order - right.order ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+export function compareTasksByListOrder(left: Task, right: Task): number {
+  return (
+    left.listOrder - right.listOrder ||
+    left.createdAt.localeCompare(right.createdAt) ||
     left.id.localeCompare(right.id)
   );
 }

@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,19 +15,24 @@ import {
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
   areaDropId,
+  TASK_LIST_DROP_ID,
   restrictDragToWindowEdges,
+  resolveTaskListDropIndex,
   resolveTaskDropOperation,
   taskDropId
 } from "./dragDrop";
 import {
   MATRIX_AREAS,
   TERMINAL_AREAS,
+  findArea,
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
+import { normalizeTaskAreaId } from "../domain/taskRules";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
+const DEFAULT_ROUTE = "#/";
 
 type RuntimeState =
   | { readonly status: "checking" }
@@ -38,12 +43,20 @@ type RuntimeState =
       readonly message: string;
     };
 
+type AppRoute =
+  | { readonly name: "matrix" }
+  | { readonly name: "tasks" }
+  | { readonly name: "task-detail"; readonly taskId: Task["id"] };
+
 export function App() {
   const [tasks, setTasks] = useState<readonly Task[]>([]);
+  const [taskListNotice, setTaskListNotice] = useState<string | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>({
     status: "checking"
   });
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [route, setRoute] = useState<AppRoute>(() => routeFromHash(window.location.hash));
+  const previousRouteRef = useRef<AppRoute>(route);
 
   useEffect(() => {
     let isCurrent = true;
@@ -75,6 +88,30 @@ export function App() {
       isCurrent = false;
     };
   }, []);
+
+  useEffect(() => {
+    function syncRouteFromHash() {
+      setRoute(routeFromHash(window.location.hash));
+    }
+
+    window.addEventListener("hashchange", syncRouteFromHash);
+
+    return () => {
+      window.removeEventListener("hashchange", syncRouteFromHash);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      previousRouteRef.current.name === "tasks" &&
+      route.name !== "tasks" &&
+      taskListNotice !== null
+    ) {
+      setTaskListNotice(null);
+    }
+
+    previousRouteRef.current = route;
+  }, [route, taskListNotice]);
 
   async function handleCreateTask(
     areaId: MatrixAreaId,
@@ -131,6 +168,90 @@ export function App() {
     }
   }
 
+  async function handleTaskListDragEnd(event: DragEndEvent) {
+    const toIndex = resolveTaskListDropIndex(
+      tasks,
+      String(event.active.id),
+      event.over === null ? null : String(event.over.id)
+    );
+
+    if (toIndex === null) {
+      return;
+    }
+
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.reorderTaskList({
+        taskId: String(event.active.id).replace(/^task:/, ""),
+        toIndex
+      });
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task list order could not be updated."));
+    }
+  }
+
+  async function handleUpdateTaskStatus(taskId: Task["id"], status: Task["status"]) {
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.updateTaskStatus({ taskId, status });
+      await refreshTasks();
+    } catch (error) {
+      setOperationError(messageForError(error, "Task status could not be updated."));
+    }
+  }
+
+  async function handleUpdateTaskDetails(
+    taskId: Task["id"],
+    details: {
+      title: Task["title"];
+      description: Task["description"];
+      areaId: MatrixAreaId;
+      status: Task["status"];
+    }
+  ): Promise<string | null> {
+    try {
+      setOperationError(null);
+      setTaskListNotice(null);
+      await browserTaskRepository.updateTaskDetails({
+        taskId,
+        title: details.title,
+        description: details.description,
+        areaId: details.areaId,
+        status: details.status
+      });
+      await refreshTasks();
+
+      return null;
+    } catch (error) {
+      return messageForError(error, "Task details could not be updated.");
+    }
+  }
+
+  async function handleDeleteTask(task: Task): Promise<boolean> {
+    const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
+
+    if (!shouldDelete) {
+      return false;
+    }
+
+    try {
+      setOperationError(null);
+      await browserTaskRepository.deleteTask({ taskId: task.id });
+      setTaskListNotice("タスクを削除しました");
+      await refreshTasks();
+      window.location.hash = "#/tasks";
+
+      return true;
+    } catch (error) {
+      setOperationError(messageForError(error, "Task could not be deleted."));
+
+      return false;
+    }
+  }
+
   async function refreshTasks() {
     setTasks(await browserTaskRepository.listTasks());
   }
@@ -150,18 +271,43 @@ export function App() {
   }
 
   return (
-    <DndContext
-      autoScroll={false}
-      modifiers={dragModifiers}
-      onDragEnd={(event) => void handleDragEnd(event)}
-    >
-      <MatrixPage
-        tasks={tasks}
-        operationError={operationError}
-        onCreateTask={handleCreateTask}
-        onUpdateTaskTitle={handleUpdateTaskTitle}
-      />
-    </DndContext>
+    <>
+      {route.name === "matrix" ? (
+        <DndContext
+          autoScroll={false}
+          modifiers={dragModifiers}
+          onDragEnd={(event) => void handleDragEnd(event)}
+        >
+          <MatrixPage
+            tasks={tasks}
+            operationError={operationError}
+            onCreateTask={handleCreateTask}
+            onUpdateTaskTitle={handleUpdateTaskTitle}
+          />
+        </DndContext>
+      ) : route.name === "tasks" ? (
+        <DndContext
+          autoScroll={false}
+          modifiers={dragModifiers}
+          onDragEnd={(event) => void handleTaskListDragEnd(event)}
+        >
+          <TasksPage
+            tasks={tasks}
+            notice={taskListNotice}
+            operationError={operationError}
+            onDeleteTask={handleDeleteTask}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+          />
+        </DndContext>
+      ) : (
+        <TaskDetailPage
+          operationError={operationError}
+          onDeleteTask={handleDeleteTask}
+          onUpdateTaskDetails={handleUpdateTaskDetails}
+          task={tasks.find((candidate) => candidate.id === route.taskId) ?? null}
+        />
+      )}
+    </>
   );
 }
 
@@ -199,9 +345,7 @@ function MatrixPage({
 
   return (
     <main className="matrix-page">
-      <header className="matrix-page__header">
-        <h1>SIFTQ</h1>
-      </header>
+      <AppHeader currentPage="matrix" />
       {operationError !== null ? (
         <p className="matrix-page__error" role="alert">
           {operationError}
@@ -239,6 +383,408 @@ function MatrixPage({
         />
       ) : null}
     </main>
+  );
+}
+
+type TasksPageProps = {
+  readonly tasks: readonly Task[];
+  readonly notice: string | null;
+  readonly operationError: string | null;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
+  readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
+};
+
+function TasksPage({
+  tasks,
+  notice,
+  operationError,
+  onDeleteTask,
+  onUpdateTaskStatus
+}: TasksPageProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: TASK_LIST_DROP_ID });
+  const [menuTaskId, setMenuTaskId] = useState<Task["id"] | null>(null);
+
+  return (
+    <main className="matrix-page">
+      <AppHeader currentPage="tasks" />
+      <section aria-labelledby="tasks-page-title" className="tasks-page">
+        <header className="tasks-page__header">
+          <h2 id="tasks-page-title">タスク一覧</h2>
+          <p>{tasks.length} tasks</p>
+        </header>
+        {notice !== null ? (
+          <p className="tasks-page__notice" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {operationError !== null ? (
+          <p className="matrix-page__error tasks-page__error" role="alert">
+            {operationError}
+          </p>
+        ) : null}
+        <ul
+          ref={setNodeRef}
+          aria-label="Task list"
+          className={`tasks-page__list${isOver ? " tasks-page__list--drop-target" : ""}`}
+        >
+          {tasks.map((task) => (
+            <TaskListCard
+              key={task.id}
+              isMenuOpen={menuTaskId === task.id}
+              onCloseMenu={() => setMenuTaskId(null)}
+              onDeleteTask={onDeleteTask}
+              onOpenMenu={() => setMenuTaskId(task.id)}
+              onUpdateTaskStatus={onUpdateTaskStatus}
+              task={task}
+            />
+          ))}
+        </ul>
+      </section>
+    </main>
+  );
+}
+
+type TaskListCardProps = {
+  readonly isMenuOpen: boolean;
+  readonly onCloseMenu: () => void;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
+  readonly onOpenMenu: () => void;
+  readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
+  readonly task: Task;
+};
+
+function TaskListCard({
+  isMenuOpen,
+  onCloseMenu,
+  onDeleteTask,
+  onOpenMenu,
+  onUpdateTaskStatus,
+  task
+}: TaskListCardProps) {
+  const draggable = useDraggable({ id: taskDropId(task.id) });
+  const droppable = useDroppable({ id: taskDropId(task.id) });
+  const area = findArea(task.areaId);
+  const description =
+    task.description.trim().length > 0 ? task.description.trim() : "説明なし";
+  const className = [
+    "tasks-page__card",
+    `tasks-page__card--${task.status}`,
+    draggable.isDragging ? "tasks-page__card--dragging" : "",
+    droppable.isOver ? "tasks-page__card--drop-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const style = {
+    transform: CSS.Translate.toString(draggable.transform)
+  };
+  const availableStatuses = ["active", "done", "skipped"] as const;
+
+  async function handleStatusChange(status: Task["status"]) {
+    onCloseMenu();
+    await onUpdateTaskStatus(task.id, status);
+  }
+
+  return (
+    <li
+      className={className}
+      ref={(node) => {
+        draggable.setNodeRef(node);
+        droppable.setNodeRef(node);
+      }}
+      style={style}
+    >
+      <button
+        aria-label={`${area.label} のドラッグハンドル`}
+        className="tasks-page__handle"
+        type="button"
+        {...draggable.listeners}
+        {...draggable.attributes}
+      >
+        <span aria-hidden="true" className="tasks-page__handle-icon">
+          ↕
+        </span>
+        <span className="tasks-page__handle-area">{area.label}</span>
+      </button>
+      <div className="tasks-page__body">
+        <h3 className="tasks-page__card-title">{task.title}</h3>
+        <p className="tasks-page__description">{description}</p>
+      </div>
+      <div className="tasks-page__controls">
+        <div className="tasks-page__status">
+          <button
+            aria-expanded={isMenuOpen}
+            aria-haspopup="menu"
+            className="tasks-page__button tasks-page__button--status"
+            type="button"
+            onClick={() => (isMenuOpen ? onCloseMenu() : onOpenMenu())}
+          >
+            {task.status}
+          </button>
+          {isMenuOpen ? (
+            <div className="tasks-page__status-menu" role="menu" aria-label="status menu">
+              {availableStatuses.map((status) => (
+                <button
+                  key={status}
+                  className="tasks-page__status-option"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => void handleStatusChange(status)}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <a className="tasks-page__button" href={`#/tasks/${task.id}`}>
+          詳細
+        </a>
+        <button
+          className="tasks-page__button"
+          type="button"
+          onClick={() => void onDeleteTask(task)}
+        >
+          削除
+        </button>
+      </div>
+    </li>
+  );
+}
+
+type TaskDetailPageProps = {
+  readonly operationError: string | null;
+  readonly onDeleteTask: (task: Task) => Promise<boolean>;
+  readonly onUpdateTaskDetails: (
+    taskId: Task["id"],
+    details: {
+      title: Task["title"];
+      description: Task["description"];
+      areaId: MatrixAreaId;
+      status: Task["status"];
+    }
+  ) => Promise<string | null>;
+  readonly task: Task | null;
+};
+
+function TaskDetailPage({
+  operationError,
+  onDeleteTask,
+  onUpdateTaskDetails,
+  task
+}: TaskDetailPageProps) {
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [description, setDescription] = useState(task?.description ?? "");
+  const [areaId, setAreaId] = useState<MatrixAreaId>(detailAreaId(task));
+  const [status, setStatus] = useState<Task["status"]>(task?.status ?? "active");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const validationError = validateTaskTitleInput(title);
+  const canSave = task !== null && validationError === null;
+
+  useEffect(() => {
+    if (task === null) {
+      setTitle("");
+      setDescription("");
+      setAreaId("do");
+      setStatus("active");
+      setSaveError(null);
+
+      return;
+    }
+
+    setTitle(task.title);
+    setDescription(task.description);
+    setAreaId(detailAreaId(task));
+    setStatus(task.status);
+    setSaveError(null);
+  }, [task]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (task === null) {
+      return;
+    }
+
+    if (validationError !== null) {
+      setSaveError(validationError);
+
+      return;
+    }
+
+    const error = await onUpdateTaskDetails(task.id, {
+      areaId,
+      description,
+      status,
+      title
+    });
+
+    setSaveError(error);
+  }
+
+  async function handleDelete() {
+    if (task === null) {
+      return;
+    }
+
+    await onDeleteTask(task);
+  }
+
+  return (
+    <main className="matrix-page">
+      <AppHeader currentPage="tasks" />
+      <section aria-labelledby="task-detail-title" className="task-detail-page">
+        {task === null ? (
+          <>
+            <h2 id="task-detail-title">タスクが見つかりませんでした</h2>
+            <p>指定された taskId は存在しないか、すでに削除されています。</p>
+            <a className="tasks-page__back-link" href="#/tasks">
+              タスク一覧へ戻る
+            </a>
+          </>
+        ) : (
+          <>
+            <header className="task-detail-page__header">
+              <h2 id="task-detail-title">タスク詳細</h2>
+              <a className="tasks-page__back-link" href="#/tasks">
+                タスク一覧へ戻る
+              </a>
+            </header>
+            {operationError !== null ? (
+              <p className="matrix-page__error tasks-page__error" role="alert">
+                {operationError}
+              </p>
+            ) : null}
+            <form className="task-detail-form" onSubmit={(event) => void handleSubmit(event)}>
+              <div className="task-detail-form__grid">
+                <label className="task-detail-form__field">
+                  title
+                  <input
+                    name="title"
+                    type="text"
+                    value={title}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      setSaveError(null);
+                    }}
+                  />
+                </label>
+                <label className="task-detail-form__field">
+                  area
+                  <select
+                    name="area"
+                    value={areaId}
+                    onChange={(event) => {
+                      setAreaId(event.target.value as MatrixAreaId);
+                      setSaveError(null);
+                    }}
+                  >
+                    {MATRIX_AREAS.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="task-detail-form__field">
+                  description
+                  <textarea
+                    name="description"
+                    value={description}
+                    onChange={(event) => {
+                      setDescription(event.target.value);
+                      setSaveError(null);
+                    }}
+                  />
+                </label>
+                <div className="task-detail-form__meta">
+                  <div>
+                    <strong>作成日時</strong>
+                    <p>{task.createdAt}</p>
+                  </div>
+                  <div>
+                    <strong>更新日時</strong>
+                    <p>{task.updatedAt}</p>
+                  </div>
+                  <label className="task-detail-form__field">
+                    status
+                    <select
+                      name="status"
+                      value={status}
+                      onChange={(event) => {
+                        setStatus(event.target.value as Task["status"]);
+                        setSaveError(null);
+                      }}
+                    >
+                      {(["active", "done", "skipped"] as const).map((candidate) => (
+                        <option key={candidate} value={candidate}>
+                          {candidate}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+              {validationError !== null ? (
+                <p className="task-edit-form__error" role="alert">
+                  {validationError}
+                </p>
+              ) : null}
+              {saveError !== null ? (
+                <p className="task-edit-form__error" role="alert">
+                  {saveError}
+                </p>
+              ) : null}
+              <div className="task-detail-form__actions">
+                <button className="tasks-page__button" type="button" onClick={() => void handleDelete()}>
+                  削除
+                </button>
+                <button className="tasks-page__button tasks-page__button--primary" disabled={!canSave} type="submit">
+                  保存
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function detailAreaId(task: Task | null): MatrixAreaId {
+  if (task !== null) {
+    return normalizeTaskAreaId(task.areaId);
+  }
+
+  return "do";
+}
+
+type AppHeaderProps = {
+  readonly currentPage: "matrix" | "tasks";
+};
+
+function AppHeader({ currentPage }: AppHeaderProps) {
+  return (
+    <header className="matrix-page__header">
+      <div className="matrix-page__header-main">
+        <h1>SIFTQ</h1>
+        <nav aria-label="Primary">
+          <a
+            aria-current={currentPage === "matrix" ? "page" : undefined}
+            className="matrix-page__nav-link"
+            href={DEFAULT_ROUTE}
+          >
+            マトリックス
+          </a>
+          <a
+            aria-current={currentPage === "tasks" ? "page" : undefined}
+            className="matrix-page__nav-link"
+            href="#/tasks"
+          >
+            タスク一覧
+          </a>
+        </nav>
+      </div>
+    </header>
   );
 }
 
@@ -504,4 +1050,24 @@ function codeForError(error: unknown): string {
     typeof error.code === "string"
     ? error.code
     : "STORAGE";
+}
+
+function routeFromHash(hash: string): AppRoute {
+  const normalizedHash = hash.length > 0 ? hash : DEFAULT_ROUTE;
+
+  if (normalizedHash === DEFAULT_ROUTE || normalizedHash === "#") {
+    return { name: "matrix" };
+  }
+
+  if (normalizedHash === "#/tasks") {
+    return { name: "tasks" };
+  }
+
+  const taskMatch = normalizedHash.match(/^#\/tasks\/(.+)$/u);
+
+  if (taskMatch !== null) {
+    return { name: "task-detail", taskId: decodeURIComponent(taskMatch[1]) };
+  }
+
+  return { name: "matrix" };
 }
