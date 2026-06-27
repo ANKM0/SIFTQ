@@ -559,7 +559,7 @@ describe("App", () => {
   });
 
   it.each(["done", "skipped"] as const)(
-    "hides active tasks from the matrix after dropping them on the %s area",
+    "transitions tasks to %s after a matrix drop and removes them from the matrix view",
     async (terminalAreaId) => {
       seedStoredTasks(
         task({ id: "task-1", title: `${terminalAreaId} task`, areaId: "do" })
@@ -567,16 +567,24 @@ describe("App", () => {
       render(<App />);
 
       expect(await screen.findByText(`${terminalAreaId} task`)).toBeTruthy();
+      expect(taskTitlesIn("Do tasks")).toEqual([`${terminalAreaId} task`]);
 
       dragTaskOverArea("task-1", terminalAreaId);
 
       await waitFor(() =>
         expect(screen.queryByText(`${terminalAreaId} task`)).toBeNull()
       );
+      expect(taskTitlesIn("Do tasks")).toEqual([]);
       expect(storedTasks()[0]).toMatchObject({
         areaId: "do",
         status: terminalAreaId
       });
+
+      fireEvent.click(screen.getByRole("link", { name: "タスク一覧" }));
+
+      expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: terminalAreaId })).toBeTruthy();
+      expect(taskListTitles()).toEqual([`${terminalAreaId} task`]);
     }
   );
 
