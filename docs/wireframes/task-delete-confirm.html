@@ -3,39 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIFTQ Wireframe - Delete Confirm</title>
-    <style>
-      body { font-family: sans-serif; margin: 0; background: #f6f4ef; color: #1f1f1f; }
-      .shell { max-width: 960px; margin: 0 auto; padding: 24px; }
-      header, .dialog { background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
-      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; }
-      .dialog { margin-top: 16px; padding: 20px; max-width: 520px; }
-      .actions { display: flex; gap: 8px; margin-top: 16px; }
-      .button { border: 1px solid #8b857a; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; text-decoration: none; color: #1f1f1f; }
-      .danger { background: #a11f1f; color: #fff; border-color: #a11f1f; }
-    </style>
+    <title>SIFTQ Wireframe - タスク削除</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
   </head>
   <body>
-    <main class="shell">
-      <header>
-        <div>
-          <h1>タスク削除確認</h1>
-          <p>State: confirm physical delete</p>
-        </div>
-        <nav aria-label="page navigation">
-          <a href="./task-list.html">タスク一覧</a>
-          <a href="./task-detail.html">詳細</a>
+    <main class="app-shell task-page">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>状態: 削除確認</p></div>
+        <nav class="header-actions" aria-label="Primary">
+          <a class="back-link" href="./matrix-with-cards.html">マトリックス</a>
+          <a class="back-link back-link--active" href="./task-list.html">タスク一覧</a>
+          <a class="back-link" href="./index.html">インデックス</a>
         </nav>
       </header>
-
-      <section class="dialog" role="dialog" aria-labelledby="delete-title">
-        <h2 id="delete-title">"Fix browser storage migration" を削除しますか?</h2>
-        <p>削除すると browser storage から完全に消えます。復元操作はありません。</p>
-        <div class="actions">
-          <a class="button" href="./task-detail.html">キャンセル</a>
-          <a class="button danger" href="./task-list-deleted.html">削除する</a>
-        </div>
+      <section class="task-list-shell" aria-hidden="true">
+        <ol class="task-list">
+          <li class="task-list-card task-list-card--active task-list-card--selected">
+            <button class="drag-handle" aria-label="Fix terminal drop をドラッグ">Do</button>
+            <div class="task-list-card__body">
+              <a class="task-list-card__title" href="./task-detail.html">Fix terminal drop</a>
+              <p class="task-list-card__description">Keep dropped Done and Skipped tasks hidden from the matrix while preserving their original area.</p>
+            </div>
+            <div class="task-list-card__actions"><button class="status-button">active ▾</button><a class="card-action" href="./task-detail.html">詳細</a></div>
+          </li>
+        </ol>
       </section>
     </main>
+    <div class="modal-backdrop">
+      <section class="modal" role="dialog" aria-labelledby="delete-title">
+        <h2 id="delete-title">タスクを削除しますか?</h2>
+        <p>Fix terminal drop は Matrix、タスク一覧、タスク詳細から削除されます。</p>
+        <div class="modal__actions">
+          <a class="back-link" href="./task-list.html">キャンセル</a>
+          <a class="card-action card-action--danger" href="./task-list-deleted.html">削除</a>
+        </div>
+      </section>
+    </div>
   </body>
 </html>

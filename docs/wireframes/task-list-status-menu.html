@@ -3,55 +3,62 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIFTQ Wireframe - Task List Status Menu</title>
-    <style>
-      body { font-family: sans-serif; margin: 0; background: #f6f4ef; color: #1f1f1f; }
-      .shell { max-width: 960px; margin: 0 auto; padding: 24px; }
-      header, .card { background: #fff; border: 1px solid #d7d2c8; border-radius: 16px; }
-      header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; }
-      .card { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 12px; align-items: start; padding: 16px; margin-top: 16px; position: relative; }
-      .handle { display: grid; gap: 6px; place-items: center; border: 1px dashed #a79f93; border-radius: 12px; min-height: 64px; padding: 10px 8px; font-weight: 700; text-align: center; }
-      .handle__icon { font-size: 1.1rem; line-height: 1; }
-      .handle__area { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
-      .menu { position: absolute; right: 190px; top: 74px; min-width: 160px; background: #fff; border: 1px solid #8b857a; border-radius: 12px; padding: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
-      .menu button { display: block; width: 100%; padding: 10px 12px; border: 0; background: transparent; text-align: left; font-weight: 700; }
-      .menu button:hover { background: #f2ead7; }
-      .button { border: 1px solid #8b857a; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; text-decoration: none; color: #1f1f1f; }
-    </style>
+    <title>SIFTQ Wireframe - タスク一覧ステータス選択</title>
+    <link rel="stylesheet" href="./matrix-mvp.css" />
   </head>
   <body>
-    <main class="shell">
-      <header>
-        <div>
-          <h1>タスク一覧</h1>
-          <p>State: status menu open</p>
-        </div>
-        <nav aria-label="page navigation">
-          <a href="./matrix-mvp.html">マトリックス</a>
-          <a href="./task-list.html">タスク一覧</a>
+    <main class="app-shell task-page">
+      <header class="app-header">
+        <div><h1>SIFTQ</h1><p>状態: ステータス選択</p></div>
+        <nav class="header-actions" aria-label="Primary">
+          <a class="back-link" href="./matrix-with-cards.html">マトリックス</a>
+          <a class="back-link back-link--active" href="./task-list.html">タスク一覧</a>
+          <a class="back-link" href="./index.html">インデックス</a>
         </nav>
       </header>
 
-      <article class="card">
-        <div class="handle" aria-label="Do のドラッグハンドル">
-          <span class="handle__icon">↕</span>
-          <span class="handle__area">Do</span>
-        </div>
-        <div>
-          <h2>Fix browser storage migration</h2>
-          <p>description preview</p>
-        </div>
-        <button class="button">active</button>
-        <div>
-          <a class="button" href="./task-detail.html">詳細</a>
-          <a class="button" href="./task-delete-confirm.html">削除</a>
-        </div>
-        <div class="menu" role="menu" aria-label="status menu">
-          <button>active</button>
-          <button>done</button>
-          <button>skipped</button>
-        </div>
-      </article>
+      <section class="task-list-shell" aria-labelledby="task-status-menu-title">
+        <header class="task-list-header">
+          <div>
+            <h2 id="task-status-menu-title">タスク一覧</h2>
+            <p>status button を押すと、active / done / skipped の選択肢を表示する。</p>
+          </div>
+          <span class="count">4 tasks</span>
+        </header>
+
+        <ol class="task-list" aria-label="一覧順で並んだ全タスク">
+          <li class="task-list-card task-list-card--active task-list-card--selected">
+            <button class="drag-handle" aria-label="Fix terminal drop をドラッグ">Do</button>
+            <div class="task-list-card__body">
+              <a class="task-list-card__title" href="./task-detail.html">Fix terminal drop</a>
+              <p class="task-list-card__description">Keep dropped Done and Skipped tasks hidden from the matrix while preserving their original area.</p>
+            </div>
+            <div class="task-list-card__actions task-list-card__actions--menu-open">
+              <a class="status-button status-button--open" href="./task-list.html" aria-expanded="true">active ▾</a>
+              <div class="status-menu" role="menu" aria-label="ステータスを選択">
+                <a class="status-menu__item status-menu__item--selected" href="./task-list.html">active</a>
+                <a class="status-menu__item" href="./task-list.html">done</a>
+                <a class="status-menu__item" href="./task-list.html">skipped</a>
+              </div>
+              <a class="card-action" href="./task-detail.html">詳細</a>
+              <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
+            </div>
+          </li>
+
+          <li class="task-list-card task-list-card--done">
+            <button class="drag-handle" aria-label="Create UI definition をドラッグ">Schedule</button>
+            <div class="task-list-card__body">
+              <a class="task-list-card__title" href="./task-detail.html">Create UI definition</a>
+              <p class="task-list-card__description">Write the contract for the task list page and detail page.</p>
+            </div>
+            <div class="task-list-card__actions">
+              <button class="status-button">done ▾</button>
+              <a class="card-action" href="./task-detail.html">詳細</a>
+              <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
+            </div>
+          </li>
+        </ol>
+      </section>
     </main>
   </body>
 </html>
