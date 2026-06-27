@@ -160,6 +160,19 @@ describe("App", () => {
     expect(doneHeading.closest(".status-drop-area-shell")).toBe(doneNode);
   });
 
+  it("keeps the skipped-board-done DOM order used by the mobile vertical stack", async () => {
+    render(<App />);
+
+    const workspace = await screen.findByLabelText("Matrix workspace");
+    const childClassNames = Array.from(workspace?.children ?? []).map((child) => child.className);
+
+    expect(workspace).toBeTruthy();
+    expect(childClassNames).toHaveLength(3);
+    expect(childClassNames[0]).toContain("matrix-workspace__status--skipped");
+    expect(childClassNames[1]).toBe("matrix-grid");
+    expect(childClassNames[2]).toContain("matrix-workspace__status--done");
+  });
+
   it.each(["done", "skipped"] as const)(
     "highlights only the %s terminal shell when its drop target is active",
     async (terminalAreaId) => {
