@@ -580,6 +580,57 @@ describe("App", () => {
     }
   );
 
+  it("keeps matrix move behavior unchanged after hiding a task in its original area", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Hidden later", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Move me", areaId: "do", order: 1 }),
+      task({ id: "task-3", title: "Scheduled task", areaId: "schedule", order: 0 })
+    );
+    render(<App />);
+
+    expect(await screen.findByText("Hidden later")).toBeTruthy();
+
+    dragTaskOverArea("task-1", "done");
+    await waitFor(() => expect(screen.queryByText("Hidden later")).toBeNull());
+
+    dragTaskOverTask("task-2", "task-3");
+    await waitFor(() =>
+      expect(taskTitlesIn("Schedule tasks")).toEqual(["Move me", "Scheduled task"])
+    );
+
+    expect(storedTasks()).toMatchObject([
+      { id: "task-1", areaId: "do", order: 1, status: "done" },
+      { id: "task-2", areaId: "schedule", order: 0, status: "active" },
+      { id: "task-3", areaId: "schedule", order: 1, status: "active" }
+    ]);
+    expect(taskTitlesIn("Do tasks")).toEqual([]);
+  });
+
+  it("keeps matrix reorder behavior unchanged after hiding a sibling task", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Hide me", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Second task", areaId: "do", order: 1 }),
+      task({ id: "task-3", title: "Third task", areaId: "do", order: 2 })
+    );
+    render(<App />);
+
+    expect(await screen.findByText("Hide me")).toBeTruthy();
+
+    dragTaskOverArea("task-1", "skipped");
+    await waitFor(() => expect(screen.queryByText("Hide me")).toBeNull());
+
+    dragTaskOverTask("task-3", "task-2");
+    await waitFor(() =>
+      expect(taskTitlesIn("Do tasks")).toEqual(["Third task", "Second task"])
+    );
+
+    expect(storedTasks()).toMatchObject([
+      { id: "task-1", areaId: "do", order: 2, status: "skipped" },
+      { id: "task-2", areaId: "do", order: 1, status: "active" },
+      { id: "task-3", areaId: "do", order: 0, status: "active" }
+    ]);
+  });
+
   it("restores task title, area, status, and order after browser reload", async () => {
     seedStoredTasks(
       task({ id: "task-1", title: "First task", areaId: "schedule", order: 1 }),
