@@ -122,7 +122,7 @@ describe("App", () => {
     expect(screen.getByRole("link", { name: "タスク一覧" }).getAttribute("href")).toBe(
       "#/tasks"
     );
-    expect(screen.getByRole("button", { name: "Do のドラッグハンドル" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Do のドラッグハンドル" })).toHaveLength(2);
     expect(screen.getByText("Visible")).toBeTruthy();
     expect(screen.getByText("Hidden")).toBeTruthy();
     expect(screen.getByText("説明なし")).toBeTruthy();

@@ -277,7 +277,7 @@ describe("browserTaskRepository", () => {
           order: 0,
           status: "active",
           createdAt: timestampAt(0),
-          updatedAt: timestampAt(2),
+          updatedAt: timestampAt(0),
           listOrder: 0
         }),
         task({

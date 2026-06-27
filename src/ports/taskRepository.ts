@@ -1,4 +1,5 @@
 import {
+  type AreaId,
   type MatrixAreaId,
   type Task,
   type TaskId,
