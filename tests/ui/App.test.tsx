@@ -14,6 +14,7 @@ import { App } from "../../src/ui/App";
 import { areaDropId, taskDropId } from "../../src/ui/dragDrop";
 
 const dndKitMock = vi.hoisted(() => ({
+  collisionDetection: undefined as unknown,
   droppableIds: [] as string[],
   onDragEnd: undefined as ((event: unknown) => void) | undefined
 }));
@@ -24,11 +25,14 @@ vi.mock("@dnd-kit/core", async () => {
   return {
     DndContext: ({
       children,
+      collisionDetection,
       onDragEnd
     }: {
       children: React.ReactNode;
+      collisionDetection?: unknown;
       onDragEnd: (event: unknown) => void;
     }) => {
+      dndKitMock.collisionDetection = collisionDetection;
       dndKitMock.onDragEnd = onDragEnd;
 
       return React.createElement(React.Fragment, null, children);
@@ -62,6 +66,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  dndKitMock.collisionDetection = undefined;
   dndKitMock.droppableIds = [];
   dndKitMock.onDragEnd = undefined;
   vi.restoreAllMocks();
@@ -98,6 +103,34 @@ describe("App", () => {
     expect(screen.queryByText("更新日時")).toBeNull();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
+  });
+
+  it("registers terminal droppables in the same area namespace as matrix areas", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Do task", areaId: "do" }),
+      task({ id: "task-2", title: "Schedule task", areaId: "schedule" })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(dndKitMock.droppableIds).toEqual([
+      areaDropId("skipped"),
+      areaDropId("do"),
+      taskDropId("task-1"),
+      areaDropId("schedule"),
+      taskDropId("task-2"),
+      areaDropId("delegate"),
+      areaDropId("eliminate"),
+      areaDropId("done")
+    ]);
+  });
+
+  it("relies on the default dnd-kit collision ranking on the matrix page", async () => {
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(dndKitMock.collisionDetection).toBeUndefined();
   });
 
   it("routes to the task list page from #/tasks and shows mutual header links", async () => {
