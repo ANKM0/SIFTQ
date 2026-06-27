@@ -20,6 +20,7 @@ import {
 const dndKitMock = vi.hoisted(() => ({
   collisionDetection: undefined as unknown,
   droppableIds: [] as string[],
+  droppableNodes: new Map<string, HTMLElement | null>(),
   onDragEnd: undefined as ((event: unknown) => void) | undefined
 }));
 
@@ -53,7 +54,9 @@ vi.mock("@dnd-kit/core", async () => {
 
       return {
         isOver: false,
-        setNodeRef: vi.fn()
+        setNodeRef: vi.fn((node: HTMLElement | null) => {
+          dndKitMock.droppableNodes.set(id, node);
+        })
       };
     }
   };
@@ -72,6 +75,7 @@ beforeEach(() => {
 afterEach(() => {
   dndKitMock.collisionDetection = undefined;
   dndKitMock.droppableIds = [];
+  dndKitMock.droppableNodes = new Map();
   dndKitMock.onDragEnd = undefined;
   vi.restoreAllMocks();
   cleanup();
@@ -128,6 +132,22 @@ describe("App", () => {
       areaDropId("eliminate"),
       areaDropId("done")
     ]);
+  });
+
+  it("attaches terminal droppable refs to the full side-column wrappers", async () => {
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+
+    const skippedNode = dndKitMock.droppableNodes.get(areaDropId("skipped"));
+    const doneNode = dndKitMock.droppableNodes.get(areaDropId("done"));
+
+    expect(skippedNode?.className).toContain("matrix-workspace__status");
+    expect(skippedNode?.className).toContain("matrix-workspace__status--skipped");
+    expect(skippedNode?.firstElementChild?.className).toContain("status-drop-area");
+    expect(doneNode?.className).toContain("matrix-workspace__status");
+    expect(doneNode?.className).toContain("matrix-workspace__status--done");
+    expect(doneNode?.firstElementChild?.className).toContain("status-drop-area");
   });
 
   it("uses the custom matrix collision ranking on the matrix page", async () => {

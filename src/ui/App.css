@@ -127,6 +127,10 @@
   margin: 0 auto;
 }
 
+.matrix-workspace__status {
+  display: flex;
+}
+
 .tasks-page,
 .task-detail-page {
   max-width: 860px;
@@ -796,6 +800,7 @@
 
 .status-drop-area {
   display: flex;
+  flex: 1;
   min-height: 100%;
   flex-direction: column;
   justify-content: center;
@@ -803,6 +808,12 @@
   background: #f8fafc;
   padding: 14px;
   text-align: center;
+}
+
+.status-drop-area-shell--drop-target .status-drop-area {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 18%);
 }
 
 .status-drop-area--drop-target {
