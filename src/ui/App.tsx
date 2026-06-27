@@ -157,6 +157,8 @@ export function App() {
     try {
       if (operation.type === "move") {
         await browserTaskRepository.moveTask(operation);
+      } else if (operation.type === "update-status") {
+        await browserTaskRepository.updateTaskStatus(operation);
       } else {
         await browserTaskRepository.reorderTask(operation);
       }

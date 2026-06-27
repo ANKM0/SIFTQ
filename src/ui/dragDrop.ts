@@ -5,7 +5,13 @@ import {
   type Modifier
 } from "@dnd-kit/core";
 
-import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
+import {
+  type AreaId,
+  type MatrixAreaId,
+  type Task,
+  type TaskId,
+  type TaskStatus
+} from "../contracts/task";
 import { isAreaId as isKnownAreaId, isMatrixArea } from "../domain/taskRules";
 
 export type TaskDropOperation =
@@ -14,6 +20,11 @@ export type TaskDropOperation =
       readonly taskId: TaskId;
       readonly toAreaId: AreaId;
       readonly insertAt: number;
+    }
+  | {
+      readonly type: "update-status";
+      readonly taskId: TaskId;
+      readonly status: Exclude<TaskStatus, "active">;
     }
   | {
       readonly type: "reorder";
@@ -87,6 +98,14 @@ export function resolveTaskDropOperation(
   const targetAreaId = areaIdFromDropId(overDropId);
 
   if (targetAreaId !== null) {
+    if (targetAreaId === "done" || targetAreaId === "skipped") {
+      return {
+        type: "update-status",
+        taskId,
+        status: targetAreaId
+      };
+    }
+
     const insertAt = tasksInArea(tasks, targetAreaId).length;
 
     return operationForTarget(taskId, activeTask.areaId, targetAreaId, insertAt);

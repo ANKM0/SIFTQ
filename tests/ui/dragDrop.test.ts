@@ -77,7 +77,7 @@ describe("dragDrop", () => {
     });
   });
 
-  it("resolves drops over terminal areas to move operations", () => {
+  it("resolves drops over terminal areas to status updates", () => {
     for (const terminalAreaId of ["done", "skipped"] as const) {
       expect(
         resolveTaskDropOperation(
@@ -86,10 +86,9 @@ describe("dragDrop", () => {
           areaDropId(terminalAreaId)
         )
       ).toEqual({
-        type: "move",
+        type: "update-status",
         taskId: "moved",
-        toAreaId: terminalAreaId,
-        insertAt: 0
+        status: terminalAreaId
       });
     }
   });
