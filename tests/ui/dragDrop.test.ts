@@ -181,41 +181,49 @@ describe("dragDrop", () => {
   });
 
   it("prefers terminal droppables over task and matrix-area candidates", () => {
-    for (const [terminalAreaId, x] of [
-      ["skipped", 40],
-      ["done", 280]
+    for (const [terminalAreaId, x, ys] of [
+      ["skipped", 40, [10, 150, 290]],
+      ["done", 280, [10, 150, 290]]
     ] as const) {
-      const collisions = matrixCollisionDetection(
-        collisionArgs({
-          collisionRect: rect({ left: x - 20, top: 40, width: 60, height: 60 }),
-          droppableRects: [
-            [areaDropId("skipped"), rect({ left: 0, top: 0, width: 80, height: 300 })],
-            [areaDropId("do"), rect({ left: 80, top: 0, width: 180, height: 300 })],
-            [areaDropId("done"), rect({ left: 240, top: 0, width: 120, height: 300 })],
-            [taskDropId("task-1"), rect({ left: x - 30, top: 30, width: 70, height: 70 })]
-          ],
-          pointerCoordinates: { x, y: 120 }
-        })
-      );
+      for (const y of ys) {
+        const collisions = matrixCollisionDetection(
+          collisionArgs({
+            collisionRect: rect({ left: x - 20, top: y - 20, width: 60, height: 60 }),
+            droppableRects: [
+              [areaDropId("skipped"), rect({ left: 0, top: 0, width: 80, height: 300 })],
+              [areaDropId("do"), rect({ left: 80, top: 0, width: 180, height: 300 })],
+              [areaDropId("done"), rect({ left: 240, top: 0, width: 120, height: 300 })],
+              [taskDropId("task-1"), rect({ left: x - 30, top: y - 30, width: 70, height: 70 })]
+            ],
+            pointerCoordinates: { x, y }
+          })
+        );
 
-      expect(collisions.map(({ id }) => id)).toEqual([areaDropId(terminalAreaId)]);
+        expect(collisions.map(({ id }) => id)).toEqual([areaDropId(terminalAreaId)]);
+      }
     }
   });
 
   it("treats the full terminal column as a single drop target", () => {
-    for (const y of [10, 150, 290]) {
-      const collisions = matrixCollisionDetection(
-        collisionArgs({
-          collisionRect: rect({ left: 20, top: y - 20, width: 40, height: 40 }),
-          droppableRects: [
-            [areaDropId("skipped"), rect({ left: 0, top: 0, width: 80, height: 300 })],
-            [areaDropId("do"), rect({ left: 80, top: 0, width: 220, height: 300 })]
-          ],
-          pointerCoordinates: { x: 40, y }
-        })
-      );
+    for (const [terminalAreaId, x] of [
+      ["skipped", 40],
+      ["done", 280]
+    ] as const) {
+      for (const y of [10, 150, 290]) {
+        const collisions = matrixCollisionDetection(
+          collisionArgs({
+            collisionRect: rect({ left: x - 20, top: y - 20, width: 40, height: 40 }),
+            droppableRects: [
+              [areaDropId("skipped"), rect({ left: 0, top: 0, width: 80, height: 300 })],
+              [areaDropId("do"), rect({ left: 80, top: 0, width: 180, height: 300 })],
+              [areaDropId("done"), rect({ left: 240, top: 0, width: 120, height: 300 })]
+            ],
+            pointerCoordinates: { x, y }
+          })
+        );
 
-      expect(collisions.map(({ id }) => id)).toEqual([areaDropId("skipped")]);
+        expect(collisions.map(({ id }) => id)).toEqual([areaDropId(terminalAreaId)]);
+      }
     }
   });
 

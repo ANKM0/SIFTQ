@@ -21,6 +21,7 @@ const dndKitMock = vi.hoisted(() => ({
   collisionDetection: undefined as unknown,
   droppableIds: [] as string[],
   droppableNodes: new Map<string, HTMLElement | null>(),
+  overIds: new Set<string>(),
   onDragEnd: undefined as ((event: unknown) => void) | undefined
 }));
 
@@ -53,7 +54,7 @@ vi.mock("@dnd-kit/core", async () => {
       dndKitMock.droppableIds.push(id);
 
       return {
-        isOver: false,
+        isOver: dndKitMock.overIds.has(id),
         setNodeRef: vi.fn((node: HTMLElement | null) => {
           dndKitMock.droppableNodes.set(id, node);
         })
@@ -76,6 +77,7 @@ afterEach(() => {
   dndKitMock.collisionDetection = undefined;
   dndKitMock.droppableIds = [];
   dndKitMock.droppableNodes = new Map();
+  dndKitMock.overIds = new Set();
   dndKitMock.onDragEnd = undefined;
   vi.restoreAllMocks();
   cleanup();
@@ -157,6 +159,30 @@ describe("App", () => {
     expect(doneNode?.firstElementChild?.className).toContain("status-drop-area");
     expect(doneHeading.closest(".status-drop-area-shell")).toBe(doneNode);
   });
+
+  it.each(["done", "skipped"] as const)(
+    "highlights only the %s terminal shell when its drop target is active",
+    async (terminalAreaId) => {
+      dndKitMock.overIds = new Set([areaDropId(terminalAreaId)]);
+
+      render(<App />);
+
+      expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+
+      const activeShell = dndKitMock.droppableNodes.get(areaDropId(terminalAreaId));
+      const inactiveAreaId = terminalAreaId === "done" ? "skipped" : "done";
+      const inactiveShell = dndKitMock.droppableNodes.get(areaDropId(inactiveAreaId));
+
+      expect(activeShell?.className).toContain("status-drop-area-shell--drop-target");
+      expect(activeShell?.firstElementChild?.className).toContain(
+        "status-drop-area--drop-target"
+      );
+      expect(inactiveShell?.className).not.toContain("status-drop-area-shell--drop-target");
+      expect(inactiveShell?.firstElementChild?.className).not.toContain(
+        "status-drop-area--drop-target"
+      );
+    }
+  );
 
   it("uses the custom matrix collision ranking on the matrix page", async () => {
     render(<App />);
