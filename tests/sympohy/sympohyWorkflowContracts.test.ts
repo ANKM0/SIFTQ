@@ -38,6 +38,7 @@ describe("sympohy Taskfile and CLI integration", () => {
     expect(cli).toContain("observe-query");
     expect(cli).toContain("observe-analyze");
     expect(cli).toContain("observe-propose");
+    expect(cli).toContain("observe-apply");
     expect(cli).toContain("stage-gate");
   });
 
@@ -95,10 +96,13 @@ describe("sympohy watcher contract", () => {
     expect(observability).toContain("aggregate_counts");
     expect(observability).toContain("analyze_failures");
     expect(observability).toContain("propose_improvements");
+    expect(observability).toContain("apply_improvements");
     expect(observability).toContain("failure_kind_counts");
     expect(observability).toContain("recurring_event_chain_patterns");
     expect(observability).toContain("event_chain_summaries");
     expect(observability).toContain("\"required_validation\"");
+    expect(observability).toContain("\"verified_draft_pr\"");
+    expect(observability).toContain("\"dangerous_auto_apply\"");
     expect(runner).toContain("\"run_id\"");
     expect(runner).toContain("\"event_id\"");
     expect(runner).toContain("\"lock\"");

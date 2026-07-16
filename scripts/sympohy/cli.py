@@ -89,6 +89,11 @@ def main(argv: list[str] | None = None) -> int:
     observe_propose_parser.add_argument("--issue", type=int)
     observe_propose_parser.add_argument("--run-id")
 
+    observe_apply_parser = subcommands.add_parser("observe-apply")
+    observe_apply_parser.add_argument("--db", required=True)
+    observe_apply_parser.add_argument("--issue", type=int)
+    observe_apply_parser.add_argument("--run-id")
+
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
     contract_parser.add_argument("payload")
@@ -179,6 +184,19 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 json.dumps(
                     store.propose_improvements(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-apply":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.apply_improvements(
                         issue=args.issue,
                         run_id=args.run_id,
                     ),

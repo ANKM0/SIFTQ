@@ -27,6 +27,7 @@ _REQUIRED_EVENT_KEYS = frozenset(
 )
 _COUNT_GROUP_FIELDS = frozenset({"event_type", "status", "phase", "run_id"})
 _PROPOSAL_TARGETS = ("prompt", "hook", "stage_gate", "docs", "skill", "test", "config")
+_LOW_RISK_APPLICATOR_TARGETS = frozenset({"docs", "prompt", "test", "config"})
 _FAILURE_KINDS = frozenset(
     {
         "hook",
@@ -412,6 +413,57 @@ class ObservationStore:
             "candidates": candidates,
         }
 
+    def apply_improvements(
+        self,
+        *,
+        issue: int | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, object]:
+        proposal = self.propose_improvements(issue=issue, run_id=run_id)
+        candidates = proposal.get("candidates", [])
+        candidate_list = (
+            list(candidates)
+            if isinstance(candidates, Sequence)
+            and not isinstance(candidates, (str, bytes, bytearray))
+            else []
+        )
+        auto_apply_candidates = [
+            dict(candidate)
+            for candidate in candidate_list
+            if isinstance(candidate, Mapping)
+            and _is_auto_apply_candidate(candidate)
+        ]
+        manual_review_candidates = [
+            dict(candidate)
+            for candidate in candidate_list
+            if isinstance(candidate, Mapping)
+            and not _is_auto_apply_candidate(candidate)
+        ]
+        return {
+            "schema_version": 1,
+            "issue": issue,
+            "run_id": run_id,
+            "stop_after": "verified_draft_pr",
+            "requires_human_review": True,
+            "prohibited_actions": [
+                "dangerous_auto_apply",
+                "broad_code_changes",
+                "auto_merge",
+            ],
+            "policy": {
+                "allowed_categories": sorted(_LOW_RISK_APPLICATOR_TARGETS),
+                "manual_review_categories": ["hook", "skill", "stage_gate"],
+                "lightweight_config_only": True,
+            },
+            "summary": {
+                "candidate_count": len(candidate_list),
+                "auto_apply_count": len(auto_apply_candidates),
+                "manual_review_count": len(manual_review_candidates),
+            },
+            "auto_apply_candidates": auto_apply_candidates,
+            "manual_review_candidates": manual_review_candidates,
+        }
+
     def _analysis_events(
         self,
         *,
@@ -792,6 +844,12 @@ def _append_candidate(
             "confidence": confidence,
             "risk": risk,
             "required_validation": list(required_validation),
+            "application": _candidate_application_policy(
+                category=category,
+                title=title,
+                summary=summary,
+                required_validation=required_validation,
+            ),
             "evidence": {
                 "run_ids": run_ids,
                 "failure_patterns": patterns,
@@ -830,6 +888,72 @@ def _collect_test_failures(
             seen.add(key)
             collected.append(normalized)
     return collected
+
+
+def _candidate_application_policy(
+    *,
+    category: str,
+    title: str,
+    summary: str,
+    required_validation: Sequence[str],
+) -> dict[str, object]:
+    if category in {"docs", "prompt", "test"}:
+        return {
+            "automation_eligibility": "eligible",
+            "scope": "low_risk",
+            "reason": (
+                f"{category} changes are in the bounded low-risk applicator scope "
+                "and must stop at a verified draft PR."
+            ),
+            "stop_after": "verified_draft_pr",
+            "requires_human_review": True,
+        }
+    if category == "config" and _is_lightweight_config_candidate(
+        title=title,
+        summary=summary,
+        required_validation=required_validation,
+    ):
+        return {
+            "automation_eligibility": "eligible",
+            "scope": "low_risk",
+            "reason": (
+                "This config proposal is limited to lightweight sympohy retry or "
+                "hook settings and must stop at a verified draft PR."
+            ),
+            "stop_after": "verified_draft_pr",
+            "requires_human_review": True,
+        }
+    return {
+        "automation_eligibility": "manual_only",
+        "scope": "needs_human_review",
+        "reason": (
+            "This proposal is outside the bounded low-risk applicator scope and "
+            "must not be auto-applied without human review."
+        ),
+        "stop_after": "manual_review",
+        "requires_human_review": True,
+    }
+
+
+def _is_lightweight_config_candidate(
+    *,
+    title: str,
+    summary: str,
+    required_validation: Sequence[str],
+) -> bool:
+    normalized_text = " ".join((title, summary)).lower()
+    if not any(token in normalized_text for token in ("config", "retry", "hook")):
+        return False
+    return any(
+        "sympohy_config_test.py" in str(command) for command in required_validation
+    )
+
+
+def _is_auto_apply_candidate(candidate: Mapping[str, object]) -> bool:
+    application = candidate.get("application")
+    if not isinstance(application, Mapping):
+        return False
+    return str(application.get("automation_eligibility")) == "eligible"
 
 
 def _as_str_list(value: object) -> list[str]:

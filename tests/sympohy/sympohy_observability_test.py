@@ -566,6 +566,168 @@ class SympohyObservabilityTest(unittest.TestCase):
             proposal["event_chain_summaries"][0]["events"][0]["event_type"],
             "hook",
         )
+        self.assertEqual(
+            candidates["docs"]["application"]["automation_eligibility"],
+            "eligible",
+        )
+        self.assertEqual(
+            candidates["docs"]["application"]["stop_after"],
+            "verified_draft_pr",
+        )
+        self.assertEqual(
+            candidates["stage_gate"]["application"]["automation_eligibility"],
+            "manual_only",
+        )
+        self.assertEqual(
+            candidates["skill"]["application"]["automation_eligibility"],
+            "manual_only",
+        )
+
+    def test_applicator_limits_auto_apply_to_low_risk_candidates_and_stops_at_draft_pr(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000001",
+                    phase="hooks",
+                    event_type="hook",
+                    status="retry",
+                    summary="hook failed: task ci",
+                    metadata={
+                        "command": "task ci",
+                        "failure_summary": "FAILED tests/sympohy/test_runner.py::test_resume",
+                        "test_failures": [
+                            {
+                                "runner": "pytest",
+                                "name": "tests/sympohy/test_runner.py::test_resume",
+                                "file": "tests/sympohy/test_runner.py",
+                                "line": 27,
+                                "summary": "AssertionError: expected retry",
+                            }
+                        ],
+                    },
+                    timestamp="2026-07-16T10:01:00Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000002",
+                    phase="hooks",
+                    event_type="hook",
+                    status="success",
+                    summary="hook passed: task ci",
+                    metadata={"command": "task ci"},
+                    timestamp="2026-07-16T10:01:08Z",
+                ),
+                self._event(
+                    run_id="run-3",
+                    event_id="run-3-000001",
+                    phase="implement",
+                    event_type="codex",
+                    status="failure",
+                    summary="codex response could not be parsed",
+                    metadata={"role": "implementation", "parse_status": "invalid_json"},
+                    timestamp="2026-07-16T10:02:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                application = store.apply_improvements(issue=126)
+
+        self.assertEqual(application["schema_version"], 1)
+        self.assertEqual(application["stop_after"], "verified_draft_pr")
+        self.assertTrue(application["requires_human_review"])
+        self.assertEqual(
+            application["policy"]["allowed_categories"],
+            ["config", "docs", "prompt", "test"],
+        )
+        self.assertIn("auto_merge", application["prohibited_actions"])
+        self.assertEqual(
+            sorted(
+                candidate["category"]
+                for candidate in application["auto_apply_candidates"]
+            ),
+            ["docs", "prompt", "test"],
+        )
+        self.assertEqual(
+            sorted(
+                candidate["category"]
+                for candidate in application["manual_review_candidates"]
+            ),
+            ["skill", "stage_gate"],
+        )
+
+    def test_applicator_treats_lightweight_config_candidates_as_low_risk(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="hooks",
+                    event_type="hook",
+                    status="retry",
+                    summary="hook failed: task ci",
+                    metadata={"command": "task ci", "failure_summary": "flake"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000001",
+                    phase="hooks",
+                    event_type="hook",
+                    status="retry",
+                    summary="hook failed: task ci",
+                    metadata={"command": "task ci", "failure_summary": "flake"},
+                    timestamp="2026-07-16T10:01:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                application = store.apply_improvements(issue=126)
+
+        config_candidates = [
+            candidate
+            for candidate in application["auto_apply_candidates"]
+            if candidate["category"] == "config"
+        ]
+        self.assertEqual(len(config_candidates), 1)
+        self.assertEqual(
+            config_candidates[0]["application"]["automation_eligibility"],
+            "eligible",
+        )
+        self.assertEqual(
+            config_candidates[0]["application"]["stop_after"],
+            "verified_draft_pr",
+        )
 
     def test_rebuild_rejects_invalid_event_shape(self) -> None:
         with TemporaryDirectory() as tmp:
