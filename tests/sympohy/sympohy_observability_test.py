@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from scripts.sympohy.observability import ObservationStore, rebuild_observation_store
 
@@ -852,6 +854,156 @@ class SympohyObservabilityTest(unittest.TestCase):
         self.assertEqual(
             config_candidates[0]["application"]["stop_after"],
             "verified_draft_pr",
+        )
+
+    def test_applicator_executes_low_risk_candidates_runs_validation_and_verifies_draft_pr(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            log_dir = worktree / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            validation_calls: list[list[str]] = []
+            push_call: dict[str, object] = {}
+            git_calls: list[list[str]] = []
+            statuses = iter(["", " M docs/contributing/issue-execution.md"])
+
+            def check_call_with_heartbeat(
+                command: list[str],
+                *,
+                cwd: Path,
+                heartbeat: object | None = None,
+            ) -> None:
+                del heartbeat
+                self.assertEqual(cwd, worktree)
+                validation_calls.append(command)
+
+            def codex_text(
+                prompts: list[str],
+                *,
+                cwd: Path,
+                log_path: Path,
+                heartbeat: object | None = None,
+                config: object | None = None,
+                role: str = "default",
+                state: object | None = None,
+            ) -> str:
+                del heartbeat, config, state
+                self.assertEqual(cwd, worktree)
+                self.assertEqual(role, "fix")
+                self.assertTrue(log_path.name.endswith(".log"))
+                self.assertIn("bounded self-improvement candidate", prompts[0])
+                log_path.write_text("applied", encoding="utf-8")
+                return ""
+
+            def status(_cwd: Path) -> str:
+                return next(statuses)
+
+            def check_call(command: list[str], *, cwd: Path) -> None:
+                self.assertEqual(cwd, worktree)
+                git_calls.append(command)
+
+            def push_branch_and_ensure_draft_pull_request(
+                *,
+                cwd: Path,
+                branch: str,
+                heartbeat: object | None = None,
+                issue_number: int | None = None,
+                base_branch: str | None = None,
+            ) -> None:
+                del heartbeat
+                push_call.update(
+                    {
+                        "cwd": cwd,
+                        "branch": branch,
+                        "issue_number": issue_number,
+                        "base_branch": base_branch,
+                    }
+                )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                with (
+                    patch(
+                        "scripts.sympohy.runner._check_call_with_heartbeat",
+                        side_effect=check_call_with_heartbeat,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._codex_text",
+                        side_effect=codex_text,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-126-sympohy",
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._push_branch_and_ensure_draft_pull_request",
+                        side_effect=push_branch_and_ensure_draft_pull_request,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._worktree_has_changes",
+                        return_value=True,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._worktree_status",
+                        side_effect=status,
+                    ),
+                    patch(
+                        "scripts.sympohy.observability.subprocess.check_call",
+                        side_effect=check_call,
+                    ),
+                ):
+                    application = store.apply_improvements(
+                        issue=126,
+                        execute=True,
+                        cwd=worktree,
+                        config=SimpleNamespace(base_branch="main"),
+                    )
+
+        self.assertEqual(
+            [candidate["category"] for candidate in application["execution"]["applied_candidates"]],
+            ["docs"],
+        )
+        self.assertEqual(
+            validation_calls,
+            [
+                ["task", "ci:markdown"],
+                ["task", "pytest", "tests/sympohy/sympohy_observability_test.py"],
+            ],
+        )
+        self.assertEqual(git_calls[0], ["git", "add", "-A"])
+        self.assertEqual(git_calls[1][:2], ["git", "commit"])
+        self.assertIn("apply self-improvement", git_calls[1][3])
+        self.assertEqual(
+            push_call,
+            {
+                "cwd": worktree,
+                "branch": "issue-126-sympohy",
+                "issue_number": 126,
+                "base_branch": "main",
+            },
+        )
+        self.assertEqual(
+            application["execution"]["draft_pull_request"]["status"],
+            "verified",
         )
 
     def test_rebuild_rejects_invalid_event_shape(self) -> None:

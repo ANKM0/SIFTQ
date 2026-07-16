@@ -3,9 +3,12 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 import json
 from pathlib import Path
+import shlex
 import sqlite3
+import subprocess
 from tempfile import NamedTemporaryFile
 from typing import Literal, Mapping, Sequence
 
@@ -418,6 +421,9 @@ class ObservationStore:
         *,
         issue: int | None = None,
         run_id: str | None = None,
+        execute: bool = False,
+        cwd: Path | None = None,
+        config: object | None = None,
     ) -> dict[str, object]:
         proposal = self.propose_improvements(issue=issue, run_id=run_id)
         candidates = proposal.get("candidates", [])
@@ -439,7 +445,7 @@ class ObservationStore:
             if isinstance(candidate, Mapping)
             and not _is_auto_apply_candidate(candidate)
         ]
-        return {
+        result = {
             "schema_version": 1,
             "issue": issue,
             "run_id": run_id,
@@ -463,6 +469,22 @@ class ObservationStore:
             "auto_apply_candidates": auto_apply_candidates,
             "manual_review_candidates": manual_review_candidates,
         }
+        if not execute:
+            return result
+        if issue is None:
+            raise ValueError("issue is required when execute=True")
+
+        apply_cwd = cwd or Path.cwd()
+        execution = _execute_auto_apply_candidates(
+            issue=issue,
+            run_id=run_id,
+            cwd=apply_cwd,
+            db_path=self.db_path,
+            config=config,
+            candidates=auto_apply_candidates,
+        )
+        result["execution"] = execution
+        return result
 
     def _analysis_events(
         self,
@@ -954,6 +976,184 @@ def _is_auto_apply_candidate(candidate: Mapping[str, object]) -> bool:
     if not isinstance(application, Mapping):
         return False
     return str(application.get("automation_eligibility")) == "eligible"
+
+
+def _execute_auto_apply_candidates(
+    *,
+    issue: int,
+    run_id: str | None,
+    cwd: Path,
+    db_path: Path,
+    config: object | None,
+    candidates: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    from .runner import (
+        _check_call_with_heartbeat,
+        _codex_text,
+        _current_branch,
+        _push_branch_and_ensure_draft_pull_request,
+        _worktree_has_changes,
+        _worktree_status,
+    )
+
+    execution: dict[str, object] = {
+        "executed": True,
+        "cwd": str(cwd),
+        "applied_candidates": [],
+        "skipped_candidates": [],
+        "validation": [],
+        "draft_pull_request": None,
+    }
+    if not candidates:
+        execution["draft_pull_request"] = {"status": "not_needed", "reason": "no_eligible_candidates"}
+        return execution
+
+    log_dir = db_path.parent / "self-improvement"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    applied_candidates: list[dict[str, object]] = []
+    skipped_candidates: list[dict[str, object]] = []
+    validation_commands: list[str] = []
+
+    for candidate in candidates:
+        before_status = _worktree_status(cwd)
+        log_path = log_dir / _candidate_log_name(candidate=candidate, run_id=run_id)
+        _codex_text(
+            _candidate_apply_prompt(
+                issue=issue,
+                candidate=candidate,
+            ),
+            cwd=cwd,
+            log_path=log_path,
+            config=config,
+            role="fix",
+        )
+        changed = _worktree_status(cwd) != before_status
+        record = {
+            "id": str(candidate.get("id", "")),
+            "category": str(candidate.get("category", "")),
+            "log_path": str(log_path),
+        }
+        if changed:
+            applied_candidates.append(record)
+            validation_commands.extend(
+                [
+                    str(command)
+                    for command in candidate.get("required_validation", [])
+                    if str(command).strip()
+                ]
+            )
+        else:
+            skipped_candidates.append(
+                {
+                    **record,
+                    "reason": "codex produced no local changes",
+                }
+            )
+
+    execution["applied_candidates"] = applied_candidates
+    execution["skipped_candidates"] = skipped_candidates
+    if not applied_candidates:
+        execution["draft_pull_request"] = {"status": "not_needed", "reason": "no_changes_applied"}
+        return execution
+
+    seen_commands: set[str] = set()
+    unique_validation_commands: list[str] = []
+    for command in validation_commands:
+        if command in seen_commands:
+            continue
+        seen_commands.add(command)
+        unique_validation_commands.append(command)
+
+    validation_results: list[dict[str, object]] = []
+    for command in unique_validation_commands:
+        _check_call_with_heartbeat(shlex.split(command), cwd=cwd)
+        validation_results.append({"command": command, "status": "passed"})
+    execution["validation"] = validation_results
+
+    subprocess.check_call(["git", "add", "-A"], cwd=cwd)
+    if not _worktree_has_changes(cwd):
+        execution["draft_pull_request"] = {
+            "status": "not_needed",
+            "reason": "validated_changes_already_committed",
+        }
+        return execution
+
+    subject = _self_improvement_commit_subject(
+        issue=issue,
+        candidate_ids=[str(candidate.get("id", "")) for candidate in applied_candidates],
+        run_id=run_id,
+    )
+    subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
+    branch = _current_branch(cwd)
+    _push_branch_and_ensure_draft_pull_request(
+        cwd=cwd,
+        branch=branch,
+        issue_number=issue,
+        base_branch=getattr(config, "base_branch", "main"),
+    )
+    execution["draft_pull_request"] = {
+        "status": "verified",
+        "branch": branch,
+        "commit_subject": subject,
+        "stop_after": "verified_draft_pr",
+    }
+    return execution
+
+
+def _candidate_log_name(*, candidate: Mapping[str, object], run_id: str | None) -> str:
+    identifier = str(candidate.get("id", "candidate")).replace(":", "-").replace("/", "-")
+    run_segment = f"{run_id}-" if run_id else ""
+    return f"{run_segment}{identifier}.log"
+
+
+def _candidate_apply_prompt(
+    *,
+    issue: int,
+    candidate: Mapping[str, object],
+) -> list[str]:
+    validations = [
+        str(command)
+        for command in candidate.get("required_validation", [])
+        if str(command).strip()
+    ]
+    return [
+        (
+            f"Issue #{issue}: apply this bounded self-improvement candidate in the current "
+            "repository."
+        ),
+        (
+            "Keep the change low risk and tightly scoped to docs, prompts, tests, or "
+            "lightweight sympohy config only. Do not make broad code changes."
+        ),
+        (
+            "Do not run git push, gh, or merge commands. Do not auto-merge. Stop after edits "
+            "so validation and draft PR checks can run separately."
+        ),
+        (
+            "Preserve existing repository conventions and touch only files needed for this "
+            f"candidate. Required validation will be run after your edits: {', '.join(validations) or 'none'}."
+        ),
+        json.dumps(candidate, ensure_ascii=False, indent=2, sort_keys=True),
+    ]
+
+
+def _self_improvement_commit_subject(
+    *,
+    issue: int,
+    candidate_ids: Sequence[str],
+    run_id: str | None,
+) -> str:
+    seed = json.dumps(
+        {
+            "candidate_ids": list(candidate_ids),
+            "run_id": run_id,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
+    return f"#{issue} chore(sympohy): apply self-improvement {digest}"
 
 
 def _as_str_list(value: object) -> list[str]:

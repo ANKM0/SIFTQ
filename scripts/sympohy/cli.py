@@ -199,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
                     store.apply_improvements(
                         issue=args.issue,
                         run_id=args.run_id,
+                        execute=True,
+                        cwd=Path.cwd(),
+                        config=config,
                     ),
                     ensure_ascii=False,
                     indent=2,
