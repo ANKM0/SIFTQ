@@ -3141,7 +3141,7 @@ def _preflight_validation_commands(changed_paths: Sequence[str]) -> list[str]:
     python_test_commands = (
         (
             ("scripts/sympohy/runner.py", "tests/sympohy/sympohy_runner_test.py"),
-            "task pytest tests/sympohy/sympohy_runner_test.py",
+            "task pytest -- tests/sympohy/sympohy_runner_test.py",
         ),
         (
             (
@@ -3149,26 +3149,26 @@ def _preflight_validation_commands(changed_paths: Sequence[str]) -> list[str]:
                 "tests/sympohy/sympohy_observability_test.py",
                 "tests/sympohy/fixtures/observability_replay_issue_126.jsonl",
             ),
-            "task pytest tests/sympohy/sympohy_observability_test.py",
+            "task pytest -- tests/sympohy/sympohy_observability_test.py",
         ),
         (
             ("scripts/sympohy/stage_gate.py", "tests/sympohy/sympohy_stage_gate_test.py"),
-            "task pytest tests/sympohy/sympohy_stage_gate_test.py",
+            "task pytest -- tests/sympohy/sympohy_stage_gate_test.py",
         ),
         (
             ("scripts/sympohy/config.py", "tests/sympohy/sympohy_config_test.py"),
-            "task pytest tests/sympohy/sympohy_config_test.py",
+            "task pytest -- tests/sympohy/sympohy_config_test.py",
         ),
         (
             ("scripts/sympohy/core.py", "tests/sympohy/sympohy_core_test.py"),
-            "task pytest tests/sympohy/sympohy_core_test.py",
+            "task pytest -- tests/sympohy/sympohy_core_test.py",
         ),
         (
             (
                 "scripts/sympohy/github.py",
                 "tests/sympohy/sympohy_github_test.py",
             ),
-            "task pytest tests/sympohy/sympohy_github_test.py",
+            "task pytest -- tests/sympohy/sympohy_github_test.py",
         ),
     )
 
@@ -3579,6 +3579,18 @@ def _block(
             status="blocked",
             progress=progress,
         )
+        state.record_event(
+            event_type="command",
+            status="blocked",
+            summary=f"blocked: {failed_command}",
+            attempt=attempts,
+            metadata={
+                "command": failed_command,
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+                **dict(details or {}),
+            },
+        )
     detail_lines = ""
     if details:
         detail_lines = "".join(f"- {key}: {value}\n" for key, value in details.items())
@@ -3624,6 +3636,22 @@ def _block_mergeability_conflict(
                 "message": "blocked",
                 "failed_command": "mergeability gate",
                 "attempts": 1,
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+                "pull_request_number": pull_request.number,
+                "base_ref": pull_request.base_ref,
+                "head_ref": pull_request.head_ref,
+                "conflict_summary": pull_request.conflict_summary(),
+                "recommended_action": recommended_action,
+            },
+        )
+        state.record_event(
+            event_type="command",
+            status="blocked",
+            summary="blocked: mergeability gate",
+            attempt=1,
+            metadata={
+                "command": "mergeability gate",
                 "cause": cause,
                 "run_log_path": str(run_log_path),
                 "pull_request_number": pull_request.number,

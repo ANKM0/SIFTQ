@@ -670,7 +670,7 @@ class SympohyObservabilityTest(unittest.TestCase):
             candidates["docs"]["required_validation"],
             [
                 "task ci:markdown",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
         )
         self.assertEqual(
@@ -986,10 +986,13 @@ class SympohyObservabilityTest(unittest.TestCase):
             validation_calls,
             [
                 ["task", "ci:markdown"],
-                ["task", "pytest", "tests/sympohy/sympohy_observability_test.py"],
+                ["task", "pytest", "--", "tests/sympohy/sympohy_observability_test.py"],
             ],
         )
-        self.assertEqual(git_calls[0], ["git", "add", "-A"])
+        self.assertEqual(
+            git_calls[0],
+            ["git", "add", "-A", "--", "docs/contributing/issue-execution.md"],
+        )
         self.assertEqual(git_calls[1][:2], ["git", "commit"])
         self.assertIn("apply self-improvement", git_calls[1][3])
         self.assertEqual(
@@ -1005,6 +1008,48 @@ class SympohyObservabilityTest(unittest.TestCase):
             application["execution"]["draft_pull_request"]["status"],
             "verified",
         )
+
+    def test_apply_improvements_rejects_dirty_worktree(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            log_dir = worktree / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                with patch(
+                    "scripts.sympohy.runner._worktree_status",
+                    return_value=" M docs/contributing/issue-execution.md\n",
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "observe-apply requires a clean worktree",
+                    ):
+                        store.apply_improvements(
+                            issue=126,
+                            execute=True,
+                            cwd=worktree,
+                            config=SimpleNamespace(base_branch="main"),
+                        )
 
     def test_rebuild_rejects_invalid_event_shape(self) -> None:
         with TemporaryDirectory() as tmp:

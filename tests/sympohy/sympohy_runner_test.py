@@ -22,6 +22,7 @@ from scripts.sympohy.core import (
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
+    _block,
     _PullRequestMetadataError,
     _PullRequestMergeability,
     _RunLockedError,
@@ -376,7 +377,7 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(
             commands,
             [
-                "task pytest tests/sympohy/sympohy_runner_test.py",
+                "task pytest -- tests/sympohy/sympohy_runner_test.py",
                 "task ci:markdown",
                 "task codd:validate",
                 "task ci:lint:task-refs",
@@ -539,10 +540,47 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(
             commands_run,
             [
-                ("task pytest tests/sympohy/sympohy_runner_test.py",),
+                ("task pytest -- tests/sympohy/sympohy_runner_test.py",),
                 ("task ci",),
             ],
         )
+
+    def test_block_records_terminal_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "running hook"})
+
+            with (
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner.comment"),
+            ):
+                _block(
+                    "#82",
+                    phase="hooks",
+                    failed_command="task ci",
+                    attempts=3,
+                    cause="hook retries exhausted",
+                    run_log_path=log_dir / "hook-1-3.log",
+                    cwd=root,
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[-1]["event_type"], "command")
+        self.assertEqual(events[-1]["status"], "blocked")
+        self.assertEqual(events[-1]["metadata"]["command"], "task ci")
+        self.assertEqual(events[-1]["metadata"]["cause"], "hook retries exhausted")
 
     def test_review_fix_loop_records_review_event(self) -> None:
         with TemporaryDirectory() as tmp:

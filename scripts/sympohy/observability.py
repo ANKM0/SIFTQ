@@ -661,7 +661,7 @@ def _propose_improvement_candidates(
             risk="low",
             required_validation=[
                 "task ci:markdown",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
             evidence_chains=policy_review_blocks,
         )
@@ -677,7 +677,7 @@ def _propose_improvement_candidates(
             risk="low",
             required_validation=[
                 "task ci:markdown",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
             evidence_chains=policy_review_blocks,
         )
@@ -692,8 +692,8 @@ def _propose_improvement_candidates(
             confidence="medium",
             risk="low",
             required_validation=[
-                "task pytest tests/sympohy/sympohy_stage_gate_test.py",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_stage_gate_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
             evidence_chains=policy_review_blocks,
         )
@@ -717,7 +717,7 @@ def _propose_improvement_candidates(
             confidence="medium",
             risk="low",
             required_validation=[
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
                 "task ci:test",
             ],
             evidence_chains=codex_or_data_failures,
@@ -743,7 +743,7 @@ def _propose_improvement_candidates(
             confidence="high",
             risk="low",
             required_validation=[
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
                 "task ci:test",
             ],
             evidence_chains=command_or_hook_test_failures,
@@ -774,8 +774,8 @@ def _propose_improvement_candidates(
             confidence="medium",
             risk="low",
             required_validation=[
-                "task pytest tests/sympohy/sympohy_config_test.py",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_config_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
             evidence_chains=matching,
         )
@@ -798,7 +798,7 @@ def _propose_improvement_candidates(
             risk="low",
             required_validation=[
                 "task ci:test",
-                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task pytest -- tests/sympohy/sympohy_observability_test.py",
             ],
             evidence_chains=browser_failures,
         )
@@ -1007,6 +1007,12 @@ def _execute_auto_apply_candidates(
     if not candidates:
         execution["draft_pull_request"] = {"status": "not_needed", "reason": "no_eligible_candidates"}
         return execution
+    initial_status = _worktree_status(cwd)
+    if initial_status.strip():
+        raise RuntimeError(
+            "observe-apply requires a clean worktree before edits: "
+            + initial_status.strip()
+        )
 
     log_dir = db_path.parent / "self-improvement"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -1071,7 +1077,9 @@ def _execute_auto_apply_candidates(
         validation_results.append({"command": command, "status": "passed"})
     execution["validation"] = validation_results
 
-    subprocess.check_call(["git", "add", "-A"], cwd=cwd)
+    changed_paths = _changed_paths_from_status(_worktree_status(cwd))
+    if changed_paths:
+        subprocess.check_call(["git", "add", "-A", "--", *changed_paths], cwd=cwd)
     if not _worktree_has_changes(cwd):
         execution["draft_pull_request"] = {
             "status": "not_needed",
@@ -1099,6 +1107,25 @@ def _execute_auto_apply_candidates(
         "stop_after": "verified_draft_pr",
     }
     return execution
+
+
+def _changed_paths_from_status(status_output: str) -> list[str]:
+    seen: set[str] = set()
+    paths: list[str] = []
+    for line in status_output.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:].strip()
+        path_variants = [path]
+        if " -> " in path:
+            old_path, new_path = path.split(" -> ", 1)
+            path_variants = [old_path.strip(), new_path.strip()]
+        for candidate in path_variants:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            paths.append(candidate)
+    return paths
 
 
 def _candidate_log_name(*, candidate: Mapping[str, object], run_id: str | None) -> str:
