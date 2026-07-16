@@ -38,6 +38,7 @@ from scripts.sympohy.runner import (
     _prepare_document_artifacts,
     _pull_request_exists,
     _pull_request_merged,
+    _preflight_validation_commands,
     _push_branch_and_ensure_draft_pull_request,
     _record_run_interrupted,
     _resolve_resume_point_for_issue,
@@ -362,6 +363,31 @@ class SympohyRunnerTest(unittest.TestCase):
             ],
         )
 
+    def test_preflight_validation_commands_match_changed_scope(self) -> None:
+        commands = _preflight_validation_commands(
+            [
+                "scripts/sympohy/runner.py",
+                "docs/design/sympohy-llm-loop-observability-self-improvement.md",
+                "Taskfile.yml",
+                "src/App.tsx",
+            ]
+        )
+
+        self.assertEqual(
+            commands,
+            [
+                "task pytest tests/sympohy/sympohy_runner_test.py",
+                "task ci:markdown",
+                "task codd:validate",
+                "task ci:lint:task-refs",
+                "task ci:lint:codex-task-perms",
+                "task ci:typecheck",
+                "task ci:lint",
+                "task ci:test",
+                "task ci:build",
+            ],
+        )
+
     def test_run_hooks_records_structured_test_failures(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -432,6 +458,89 @@ class SympohyRunnerTest(unittest.TestCase):
                     "line": 41,
                     "summary": "AssertionError: expected true to be false",
                 },
+            ],
+        )
+
+    def test_run_preflight_validations_before_repository_gate_for_final_verifier_fix(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (cwd / "scripts").mkdir()
+            (cwd / "scripts" / "sympohy").mkdir()
+            (cwd / "scripts" / "sympohy" / "runner.py").write_text(
+                "changed\n",
+                encoding="utf-8",
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            issue = Issue(
+                number=82,
+                title="Verify preflight before repository gate",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+
+            commands_run: list[tuple[str, ...]] = []
+
+            def fake_run_hooks(
+                hooks: tuple[str, ...] | list[str],
+                *_args: object,
+                **_kwargs: object,
+            ) -> int:
+                commands_run.append(tuple(hooks))
+                return 0
+
+            with (
+                patch("scripts.sympohy.runner._worktree_has_changes", side_effect=[False, True]),
+                patch("scripts.sympohy.runner._changed_worktree_paths", return_value=["scripts/sympohy/runner.py"]),
+                patch("scripts.sympohy.runner._codex_text"),
+                patch("scripts.sympohy.runner._run_hooks", side_effect=fake_run_hooks),
+                patch("scripts.sympohy.runner._commit_all_if_new", return_value=True),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
+                patch("scripts.sympohy.runner.set_issue_state"),
+            ):
+                result = _run_final_verifier_fix_round(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    findings=[
+                        parse_final_verifier_block_findings(
+                            {
+                                "status": "block",
+                                "findings": [
+                                    {
+                                        "kind": "verification",
+                                        "summary": "Need regression proof",
+                                        "evidence": "task ci missing",
+                                        "suggested_fix": "Run targeted validation first",
+                                    }
+                                ],
+                            }
+                        )[0]
+                    ],
+                    fix_attempt=1,
+                    total_steps=13,
+                    existing_fix_subjects=set(),
+                )
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            commands_run,
+            [
+                ("task pytest tests/sympohy/sympohy_runner_test.py",),
+                ("task ci",),
             ],
         )
 
@@ -1627,6 +1736,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     return "issue-82-sympohy\n"
                 if args == ["git", "log", "--format=%s", "main..HEAD"]:
                     return ""
+                if args == ["git", "status", "--porcelain"]:
+                    return ""
                 raise AssertionError(f"unexpected check_output: {args}")
 
             with (
@@ -1689,6 +1800,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return ""
+                if args == ["git", "status", "--porcelain"]:
                     return ""
                 raise AssertionError(f"unexpected check_output: {args}")
 

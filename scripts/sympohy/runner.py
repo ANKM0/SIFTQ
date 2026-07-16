@@ -1811,12 +1811,32 @@ def _run_issue_locked(
             state.write(
                 phase="hooks",
                 progress={
-                    "message": "running verification hooks",
+                    "message": "running scoped validation and repository gate",
                     "current_logical_step": index,
                     "completed_logical_steps": index,
                     "total_logical_steps": total_steps,
                 },
             )
+            if _run_preflight_validations(
+                config.ci_retry_max_attempts,
+                worktree,
+                log_dir,
+                config=config,
+                state=state,
+                logical_step=index,
+                total_logical_steps=total_steps,
+            ) != 0:
+                _block(
+                    issue_ref,
+                    phase="hooks",
+                    failed_command="scoped validation",
+                    attempts=config.ci_retry_max_attempts,
+                    cause="scoped validation still failed after retries",
+                    run_log_path=log_dir,
+                    cwd=worktree,
+                    state=state,
+                )
+                return 2
             if _run_hooks(
                 config.hooks,
                 config.ci_retry_max_attempts,
@@ -2794,6 +2814,24 @@ def _run_final_verifier_fix_round(
         base_branch=config.base_branch,
         existing_subjects=existing_fix_subjects,
     ):
+        if _run_preflight_validations(
+            config.ci_retry_max_attempts,
+            cwd,
+            log_dir,
+            config=config,
+            state=state,
+        ) != 0:
+            _block(
+                issue_ref,
+                phase="hooks",
+                failed_command="scoped validation",
+                attempts=config.ci_retry_max_attempts,
+                cause="scoped validation still failed after final verifier fix retries",
+                run_log_path=log_dir,
+                cwd=cwd,
+                state=state,
+            )
+            return 2
         if _run_hooks(
             config.hooks,
             config.ci_retry_max_attempts,
@@ -2876,6 +2914,25 @@ def _run_final_verifier_fix_round(
                 "final verifier fix produced no changes for commit subject: "
                 f"{subject}"
             ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    if _run_preflight_validations(
+        config.ci_retry_max_attempts,
+        cwd,
+        log_dir,
+        config=config,
+        state=state,
+    ) != 0:
+        _block(
+            issue_ref,
+            phase="hooks",
+            failed_command="scoped validation",
+            attempts=config.ci_retry_max_attempts,
+            cause="scoped validation still failed after final verifier fix retries",
             run_log_path=log_dir,
             cwd=cwd,
             state=state,
@@ -3046,6 +3103,134 @@ def _run_hooks(
                 state=state,
             )
     return 0
+
+
+def _changed_worktree_paths(cwd: Path) -> list[str]:
+    seen: set[str] = set()
+    paths: list[str] = []
+    try:
+        status_output = _worktree_status(cwd)
+    except subprocess.CalledProcessError:
+        return paths
+    for line in status_output.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:].strip()
+        if " -> " in path:
+            path = path.rsplit(" -> ", 1)[-1].strip()
+        if not path:
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        paths.append(path)
+    return paths
+
+
+def _preflight_validation_commands(changed_paths: Sequence[str]) -> list[str]:
+    commands: list[str] = []
+
+    def add(command: str) -> None:
+        if command not in commands:
+            commands.append(command)
+
+    has_frontend_changes = False
+    has_python_changes = False
+    needs_generic_pytest = False
+
+    python_test_commands = (
+        (
+            ("scripts/sympohy/runner.py", "tests/sympohy/sympohy_runner_test.py"),
+            "task pytest tests/sympohy/sympohy_runner_test.py",
+        ),
+        (
+            (
+                "scripts/sympohy/observability.py",
+                "tests/sympohy/sympohy_observability_test.py",
+                "tests/sympohy/fixtures/observability_replay_issue_126.jsonl",
+            ),
+            "task pytest tests/sympohy/sympohy_observability_test.py",
+        ),
+        (
+            ("scripts/sympohy/stage_gate.py", "tests/sympohy/sympohy_stage_gate_test.py"),
+            "task pytest tests/sympohy/sympohy_stage_gate_test.py",
+        ),
+        (
+            ("scripts/sympohy/config.py", "tests/sympohy/sympohy_config_test.py"),
+            "task pytest tests/sympohy/sympohy_config_test.py",
+        ),
+        (
+            ("scripts/sympohy/core.py", "tests/sympohy/sympohy_core_test.py"),
+            "task pytest tests/sympohy/sympohy_core_test.py",
+        ),
+        (
+            (
+                "scripts/sympohy/github.py",
+                "tests/sympohy/sympohy_github_test.py",
+            ),
+            "task pytest tests/sympohy/sympohy_github_test.py",
+        ),
+    )
+
+    for path in changed_paths:
+        if path.endswith(".md"):
+            add("task ci:markdown")
+        if path.startswith(("docs/adr/", "docs/design/", "docs/requirements/", "docs/wireframes/")):
+            add("task codd:validate")
+        if path in {"Taskfile.yml", ".github/workflows/ci.yml"}:
+            add("task ci:lint:task-refs")
+        if path in {"Taskfile.yml", ".codex/rules/siftq.rules"}:
+            add("task ci:lint:codex-task-perms")
+        if path.endswith((".ts", ".tsx", ".js", ".jsx", ".css", ".html")) or path.startswith(
+            ("src/", "tests/docs/")
+        ):
+            has_frontend_changes = True
+        if path.endswith(".py") or path.startswith("tests/sympohy/"):
+            has_python_changes = True
+            matched_python_test = False
+            for prefixes, command in python_test_commands:
+                if any(path.startswith(prefix) for prefix in prefixes):
+                    add(command)
+                    matched_python_test = True
+                    break
+            if not matched_python_test and (
+                path.startswith("scripts/sympohy/") or path.startswith("tests/sympohy/")
+            ):
+                needs_generic_pytest = True
+
+    if has_frontend_changes:
+        add("task ci:typecheck")
+        add("task ci:lint")
+        add("task ci:test")
+        add("task ci:build")
+    if has_python_changes and needs_generic_pytest:
+        add("task pytest")
+    return commands
+
+
+def _run_preflight_validations(
+    retry_max_attempts: int,
+    cwd: Path,
+    log_dir: Path,
+    *,
+    config: SympohyConfig | None = None,
+    state: _RunStateWriter | None = None,
+    logical_step: int | None = None,
+    total_logical_steps: int | None = None,
+) -> int:
+    commands = _preflight_validation_commands(_changed_worktree_paths(cwd))
+    if not commands:
+        return 0
+    return _run_hooks(
+        commands,
+        retry_max_attempts,
+        cwd,
+        log_dir,
+        config=config,
+        state=state,
+        logical_step=logical_step,
+        total_logical_steps=total_logical_steps,
+    )
 
 
 def _review_fix_loop(
