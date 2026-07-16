@@ -162,6 +162,11 @@ describe("browserTaskRepository", () => {
       code: "NOT_FOUND",
       message: "Task was not found."
     } satisfies Partial<BrowserTaskRepositoryError>);
+
+    await expect(repository.bulkDeleteTasks({ taskIds: ["missing-task"] })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
   });
 
   it("migrates legacy browser tasks missing description, timestamps, and list order", async () => {
@@ -447,6 +452,83 @@ describe("browserTaskRepository", () => {
         order: 0,
         createdAt: timestampAt(2),
         updatedAt: timestampAt(3),
+        listOrder: 1
+      })
+    ]);
+  });
+
+  it("bulk deletes tasks and normalizes list order and active matrix order", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "Do first" });
+    await repository.createTask({ areaId: "schedule", title: "Schedule first" });
+    await repository.createTask({ areaId: "do", title: "Do second" });
+    await repository.createTask({ areaId: "schedule", title: "Schedule second" });
+    await repository.createTask({ areaId: "do", title: "Do third" });
+
+    await repository.bulkDeleteTasks({ taskIds: ["task-1", "task-4"] });
+
+    await expect(repository.listTasks()).resolves.toEqual([
+      task({
+        id: "task-2",
+        title: "Schedule first",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(5),
+        listOrder: 0
+      }),
+      task({
+        id: "task-3",
+        title: "Do second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(5),
+        listOrder: 1
+      }),
+      task({
+        id: "task-5",
+        title: "Do third",
+        areaId: "do",
+        order: 1,
+        createdAt: timestampAt(4),
+        updatedAt: timestampAt(5),
+        listOrder: 2
+      })
+    ]);
+  });
+
+  it("does not partially delete tasks when bulk delete includes a missing task", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "First" });
+    await repository.createTask({ areaId: "schedule", title: "Second" });
+
+    await expect(
+      repository.bulkDeleteTasks({ taskIds: ["task-1", "missing-task"] })
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: "Task was not found."
+    } satisfies Partial<BrowserTaskRepositoryError>);
+
+    await expect(repository.listTasks()).resolves.toEqual([
+      task({
+        id: "task-1",
+        title: "First",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(0),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Second",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(1),
         listOrder: 1
       })
     ]);

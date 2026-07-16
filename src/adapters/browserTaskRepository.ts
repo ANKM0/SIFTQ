@@ -18,6 +18,7 @@ import {
   validateTaskTitleInput
 } from "../domain/taskRules";
 import {
+  type BulkDeleteTasksInput,
   type CreateTaskInput,
   type DeleteTaskInput,
   type MoveTaskInput,
@@ -82,6 +83,14 @@ export function createBrowserTaskRepository(
   };
 
   return {
+    async bulkDeleteTasks(input: BulkDeleteTasksInput): Promise<void> {
+      const tasks = loadPersistedTasks();
+      const deletedTaskIds = new Set(input.taskIds.map((taskId) => taskById(tasks, taskId).id));
+      const nextTasks = deleteTasks(tasks, deletedTaskIds, nowFactory());
+
+      saveTasks(storage, storageKey, nextTasks);
+    },
+
     async createTask(input: CreateTaskInput): Promise<Task> {
       if (!isMatrixArea(input.areaId)) {
         throw new BrowserTaskRepositoryError(
@@ -114,18 +123,7 @@ export function createBrowserTaskRepository(
     async deleteTask(input: DeleteTaskInput): Promise<void> {
       const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
-      const withoutTask = tasks.filter((candidate) => candidate.id !== task.id);
-      const normalizedTasks =
-        task.status === "active" && isMatrixArea(task.areaId)
-          ? normalizeArea(withoutTask, task.areaId)
-          : withoutTask;
-      const updatedAt = nowFactory();
-      const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
-      const nextTasks = orderedTasks.map((candidate, index) =>
-        candidate.listOrder === index
-          ? candidate
-          : ({ ...candidate, listOrder: index, updatedAt } satisfies Task)
-      );
+      const nextTasks = deleteTasks(tasks, new Set([task.id]), nowFactory());
 
       saveTasks(storage, storageKey, nextTasks);
     },
@@ -282,6 +280,9 @@ export function createBrowserTaskRepository(
 }
 
 export const browserTaskRepository: TaskRepository = {
+  bulkDeleteTasks(input) {
+    return getDefaultRepository().bulkDeleteTasks(input);
+  },
   createTask(input) {
     return getDefaultRepository().createTask(input);
   },
@@ -611,6 +612,26 @@ function clamp(value: number, min: number, max: number): number {
 
 function nextListOrder(tasks: readonly Task[]): number {
   return tasks.reduce((maxOrder, task) => Math.max(maxOrder, task.listOrder), -1) + 1;
+}
+
+function deleteTasks(
+  tasks: readonly Task[],
+  deletedTaskIds: ReadonlySet<TaskId>,
+  updatedAt: string
+): Task[] {
+  if (deletedTaskIds.size === 0) {
+    return [...tasks];
+  }
+
+  const remainingTasks = tasks.filter((task) => !deletedTaskIds.has(task.id));
+  const normalizedTasks = normalizeAllAreas(remainingTasks);
+  const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
+
+  return orderedTasks.map((task, listOrder) =>
+    task.listOrder === listOrder
+      ? task
+      : ({ ...task, listOrder, updatedAt } satisfies Task)
+  );
 }
 
 function updateTaskStatus(
