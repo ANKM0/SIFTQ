@@ -400,6 +400,30 @@ describe("App", () => {
     expect(taskListTitles()).toEqual(["Hidden"]);
   });
 
+  it("removes a deleted active task from the matrix after leaving the task list", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Scheduled", areaId: "schedule" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "削除" })[0]);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("タスクを削除しました")
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "マトリックス" }));
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(screen.queryByText("Visible")).toBeNull();
+    expect(taskTitlesIn("Schedule tasks")).toEqual(["Scheduled"]);
+  });
+
   it("drops removed tasks from the local selection state", async () => {
     seedStoredTasks(
       task({ id: "task-1", title: "Visible", areaId: "do" }),
@@ -469,6 +493,33 @@ describe("App", () => {
     expect(window.confirm).toHaveBeenCalledWith("2件のタスクを削除しますか?");
     expect(taskListTitles()).toEqual(["Hidden"]);
     expect(screen.getByLabelText("現在の選択件数").textContent).toBe("0件選択中");
+  });
+
+  it("shows not-found for a deleted task detail route after bulk delete", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Visible を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "選択したタスクを削除" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("選択したタスクを削除しました")
+    );
+
+    window.location.hash = "#/tasks/task-1";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+
+    expect(
+      await screen.findByRole("heading", { name: "タスクが見つかりませんでした" })
+    ).toBeTruthy();
+    expect(screen.getByText("指定された taskId は存在しないか、すでに削除されています。")).toBeTruthy();
   });
 
   it("keeps selection and tasks when bulk delete confirmation is canceled", async () => {

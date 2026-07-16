@@ -249,7 +249,7 @@ export function App() {
       await browserTaskRepository.deleteTask({ taskId: task.id });
       setTaskListNotice("タスクを削除しました");
       await refreshTasks();
-      window.location.hash = "#/tasks";
+      navigateToHash("#/tasks");
 
       return true;
     } catch (error) {
@@ -282,6 +282,11 @@ export function App() {
 
   async function refreshTasks() {
     setTasks(await browserTaskRepository.listTasks());
+  }
+
+  function navigateToHash(hash: string) {
+    window.location.hash = hash;
+    setRoute(routeFromHash(hash));
   }
 
   if (runtimeState.status === "checking") {
@@ -357,6 +362,18 @@ function MatrixPage({
   onUpdateTaskTitle
 }: MatrixPageProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (editingTask === null) {
+      return;
+    }
+
+    const nextEditingTask = tasks.find((candidate) => candidate.id === editingTask.id) ?? null;
+
+    if (nextEditingTask !== editingTask) {
+      setEditingTask(nextEditingTask);
+    }
+  }, [editingTask, tasks]);
 
   async function handleSaveTitle(title: string): Promise<string | null> {
     if (editingTask === null) {
@@ -439,6 +456,11 @@ function TasksPage({
 
   useEffect(() => {
     setSelectedTaskIds((currentIds) => pruneSelectedTaskIds(currentIds, tasks));
+    setMenuTaskId((currentTaskId) =>
+      currentTaskId !== null && tasks.some((task) => task.id === currentTaskId)
+        ? currentTaskId
+        : null
+    );
   }, [tasks]);
 
   function handleSelectTask(taskId: Task["id"], checked: boolean) {
