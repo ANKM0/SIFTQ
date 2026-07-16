@@ -174,6 +174,13 @@ describe("App", () => {
     expect(selectionCount.textContent).toBe("1件選択中");
     expect(firstCheckbox).toHaveProperty("checked", false);
     expect(secondCheckbox).toHaveProperty("checked", true);
+
+    fireEvent.click(secondCheckbox);
+
+    expect(selectionCount.textContent).toBe("0件選択中");
+    expect(secondCheckbox).toHaveProperty("checked", false);
+    expect(bulkDeleteButton).toHaveProperty("disabled", true);
+    expect(screen.queryByText("選択中")).toBeNull();
   });
 
   it("routes to the task detail page from #/tasks/:taskId", async () => {
@@ -493,6 +500,11 @@ describe("App", () => {
     expect(window.confirm).toHaveBeenCalledWith("2件のタスクを削除しますか?");
     expect(taskListTitles()).toEqual(["Hidden"]);
     expect(screen.getByLabelText("現在の選択件数").textContent).toBe("0件選択中");
+    expect(screen.getByRole("button", { name: "選択したタスクを削除" })).toHaveProperty(
+      "disabled",
+      true
+    );
+    expect(screen.queryByText("選択中")).toBeNull();
   });
 
   it("shows not-found for a deleted task detail route after bulk delete", async () => {
@@ -540,7 +552,12 @@ describe("App", () => {
     await waitFor(() => expect(window.confirm).toHaveBeenCalledWith("1件のタスクを削除しますか?"));
     expect(taskListTitles()).toEqual(["Visible", "Hidden"]);
     expect(screen.getByLabelText("現在の選択件数").textContent).toBe("1件選択中");
+    expect(screen.getByRole("button", { name: "選択したタスクを削除" })).toHaveProperty(
+      "disabled",
+      false
+    );
     expect(storedTasks()).toHaveLength(2);
+    expect(screen.getByText("選択中")).toBeTruthy();
     expect(screen.queryByRole("status")).toBeNull();
   });
 

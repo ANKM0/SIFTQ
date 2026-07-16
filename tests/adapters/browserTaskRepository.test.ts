@@ -499,6 +499,40 @@ describe("browserTaskRepository", () => {
     ]);
   });
 
+  it("bulk deletes multiple tasks while keeping terminal tasks stored and normalizing remaining orders", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "Do first" });
+    await repository.createTask({ areaId: "do", title: "Do second" });
+    await repository.createTask({ areaId: "schedule", title: "Schedule first" });
+    await repository.createTask({ areaId: "delegate", title: "Delegate first" });
+    await repository.updateTaskStatus({ taskId: "task-4", status: "done" });
+
+    await repository.bulkDeleteTasks({ taskIds: ["task-1", "task-3"] });
+
+    await expect(repository.listTasks()).resolves.toEqual([
+      task({
+        id: "task-2",
+        title: "Do second",
+        areaId: "do",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(5),
+        listOrder: 0
+      }),
+      task({
+        id: "task-4",
+        title: "Delegate first",
+        areaId: "delegate",
+        order: 0,
+        createdAt: timestampAt(3),
+        updatedAt: timestampAt(5),
+        listOrder: 1,
+        status: "done"
+      })
+    ]);
+  });
+
   it("does not partially delete tasks when bulk delete includes a missing task", async () => {
     const repository = repositoryForTest();
 
