@@ -84,9 +84,16 @@ describe("sympohy watcher contract", () => {
 
   it("persists run state for stale-running inspection", () => {
     expect(runner).toContain("state.json");
+    expect(runner).toContain("events.jsonl");
     expect(runner).toContain("\"run_id\"");
+    expect(runner).toContain("\"event_id\"");
     expect(runner).toContain("\"lock\"");
     expect(runner).toContain("\"phase\"");
+    expect(runner).toContain("\"event_type\"");
+    expect(runner).toContain("\"attempt\"");
+    expect(runner).toContain("\"duration\"");
+    expect(runner).toContain("\"summary\"");
+    expect(runner).toContain("\"metadata\"");
     expect(runner).toContain("\"pid\"");
     expect(runner).toContain("\"heartbeat\"");
     expect(runner).toContain("\"worktree\"");

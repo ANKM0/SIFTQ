@@ -129,6 +129,56 @@ class _PullRequestMergeability:
         return "GitHub reports " + ", ".join(details) + "."
 
 
+class _RunEventStream:
+    def __init__(
+        self,
+        *,
+        issue_number: int,
+        log_dir: Path,
+        run_id: str,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self.issue_number = issue_number
+        self.log_dir = log_dir
+        self.run_id = run_id
+        self._clock = clock
+        self._next_event_index = 1
+
+    @property
+    def path(self) -> Path:
+        return self.log_dir / "events.jsonl"
+
+    def append(
+        self,
+        *,
+        phase: str | None,
+        event_type: str,
+        status: str,
+        summary: str,
+        attempt: int | None = None,
+        duration: float | int | None = None,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "run_id": self.run_id,
+            "event_id": f"{self.run_id}-{self._next_event_index:06d}",
+            "issue": self.issue_number,
+            "phase": phase,
+            "event_type": event_type,
+            "status": status,
+            "attempt": attempt,
+            "duration": duration,
+            "summary": summary,
+            "metadata": dict(metadata or {}),
+            "timestamp": _isoformat_utc(self._clock()),
+        }
+        with self.path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+        self._next_event_index += 1
+        return payload
+
+
 class _RunStateWriter:
     def __init__(
         self,
@@ -158,6 +208,12 @@ class _RunStateWriter:
         self.last_known_progress: Mapping[str, object] = {}
         self.last_recovery: Mapping[str, object] | None = None
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._event_stream = _RunEventStream(
+            issue_number=issue_number,
+            log_dir=log_dir,
+            run_id=self.run_id,
+            clock=self._clock,
+        )
 
     @property
     def state_path(self) -> Path:
@@ -230,6 +286,26 @@ class _RunStateWriter:
     def heartbeat(self) -> None:
         self.write()
 
+    def record_event(
+        self,
+        *,
+        event_type: str,
+        status: str,
+        summary: str,
+        attempt: int | None = None,
+        duration: float | int | None = None,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        return self._event_stream.append(
+            phase=self.phase,
+            event_type=event_type,
+            status=status,
+            summary=summary,
+            attempt=attempt,
+            duration=duration,
+            metadata=metadata,
+        )
+
     def record_recovery(
         self,
         event: str,
@@ -247,6 +323,12 @@ class _RunStateWriter:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+        self.record_event(
+            event_type="recovery",
+            status="success",
+            summary=event.replace("_", " "),
+            metadata={"event": event, **dict(details or {})},
+        )
         self.write(progress=self.last_known_progress)
 
 
@@ -287,13 +369,20 @@ def _handle_run_interrupt(signum: int, _frame: object) -> None:
 
 
 def _record_run_interrupted(state: _RunStateWriter, signum: int) -> None:
+    signal_name = _signal_name(signum)
     progress = dict(state.last_known_progress)
     progress.update(
         {
             "message": "interrupted by signal",
-            "signal": _signal_name(signum),
+            "signal": signal_name,
             "resume_action": "resume_interrupted_run",
         }
+    )
+    state.record_event(
+        event_type="command",
+        status="interrupted",
+        summary="run interrupted by signal",
+        metadata={"signal": signal_name},
     )
     state.write(status="interrupted", progress=progress)
 

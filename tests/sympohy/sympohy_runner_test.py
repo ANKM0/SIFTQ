@@ -3225,6 +3225,10 @@ class SympohyRunnerTest(unittest.TestCase):
 
             _record_run_interrupted(writer, signal.SIGTERM)
             state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(state["status"], "interrupted")
         self.assertEqual(state["phase"], "implement")
@@ -3235,6 +3239,9 @@ class SympohyRunnerTest(unittest.TestCase):
             state["last_known_progress"]["resume_action"],
             "resume_interrupted_run",
         )
+        self.assertEqual(events[0]["event_type"], "command")
+        self.assertEqual(events[0]["status"], "interrupted")
+        self.assertEqual(events[0]["metadata"], {"signal": "SIGTERM"})
 
     def test_run_state_writer_records_recovery_log(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
@@ -3258,6 +3265,9 @@ class SympohyRunnerTest(unittest.TestCase):
             recovery_lines = (log_dir / "recovery.log").read_text(
                 encoding="utf-8"
             ).splitlines()
+            event_lines = (log_dir / "events.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
 
         self.assertEqual(state["last_recovery"]["event"], "implementation_recovery_inspected")
         self.assertEqual(state["last_recovery"]["completed_logical_steps"], 2)
@@ -3266,6 +3276,72 @@ class SympohyRunnerTest(unittest.TestCase):
             json.loads(recovery_lines[0])["event"],
             "implementation_recovery_inspected",
         )
+        recovery_event = json.loads(event_lines[0])
+        self.assertEqual(recovery_event["run_id"], "run-82")
+        self.assertEqual(recovery_event["event_id"], "run-82-000001")
+        self.assertEqual(recovery_event["issue"], 82)
+        self.assertEqual(recovery_event["phase"], "implement")
+        self.assertEqual(recovery_event["event_type"], "recovery")
+        self.assertEqual(recovery_event["status"], "success")
+        self.assertIsNone(recovery_event["attempt"])
+        self.assertIsNone(recovery_event["duration"])
+        self.assertEqual(recovery_event["summary"], "implementation recovery inspected")
+        self.assertEqual(
+            recovery_event["metadata"],
+            {
+                "completed_logical_steps": 2,
+                "event": "implementation_recovery_inspected",
+            },
+        )
+        self.assertEqual(recovery_event["timestamp"], "2026-06-15T12:00:00Z")
+
+    def test_run_state_writer_appends_ldjson_events_in_order(self) -> None:
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                run_id="run-82",
+                clock=lambda: now,
+            )
+            writer.write(phase="review", progress={"message": "reviewing"})
+            writer.record_event(
+                event_type="review",
+                status="success",
+                summary="review round passed",
+                attempt=1,
+                duration=2.5,
+                metadata={"reviewer_role": "adversarial-review"},
+            )
+            writer.record_event(
+                event_type="stage_gate",
+                status="pass",
+                summary="review gate passed",
+                metadata={"stage": "review"},
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(len(events), 2)
+        self.assertEqual(
+            [event["event_id"] for event in events],
+            ["run-82-000001", "run-82-000002"],
+        )
+        self.assertEqual(events[0]["attempt"], 1)
+        self.assertEqual(events[0]["duration"], 2.5)
+        self.assertEqual(
+            events[0]["metadata"],
+            {"reviewer_role": "adversarial-review"},
+        )
+        self.assertEqual(events[1]["attempt"], None)
+        self.assertEqual(events[1]["duration"], None)
+        self.assertEqual(events[1]["metadata"], {"stage": "review"})
 
     def test_run_state_writer_refuses_write_after_lock_takeover(self) -> None:
         with TemporaryDirectory() as tmp:
