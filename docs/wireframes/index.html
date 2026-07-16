@@ -88,6 +88,27 @@
           <strong>タスク一覧</strong>
           <span>全taskをlistOrder順のカードで表示する。</span>
         </a>
+        <a
+          class="wire-flow-card wire-flow-card--task-list-selection"
+          href="./task-list-selection.html"
+        >
+          <strong>選択あり一覧</strong>
+          <span>checkbox 選択と一括削除 enabled 状態。</span>
+        </a>
+        <a
+          class="wire-flow-card wire-flow-card--task-bulk-delete"
+          href="./task-bulk-delete-confirm.html"
+        >
+          <strong>一括削除確認</strong>
+          <span>選択件数を確認し、キャンセルか削除を選ぶ。</span>
+        </a>
+        <a
+          class="wire-flow-card wire-flow-card--task-bulk-deleted"
+          href="./task-list-bulk-deleted.html"
+        >
+          <strong>一括削除後一覧</strong>
+          <span>選択したタスクを削除しました通知を表示する。</span>
+        </a>
         <a class="wire-flow-card wire-flow-card--task-dragging" href="./task-list-dragging.html">
           <strong>一覧並び替え</strong>
           <span>DnDでlistOrderだけを更新する。</span>
@@ -173,7 +194,22 @@
             <tr>
               <td><a href="./task-list.html">タスク一覧</a></td>
               <td>全taskをdraggable list cardで表示し、title、description、area、statusを確認する。</td>
-              <td>詳細 → タスク詳細 / ステータス → ステータス選択 / 削除 → 削除確認 / drag → 一覧並び替え</td>
+              <td>詳細 → タスク詳細 / ステータス → ステータス選択 / 削除 → 削除確認 / drag → 一覧並び替え / checkbox → 選択あり一覧</td>
+            </tr>
+            <tr>
+              <td><a href="./task-list-selection.html">選択あり一覧</a></td>
+              <td>checkbox 選択、選択件数、一括削除 button の enabled state を確認する。</td>
+              <td>一括削除 → 一括削除確認 / checkbox toggle → タスク一覧</td>
+            </tr>
+            <tr>
+              <td><a href="./task-bulk-delete-confirm.html">一括削除確認</a></td>
+              <td>選択件数を含む確認とキャンセル時の選択維持を確認する。</td>
+              <td>削除 → 一括削除後一覧 / キャンセル → 選択あり一覧</td>
+            </tr>
+            <tr>
+              <td><a href="./task-list-bulk-deleted.html">一括削除後一覧</a></td>
+              <td>選択したタスクを削除しました通知を出し、選択状態を空にする。</td>
+              <td>次操作待ち</td>
             </tr>
             <tr>
               <td><a href="./task-list-dragging.html">一覧並び替え</a></td>

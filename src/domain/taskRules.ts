@@ -3,6 +3,7 @@ import {
   type AreaId,
   type MatrixAreaId,
   type Task,
+  type TaskId,
   type TaskStatus
 } from "../contracts/task";
 
@@ -85,4 +86,95 @@ export function compareTasksByListOrder(left: Task, right: Task): number {
     left.createdAt.localeCompare(right.createdAt) ||
     left.id.localeCompare(right.id)
   );
+}
+
+export function buildDeleteTaskConfirmation(task: Pick<Task, "title">): string {
+  return `"${task.title}" を削除しますか?`;
+}
+
+export function buildBulkDeleteConfirmation(selectedCount: number): string {
+  return `${selectedCount}件のタスクを削除しますか?`;
+}
+
+export function formatSelectedTaskCount(selectedCount: number): string {
+  return `${selectedCount}件選択中`;
+}
+
+export function toggleTaskSelection(
+  selectedTaskIds: readonly TaskId[],
+  taskId: TaskId,
+  checked: boolean
+): TaskId[] {
+  if (checked) {
+    return selectedTaskIds.includes(taskId) ? [...selectedTaskIds] : [...selectedTaskIds, taskId];
+  }
+
+  return selectedTaskIds.filter((candidateId) => candidateId !== taskId);
+}
+
+export function pruneSelectedTaskIds(
+  selectedTaskIds: readonly TaskId[],
+  tasks: readonly Pick<Task, "id">[]
+): TaskId[] {
+  const taskIds = new Set(tasks.map((task) => task.id));
+
+  return selectedTaskIds.filter((taskId) => taskIds.has(taskId));
+}
+
+export function deleteTasksAndNormalizeOrder(
+  tasks: readonly Task[],
+  deletedTaskIds: ReadonlySet<TaskId>,
+  updatedAt: string
+): Task[] {
+  if (deletedTaskIds.size === 0) {
+    return [...tasks];
+  }
+
+  const remainingTasks = tasks.filter((task) => !deletedTaskIds.has(task.id));
+  const normalizedTasks = normalizeAllAreas(remainingTasks);
+  const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
+
+  return orderedTasks.map((task, listOrder) =>
+    task.listOrder === listOrder
+      ? task
+      : ({ ...task, listOrder, updatedAt } satisfies Task)
+  );
+}
+
+function normalizeAllAreas(tasks: readonly Task[]): Task[] {
+  return AREA_ORDER.reduce(
+    (normalizedTasks, areaId) => normalizeArea(normalizedTasks, areaId),
+    [...tasks]
+  ).sort(compareTasksByAreaOrder);
+}
+
+function normalizeArea(tasks: readonly Task[], areaId: AreaId): Task[] {
+  const normalizedAreaTasks = normalizeVisibleAreaTasks(tasksInArea(tasks, areaId));
+
+  return replaceArea(tasks, areaId, normalizedAreaTasks).sort(compareTasksByAreaOrder);
+}
+
+function normalizeVisibleAreaTasks(tasks: readonly Task[]): Task[] {
+  let nextOrder = 0;
+
+  return tasks.map((task) =>
+    isTaskVisibleInMatrix(task) ? { ...task, order: nextOrder++ } : task
+  );
+}
+
+function tasksInArea(tasks: readonly Task[], areaId: AreaId): Task[] {
+  return [...tasks]
+    .filter((task) => task.areaId === areaId)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+}
+
+function replaceArea(
+  tasks: readonly Task[],
+  areaId: AreaId,
+  areaTasks: readonly Task[]
+): Task[] {
+  return [
+    ...tasks.filter((task) => task.areaId !== areaId),
+    ...areaTasks
+  ];
 }

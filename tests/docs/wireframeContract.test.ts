@@ -10,9 +10,12 @@ import matrixWireframe from "../../docs/wireframes/matrix-mvp.html?raw";
 import terminalDropWireframe from "../../docs/wireframes/matrix-terminal-drop.html?raw";
 import cardsWireframe from "../../docs/wireframes/matrix-with-cards.html?raw";
 import taskDeleteWireframe from "../../docs/wireframes/task-delete-confirm.html?raw";
+import taskBulkDeleteConfirmWireframe from "../../docs/wireframes/task-bulk-delete-confirm.html?raw";
 import taskDetailWireframe from "../../docs/wireframes/task-detail.html?raw";
+import taskBulkDeletedWireframe from "../../docs/wireframes/task-list-bulk-deleted.html?raw";
 import taskDeletedWireframe from "../../docs/wireframes/task-list-deleted.html?raw";
 import taskDraggingWireframe from "../../docs/wireframes/task-list-dragging.html?raw";
+import taskListSelectionWireframe from "../../docs/wireframes/task-list-selection.html?raw";
 import taskStatusMenuWireframe from "../../docs/wireframes/task-list-status-menu.html?raw";
 import taskListContract from "../../docs/wireframes/task-list-v3.md?raw";
 import taskListWireframe from "../../docs/wireframes/task-list.html?raw";
@@ -77,6 +80,9 @@ describe("Matrix MVP wireframes", () => {
 
   it("documents the task list as draggable list cards", () => {
     expect(wireframeIndex).toContain("task-list.html");
+    expect(wireframeIndex).toContain("task-list-selection.html");
+    expect(wireframeIndex).toContain("task-bulk-delete-confirm.html");
+    expect(wireframeIndex).toContain("task-list-bulk-deleted.html");
     expect(wireframeIndex).toContain("task-detail.html");
     expect(wireframeIndex).not.toMatch(/\bv3\b/i);
     expect(taskListContract).toContain("node_id: design:task-list-v3-wireframe");
@@ -116,6 +122,26 @@ describe("Matrix MVP wireframes", () => {
     expect(taskListWireframe).not.toContain("更新日時");
   });
 
+  it("locks the bulk-delete selection, confirmation, and success states", () => {
+    expect(taskListSelectionWireframe).toContain("2件選択中");
+    expect(taskListSelectionWireframe).toContain("task-list-card--selected");
+    expect(taskListSelectionWireframe).toContain('aria-label="Fix terminal drop を選択" checked');
+    expect(taskListSelectionWireframe).toContain(">選択したタスクを削除<");
+
+    expect(taskBulkDeleteConfirmWireframe).toContain('role="dialog"');
+    expect(taskBulkDeleteConfirmWireframe).toContain("2件のタスクを削除しますか?");
+    expect(taskBulkDeleteConfirmWireframe).toContain("Matrix、タスク一覧、タスク詳細から削除");
+    expect(taskBulkDeleteConfirmWireframe).toContain('href="./task-list-selection.html"');
+    expect(taskBulkDeleteConfirmWireframe).toContain('href="./task-list-bulk-deleted.html"');
+    expect(taskBulkDeleteConfirmWireframe).toContain('aria-hidden="true"');
+
+    expect(taskBulkDeletedWireframe).toContain("選択したタスクを削除しました");
+    expect(taskBulkDeletedWireframe).toContain('role="status"');
+    expect(taskBulkDeletedWireframe).toContain("0件選択中");
+    expect(taskBulkDeletedWireframe).toContain("disabled>選択したタスクを削除<");
+    expect(taskBulkDeletedWireframe).not.toContain("task-list-card--selected");
+  });
+
   it("keeps Matrix and Tasks navigation available from every app wireframe", () => {
     const appWireframes = [
       matrixWireframe,
@@ -126,6 +152,9 @@ describe("Matrix MVP wireframes", () => {
       draggingWireframe,
       terminalDropWireframe,
       taskListWireframe,
+      taskListSelectionWireframe,
+      taskBulkDeleteConfirmWireframe,
+      taskBulkDeletedWireframe,
       taskDeletedWireframe,
       taskDraggingWireframe,
       taskStatusMenuWireframe,

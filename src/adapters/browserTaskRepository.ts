@@ -9,6 +9,7 @@ import {
   AREA_ORDER,
   compareTasksByAreaOrder,
   compareTasksByListOrder,
+  deleteTasksAndNormalizeOrder,
   isAreaId,
   isMatrixArea,
   isTaskVisibleInMatrix,
@@ -18,6 +19,7 @@ import {
   validateTaskTitleInput
 } from "../domain/taskRules";
 import {
+  type BulkDeleteTasksInput,
   type CreateTaskInput,
   type DeleteTaskInput,
   type MoveTaskInput,
@@ -82,6 +84,14 @@ export function createBrowserTaskRepository(
   };
 
   return {
+    async bulkDeleteTasks(input: BulkDeleteTasksInput): Promise<void> {
+      const tasks = loadPersistedTasks();
+      const deletedTaskIds = new Set(input.taskIds.map((taskId) => taskById(tasks, taskId).id));
+      const nextTasks = deleteTasksAndNormalizeOrder(tasks, deletedTaskIds, nowFactory());
+
+      saveTasks(storage, storageKey, nextTasks);
+    },
+
     async createTask(input: CreateTaskInput): Promise<Task> {
       if (!isMatrixArea(input.areaId)) {
         throw new BrowserTaskRepositoryError(
@@ -114,18 +124,7 @@ export function createBrowserTaskRepository(
     async deleteTask(input: DeleteTaskInput): Promise<void> {
       const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
-      const withoutTask = tasks.filter((candidate) => candidate.id !== task.id);
-      const normalizedTasks =
-        task.status === "active" && isMatrixArea(task.areaId)
-          ? normalizeArea(withoutTask, task.areaId)
-          : withoutTask;
-      const updatedAt = nowFactory();
-      const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
-      const nextTasks = orderedTasks.map((candidate, index) =>
-        candidate.listOrder === index
-          ? candidate
-          : ({ ...candidate, listOrder: index, updatedAt } satisfies Task)
-      );
+      const nextTasks = deleteTasksAndNormalizeOrder(tasks, new Set([task.id]), nowFactory());
 
       saveTasks(storage, storageKey, nextTasks);
     },
@@ -282,6 +281,9 @@ export function createBrowserTaskRepository(
 }
 
 export const browserTaskRepository: TaskRepository = {
+  bulkDeleteTasks(input) {
+    return getDefaultRepository().bulkDeleteTasks(input);
+  },
   createTask(input) {
     return getDefaultRepository().createTask(input);
   },

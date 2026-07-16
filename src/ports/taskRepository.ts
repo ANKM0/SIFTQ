@@ -31,6 +31,10 @@ export type DeleteTaskInput = {
   readonly taskId: TaskId;
 };
 
+export type BulkDeleteTasksInput = {
+  readonly taskIds: readonly TaskId[];
+};
+
 export type UpdateTaskTitleInput = {
   readonly taskId: TaskId;
   readonly title: string;
@@ -50,6 +54,7 @@ export type UpdateTaskDetailsInput = {
 };
 
 export type TaskRepository = {
+  bulkDeleteTasks(input: BulkDeleteTasksInput): Promise<void>;
   createTask(input: CreateTaskInput): Promise<Task>;
   deleteTask(input: DeleteTaskInput): Promise<void>;
   listTasks(): Promise<Task[]>;

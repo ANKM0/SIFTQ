@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIFTQ Wireframe - Task List</title>
+    <title>SIFTQ Wireframe - タスク一括削除後</title>
     <link rel="stylesheet" href="./matrix-mvp.css" />
   </head>
   <body>
     <main class="app-shell task-page">
       <header class="app-header">
-        <div><h1>SIFTQ</h1><p>状態: タスク一覧</p></div>
+        <div><h1>SIFTQ</h1><p>状態: タスク一括削除後</p></div>
         <nav class="header-actions" aria-label="Primary">
           <a class="back-link" href="./matrix-with-cards.html">マトリックス</a>
           <a class="back-link back-link--active" href="./task-list.html">タスク一覧</a>
@@ -17,11 +17,12 @@
         </nav>
       </header>
 
-      <section class="task-list-shell" aria-labelledby="task-list-title">
+      <section class="task-list-shell" aria-labelledby="task-list-bulk-deleted-title">
+        <div class="notice notice--success" role="status">選択したタスクを削除しました</div>
         <header class="task-list-header">
           <div>
-            <h2 id="task-list-title">タスク一覧</h2>
-            <p>active / done / skipped の全タスク。カードをドラッグして一覧順を変更する。</p>
+            <h2 id="task-list-bulk-deleted-title">タスク一覧</h2>
+            <p>削除した task は一覧、Matrix、詳細から表示されず、選択状態は空になる。</p>
           </div>
           <div class="task-list-header__meta">
             <span class="count">0件選択中</span>
@@ -30,34 +31,6 @@
         </header>
 
         <ol class="task-list" aria-label="一覧順で並んだ全タスク">
-          <li class="task-list-card task-list-card--active">
-            <input type="checkbox" class="task-list-card__checkbox" aria-label="Fix terminal drop を選択" />
-            <button class="drag-handle" aria-label="Fix terminal drop をドラッグ">Do</button>
-            <div class="task-list-card__body">
-              <a class="task-list-card__title" href="./task-detail.html">Fix terminal drop</a>
-              <p class="task-list-card__description">Keep dropped Done and Skipped tasks hidden from the matrix while preserving their original area.</p>
-            </div>
-            <div class="task-list-card__actions">
-              <a class="status-button" href="./task-list-status-menu.html">active ▾</a>
-              <a class="card-action" href="./task-detail.html">詳細</a>
-              <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
-            </div>
-          </li>
-
-          <li class="task-list-card task-list-card--done">
-            <input type="checkbox" class="task-list-card__checkbox" aria-label="Create UI definition を選択" />
-            <button class="drag-handle" aria-label="Create UI definition をドラッグ">Schedule</button>
-            <div class="task-list-card__body">
-              <a class="task-list-card__title" href="./task-detail.html">Create UI definition</a>
-              <p class="task-list-card__description">Write the contract for the task list page and detail page.</p>
-            </div>
-            <div class="task-list-card__actions">
-              <a class="status-button" href="./task-list-status-menu.html">done ▾</a>
-              <a class="card-action" href="./task-detail.html">詳細</a>
-              <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
-            </div>
-          </li>
-
           <li class="task-list-card task-list-card--skipped">
             <input type="checkbox" class="task-list-card__checkbox" aria-label="Discuss browser session state を選択" />
             <button class="drag-handle" aria-label="Discuss browser session state をドラッグ">Delegate</button>

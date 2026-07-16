@@ -17,6 +17,9 @@ codd:
 ## Target HTML（対象HTML）
 
 - `task-list.html`: 全taskをdraggable list cardとして表示する通常状態。
+- `task-list-selection.html`: checkbox を選択し、一括削除 button が enabled になった状態。
+- `task-bulk-delete-confirm.html`: 選択件数を含む一括削除確認状態。
+- `task-list-bulk-deleted.html`: 一括削除後の成功通知付き一覧状態。
 - `task-list-deleted.html`: 物理削除後の削除成功通知付き一覧状態。
 - `task-list-dragging.html`: 一覧cardのDnD並び替え状態。
 - `task-list-status-menu.html`: status button押下後のstatus選択状態。
@@ -29,8 +32,11 @@ codd:
 - Matrix画面から `Tasks` navigationでタスク一覧へ移動できる。
 - タスク一覧はtableではなく、縦並びのdraggable list cardで表示する。
 - タスク一覧は active / done / skipped の全taskを常に表示し、status filterを持たない。
-- 各list cardは左端のdrag handle内にareaを表示し、title, description, status,
-  詳細, 削除を持つ。
+- 各list cardは左端のdrag handle内にareaを表示し、task title を含む accessible name を持つ checkbox、
+  title, description, status, 詳細, 削除を持つ。
+- checkbox は複数選択でき、選択中のcardは task list 上で視認できる。
+- header には選択件数と一括削除 button を表示する。
+- 一括削除 button は選択 task が 0 件のとき disabled、1 件以上のとき enabled にする。
 - statusはcard右側のpill型buttonで表示し、変更可能であることを示す。
 - status button押下後は active / done / skipped の選択肢を表示する。
 - descriptionが空の場合は `説明なし` を表示する。
@@ -42,16 +48,23 @@ codd:
 - 一覧card内のareaは表示のみで、area編集は詳細画面で行う。
 - 一覧cardには `createdAt` / `updatedAt` を表示しない。
 - 一覧DnDは全taskを対象にし、`listOrder` を更新する。Matrixの `areaId` / `order` には影響しない。
+- 一括削除確認では選択件数を表示し、キャンセル時は選択状態を維持する。
+- 一括削除成功後は選択状態を空にし、残った task の `listOrder` と active task の Matrix `order` を
+  `0..n-1` に正規化する。
 - 詳細では `title`, `description`, `area`, `status` を編集できる。
 - 詳細では `createdAt` / `updatedAt` を読み取り専用で表示する。
 - 削除前にはtask titleを含む確認を表示する。
 - 削除成功後は一覧へ戻る。
 - 削除成功後は一覧上部に `タスクを削除しました` 通知を表示し、復元操作は提供しない。
+- 一括削除成功後は一覧上部に `選択したタスクを削除しました` 通知を表示し、復元操作は提供しない。
 - not found状態は存在しないtask詳細URLを開いた404状態として扱い、一覧へ戻る導線を表示する。
 
 ## States（状態）
 
 - 通常一覧: 全task cardが `listOrder` 順で縦に並ぶ。
+- 選択あり一覧: checkbox と selected state を表示し、一括削除 button が enabled になる。
+- 一括削除確認: 選択件数と selected task の確認、キャンセル、削除。
+- 一括削除後一覧: 選択状態が空で、削除成功通知を表示する。
 - 削除後一覧: 削除成功通知を表示し、削除済みtaskを一覧に表示しない。
 - DnD中: drag中card、drop位置、保存対象が一覧順であることを示す。
 - 詳細: 編集form、保存、削除、タスク一覧へ戻る、readonly timestamps。
@@ -62,13 +75,15 @@ codd:
 
 - Header navigationは `マトリックス` と `タスク一覧` を並べ、現在地をactive表示にする。
 - List cardの主情報はtitleとdescription、補助情報は左端のarea handleとstatusに分ける。
+- List headerは選択件数と一括削除 button を並べ、0 件選択時の disabled state を見せる。
 - 詳細画面では `作成日時` / `更新日時` をform下部のreadonly metaとして表示する。
 - Matrix wireframeのtask cardは引き続きtitle-onlyとし、descriptionやtimestampsを表示しない。
 
 ## Contract Test（契約テスト）
 
 - `tests/docs/wireframeContract.test.ts` でtask list v3のHTMLリンク、list card形式、
-  status filter非採用、detail timestamps、delete confirmation、not foundを固定する。
+  checkbox、選択件数、一括削除 confirmation/success、status filter非採用、detail timestamps、
+  delete confirmation、not foundを固定する。
 
 ## Open Questions（未決事項）
 

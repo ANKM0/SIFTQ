@@ -14,6 +14,14 @@ import {
 } from "../contracts/task";
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
+  buildBulkDeleteConfirmation,
+  buildDeleteTaskConfirmation,
+  formatSelectedTaskCount,
+  normalizeTaskAreaId,
+  pruneSelectedTaskIds,
+  toggleTaskSelection
+} from "../domain/taskRules";
+import {
   areaDropId,
   matrixCollisionDetection,
   TASK_LIST_DROP_ID,
@@ -28,7 +36,6 @@ import {
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
-import { normalizeTaskAreaId } from "../domain/taskRules";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
@@ -233,7 +240,7 @@ export function App() {
   }
 
   async function handleDeleteTask(task: Task): Promise<boolean> {
-    const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
+    const shouldDelete = window.confirm(buildDeleteTaskConfirmation(task));
 
     if (!shouldDelete) {
       return false;
@@ -244,7 +251,7 @@ export function App() {
       await browserTaskRepository.deleteTask({ taskId: task.id });
       setTaskListNotice("タスクを削除しました");
       await refreshTasks();
-      window.location.hash = "#/tasks";
+      navigateToHash("#/tasks");
 
       return true;
     } catch (error) {
@@ -254,8 +261,34 @@ export function App() {
     }
   }
 
+  async function handleBulkDeleteTasks(taskIds: readonly Task["id"][]): Promise<boolean> {
+    const shouldDelete = window.confirm(buildBulkDeleteConfirmation(taskIds.length));
+
+    if (!shouldDelete) {
+      return false;
+    }
+
+    try {
+      setOperationError(null);
+      await browserTaskRepository.bulkDeleteTasks({ taskIds });
+      setTaskListNotice("選択したタスクを削除しました");
+      await refreshTasks();
+
+      return true;
+    } catch (error) {
+      setOperationError(messageForError(error, "Tasks could not be deleted."));
+
+      return false;
+    }
+  }
+
   async function refreshTasks() {
     setTasks(await browserTaskRepository.listTasks());
+  }
+
+  function navigateToHash(hash: string) {
+    window.location.hash = hash;
+    setRoute(routeFromHash(hash));
   }
 
   if (runtimeState.status === "checking") {
@@ -297,6 +330,7 @@ export function App() {
           <TasksPage
             tasks={tasks}
             notice={taskListNotice}
+            onBulkDeleteTasks={handleBulkDeleteTasks}
             operationError={operationError}
             onDeleteTask={handleDeleteTask}
             onUpdateTaskStatus={handleUpdateTaskStatus}
@@ -331,6 +365,18 @@ function MatrixPage({
   onUpdateTaskTitle
 }: MatrixPageProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (editingTask === null) {
+      return;
+    }
+
+    const nextEditingTask = tasks.find((candidate) => candidate.id === editingTask.id) ?? null;
+
+    if (nextEditingTask !== editingTask) {
+      setEditingTask(nextEditingTask);
+    }
+  }, [editingTask, tasks]);
 
   async function handleSaveTitle(title: string): Promise<string | null> {
     if (editingTask === null) {
@@ -384,6 +430,7 @@ function MatrixPage({
 type TasksPageProps = {
   readonly tasks: readonly Task[];
   readonly notice: string | null;
+  readonly onBulkDeleteTasks: (taskIds: readonly Task["id"][]) => Promise<boolean>;
   readonly operationError: string | null;
   readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
@@ -392,20 +439,64 @@ type TasksPageProps = {
 function TasksPage({
   tasks,
   notice,
+  onBulkDeleteTasks,
   operationError,
   onDeleteTask,
   onUpdateTaskStatus
 }: TasksPageProps) {
   const { isOver, setNodeRef } = useDroppable({ id: TASK_LIST_DROP_ID });
   const [menuTaskId, setMenuTaskId] = useState<Task["id"] | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<readonly Task["id"][]>([]);
+  const selectedCount = selectedTaskIds.length;
+
+  useEffect(() => {
+    setSelectedTaskIds((currentIds) => pruneSelectedTaskIds(currentIds, tasks));
+    setMenuTaskId((currentTaskId) =>
+      currentTaskId !== null && tasks.some((task) => task.id === currentTaskId)
+        ? currentTaskId
+        : null
+    );
+  }, [tasks]);
+
+  function handleSelectTask(taskId: Task["id"], checked: boolean) {
+    setSelectedTaskIds((currentIds) => toggleTaskSelection(currentIds, taskId, checked));
+  }
+
+  async function handleBulkDelete() {
+    const didDelete = await onBulkDeleteTasks(selectedTaskIds);
+
+    if (didDelete) {
+      setSelectedTaskIds([]);
+    }
+  }
 
   return (
     <main className="matrix-page">
       <AppHeader currentPage="tasks" />
       <section aria-labelledby="tasks-page-title" className="tasks-page">
         <header className="tasks-page__header">
-          <h2 id="tasks-page-title">タスク一覧</h2>
-          <p>{tasks.length} tasks</p>
+          <div className="tasks-page__header-copy">
+            <h2 id="tasks-page-title">タスク一覧</h2>
+            <p>{tasks.length} tasks</p>
+          </div>
+          <div className="tasks-page__header-actions">
+            <p
+              aria-atomic="true"
+              aria-label="現在の選択件数"
+              aria-live="polite"
+              className="tasks-page__selection-count"
+            >
+              {formatSelectedTaskCount(selectedCount)}
+            </p>
+            <button
+              className="tasks-page__button tasks-page__button--danger"
+              disabled={selectedCount === 0}
+              type="button"
+              onClick={() => void handleBulkDelete()}
+            >
+              選択したタスクを削除
+            </button>
+          </div>
         </header>
         {notice !== null ? (
           <p className="tasks-page__notice" role="status">
@@ -426,9 +517,11 @@ function TasksPage({
             <TaskListCard
               key={task.id}
               isMenuOpen={menuTaskId === task.id}
+              isSelected={selectedTaskIds.includes(task.id)}
               onCloseMenu={() => setMenuTaskId(null)}
               onDeleteTask={onDeleteTask}
               onOpenMenu={() => setMenuTaskId(task.id)}
+              onSelectTask={handleSelectTask}
               onUpdateTaskStatus={onUpdateTaskStatus}
               task={task}
             />
@@ -441,18 +534,22 @@ function TasksPage({
 
 type TaskListCardProps = {
   readonly isMenuOpen: boolean;
+  readonly isSelected: boolean;
   readonly onCloseMenu: () => void;
   readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onOpenMenu: () => void;
+  readonly onSelectTask: (taskId: Task["id"], checked: boolean) => void;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
   readonly task: Task;
 };
 
 function TaskListCard({
   isMenuOpen,
+  isSelected,
   onCloseMenu,
   onDeleteTask,
   onOpenMenu,
+  onSelectTask,
   onUpdateTaskStatus,
   task
 }: TaskListCardProps) {
@@ -464,6 +561,7 @@ function TaskListCard({
   const className = [
     "tasks-page__card",
     `tasks-page__card--${task.status}`,
+    isSelected ? "tasks-page__card--selected" : "",
     draggable.isDragging ? "tasks-page__card--dragging" : "",
     droppable.isOver ? "tasks-page__card--drop-target" : ""
   ]
@@ -488,6 +586,13 @@ function TaskListCard({
       }}
       style={style}
     >
+      <input
+        aria-label={`${task.title} を選択`}
+        checked={isSelected}
+        className="tasks-page__checkbox"
+        type="checkbox"
+        onChange={(event) => onSelectTask(task.id, event.target.checked)}
+      />
       <button
         aria-label={`${area.label} のドラッグハンドル`}
         className="tasks-page__handle"
@@ -501,7 +606,10 @@ function TaskListCard({
         <span className="tasks-page__handle-area">{area.label}</span>
       </button>
       <div className="tasks-page__body">
-        <h3 className="tasks-page__card-title">{task.title}</h3>
+        <div className="tasks-page__card-title-row">
+          <h3 className="tasks-page__card-title">{task.title}</h3>
+          {isSelected ? <span className="tasks-page__selected-badge">選択中</span> : null}
+        </div>
         <p className="tasks-page__description">{description}</p>
       </div>
       <div className="tasks-page__controls">
