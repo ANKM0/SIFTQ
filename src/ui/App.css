@@ -363,16 +363,21 @@
   align-items: center;
   justify-content: center;
   min-width: 64px;
+  max-width: 100%;
   min-height: 36px;
   border: 1px solid #c5ccd8;
   border-radius: 10px;
   background: #ffffff;
   color: #1f2937;
-  padding: 0 12px;
+  padding: 8px 12px;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.3;
   text-decoration: none;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -526,6 +531,7 @@
 
 .task-detail-form__back-link {
   align-self: flex-end;
+  min-width: 0;
 }
 
 .task-detail-form__action-group {
@@ -545,6 +551,29 @@
 
 .tasks-page__button--primary:hover {
   background: #1d4ed8;
+}
+
+@media (max-width: 840px) {
+  .task-detail-form__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .task-detail-form__back-link {
+    align-self: auto;
+  }
+
+  .task-detail-form__action-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .task-detail-form__action-group .tasks-page__button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 720px) {
