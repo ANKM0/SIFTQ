@@ -297,8 +297,7 @@ class _RunStateWriter:
         duration: float | int | None = None,
         metadata: Mapping[str, object] | None = None,
     ) -> Mapping[str, object]:
-        if event_type == "browser_observation":
-            metadata = _sanitize_browser_observation_metadata(metadata)
+        metadata = _sanitize_event_metadata(event_type=event_type, metadata=metadata)
         return self._event_stream.append(
             phase=self.phase,
             event_type=event_type,
@@ -4200,6 +4199,28 @@ _BROWSER_OBSERVATION_FORBIDDEN_KEYS = frozenset(
         "dom_snapshot_path",
     }
 )
+_EVENT_METADATA_MAX_DEPTH = 4
+_EVENT_METADATA_MAX_KEYS = 16
+_EVENT_METADATA_MAX_ITEMS = 16
+_EVENT_METADATA_MAX_STRING_LENGTH = 240
+_DEVELOPER_INSTRUCTION_SUMMARY_MAX_LENGTH = 160
+_DEVELOPER_INSTRUCTION_MAX_SOURCE_BYTES = 64 * 1024
+_DEVELOPER_INSTRUCTION_PRIVATE_PATH_PARTS = frozenset(
+    {
+        ".git",
+        ".ssh",
+        ".aws",
+        ".config",
+    }
+)
+_DEVELOPER_INSTRUCTION_PRIVATE_PATH_PATTERNS = (
+    ".env",
+    ".env.local",
+    ".env.production",
+    "auth.json",
+    ".sympohy/config.yaml",
+)
+_DEVELOPER_INSTRUCTION_ALLOWED_SUFFIXES = frozenset({".md", ".rules"})
 
 
 def _sanitize_browser_observation_metadata(
@@ -4217,6 +4238,63 @@ def _sanitize_browser_observation_metadata(
     if forbidden:
         sanitized["redacted_artifacts"] = forbidden
     return sanitized
+
+
+def _sanitize_event_metadata(
+    *,
+    event_type: str,
+    metadata: Mapping[str, object] | None,
+) -> dict[str, object]:
+    if metadata is None:
+        return {}
+    if event_type == "browser_observation":
+        base = _sanitize_browser_observation_metadata(metadata)
+    else:
+        base = dict(metadata)
+    sanitized = _sanitize_metadata_value(base, depth=0)
+    if isinstance(sanitized, dict):
+        return sanitized
+    return {"value": sanitized}
+
+
+def _sanitize_metadata_value(value: object, *, depth: int) -> object:
+    if depth >= _EVENT_METADATA_MAX_DEPTH:
+        return "<redacted:depth-limit>"
+    if isinstance(value, str):
+        return _truncate_text(value, max_length=_EVENT_METADATA_MAX_STRING_LENGTH)
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int | float):
+        return value
+    if isinstance(value, Mapping):
+        sanitized: dict[str, object] = {}
+        items = list(value.items())
+        for key, item in items[:_EVENT_METADATA_MAX_KEYS]:
+            sanitized[str(key)] = _sanitize_metadata_value(item, depth=depth + 1)
+        if len(items) > _EVENT_METADATA_MAX_KEYS:
+            sanitized["redacted_keys"] = len(items) - _EVENT_METADATA_MAX_KEYS
+        return sanitized
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        sanitized_items = [
+            _sanitize_metadata_value(item, depth=depth + 1)
+            for item in value[:_EVENT_METADATA_MAX_ITEMS]
+        ]
+        if len(value) > _EVENT_METADATA_MAX_ITEMS:
+            sanitized_items.append(
+                f"<redacted:{len(value) - _EVENT_METADATA_MAX_ITEMS} more items>"
+            )
+        return sanitized_items
+    if isinstance(value, (bytes, bytearray)):
+        return f"<redacted:{type(value).__name__}:{len(value)} bytes>"
+    return _truncate_text(repr(value), max_length=_EVENT_METADATA_MAX_STRING_LENGTH)
+
+
+def _truncate_text(text: str, *, max_length: int) -> str:
+    if len(text) <= max_length:
+        return text
+    if max_length <= 3:
+        return text[:max_length]
+    return text[: max_length - 3] + "..."
 
 
 def _prompt_hash(prompt: str) -> str:
@@ -4256,7 +4334,13 @@ def _record_codex_event(
 
 
 _INSTRUCTION_PATH_RE = re.compile(
-    r"(?P<path>(?:\.agents|docs)/[A-Za-z0-9_./-]+(?:\.md|/SKILL\.md))"
+    r"(?P<path>(?:"
+    r"\.agents/[A-Za-z0-9_./-]+/SKILL\.md|"
+    r"docs/[A-Za-z0-9_./-]+\.md|"
+    r"(?:[A-Za-z0-9_./-]+/)?AGENTS\.md|"
+    r"\.codex/rules/[A-Za-z0-9_.-]+\.rules|"
+    r"\.sympohy/config\.yaml"
+    r"))"
 )
 
 
@@ -4274,11 +4358,11 @@ def _record_prompt_instruction_sources(
         if path_text in seen:
             continue
         seen.add(path_text)
-        source_kind = "skill" if "/SKILL.md" in path_text else "doc"
+        source_kind = _instruction_source_kind(path_text)
         summary = (
             "codex prompt references repository skill instructions"
             if source_kind == "skill"
-            else "codex prompt references repository contributing or design docs"
+            else "codex prompt references repository developer instructions"
         )
         _record_developer_instruction_source(
             state=state,
@@ -4297,18 +4381,76 @@ def _record_developer_instruction_source(
     ref: str,
     summary: str,
 ) -> None:
-    content_sha = _source_sha256(cwd / ref)
+    metadata = _developer_instruction_metadata(
+        cwd=cwd,
+        source_kind=source_kind,
+        ref=ref,
+        summary=summary,
+    )
     state.record_event(
         event_type="developer_instruction",
         status="observed",
-        summary=f"developer instruction source observed: {ref}",
-        metadata={
-            "source_kind": source_kind,
-            "ref": ref,
-            "sha256": content_sha,
-            "summary": summary,
-        },
+        summary=f"developer instruction source observed: {metadata['ref']}",
+        metadata=metadata,
     )
+
+
+def _instruction_source_kind(ref: str) -> str:
+    if ref.endswith("/SKILL.md"):
+        return "skill"
+    if ref.endswith(".rules"):
+        return "rule"
+    if ref.endswith("AGENTS.md"):
+        return "agent_instruction"
+    if ref == ".sympohy/config.yaml":
+        return "config"
+    return "doc"
+
+
+def _developer_instruction_metadata(
+    *,
+    cwd: Path,
+    source_kind: str,
+    ref: str,
+    summary: str,
+) -> dict[str, object]:
+    path = cwd / ref
+    source_ref = ref
+    redaction_reason = _developer_instruction_redaction_reason(path, ref=ref)
+    if redaction_reason is None:
+        sha256 = _source_sha256(path)
+    else:
+        sha256 = hashlib.sha256(ref.encode("utf-8")).hexdigest()
+        source_ref = f"<redacted:{redaction_reason}>"
+    metadata: dict[str, object] = {
+        "source_kind": source_kind,
+        "path": source_ref,
+        "ref": source_ref,
+        "sha256": sha256,
+        "summary": _truncate_text(
+            summary,
+            max_length=_DEVELOPER_INSTRUCTION_SUMMARY_MAX_LENGTH,
+        ),
+    }
+    if redaction_reason is not None:
+        metadata["redaction"] = redaction_reason
+    return metadata
+
+
+def _developer_instruction_redaction_reason(path: Path, *, ref: str) -> str | None:
+    normalized_ref = ref.strip()
+    if normalized_ref in _DEVELOPER_INSTRUCTION_PRIVATE_PATH_PATTERNS:
+        return "private_config"
+    if any(part in _DEVELOPER_INSTRUCTION_PRIVATE_PATH_PARTS for part in path.parts):
+        return "private_path"
+    if path.suffix and path.suffix not in _DEVELOPER_INSTRUCTION_ALLOWED_SUFFIXES:
+        return "unsupported_artifact_type"
+    try:
+        if path.exists() and path.stat().st_size > _DEVELOPER_INSTRUCTION_MAX_SOURCE_BYTES:
+            return "artifact_too_large"
+    except OSError:
+        return "source_unavailable"
+    return None
 
 
 def _source_sha256(path: Path) -> str:

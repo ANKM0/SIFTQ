@@ -134,10 +134,18 @@ class SympohyRunnerTest(unittest.TestCase):
         )
         self.assertEqual(events[0]["metadata"]["source_kind"], "skill")
         self.assertEqual(
+            events[0]["metadata"]["path"],
+            ".agents/skills/feature-docs-planning/SKILL.md",
+        )
+        self.assertEqual(
             events[0]["metadata"]["ref"],
             ".agents/skills/feature-docs-planning/SKILL.md",
         )
         self.assertEqual(events[1]["metadata"]["source_kind"], "doc")
+        self.assertEqual(
+            events[1]["metadata"]["path"],
+            "docs/contributing/development-flow.md",
+        )
         self.assertEqual(
             events[1]["metadata"]["ref"],
             "docs/contributing/development-flow.md",
@@ -148,6 +156,63 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(events[2]["metadata"]["parse_status"], "parsed")
         self.assertEqual(events[2]["metadata"]["returncode"], 0)
         self.assertTrue(events[2]["metadata"]["prompt_hash"])
+
+    def test_codex_json_redacts_private_config_instruction_sources(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            config_path = cwd / ".sympohy"
+            config_path.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (config_path / "config.yaml").write_text(
+                "token: super-secret\n",
+                encoding="utf-8",
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "planning"})
+
+            with patch(
+                "scripts.sympohy.runner._check_output_with_heartbeat",
+                return_value='{"artifact_decisions": {"requirements": {"mode": "not_needed", "reason": "n/a"}}}',
+            ):
+                _codex_json(
+                    [
+                        "Read .sympohy/config.yaml before continuing.",
+                    ],
+                    cwd=cwd,
+                    log_path=log_dir / "artifact-decisions.json",
+                    heartbeat=state.heartbeat,
+                    config=self._config(root),
+                    role="planning",
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        instruction_event = events[0]
+        self.assertEqual(instruction_event["event_type"], "developer_instruction")
+        self.assertEqual(instruction_event["metadata"]["source_kind"], "config")
+        self.assertEqual(
+            instruction_event["metadata"]["path"],
+            "<redacted:private_config>",
+        )
+        self.assertEqual(
+            instruction_event["metadata"]["ref"],
+            "<redacted:private_config>",
+        )
+        self.assertEqual(
+            instruction_event["metadata"]["redaction"],
+            "private_config",
+        )
+        self.assertNotIn(".sympohy/config.yaml", json.dumps(instruction_event))
 
     def test_run_stage_gate_records_event(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -3628,6 +3693,40 @@ class SympohyRunnerTest(unittest.TestCase):
                     "trace_path",
                 ],
             },
+        )
+
+    def test_run_state_writer_truncates_oversized_event_metadata(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="implement", progress={"message": "oversized metadata"})
+            writer.record_event(
+                event_type="command",
+                status="success",
+                summary="oversized metadata captured",
+                metadata={
+                    "long_text": "x" * 400,
+                    "nested": {
+                        "items": list(range(20)),
+                    },
+                },
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(len(events[0]["metadata"]["long_text"]), 240)
+        self.assertTrue(events[0]["metadata"]["long_text"].endswith("..."))
+        self.assertEqual(len(events[0]["metadata"]["nested"]["items"]), 17)
+        self.assertEqual(
+            events[0]["metadata"]["nested"]["items"][-1],
+            "<redacted:4 more items>",
         )
 
     def test_run_state_writer_refuses_write_after_lock_takeover(self) -> None:
