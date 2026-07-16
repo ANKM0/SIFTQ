@@ -334,6 +334,26 @@ describe("App", () => {
     ).toEqual(["title", "area", "description", "status", "タスク一覧へ戻る", "削除", "保存"]);
   });
 
+  it("renders the detail actions in the layout order used by the responsive footer", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    const actions = document.querySelector(".task-detail-form__actions");
+    const backLink = screen.getByRole("link", { name: "タスク一覧へ戻る" });
+    const actionGroup = document.querySelector(".task-detail-form__action-group");
+
+    expect(actions?.children).toHaveLength(2);
+    expect(actions?.firstElementChild).toBe(backLink);
+    expect(actions?.lastElementChild).toBe(actionGroup);
+    expect(
+      Array.from(actionGroup?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim())
+    ).toEqual(["削除", "保存"]);
+  });
+
   it("normalizes legacy terminal tasks to the fallback matrix area in detail", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
     window.location.hash = "#/tasks/task-1";
