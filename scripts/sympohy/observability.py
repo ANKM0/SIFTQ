@@ -34,7 +34,7 @@ _PROPOSAL_TARGETS = ("prompt", "hook", "stage_gate", "docs", "skill", "test", "c
 _LOW_RISK_APPLICATOR_TARGETS = frozenset({"docs", "prompt", "test", "config"})
 _LOW_RISK_APPLICATOR_PATHS: dict[str, tuple[str, ...]] = {
     "docs": ("docs/**",),
-    "prompt": ("scripts/sympohy/runner.py", "tests/sympohy/**"),
+    "prompt": ("tests/sympohy/**",),
     "test": ("tests/**",),
     "config": (".sympohy/config.yaml", "tests/sympohy/**"),
 }

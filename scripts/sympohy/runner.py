@@ -327,7 +327,7 @@ class _RunStateWriter:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
         self.record_event(
             event_type="recovery",
-            status="success",
+            status=_recovery_event_status(event),
             summary=event.replace("_", " "),
             metadata={"event": event, **dict(details or {})},
         )
@@ -361,6 +361,12 @@ def _interrupt_signal_numbers() -> tuple[int, ...]:
         if signum is not None:
             numbers.append(signum)
     return tuple(numbers)
+
+
+def _recovery_event_status(event: str) -> str:
+    if event.endswith("_blocked"):
+        return "block"
+    return "success"
 
 
 def _handle_run_interrupt(signum: int, _frame: object) -> None:

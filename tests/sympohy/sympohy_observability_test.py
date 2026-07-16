@@ -8,7 +8,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from scripts.sympohy.observability import ObservationStore, rebuild_observation_store
+from scripts.sympohy.observability import (
+    ObservationStore,
+    _enforce_candidate_scope,
+    rebuild_observation_store,
+)
 
 
 class SympohyObservabilityTest(unittest.TestCase):
@@ -1071,6 +1075,16 @@ class SympohyObservabilityTest(unittest.TestCase):
                             cwd=worktree,
                             config=SimpleNamespace(base_branch="main"),
                         )
+
+    def test_prompt_auto_apply_scope_rejects_runner_changes(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "observe-apply rejected out-of-scope changes .*scripts/sympohy/runner.py",
+        ):
+            _enforce_candidate_scope(
+                candidate={"id": "candidate-prompt", "category": "prompt"},
+                changed_paths=["scripts/sympohy/runner.py"],
+            )
 
     def test_apply_improvements_rejects_dirty_worktree(self) -> None:
         with TemporaryDirectory() as tmp:

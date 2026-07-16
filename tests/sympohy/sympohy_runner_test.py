@@ -3856,6 +3856,40 @@ class SympohyRunnerTest(unittest.TestCase):
                 "event": "implementation_recovery_inspected",
             },
         )
+
+    def test_run_state_writer_records_blocked_recovery_as_block_status(self) -> None:
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                run_id="run-82",
+                clock=lambda: now,
+            )
+            writer.write(phase="implement", progress={"message": "resume"})
+            writer.record_recovery(
+                "unsafe_recovery_blocked",
+                {"resume_action": "block_unsafe_resume"},
+            )
+
+            event_lines = (log_dir / "events.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+
+        recovery_event = json.loads(event_lines[0])
+        self.assertEqual(recovery_event["event_type"], "recovery")
+        self.assertEqual(recovery_event["status"], "block")
+        self.assertEqual(recovery_event["summary"], "unsafe recovery blocked")
+        self.assertEqual(
+            recovery_event["metadata"],
+            {
+                "event": "unsafe_recovery_blocked",
+                "resume_action": "block_unsafe_resume",
+            },
+        )
         self.assertEqual(recovery_event["timestamp"], "2026-06-15T12:00:00Z")
 
     def test_run_state_writer_appends_ldjson_events_in_order(self) -> None:
