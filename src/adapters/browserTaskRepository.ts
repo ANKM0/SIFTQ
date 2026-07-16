@@ -9,6 +9,7 @@ import {
   AREA_ORDER,
   compareTasksByAreaOrder,
   compareTasksByListOrder,
+  deleteTasksAndNormalizeOrder,
   isAreaId,
   isMatrixArea,
   isTaskVisibleInMatrix,
@@ -86,7 +87,7 @@ export function createBrowserTaskRepository(
     async bulkDeleteTasks(input: BulkDeleteTasksInput): Promise<void> {
       const tasks = loadPersistedTasks();
       const deletedTaskIds = new Set(input.taskIds.map((taskId) => taskById(tasks, taskId).id));
-      const nextTasks = deleteTasks(tasks, deletedTaskIds, nowFactory());
+      const nextTasks = deleteTasksAndNormalizeOrder(tasks, deletedTaskIds, nowFactory());
 
       saveTasks(storage, storageKey, nextTasks);
     },
@@ -123,7 +124,7 @@ export function createBrowserTaskRepository(
     async deleteTask(input: DeleteTaskInput): Promise<void> {
       const tasks = loadPersistedTasks();
       const task = taskById(tasks, input.taskId);
-      const nextTasks = deleteTasks(tasks, new Set([task.id]), nowFactory());
+      const nextTasks = deleteTasksAndNormalizeOrder(tasks, new Set([task.id]), nowFactory());
 
       saveTasks(storage, storageKey, nextTasks);
     },
@@ -612,26 +613,6 @@ function clamp(value: number, min: number, max: number): number {
 
 function nextListOrder(tasks: readonly Task[]): number {
   return tasks.reduce((maxOrder, task) => Math.max(maxOrder, task.listOrder), -1) + 1;
-}
-
-function deleteTasks(
-  tasks: readonly Task[],
-  deletedTaskIds: ReadonlySet<TaskId>,
-  updatedAt: string
-): Task[] {
-  if (deletedTaskIds.size === 0) {
-    return [...tasks];
-  }
-
-  const remainingTasks = tasks.filter((task) => !deletedTaskIds.has(task.id));
-  const normalizedTasks = normalizeAllAreas(remainingTasks);
-  const orderedTasks = [...normalizedTasks].sort(compareTasksByListOrder);
-
-  return orderedTasks.map((task, listOrder) =>
-    task.listOrder === listOrder
-      ? task
-      : ({ ...task, listOrder, updatedAt } satisfies Task)
-  );
 }
 
 function updateTaskStatus(

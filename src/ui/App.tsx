@@ -14,6 +14,14 @@ import {
 } from "../contracts/task";
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
+  buildBulkDeleteConfirmation,
+  buildDeleteTaskConfirmation,
+  formatSelectedTaskCount,
+  normalizeTaskAreaId,
+  pruneSelectedTaskIds,
+  toggleTaskSelection
+} from "../domain/taskRules";
+import {
   areaDropId,
   TASK_LIST_DROP_ID,
   restrictDragToWindowEdges,
@@ -28,7 +36,6 @@ import {
   tasksForArea,
   validateTaskTitleInput
 } from "./taskPresentation";
-import { normalizeTaskAreaId } from "../domain/taskRules";
 import "./App.css";
 
 const dragModifiers = [restrictDragToWindowEdges];
@@ -231,7 +238,7 @@ export function App() {
   }
 
   async function handleDeleteTask(task: Task): Promise<boolean> {
-    const shouldDelete = window.confirm(`"${task.title}" を削除しますか?`);
+    const shouldDelete = window.confirm(buildDeleteTaskConfirmation(task));
 
     if (!shouldDelete) {
       return false;
@@ -247,6 +254,27 @@ export function App() {
       return true;
     } catch (error) {
       setOperationError(messageForError(error, "Task could not be deleted."));
+
+      return false;
+    }
+  }
+
+  async function handleBulkDeleteTasks(taskIds: readonly Task["id"][]): Promise<boolean> {
+    const shouldDelete = window.confirm(buildBulkDeleteConfirmation(taskIds.length));
+
+    if (!shouldDelete) {
+      return false;
+    }
+
+    try {
+      setOperationError(null);
+      await browserTaskRepository.bulkDeleteTasks({ taskIds });
+      setTaskListNotice("選択したタスクを削除しました");
+      await refreshTasks();
+
+      return true;
+    } catch (error) {
+      setOperationError(messageForError(error, "Tasks could not be deleted."));
 
       return false;
     }
@@ -294,6 +322,7 @@ export function App() {
           <TasksPage
             tasks={tasks}
             notice={taskListNotice}
+            onBulkDeleteTasks={handleBulkDeleteTasks}
             operationError={operationError}
             onDeleteTask={handleDeleteTask}
             onUpdateTaskStatus={handleUpdateTaskStatus}
@@ -389,6 +418,7 @@ function MatrixPage({
 type TasksPageProps = {
   readonly tasks: readonly Task[];
   readonly notice: string | null;
+  readonly onBulkDeleteTasks: (taskIds: readonly Task["id"][]) => Promise<boolean>;
   readonly operationError: string | null;
   readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
@@ -397,6 +427,7 @@ type TasksPageProps = {
 function TasksPage({
   tasks,
   notice,
+  onBulkDeleteTasks,
   operationError,
   onDeleteTask,
   onUpdateTaskStatus
@@ -407,21 +438,19 @@ function TasksPage({
   const selectedCount = selectedTaskIds.length;
 
   useEffect(() => {
-    const taskIds = new Set(tasks.map((task) => task.id));
-
-    setSelectedTaskIds((currentIds) =>
-      currentIds.filter((taskId) => taskIds.has(taskId))
-    );
+    setSelectedTaskIds((currentIds) => pruneSelectedTaskIds(currentIds, tasks));
   }, [tasks]);
 
   function handleSelectTask(taskId: Task["id"], checked: boolean) {
-    setSelectedTaskIds((currentIds) => {
-      if (checked) {
-        return currentIds.includes(taskId) ? currentIds : [...currentIds, taskId];
-      }
+    setSelectedTaskIds((currentIds) => toggleTaskSelection(currentIds, taskId, checked));
+  }
 
-      return currentIds.filter((candidateId) => candidateId !== taskId);
-    });
+  async function handleBulkDelete() {
+    const didDelete = await onBulkDeleteTasks(selectedTaskIds);
+
+    if (didDelete) {
+      setSelectedTaskIds([]);
+    }
   }
 
   return (
@@ -434,11 +463,12 @@ function TasksPage({
             <p>{tasks.length} tasks</p>
           </div>
           <div className="tasks-page__header-actions">
-            <p aria-live="polite">{selectedCount}件選択中</p>
+            <p aria-live="polite">{formatSelectedTaskCount(selectedCount)}</p>
             <button
               className="tasks-page__button tasks-page__button--danger"
               disabled={selectedCount === 0}
               type="button"
+              onClick={() => void handleBulkDelete()}
             >
               選択したタスクを削除
             </button>

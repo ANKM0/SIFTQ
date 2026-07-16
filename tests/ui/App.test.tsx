@@ -442,6 +442,52 @@ describe("App", () => {
     expect(window.location.hash).toBe("#/tasks");
   });
 
+  it("bulk deletes selected tasks and shows a notice", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" }),
+      task({ id: "task-3", title: "Later", areaId: "schedule" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Visible を選択" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Later を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "選択したタスクを削除" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("選択したタスクを削除しました")
+    );
+    expect(window.confirm).toHaveBeenCalledWith("2件のタスクを削除しますか?");
+    expect(taskListTitles()).toEqual(["Hidden"]);
+    expect(screen.getByText("0件選択中")).toBeTruthy();
+  });
+
+  it("keeps selection and tasks when bulk delete confirmation is canceled", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Visible を選択" }));
+    fireEvent.click(screen.getByRole("button", { name: "選択したタスクを削除" }));
+
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledWith("1件のタスクを削除しますか?"));
+    expect(taskListTitles()).toEqual(["Visible", "Hidden"]);
+    expect(screen.getByText("1件選択中")).toBeTruthy();
+    expect(storedTasks()).toHaveLength(2);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("clears the delete notice after leaving the task list", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
     window.location.hash = "#/tasks";
