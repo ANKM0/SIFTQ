@@ -88,6 +88,10 @@ Matrix は初期表示として引き続き利用できる。`#/tasks` は縦並
 - 物理削除後の task list 上部には `タスクを削除しました` 通知を表示し、通常の list 状態ではこの通知を表示しない。
 - 物理削除後の task list には削除済み task の placeholder や復元操作を表示しない。
 - 存在しない task の detail URL を開いた場合は not found 状態を表示し、list へ戻れる。
+- task detail page には左下の戻る button と、右下の削除 / 保存 button を表示する。
+- task detail page の削除 button と保存 button の間には十分な余白を確保し、誤操作しにくい配置にする。
+- task detail page は小さい画面幅でも戻る / 削除 / 保存 button が重ならず、text や icon がはみ出さない。
+- task detail page の keyboard focus 順は自然で、既存の保存 / 削除 / 戻る挙動を維持する。
 
 ## 非機能要件
 

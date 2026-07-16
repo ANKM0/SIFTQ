@@ -301,18 +301,37 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 0 16px;
 }
 
+.task-detail-actions__group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .task-detail-actions .back-link,
-.task-detail-actions .card-action {
+.task-detail-actions .card-action,
+.task-detail-actions .button-primary {
   width: 112px;
   min-height: 34px;
   height: 34px;
   padding: 0 10px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.task-detail-actions .button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
 }
 
 .task-list-header > div {
@@ -1057,6 +1076,11 @@ textarea {
   .task-detail-actions,
   .task-detail-header {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .task-detail-actions__group {
+    justify-content: flex-start;
   }
 
   .detail-grid {

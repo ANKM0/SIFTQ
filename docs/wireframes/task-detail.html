@@ -17,11 +17,6 @@
         </nav>
       </header>
 
-      <div class="task-detail-actions">
-        <a class="back-link detail-back-link" href="./task-list.html">⇦ 一覧へ戻る</a>
-        <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
-      </div>
-
       <section class="task-detail-shell" aria-label="タスク詳細">
         <form class="task-detail-form">
           <label>タイトル <input value="完了・スキップ済みタスクを非表示にする" /></label>
@@ -49,9 +44,12 @@
             <div><dt>作成日時</dt><dd>2026-06-25 12:00</dd></div>
             <div><dt>更新日時</dt><dd>2026-06-25 12:04</dd></div>
           </dl>
-          <div class="modal__actions">
-            <a class="back-link" href="./task-list.html">キャンセル</a>
-            <button class="button-primary">保存</button>
+          <div class="task-detail-actions" aria-label="タスク操作">
+            <a class="back-link detail-back-link" href="./task-list.html">⇦ 一覧へ戻る</a>
+            <div class="task-detail-actions__group">
+              <a class="card-action card-action--danger" href="./task-delete-confirm.html">削除</a>
+              <button class="button-primary">保存</button>
+            </div>
           </div>
         </form>
       </section>

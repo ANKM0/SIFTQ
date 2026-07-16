@@ -40,6 +40,10 @@ enabled にする。
 status を編集でき、createdAt / updatedAt を読み取り専用で表示する。detail に存在しない taskId を
 指定した場合は not found state を表示する。
 
+Task detail page の操作 area は、左下に戻る button、右下に削除 / 保存 button を持つ。
+削除 / 保存 button の間は十分に離し、狭い画面でも button 同士が重ならないように折り返す。
+focus 順は visual order に沿って自然に進み、既存の戻る / 削除 / 保存の挙動は変えない。
+
 物理削除は list と detail の個別操作、および list の checkbox 選択による一括削除から実行できる。
 個別削除と一括削除のどちらも削除前に task title か選択件数を含む確認を出す。削除後は browser
 storage から消え、Matrix と task list の両画面から消える。一括削除後は task list に戻り、
@@ -85,7 +89,9 @@ status が done / skipped でも area を保持する。
 - UI tests:
   - `#/tasks` の list 表示、checkbox、選択件数、bulk delete button の disabled/enabled、全 status 表示、
     `説明なし`、status menu、detail 遷移、削除確認
-  - `#/tasks/:taskId` の detail 編集、readonly timestamps、not found
+  - `#/tasks/:taskId` の detail 編集、readonly timestamps、not found、戻る / 削除 / 保存 button の配置
+  - task detail の narrow viewport で button が重ならず、text / icon がはみ出さないこと
+  - task detail の focus 順が自然であること
   - Matrix との相互遷移
   - list からの DnD 並び替えが Matrix 表示へ影響しないこと
   - bulk delete の cancel で選択状態が維持されること
