@@ -29,6 +29,7 @@ from scripts.sympohy.runner import (
     _RunStateWriter,
     _UnsafeRecoveryError,
     _attempt_pre_review_mergeability_autofix,
+    _check_call_with_heartbeat,
     _check_output_with_heartbeat,
     _commit_all_if_new,
     _codex_json,
@@ -41,6 +42,7 @@ from scripts.sympohy.runner import (
     _pull_request_merged,
     _preflight_validation_commands,
     _push_branch_and_ensure_draft_pull_request,
+    _record_browser_observation_boundary,
     _record_run_interrupted,
     _resolve_resume_point_for_issue,
     _resume_fix_phase,
@@ -3711,6 +3713,7 @@ class SympohyRunnerTest(unittest.TestCase):
             cwd=Path("/tmp/worktree"),
             issue_number=82,
             heartbeat=None,
+            state=None,
         )
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
@@ -3987,6 +3990,104 @@ class SympohyRunnerTest(unittest.TestCase):
                 ],
             },
         )
+
+    def test_check_call_with_heartbeat_records_successful_command_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "merging"})
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                return_value=0,
+            ):
+                _check_call_with_heartbeat(
+                    ["gh", "pr", "checks", "--watch"],
+                    cwd=Path(tmp),
+                    heartbeat=writer.heartbeat,
+                    state=writer,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "command")
+        self.assertEqual(events[0]["status"], "success")
+        self.assertEqual(events[0]["metadata"]["command"], "gh pr checks --watch")
+        self.assertEqual(events[0]["metadata"]["returncode"], 0)
+
+    def test_browser_observation_boundary_records_skipped_real_run_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "skipped")
+        self.assertEqual(
+            events[0]["metadata"],
+            {
+                "reason": "missing_lightweight_observation_file",
+                "source": "browser-observation.json",
+            },
+        )
+
+    def test_browser_observation_boundary_records_lightweight_source(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "browser-observation.json").write_text(
+                json.dumps(
+                    {
+                        "console_error_count": 2,
+                        "page_error_count": 1,
+                        "storage_key_count": 4,
+                        "state_hash": "abc123",
+                        "accessibility_summary": "1 violation",
+                        "trace_path": "artifacts/trace.zip",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "observed")
+        self.assertEqual(events[0]["metadata"]["console_error_count"], 2)
+        self.assertEqual(events[0]["metadata"]["page_error_count"], 1)
+        self.assertEqual(events[0]["metadata"]["storage_key_count"], 4)
+        self.assertEqual(events[0]["metadata"]["state_hash"], "abc123")
+        self.assertEqual(events[0]["metadata"]["accessibility_summary"], "1 violation")
+        self.assertEqual(events[0]["metadata"]["redacted_artifacts"], ["trace_path"])
 
     def test_run_state_writer_truncates_oversized_event_metadata(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -4577,6 +4678,12 @@ class SympohyRunnerTest(unittest.TestCase):
                     state,
                     total_steps=3,
                 )
+                recorded_events = [
+                    json.loads(line)
+                    for line in (log_dir / "events.jsonl").read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                ]
 
         self.assertEqual(result, 0)
         comment.assert_called_once()
@@ -4614,6 +4721,21 @@ class SympohyRunnerTest(unittest.TestCase):
                 call.kwargs["heartbeat"] == state.heartbeat
                 for call in run_command.call_args_list
             )
+        )
+        self.assertIn(
+            ("browser_observation", "skipped"),
+            [(event["event_type"], event["status"]) for event in recorded_events],
+        )
+        command_events = [
+            event for event in recorded_events if event["event_type"] == "command"
+        ]
+        self.assertEqual(
+            [event["metadata"]["command"] for event in command_events],
+            [
+                "gh pr ready",
+                "gh pr checks --watch",
+                "gh pr merge --squash --delete-branch",
+            ],
         )
         check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
         check_call.assert_any_call(["gh", "issue", "close", "#82"])

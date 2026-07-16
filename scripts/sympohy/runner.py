@@ -333,6 +333,20 @@ class _RunStateWriter:
         )
         self.write(progress=self.last_known_progress)
 
+    def record_browser_observation(
+        self,
+        *,
+        status: str,
+        summary: str,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        return self.record_event(
+            event_type="browser_observation",
+            status=status,
+            summary=summary,
+            metadata=metadata,
+        )
+
 
 _ACTIVE_RUN_STATE: _RunStateWriter | None = None
 
@@ -1521,6 +1535,7 @@ def _run_issue_locked(
                 heartbeat=state.heartbeat,
                 issue_number=issue.number,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -2257,7 +2272,12 @@ def _run_review_fix_round(
         base_branch=config.base_branch,
         existing_subjects=existing_fix_subjects,
     ):
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
         state.write(
             phase="review",
             progress={
@@ -2315,7 +2335,12 @@ def _run_review_fix_round(
         existing_subjects=existing_fix_subjects,
     )
     if committed:
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
     state.write(
         phase="review",
         progress={
@@ -2546,6 +2571,11 @@ def _run_final_verifier_and_merge(
 
     empty_review = parse_review_json('{"findings":[]}')
     pull_request_number = _resolve_pull_request_number(worktree)
+    state.write(
+        phase="finalize",
+        progress={"message": "capturing browser observation"},
+    )
+    _record_browser_observation_boundary(state=state, log_dir=log_dir)
     verifier_attempt = 0
     while True:
         verifier_attempt += 1
@@ -2699,16 +2729,19 @@ def _run_final_verifier_and_merge(
         ["gh", "pr", "ready"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     _check_call_with_heartbeat(
         ["gh", "pr", "checks", "--watch"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     _check_call_with_heartbeat(
         ["gh", "pr", "merge", "--squash", "--delete-branch"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     return _finish_merged_issue(
         issue_ref,
@@ -2857,7 +2890,12 @@ def _run_final_verifier_fix_round(
                 state=state,
             )
             return 2
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
         state.write(
             phase="finalize",
             progress={
@@ -2976,6 +3014,7 @@ def _run_final_verifier_fix_round(
             ["git", "push"],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     state.write(
         phase="finalize",
@@ -3440,14 +3479,24 @@ def _attempt_pre_review_mergeability_autofix(
             ["git", "fetch", "origin", pull_request.base_ref],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     except subprocess.CalledProcessError as exc:
         return f"git fetch failed with exit code {exc.returncode}"
 
+    merge_command = ["git", "merge", "--no-ff", "--no-commit", merge_target]
+    merge_started_at = time.monotonic()
     merge_returncode = _run_command_with_heartbeat(
-        ["git", "merge", "--no-ff", "--no-commit", merge_target],
+        merge_command,
         cwd=cwd,
         heartbeat=state.heartbeat,
+    )
+    _record_command_event(
+        state=state,
+        args=merge_command,
+        status="success" if merge_returncode == 0 else "failed",
+        duration=_elapsed_seconds(merge_started_at),
+        returncode=merge_returncode,
     )
     if merge_returncode not in {0, 1}:
         return f"git merge exited with unexpected status {merge_returncode}"
@@ -3498,6 +3547,7 @@ def _attempt_pre_review_mergeability_autofix(
             ["git", "push"],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     except subprocess.CalledProcessError as exc:
         return f"git push failed with exit code {exc.returncode}"
@@ -3987,10 +4037,60 @@ def _check_call_with_heartbeat(
     *,
     cwd: Path,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
-    returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
+    started_at = time.monotonic()
+    returncode: int | None = None
+    try:
+        returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
+    except Exception as exc:
+        _record_command_event(
+            state=state,
+            args=args,
+            status="failed",
+            duration=_elapsed_seconds(started_at),
+            returncode=returncode,
+            failure_summary=str(exc),
+        )
+        raise
+    _record_command_event(
+        state=state,
+        args=args,
+        status="success" if returncode == 0 else "failed",
+        duration=_elapsed_seconds(started_at),
+        returncode=returncode,
+    )
     if returncode != 0:
         raise subprocess.CalledProcessError(returncode, args)
+
+
+def _record_command_event(
+    *,
+    state: _RunStateWriter | None,
+    args: Sequence[str],
+    status: str,
+    duration: float | int | None,
+    returncode: int | None,
+    failure_summary: str = "",
+) -> None:
+    if state is None:
+        return
+    command = shlex.join(str(arg) for arg in args)
+    metadata: dict[str, object] = {
+        "command": command,
+        "argv": [str(arg) for arg in args],
+    }
+    if returncode is not None:
+        metadata["returncode"] = returncode
+    if failure_summary:
+        metadata["failure_summary"] = _failure_summary(failure_summary)
+    state.record_event(
+        event_type="command",
+        status=status,
+        summary=f"command {status}: {command}",
+        duration=duration,
+        metadata=metadata,
+    )
 
 
 def _terminate_process(process: subprocess.Popen[object]) -> None:
@@ -4534,6 +4634,10 @@ _BROWSER_OBSERVATION_ALLOWED_KEYS = frozenset(
         "storage_key_count",
         "state_hash",
         "accessibility_summary",
+        "source",
+        "source_path",
+        "reason",
+        "parse_error",
     }
 )
 _BROWSER_OBSERVATION_FORBIDDEN_KEYS = frozenset(
@@ -4592,6 +4696,57 @@ def _sanitize_browser_observation_metadata(
     if forbidden:
         sanitized["redacted_artifacts"] = forbidden
     return sanitized
+
+
+def _record_browser_observation_boundary(
+    *,
+    state: _RunStateWriter,
+    log_dir: Path,
+) -> None:
+    source_path = log_dir / "browser-observation.json"
+    if not source_path.exists():
+        state.record_browser_observation(
+            status="skipped",
+            summary="browser observation source not configured",
+            metadata={
+                "source": "browser-observation.json",
+                "reason": "missing_lightweight_observation_file",
+            },
+        )
+        return
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source could not be parsed",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": str(exc),
+            },
+        )
+        return
+    if not isinstance(payload, Mapping):
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source was not an object",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": "expected JSON object",
+            },
+        )
+        return
+    state.record_browser_observation(
+        status="observed",
+        summary="browser observation captured",
+        metadata={
+            "source": "browser-observation.json",
+            "source_path": str(source_path),
+            **dict(payload),
+        },
+    )
 
 
 def _sanitize_event_metadata(
@@ -5097,6 +5252,7 @@ def _ensure_draft_pull_request(
     cwd: Path,
     issue_number: int | None = None,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
@@ -5104,6 +5260,7 @@ def _ensure_draft_pull_request(
             cwd=cwd,
             issue_number=issue_number or _issue_number_from_branch(branch),
             heartbeat=heartbeat,
+            state=state,
         )
         return
     if issue_number is None:
@@ -5133,6 +5290,7 @@ def _ensure_draft_pull_request(
             ],
             cwd=cwd,
             heartbeat=heartbeat,
+            state=state,
         )
     finally:
         if body_file_path is not None:
@@ -5146,6 +5304,7 @@ def _push_branch_and_ensure_draft_pull_request(
     heartbeat: Callable[[], None] | None = None,
     issue_number: int | None = None,
     base_branch: str | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     if issue_number is not None and base_branch is not None:
         _ensure_initial_pull_request_commit(
@@ -5157,11 +5316,13 @@ def _push_branch_and_ensure_draft_pull_request(
         ["git", "push", "-u", "origin", branch],
         cwd=cwd,
         heartbeat=heartbeat,
+        state=state,
     )
     _ensure_draft_pull_request(
         cwd=cwd,
         issue_number=issue_number,
         heartbeat=heartbeat,
+        state=state,
     )
 
 
@@ -5196,6 +5357,7 @@ def _ensure_existing_pull_request_metadata(
     cwd: Path,
     issue_number: int | None,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     payload = json.loads(
         subprocess.check_output(
@@ -5232,6 +5394,7 @@ def _ensure_existing_pull_request_metadata(
         pull_request_number=pull_request_number,
         body=updated_body,
         heartbeat=heartbeat,
+        state=state,
     )
 
 
@@ -5304,6 +5467,7 @@ def _update_pull_request_body(
     pull_request_number: object,
     body: str,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     body_file_path: Path | None = None
     try:
@@ -5325,6 +5489,7 @@ def _update_pull_request_body(
             command,
             cwd=cwd,
             heartbeat=heartbeat,
+            state=state,
         )
     finally:
         if body_file_path is not None:

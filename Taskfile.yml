@@ -41,7 +41,7 @@ tasks:
   pytest:
     desc: Run pytest with optional file targets and additional arguments (ADR 0014).
     cmds:
-      - uv run python -m pytest {{.ARGS}} {{default "tests/sympohy" .FILES}}
+      - uv run python -m pytest {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ARGS}} {{default "tests/sympohy" .FILES}}{{end}}
 
   ci:
     desc: Run the local CI gate.
