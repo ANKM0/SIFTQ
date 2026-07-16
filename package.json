@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "docs:flow:svg": "mmdc -i docs/contributing/assets/development-flow.mmd -o docs/contributing/assets/development-flow.svg"
   },
@@ -20,6 +21,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@eslint/js": "^9.29.0",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.1.8",

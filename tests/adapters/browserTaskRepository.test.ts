@@ -132,6 +132,51 @@ describe("browserTaskRepository", () => {
     } satisfies Partial<BrowserTaskRepositoryError>);
   });
 
+  it("preserves active move and reorder behavior after terminal status changes", async () => {
+    const repository = repositoryForTest();
+
+    await repository.createTask({ areaId: "do", title: "Hide me" });
+    await repository.createTask({ areaId: "do", title: "Move me" });
+    await repository.createTask({ areaId: "schedule", title: "Scheduled" });
+
+    await repository.moveTask({ taskId: "task-1", toAreaId: "done", insertAt: 0 });
+    await repository.moveTask({ taskId: "task-2", toAreaId: "schedule", insertAt: 0 });
+    await repository.updateTaskStatus({ taskId: "task-3", status: "skipped" });
+    await repository.reorderTask({ taskId: "task-2", toIndex: 0 });
+
+    expect(await repository.listTasks()).toEqual([
+      task({
+        id: "task-1",
+        title: "Hide me",
+        areaId: "do",
+        order: 1,
+        status: "done",
+        createdAt: timestampAt(0),
+        updatedAt: timestampAt(3),
+        listOrder: 0
+      }),
+      task({
+        id: "task-2",
+        title: "Move me",
+        areaId: "schedule",
+        order: 0,
+        createdAt: timestampAt(1),
+        updatedAt: timestampAt(6),
+        listOrder: 1
+      }),
+      task({
+        id: "task-3",
+        title: "Scheduled",
+        areaId: "schedule",
+        order: 1,
+        status: "skipped",
+        createdAt: timestampAt(2),
+        updatedAt: timestampAt(5),
+        listOrder: 2
+      })
+    ]);
+  });
+
   it("rejects invalid titles and corrupt storage", async () => {
     const repository = repositoryForTest();
 

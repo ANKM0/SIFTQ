@@ -45,6 +45,9 @@ jobs:
       - name: Install frontend dependencies
         run: task setup:frontend:ci
 
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Check sympohy project configuration
         run: task ci:sympohy
 

@@ -15,6 +15,7 @@ import {
 import { browserTaskRepository } from "../adapters/browserTaskRepository";
 import {
   areaDropId,
+  matrixCollisionDetection,
   TASK_LIST_DROP_ID,
   restrictDragToWindowEdges,
   resolveTaskListDropIndex,
@@ -23,7 +24,6 @@ import {
 } from "./dragDrop";
 import {
   MATRIX_AREAS,
-  TERMINAL_AREAS,
   findArea,
   tasksForArea,
   validateTaskTitleInput
@@ -157,6 +157,8 @@ export function App() {
     try {
       if (operation.type === "move") {
         await browserTaskRepository.moveTask(operation);
+      } else if (operation.type === "update-status") {
+        await browserTaskRepository.updateTaskStatus(operation);
       } else {
         await browserTaskRepository.reorderTask(operation);
       }
@@ -275,6 +277,7 @@ export function App() {
       {route.name === "matrix" ? (
         <DndContext
           autoScroll={false}
+          collisionDetection={matrixCollisionDetection}
           modifiers={dragModifiers}
           onDragEnd={(event) => void handleDragEnd(event)}
         >
@@ -352,11 +355,7 @@ function MatrixPage({
         </p>
       ) : null}
       <section aria-label="Matrix workspace" className="matrix-workspace">
-        <div className="matrix-workspace__status matrix-workspace__status--skipped">
-          {TERMINAL_AREAS.filter((area) => area.id === "skipped").map((area) => (
-            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
-          ))}
-        </div>
+        <StatusDropArea areaId="skipped" label="Skipped" />
         <section aria-label="Task matrix" className="matrix-grid">
           {MATRIX_AREAS.map((area) => (
             <AreaPanel
@@ -369,11 +368,7 @@ function MatrixPage({
             />
           ))}
         </section>
-        <div className="matrix-workspace__status matrix-workspace__status--done">
-          {TERMINAL_AREAS.filter((area) => area.id === "done").map((area) => (
-            <StatusDropArea key={area.id} areaId={area.id} label={area.label} />
-          ))}
-        </div>
+        <StatusDropArea areaId="done" label="Done" />
       </section>
       {editingTask !== null ? (
         <TaskTitleEditModal
@@ -1007,6 +1002,14 @@ type StatusDropAreaProps = {
 function StatusDropArea({ areaId, label }: StatusDropAreaProps) {
   const { isOver, setNodeRef } = useDroppable({ id: areaDropId(areaId) });
   const className = [
+    "matrix-workspace__status",
+    `matrix-workspace__status--${areaId}`,
+    "status-drop-area-shell",
+    isOver ? "status-drop-area-shell--drop-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const articleClassName = [
     "status-drop-area",
     isOver ? "status-drop-area--drop-target" : ""
   ]
@@ -1014,10 +1017,12 @@ function StatusDropArea({ areaId, label }: StatusDropAreaProps) {
     .join(" ");
 
   return (
-    <article ref={setNodeRef} className={className}>
-      <h2>{label}</h2>
-      <p>0 cards</p>
-    </article>
+    <div ref={setNodeRef} className={className}>
+      <article className={articleClassName}>
+        <h2>{label}</h2>
+        <p>0 cards</p>
+      </article>
+    </div>
   );
 }
 

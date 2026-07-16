@@ -2,6 +2,7 @@ version: "3"
 
 env:
   UV_CACHE_DIR: "{{.TASKFILE_DIR}}/tmp/uv-cache"
+  PLAYWRIGHT_BROWSERS_PATH: "{{.TASKFILE_DIR}}/tmp/playwright-browsers"
 
 tasks:
   default:
@@ -148,8 +149,29 @@ tasks:
   ci:test:
     desc: Run Vitest and the configured pytest suite (ADR 0014 review anchor).
     cmds:
+      - pnpm exec playwright install chromium
       - pnpm test
       - task pytest
+      - |
+        set -eu
+        browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
+        if [ -z "${browser}" ]; then
+          echo "Playwright Chromium executable was not installed into ${PLAYWRIGHT_BROWSERS_PATH}." >&2
+          exit 1
+        fi
+
+        missing="$(ldd "${browser}" | awk '/not found/ { print $1 }')"
+        if [ -n "${missing}" ]; then
+          echo "Skipping Playwright E2E locally because Chromium is missing shared libraries:" >&2
+          printf '%s\n' "${missing}" >&2
+          echo "Install the Playwright Linux deps and rerun 'task ci:test' to execute E2E locally." >&2
+          if [ "${CI:-}" = "true" ]; then
+            exit 1
+          fi
+          exit 0
+        fi
+
+        pnpm test:e2e
 
   ci:build:
     desc: Build the frontend.

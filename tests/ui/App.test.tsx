@@ -11,10 +11,17 @@ import {
   type TaskId
 } from "../../src/contracts/task";
 import { App } from "../../src/ui/App";
-import { areaDropId, taskDropId } from "../../src/ui/dragDrop";
+import {
+  areaDropId,
+  matrixCollisionDetection,
+  taskDropId
+} from "../../src/ui/dragDrop";
 
 const dndKitMock = vi.hoisted(() => ({
+  collisionDetection: undefined as unknown,
   droppableIds: [] as string[],
+  droppableNodes: new Map<string, HTMLElement | null>(),
+  overIds: new Set<string>(),
   onDragEnd: undefined as ((event: unknown) => void) | undefined
 }));
 
@@ -24,11 +31,14 @@ vi.mock("@dnd-kit/core", async () => {
   return {
     DndContext: ({
       children,
+      collisionDetection,
       onDragEnd
     }: {
       children: React.ReactNode;
+      collisionDetection?: unknown;
       onDragEnd: (event: unknown) => void;
     }) => {
+      dndKitMock.collisionDetection = collisionDetection;
       dndKitMock.onDragEnd = onDragEnd;
 
       return React.createElement(React.Fragment, null, children);
@@ -44,8 +54,10 @@ vi.mock("@dnd-kit/core", async () => {
       dndKitMock.droppableIds.push(id);
 
       return {
-        isOver: false,
-        setNodeRef: vi.fn()
+        isOver: dndKitMock.overIds.has(id),
+        setNodeRef: vi.fn((node: HTMLElement | null) => {
+          dndKitMock.droppableNodes.set(id, node);
+        })
       };
     }
   };
@@ -62,7 +74,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  dndKitMock.collisionDetection = undefined;
   dndKitMock.droppableIds = [];
+  dndKitMock.droppableNodes = new Map();
+  dndKitMock.overIds = new Set();
   dndKitMock.onDragEnd = undefined;
   vi.restoreAllMocks();
   cleanup();
@@ -98,6 +113,95 @@ describe("App", () => {
     expect(screen.queryByText("更新日時")).toBeNull();
     expect(dndKitMock.droppableIds).toContain(areaDropId("skipped"));
     expect(dndKitMock.droppableIds).toContain(areaDropId("done"));
+  });
+
+  it("registers terminal droppables in the same area namespace as matrix areas", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Do task", areaId: "do" }),
+      task({ id: "task-2", title: "Schedule task", areaId: "schedule" })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(dndKitMock.droppableIds).toEqual([
+      areaDropId("skipped"),
+      areaDropId("do"),
+      taskDropId("task-1"),
+      areaDropId("schedule"),
+      taskDropId("task-2"),
+      areaDropId("delegate"),
+      areaDropId("eliminate"),
+      areaDropId("done")
+    ]);
+  });
+
+  it("attaches terminal droppable refs to the visible full-height side-column shells", async () => {
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+
+    const skippedNode = dndKitMock.droppableNodes.get(areaDropId("skipped"));
+    const doneNode = dndKitMock.droppableNodes.get(areaDropId("done"));
+    const skippedHeading = screen.getByRole("heading", { name: "Skipped" });
+    const doneHeading = screen.getByRole("heading", { name: "Done" });
+
+    expect(skippedNode?.className).toContain("matrix-workspace__status");
+    expect(skippedNode?.className).toContain("matrix-workspace__status--skipped");
+    expect(skippedNode?.className).toContain("status-drop-area-shell");
+    expect(skippedNode?.childElementCount).toBe(1);
+    expect(skippedNode?.firstElementChild?.className).toContain("status-drop-area");
+    expect(skippedHeading.closest(".status-drop-area-shell")).toBe(skippedNode);
+    expect(doneNode?.className).toContain("matrix-workspace__status");
+    expect(doneNode?.className).toContain("matrix-workspace__status--done");
+    expect(doneNode?.className).toContain("status-drop-area-shell");
+    expect(doneNode?.childElementCount).toBe(1);
+    expect(doneNode?.firstElementChild?.className).toContain("status-drop-area");
+    expect(doneHeading.closest(".status-drop-area-shell")).toBe(doneNode);
+  });
+
+  it("keeps the skipped-board-done DOM order used by the mobile vertical stack", async () => {
+    render(<App />);
+
+    const workspace = await screen.findByLabelText("Matrix workspace");
+    const childClassNames = Array.from(workspace?.children ?? []).map((child) => child.className);
+
+    expect(workspace).toBeTruthy();
+    expect(childClassNames).toHaveLength(3);
+    expect(childClassNames[0]).toContain("matrix-workspace__status--skipped");
+    expect(childClassNames[1]).toBe("matrix-grid");
+    expect(childClassNames[2]).toContain("matrix-workspace__status--done");
+  });
+
+  it.each(["done", "skipped"] as const)(
+    "highlights only the %s terminal shell when its drop target is active",
+    async (terminalAreaId) => {
+      dndKitMock.overIds = new Set([areaDropId(terminalAreaId)]);
+
+      render(<App />);
+
+      expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+
+      const activeShell = dndKitMock.droppableNodes.get(areaDropId(terminalAreaId));
+      const inactiveAreaId = terminalAreaId === "done" ? "skipped" : "done";
+      const inactiveShell = dndKitMock.droppableNodes.get(areaDropId(inactiveAreaId));
+
+      expect(activeShell?.className).toContain("status-drop-area-shell--drop-target");
+      expect(activeShell?.firstElementChild?.className).toContain(
+        "status-drop-area--drop-target"
+      );
+      expect(inactiveShell?.className).not.toContain("status-drop-area-shell--drop-target");
+      expect(inactiveShell?.firstElementChild?.className).not.toContain(
+        "status-drop-area--drop-target"
+      );
+    }
+  );
+
+  it("uses the custom matrix collision ranking on the matrix page", async () => {
+    render(<App />);
+
+    expect(await screen.findByLabelText("Task matrix")).toBeTruthy();
+    expect(dndKitMock.collisionDetection).toBe(matrixCollisionDetection);
   });
 
   it("routes to the task list page from #/tasks and shows mutual header links", async () => {
@@ -502,7 +606,7 @@ describe("App", () => {
   });
 
   it.each(["done", "skipped"] as const)(
-    "hides active tasks from the matrix after dropping them on the %s area",
+    "transitions tasks to %s after a matrix drop and removes them from the matrix view",
     async (terminalAreaId) => {
       seedStoredTasks(
         task({ id: "task-1", title: `${terminalAreaId} task`, areaId: "do" })
@@ -510,18 +614,77 @@ describe("App", () => {
       render(<App />);
 
       expect(await screen.findByText(`${terminalAreaId} task`)).toBeTruthy();
+      expect(taskTitlesIn("Do tasks")).toEqual([`${terminalAreaId} task`]);
 
       dragTaskOverArea("task-1", terminalAreaId);
 
       await waitFor(() =>
         expect(screen.queryByText(`${terminalAreaId} task`)).toBeNull()
       );
+      expect(taskTitlesIn("Do tasks")).toEqual([]);
       expect(storedTasks()[0]).toMatchObject({
         areaId: "do",
         status: terminalAreaId
       });
+
+      fireEvent.click(screen.getByRole("link", { name: "タスク一覧" }));
+
+      expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: terminalAreaId })).toBeTruthy();
+      expect(taskListTitles()).toEqual([`${terminalAreaId} task`]);
     }
   );
+
+  it("keeps matrix move behavior unchanged after hiding a task in its original area", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Hidden later", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Move me", areaId: "do", order: 1 }),
+      task({ id: "task-3", title: "Scheduled task", areaId: "schedule", order: 0 })
+    );
+    render(<App />);
+
+    expect(await screen.findByText("Hidden later")).toBeTruthy();
+
+    dragTaskOverArea("task-1", "done");
+    await waitFor(() => expect(screen.queryByText("Hidden later")).toBeNull());
+
+    dragTaskOverTask("task-2", "task-3");
+    await waitFor(() =>
+      expect(taskTitlesIn("Schedule tasks")).toEqual(["Move me", "Scheduled task"])
+    );
+
+    expect(storedTasks()).toMatchObject([
+      { id: "task-1", areaId: "do", order: 1, status: "done" },
+      { id: "task-2", areaId: "schedule", order: 0, status: "active" },
+      { id: "task-3", areaId: "schedule", order: 1, status: "active" }
+    ]);
+    expect(taskTitlesIn("Do tasks")).toEqual([]);
+  });
+
+  it("keeps matrix reorder behavior unchanged after hiding a sibling task", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Hide me", areaId: "do", order: 0 }),
+      task({ id: "task-2", title: "Second task", areaId: "do", order: 1 }),
+      task({ id: "task-3", title: "Third task", areaId: "do", order: 2 })
+    );
+    render(<App />);
+
+    expect(await screen.findByText("Hide me")).toBeTruthy();
+
+    dragTaskOverArea("task-1", "skipped");
+    await waitFor(() => expect(screen.queryByText("Hide me")).toBeNull());
+
+    dragTaskOverTask("task-3", "task-2");
+    await waitFor(() =>
+      expect(taskTitlesIn("Do tasks")).toEqual(["Third task", "Second task"])
+    );
+
+    expect(storedTasks()).toMatchObject([
+      { id: "task-1", areaId: "do", order: 2, status: "skipped" },
+      { id: "task-2", areaId: "do", order: 1, status: "active" },
+      { id: "task-3", areaId: "do", order: 0, status: "active" }
+    ]);
+  });
 
   it("restores task title, area, status, and order after browser reload", async () => {
     seedStoredTasks(

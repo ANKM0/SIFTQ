@@ -1,6 +1,17 @@
-import { type Modifier } from "@dnd-kit/core";
+import {
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
+  type Modifier
+} from "@dnd-kit/core";
 
-import { type AreaId, type MatrixAreaId, type Task, type TaskId } from "../contracts/task";
+import {
+  type AreaId,
+  type MatrixAreaId,
+  type Task,
+  type TaskId,
+  type TaskStatus
+} from "../contracts/task";
 import { isAreaId as isKnownAreaId, isMatrixArea } from "../domain/taskRules";
 
 export type TaskDropOperation =
@@ -9,6 +20,11 @@ export type TaskDropOperation =
       readonly taskId: TaskId;
       readonly toAreaId: AreaId;
       readonly insertAt: number;
+    }
+  | {
+      readonly type: "update-status";
+      readonly taskId: TaskId;
+      readonly status: Exclude<TaskStatus, "active">;
     }
   | {
       readonly type: "reorder";
@@ -25,6 +41,18 @@ export function areaDropId(areaId: AreaId): string {
 export function taskDropId(taskId: TaskId): string {
   return `task:${taskId}`;
 }
+
+export const matrixCollisionDetection: CollisionDetection = (args) => {
+  const terminalPointerCollisions = pointerWithin(args).filter(({ id }) =>
+    isTerminalAreaDropId(String(id))
+  );
+
+  if (terminalPointerCollisions.length > 0) {
+    return terminalPointerCollisions;
+  }
+
+  return rectIntersection(args);
+};
 
 export const restrictDragToWindowEdges: Modifier = ({
   draggingNodeRect,
@@ -70,6 +98,14 @@ export function resolveTaskDropOperation(
   const targetAreaId = areaIdFromDropId(overDropId);
 
   if (targetAreaId !== null) {
+    if (targetAreaId === "done" || targetAreaId === "skipped") {
+      return {
+        type: "update-status",
+        taskId,
+        status: targetAreaId
+      };
+    }
+
     const insertAt = tasksInArea(tasks, targetAreaId).length;
 
     return operationForTarget(taskId, activeTask.areaId, targetAreaId, insertAt);
@@ -166,6 +202,12 @@ function areaIdFromDropId(dropId: string): AreaId | null {
 
 function isAreaId(areaId: string): areaId is AreaId {
   return isKnownAreaId(areaId);
+}
+
+function isTerminalAreaDropId(dropId: string): boolean {
+  const areaId = areaIdFromDropId(dropId);
+
+  return areaId === "done" || areaId === "skipped";
 }
 
 function clamp(value: number, min: number, max: number): number {

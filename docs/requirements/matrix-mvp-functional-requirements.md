@@ -44,6 +44,9 @@ codd:
     - id: design:task-list-v3-wireframe
       relation: depends_on
       semantic: ui
+    - id: design:matrix-terminal-drop-hitbox-fix
+      relation: depends_on
+      semantic: product
 ---
 
 # Matrix MVP Functional Requirements
@@ -80,6 +83,9 @@ DoneまたはSkippedへのステータス更新を行える必要がある。
 - ユーザーはタスクカードを別のmatrix areaへドラッグして移動できる。
 - 並び替え後、またはmatrix area間移動後の順番はbrowser storageに保持する。
 - DoneまたはSkippedへのドロップはステータス更新として扱う。
+- Desktopでは Done / Skipped terminal side column の上側、中央、下側のどこにカードを重ねても同じ terminal drop target として扱う。
+- terminal area 上に pointer がある場合は、task card / matrix area droppable より terminal droppable を優先する。
+- terminal droppable が優先されている間は、対応する terminal 側だけを highlight する。
 - DoneまたはSkippedへ移動したタスクは通常表示からは見えなくする。
 - Browser reload後も、task title、area、status、orderを復元できる。
 - `task frontend:dev` でローカルブラウザからMVPを確認できる。
@@ -111,6 +117,8 @@ DoneまたはSkippedへのステータス更新を行える必要がある。
 - タスクカードをmatrix area内で並び替えできる。
 - タスクカードを別のmatrix areaへ移動できる。
 - Done / Skippedへドロップするとカードが通常表示から見えなくなる。
+- Desktop で Skipped / Done terminal side column の上側、中央、下側のいずれに card を重ねても drop target highlight が表示される。
+- Desktop で Skipped / Done terminal side column の上側、中央、下側のいずれに card を drop しても task が `skipped` / `done` になる。
 - Browser reload後も task title、area、status、order が復元される。
 - 長いtitleでもレイアウトが崩れない。
 

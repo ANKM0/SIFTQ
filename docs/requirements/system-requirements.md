@@ -107,6 +107,9 @@ codd:
     - id: req:matrix-mvp-non-functional
       relation: depends_on
       semantic: product
+    - id: design:matrix-terminal-drop-hitbox-fix
+      relation: depends_on
+      semantic: governance
 ---
 
 # SIFTQ System Requirements
