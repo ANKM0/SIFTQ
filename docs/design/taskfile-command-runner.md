@@ -58,6 +58,8 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 | `task setup:frontend` | `pnpm install` |
 | `task setup:frontend:ci` | `pnpm install --frozen-lockfile` |
 | `task ci` | local CI gate |
+| `task setup:sympohy` | `uv run python -m scripts.sympohy setup` |
+| `task ci:sympohy` | `task setup:sympohy` and `task ai:sympohy:doctor` |
 | `task ci:commit-messages` | `uv run python scripts/ci/check_commit_messages.py` |
 | `task ci:markdown` | `uv run python scripts/ci/check_markdown.py` |
 | `task ci:typecheck` | `pnpm typecheck` |
@@ -70,6 +72,23 @@ Taskfileを導入し、ローカル開発、CI、CoDD検証の入口を`task`に
 | `task codd:validate` | `uv run codd validate` |
 | `task codd:dag` | `uv run codd dag verify` |
 | `task codd:elicit` | `uv run codd elicit` |
+| `task ai:sympohy` | `uv run python -m scripts.sympohy run` |
+| `task ai:sympohy:refine` | `uv run python -m scripts.sympohy refine` |
+| `task ai:sympohy:resume` | `uv run python -m scripts.sympohy resume` |
+| `task ai:sympohy:observe:replay` | `uv run python -m scripts.sympohy observe-replay` |
+| `task ai:sympohy:observe:query` | `uv run python -m scripts.sympohy observe-query` |
+| `task ai:sympohy:observe:analyze` | `uv run python -m scripts.sympohy observe-analyze` |
+| `task ai:sympohy:observe:propose` | `uv run python -m scripts.sympohy observe-propose` |
+| `task ai:sympohy:observe:apply` | `uv run python -m scripts.sympohy observe-apply` |
+| `task ai:sympohy:stage-gate` | `uv run python -m scripts.sympohy stage-gate` |
+| `task ai:sympohy:doctor` | `uv run python -m scripts.sympohy doctor` |
+| `task ai:sympohy:labels:sync` | `uv run python -m scripts.sympohy labels-sync` |
+| `task ai:sympohy:migrate` | `uv run python -m scripts.sympohy migrate` |
+| `task ai:sympohy:watch` | `uv run python -m scripts.sympohy watch` |
+| `task ai:sympohy:systemd:install` | `uv run python -m scripts.sympohy systemd-install` |
+| `task ai:sympohy:systemd:start` | `uv run python -m scripts.sympohy systemd-start` |
+| `task ai:sympohy:systemd:stop` | `uv run python -m scripts.sympohy systemd-stop` |
+| `task ai:sympohy:systemd:status` | `uv run python -m scripts.sympohy systemd-status` |
 
 ## 受け入れ条件
 
