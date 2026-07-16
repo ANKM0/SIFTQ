@@ -79,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     observe_query_parser.add_argument("--text")
     observe_query_parser.add_argument("--limit", type=int, default=100)
 
+    observe_analyze_parser = subcommands.add_parser("observe-analyze")
+    observe_analyze_parser.add_argument("--db", required=True)
+    observe_analyze_parser.add_argument("--issue", type=int)
+    observe_analyze_parser.add_argument("--run-id")
+
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
     contract_parser.add_argument("payload")
@@ -145,6 +150,19 @@ def main(argv: list[str] | None = None) -> int:
                         status=args.status,
                         text=args.text,
                         limit=args.limit,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-analyze":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.analyze_failures(
+                        issue=args.issue,
+                        run_id=args.run_id,
                     ),
                     ensure_ascii=False,
                     indent=2,

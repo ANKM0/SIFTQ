@@ -196,6 +196,170 @@ class SympohyObservabilityTest(unittest.TestCase):
             ],
         )
 
+    def test_analyzer_classifies_resolved_and_blocked_failure_chains(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="implement",
+                    event_type="command",
+                    status="failure",
+                    summary="task ci failed",
+                    metadata={"command": "task ci", "failure_summary": "flake"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000002",
+                    phase="implement",
+                    event_type="command",
+                    status="success",
+                    summary="task ci passed",
+                    metadata={"command": "task ci"},
+                    timestamp="2026-07-16T10:00:08Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:01:00Z",
+                ),
+                self._event(
+                    run_id="run-3",
+                    event_id="run-3-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked again",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:02:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                analysis = store.analyze_failures(issue=126)
+
+        self.assertEqual(
+            analysis["failure_kind_counts"],
+            [
+                {"kind": "policy", "count": 2},
+                {"kind": "command", "count": 1},
+            ],
+        )
+        self.assertEqual(len(analysis["resolved_failures"]), 1)
+        self.assertEqual(
+            analysis["resolved_failures"][0]["failure_signatures"],
+            ["command:task ci"],
+        )
+        self.assertEqual(len(analysis["blocked_failures"]), 2)
+        self.assertTrue(
+            all(
+                item["failure_signatures"] == ["policy:stage_gate:review"]
+                for item in analysis["blocked_failures"]
+            )
+        )
+        self.assertEqual(
+            analysis["recurring_event_chain_patterns"][0],
+            {
+                "pattern": "policy:stage_gate:review",
+                "count": 2,
+                "run_ids": ["run-2", "run-3"],
+            },
+        )
+
+    def test_analyzer_reports_phase_dwell_from_event_spans(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            self._event(
+                                run_id="run-1",
+                                event_id="run-1-000001",
+                                phase="implement",
+                                event_type="codex",
+                                status="success",
+                                summary="planning",
+                                metadata={"role": "implementation"},
+                                timestamp="2026-07-16T10:00:00Z",
+                            ),
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
+                        json.dumps(
+                            self._event(
+                                run_id="run-1",
+                                event_id="run-1-000002",
+                                phase="implement",
+                                event_type="command",
+                                status="success",
+                                summary="task ci passed",
+                                metadata={"command": "task ci"},
+                                timestamp="2026-07-16T10:00:06Z",
+                            ),
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
+                        json.dumps(
+                            self._event(
+                                run_id="run-2",
+                                event_id="run-2-000001",
+                                phase="review",
+                                event_type="review",
+                                status="pass",
+                                summary="review passed",
+                                metadata={"reviewer_role": "adversarial-review"},
+                                timestamp="2026-07-16T10:01:00Z",
+                            ),
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                analysis = store.analyze_failures(issue=126)
+
+        self.assertEqual(
+            analysis["phase_dwell"],
+            [
+                {
+                    "phase": "implement",
+                    "run_count": 1,
+                    "event_count": 2,
+                    "total_duration_seconds": 6.0,
+                    "max_duration_seconds": 6.0,
+                },
+                {
+                    "phase": "review",
+                    "run_count": 1,
+                    "event_count": 1,
+                    "total_duration_seconds": 0.0,
+                    "max_duration_seconds": 0.0,
+                },
+            ],
+        )
+
     def test_rebuild_rejects_invalid_event_shape(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-126"
@@ -251,10 +415,35 @@ class SympohyObservabilityTest(unittest.TestCase):
             sort_keys=True,
         )
 
+    def _event(
+        self,
+        *,
+        run_id: str,
+        event_id: str,
+        phase: str,
+        event_type: str,
+        status: str,
+        summary: str,
+        metadata: dict[str, object],
+        timestamp: str,
+    ) -> dict[str, object]:
+        return {
+            "run_id": run_id,
+            "event_id": event_id,
+            "issue": 126,
+            "phase": phase,
+            "event_type": event_type,
+            "status": status,
+            "attempt": 1,
+            "duration": 1.0,
+            "summary": summary,
+            "metadata": metadata,
+            "timestamp": timestamp,
+        }
+
     def _sqlite_dump(self, path: Path) -> str:
         connection = sqlite3.connect(path)
         try:
             return "\n".join(connection.iterdump())
         finally:
             connection.close()
-
