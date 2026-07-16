@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -449,6 +450,7 @@ def _run_stage_gate(
         "--input",
         str(input_path.resolve()),
     ]
+    started_at = time.monotonic()
     completed = subprocess.run(
         command,
         cwd=cwd,
@@ -474,6 +476,21 @@ def _run_stage_gate(
     if completed.returncode != 0 and result.get("status") == "pass":
         result["status"] = "block"
         result["reason"] = "stage gate command failed after reporting pass"
+    if state is not None:
+        stage_gate_status = str(result.get("status", "block"))
+        reason = str(result.get("reason", "")).strip()
+        state.record_event(
+            event_type="stage_gate",
+            status=stage_gate_status,
+            summary=f"{stage} stage gate {stage_gate_status}",
+            duration=_elapsed_seconds(started_at),
+            metadata={
+                "stage": stage,
+                "command": config.stage_gate_command,
+                "returncode": completed.returncode,
+                "failure_summary": reason or _failure_summary(completed.stderr),
+            },
+        )
     output_path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -562,6 +579,7 @@ def _prepare_document_artifacts(
             worktree=worktree,
             log_path=decisions_path,
             heartbeat=state.heartbeat,
+            state=state,
         )
 
     for stage in ("requirements", "design", "wireframes", "adr"):
@@ -630,6 +648,7 @@ def _prepare_document_artifacts(
                 worktree=worktree,
                 log_path=fix_log_path,
                 heartbeat=state.heartbeat,
+                state=state,
                 repair_stage=stage,
                 repair_reason=str(result.get("reason", "")),
                 previous_decisions=decisions,
@@ -657,6 +676,7 @@ def _request_artifact_decisions(
     worktree: Path,
     log_path: Path,
     heartbeat: Callable[[], None] | None,
+    state: _RunStateWriter | None = None,
     repair_stage: str | None = None,
     repair_reason: str | None = None,
     previous_decisions: Mapping[str, object] | None = None,
@@ -697,6 +717,7 @@ def _request_artifact_decisions(
         heartbeat=heartbeat,
         config=config,
         role="planning",
+        state=state,
     )
     return _artifact_decisions(payload)
 
@@ -1555,6 +1576,7 @@ def _run_issue_locked(
             heartbeat=state.heartbeat,
             config=config,
             role="planning",
+            state=state,
         )
     logical_steps = _logical_steps(plan)
     total_steps = len(logical_steps)
@@ -1783,6 +1805,7 @@ def _run_issue_locked(
                     heartbeat=state.heartbeat,
                     config=config,
                     role="implementation",
+                    state=state,
                 )
             state.write(
                 phase="hooks",
@@ -2245,6 +2268,7 @@ def _run_review_fix_round(
         heartbeat=state.heartbeat,
         config=config,
         role="fix",
+        state=state,
     )
     if not _worktree_has_changes(cwd):
         state.write(
@@ -2518,6 +2542,7 @@ def _run_final_verifier_and_merge(
             heartbeat=state.heartbeat,
             config=config,
             role="merge_readiness",
+            state=state,
         )
         final = _final_verifier_with_stage_status(final)
         _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
@@ -2837,6 +2862,7 @@ def _run_final_verifier_fix_round(
         heartbeat=state.heartbeat,
         config=config,
         role="fix",
+        state=state,
     )
 
     if not _worktree_has_changes(cwd):
@@ -2969,6 +2995,7 @@ def _run_hooks(
                 if total_logical_steps is not None:
                     progress["total_logical_steps"] = total_logical_steps
                 state.write(phase="hooks", progress=progress)
+            started_at = time.monotonic()
             with log_path.open("w", encoding="utf-8") as log:
                 returncode = _run_command_with_heartbeat(
                     shlex.split(command),
@@ -2977,6 +3004,23 @@ def _run_hooks(
                     stderr=subprocess.STDOUT,
                     text=True,
                     heartbeat=state.heartbeat if state is not None else None,
+                )
+            if state is not None:
+                failure_summary = ""
+                if returncode != 0:
+                    failure_summary = _failure_summary(log_path.read_text(encoding="utf-8"))
+                state.record_event(
+                    event_type="hook",
+                    status="success" if returncode == 0 else "retry",
+                    summary=f"hook {'passed' if returncode == 0 else 'failed'}: {command}",
+                    attempt=attempts,
+                    duration=_elapsed_seconds(started_at),
+                    metadata={
+                        "command": command,
+                        "hook_index": hook_index,
+                        "returncode": returncode,
+                        "failure_summary": failure_summary,
+                    },
                 )
             if returncode == 0:
                 break
@@ -2992,6 +3036,7 @@ def _run_hooks(
                 heartbeat=state.heartbeat if state is not None else None,
                 config=config if state is not None else None,
                 role="fix",
+                state=state,
             )
     return 0
 
@@ -3059,10 +3104,25 @@ def _review_fix_loop(
             heartbeat=state.heartbeat,
             config=config,
             role="review",
+            state=state,
         )
         review = parse_review_json(review_json)
         review_json = _review_json_with_stage_status(review)
         review_log_path.write_text(review_json, encoding="utf-8")
+        state.record_event(
+            event_type="review",
+            status=review.stage_gate_status,
+            summary=f"review round {round_index} {review.stage_gate_status}",
+            attempt=round_index,
+            metadata={
+                "reviewer_role": "adversarial-review",
+                "review_round": round_index,
+                "blocking_findings_summary": _summarize_review_findings(
+                    review.blocking_findings
+                ),
+                "finding_count": len(review.findings),
+            },
+        )
         review_result = _run_review_fix_round(
             issue_ref,
             issue,
@@ -3208,6 +3268,7 @@ def _attempt_pre_review_mergeability_autofix(
             heartbeat=state.heartbeat,
             config=config,
             role="fix",
+            state=state,
         )
 
     if _worktree_has_conflict_markers(cwd):
@@ -3414,18 +3475,86 @@ def _codex_json(
     heartbeat: Callable[[], None] | None = None,
     config: SympohyConfig | None = None,
     role: str = "default",
+    state: _RunStateWriter | None = None,
 ) -> Mapping[str, object]:
-    output = _codex_text(
-        prompts,
-        cwd=cwd,
-        log_path=log_path,
-        heartbeat=heartbeat,
-        config=config,
+    prompt = "\n\n".join(prompts)
+    model_config = config.codex_model_for(role) if config is not None else None
+    _record_prompt_instruction_sources(state=state, cwd=cwd, prompt=prompt)
+    started_at = time.monotonic()
+    try:
+        output = _check_output_with_heartbeat(
+            _codex_exec_args(prompt, config=config, role=role),
+            cwd=cwd,
+            heartbeat=heartbeat,
+            log_path=log_path,
+        )
+    except subprocess.CalledProcessError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status="not_attempted",
+            duration=_elapsed_seconds(started_at),
+            returncode=exc.returncode,
+            failure_summary=_failure_summary(exc.output),
+        )
+        raise
+
+    parse_status = "parsed"
+    try:
+        payload = json.loads(output)
+        if not isinstance(payload, Mapping):
+            parse_status = "non_object"
+            raise ValueError("Codex JSON output must be an object")
+    except json.JSONDecodeError as exc:
+        parse_status = "invalid_json"
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status=parse_status,
+            duration=_elapsed_seconds(started_at),
+            returncode=0,
+            failure_summary=_failure_summary(str(exc)),
+        )
+        raise
+    except ValueError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status=parse_status,
+            duration=_elapsed_seconds(started_at),
+            returncode=0,
+            failure_summary=_failure_summary(str(exc)),
+        )
+        raise
+
+    _record_codex_event(
+        state=state,
         role=role,
+        model=model_config.model if model_config is not None else None,
+        reasoning_effort=(
+            model_config.reasoning_effort if model_config is not None else None
+        ),
+        prompt=prompt,
+        parse_status=parse_status,
+        duration=_elapsed_seconds(started_at),
+        returncode=0,
+        failure_summary="",
     )
-    payload = json.loads(output)
-    if not isinstance(payload, Mapping):
-        raise ValueError("Codex JSON output must be an object")
     return payload
 
 
@@ -3437,13 +3566,46 @@ def _codex_text(
     heartbeat: Callable[[], None] | None = None,
     config: SympohyConfig | None = None,
     role: str = "default",
+    state: _RunStateWriter | None = None,
 ) -> str:
     prompt = "\n\n".join(prompts)
-    output = _check_output_with_heartbeat(
-        _codex_exec_args(prompt, config=config, role=role),
-        cwd=cwd,
-        heartbeat=heartbeat,
-        log_path=log_path,
+    model_config = config.codex_model_for(role) if config is not None else None
+    _record_prompt_instruction_sources(state=state, cwd=cwd, prompt=prompt)
+    started_at = time.monotonic()
+    try:
+        output = _check_output_with_heartbeat(
+            _codex_exec_args(prompt, config=config, role=role),
+            cwd=cwd,
+            heartbeat=heartbeat,
+            log_path=log_path,
+        )
+    except subprocess.CalledProcessError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status="not_requested",
+            duration=_elapsed_seconds(started_at),
+            returncode=exc.returncode,
+            failure_summary=_failure_summary(exc.output),
+        )
+        raise
+    _record_codex_event(
+        state=state,
+        role=role,
+        model=model_config.model if model_config is not None else None,
+        reasoning_effort=(
+            model_config.reasoning_effort if model_config is not None else None
+        ),
+        prompt=prompt,
+        parse_status="not_requested",
+        duration=_elapsed_seconds(started_at),
+        returncode=0,
+        failure_summary="",
     )
     return output
 
@@ -3989,6 +4151,125 @@ def _worktree_status(cwd: Path) -> str:
         text=True,
     )
     return output
+
+
+def _elapsed_seconds(started_at: float) -> float:
+    return round(time.monotonic() - started_at, 6)
+
+
+def _failure_summary(output: str | bytes | None, *, max_length: int = 240) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        text = output.decode("utf-8", errors="replace")
+    else:
+        text = output
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    summary = lines[0]
+    if len(summary) > max_length:
+        return summary[: max_length - 3] + "..."
+    return summary
+
+
+def _prompt_hash(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def _record_codex_event(
+    *,
+    state: _RunStateWriter | None,
+    role: str,
+    model: str | None,
+    reasoning_effort: str | None,
+    prompt: str,
+    parse_status: str,
+    duration: float,
+    returncode: int,
+    failure_summary: str,
+) -> None:
+    if state is None:
+        return
+    metadata = {
+        "role": role,
+        "model": model,
+        "reasoning_effort": reasoning_effort,
+        "prompt_hash": _prompt_hash(prompt),
+        "parse_status": parse_status,
+        "returncode": returncode,
+        "failure_summary": failure_summary,
+    }
+    state.record_event(
+        event_type="codex",
+        status="success" if returncode == 0 and not failure_summary else "failed",
+        summary=f"codex {role} {'completed' if returncode == 0 else 'failed'}",
+        duration=duration,
+        metadata=metadata,
+    )
+
+
+_INSTRUCTION_PATH_RE = re.compile(
+    r"(?P<path>(?:\.agents|docs)/[A-Za-z0-9_./-]+(?:\.md|/SKILL\.md))"
+)
+
+
+def _record_prompt_instruction_sources(
+    *,
+    state: _RunStateWriter | None,
+    cwd: Path,
+    prompt: str,
+) -> None:
+    if state is None:
+        return
+    seen: set[str] = set()
+    for match in _INSTRUCTION_PATH_RE.finditer(prompt):
+        path_text = match.group("path")
+        if path_text in seen:
+            continue
+        seen.add(path_text)
+        source_kind = "skill" if "/SKILL.md" in path_text else "doc"
+        summary = (
+            "codex prompt references repository skill instructions"
+            if source_kind == "skill"
+            else "codex prompt references repository contributing or design docs"
+        )
+        _record_developer_instruction_source(
+            state=state,
+            cwd=cwd,
+            source_kind=source_kind,
+            ref=path_text,
+            summary=summary,
+        )
+
+
+def _record_developer_instruction_source(
+    *,
+    state: _RunStateWriter,
+    cwd: Path,
+    source_kind: str,
+    ref: str,
+    summary: str,
+) -> None:
+    content_sha = _source_sha256(cwd / ref)
+    state.record_event(
+        event_type="developer_instruction",
+        status="observed",
+        summary=f"developer instruction source observed: {ref}",
+        metadata={
+            "source_kind": source_kind,
+            "ref": ref,
+            "sha256": content_sha,
+            "summary": summary,
+        },
+    )
+
+
+def _source_sha256(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return hashlib.sha256(str(path).encode("utf-8")).hexdigest()
 
 
 def _merge_has_unmerged_paths(cwd: Path) -> bool:

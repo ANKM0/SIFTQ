@@ -30,6 +30,7 @@ from scripts.sympohy.runner import (
     _attempt_pre_review_mergeability_autofix,
     _check_output_with_heartbeat,
     _commit_all_if_new,
+    _codex_json,
     _codex_exec_args,
     _ensure_draft_pull_request,
     _infer_implementation_recovery,
@@ -83,6 +84,244 @@ class SympohyRunnerTest(unittest.TestCase):
                 'model_reasoning_effort="xhigh"',
                 "review prompt",
             ],
+        )
+
+    def test_codex_json_records_codex_and_developer_instruction_events(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            docs_path = cwd / "docs" / "contributing"
+            skill_path = cwd / ".agents" / "skills" / "feature-docs-planning"
+            docs_path.mkdir(parents=True)
+            skill_path.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (docs_path / "development-flow.md").write_text("flow", encoding="utf-8")
+            (skill_path / "SKILL.md").write_text("skill", encoding="utf-8")
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "planning"})
+
+            with patch(
+                "scripts.sympohy.runner._check_output_with_heartbeat",
+                return_value='{"artifact_decisions": {"requirements": {"mode": "not_needed", "reason": "n/a"}}}',
+            ):
+                payload = _codex_json(
+                    [
+                        "Use .agents/skills/feature-docs-planning/SKILL.md.",
+                        "Read docs/contributing/development-flow.md.",
+                    ],
+                    cwd=cwd,
+                    log_path=log_dir / "artifact-decisions.json",
+                    heartbeat=state.heartbeat,
+                    config=self._config(root),
+                    role="planning",
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertIn("artifact_decisions", payload)
+        self.assertEqual(
+            [event["event_type"] for event in events],
+            ["developer_instruction", "developer_instruction", "codex"],
+        )
+        self.assertEqual(events[0]["metadata"]["source_kind"], "skill")
+        self.assertEqual(
+            events[0]["metadata"]["ref"],
+            ".agents/skills/feature-docs-planning/SKILL.md",
+        )
+        self.assertEqual(events[1]["metadata"]["source_kind"], "doc")
+        self.assertEqual(
+            events[1]["metadata"]["ref"],
+            "docs/contributing/development-flow.md",
+        )
+        self.assertEqual(events[2]["metadata"]["role"], "planning")
+        self.assertEqual(events[2]["metadata"]["model"], "gpt-5.5")
+        self.assertEqual(events[2]["metadata"]["reasoning_effort"], "high")
+        self.assertEqual(events[2]["metadata"]["parse_status"], "parsed")
+        self.assertEqual(events[2]["metadata"]["returncode"], 0)
+        self.assertTrue(events[2]["metadata"]["prompt_hash"])
+
+    def test_run_stage_gate_records_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=10,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=5,
+                retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
+                stage_gate_command="task ai:sympohy:stage-gate",
+            )
+            worktree = root / "worktree"
+            log_dir = root / "runs" / "issue-101"
+            worktree.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=101,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "gate"})
+            issue = Issue(
+                number=101,
+                title="Normalize stage gate workspace",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with patch(
+                "scripts.sympohy.runner.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    args=["task"],
+                    returncode=0,
+                    stdout='{"status":"pass","stage":"requirements","issue":101}',
+                    stderr="",
+                ),
+            ):
+                _run_stage_gate(
+                    "requirements",
+                    config=config,
+                    issue=issue,
+                    log_dir=log_dir,
+                    context={"artifact_decisions": {}, "workspace": str(worktree)},
+                    cwd=worktree,
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "stage_gate")
+        self.assertEqual(events[0]["status"], "pass")
+        self.assertEqual(events[0]["metadata"]["stage"], "requirements")
+        self.assertEqual(events[0]["metadata"]["returncode"], 0)
+
+    def test_run_hooks_records_failure_summary_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "hooks"})
+
+            def fail_hook(
+                _args: list[str],
+                *,
+                stdout: object,
+                **_kwargs: object,
+            ) -> int:
+                assert hasattr(stdout, "write")
+                stdout.write("FAILED tests/test_example.py::test_case\nmore detail\n")
+                return 1
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                side_effect=fail_hook,
+            ):
+                result = _run_hooks(
+                    ("task ci",),
+                    1,
+                    cwd,
+                    log_dir,
+                    config=self._config(root),
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 1)
+        self.assertEqual(events[0]["event_type"], "hook")
+        self.assertEqual(events[0]["status"], "retry")
+        self.assertEqual(events[0]["metadata"]["returncode"], 1)
+        self.assertEqual(
+            events[0]["metadata"]["failure_summary"],
+            "FAILED tests/test_example.py::test_case",
+        )
+
+    def test_review_fix_loop_records_review_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            issue = Issue(
+                number=82,
+                title="Review me",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._ensure_review_mergeability",
+                    return_value="91",
+                ),
+                patch(
+                    "scripts.sympohy.runner._codex_text",
+                    return_value='{"status":"retry","findings":[{"severity":"high","summary":"fix me","status":"open"}]}',
+                ),
+                patch(
+                    "scripts.sympohy.runner._run_review_fix_round",
+                    return_value=0,
+                ),
+                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
+                patch("scripts.sympohy.runner.set_issue_state"),
+            ):
+                result = _review_fix_loop(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    start_round=1,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 0)
+        review_event = events[0]
+        self.assertEqual(review_event["event_type"], "review")
+        self.assertEqual(review_event["status"], "retry")
+        self.assertEqual(review_event["attempt"], 1)
+        self.assertEqual(review_event["metadata"]["reviewer_role"], "adversarial-review")
+        self.assertEqual(
+            review_event["metadata"]["blocking_findings_summary"],
+            "high: fix me",
         )
 
     def test_run_stage_gate_writes_absolute_workspace_to_input(self) -> None:
