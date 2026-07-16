@@ -17,6 +17,9 @@ codd:
     - id: design:sympohy-terminal-resume-review-hardening
       relation: depends_on
       semantic: recovery
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: recovery
 ---
 
 # sympohy 停滞実行復旧設計

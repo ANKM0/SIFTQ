@@ -29,6 +29,9 @@ codd:
     - id: design:sympohy-terminal-resume-review-hardening
       relation: depends_on
       semantic: automation
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: automation
     - id: design:codex-configuration-memo
       relation: depends_on
       semantic: automation

@@ -40,3 +40,4 @@ The ADR index contract is covered by `tests/docs/adrIndex.test.ts`.
 | [0016](./0016-sqlite-tauri-rust-backend-boundary.md) | SQLite, Tauri, and Rust Backend Boundary | Superseded by ADR 0018 |
 | [0017](./0017-real-sqlite-test-strategy.md) | Real SQLite Test Strategy | Superseded by ADR 0018 |
 | [0018](./0018-browser-only-matrix-runtime-storage.md) | Browser-Only Matrix Runtime and Storage | Accepted |
+| [0019](./0019-sympohy-llm-loop-observability-self-improvement.md) | sympohy LLM Loop Observability and Self-Improvement Workflow | Proposed |

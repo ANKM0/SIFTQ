@@ -44,7 +44,16 @@ codd:
     - id: design:sympohy-ticket-driven-ai-runner-adr
       relation: depends_on
       semantic: governance
+    - id: req:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: governance
     - id: req:sympohy-terminal-resume-review-hardening
+      relation: depends_on
+      semantic: governance
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: governance
+    - id: design:sympohy-llm-loop-observability-self-improvement-adr
       relation: depends_on
       semantic: governance
     - id: design:sympohy-terminal-resume-review-hardening

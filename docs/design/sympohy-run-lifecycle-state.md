@@ -17,6 +17,9 @@ codd:
     - id: design:sympohy-terminal-resume-review-hardening
       relation: depends_on
       semantic: lifecycle
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: lifecycle
 ---
 
 # sympohy 実行ライフサイクル・状態設計
