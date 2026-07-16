@@ -282,6 +282,103 @@ class SympohyObservabilityTest(unittest.TestCase):
             },
         )
 
+    def test_analyzer_keeps_structured_test_failures_in_failure_chains(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="hooks",
+                    event_type="hook",
+                    status="retry",
+                    summary="hook failed: task ci",
+                    metadata={
+                        "command": "task ci",
+                        "failure_summary": "FAILED tests/sympohy/test_runner.py::test_resume",
+                        "test_failures": [
+                            {
+                                "runner": "pytest",
+                                "name": "tests/sympohy/test_runner.py::test_resume",
+                                "file": "tests/sympohy/test_runner.py",
+                                "line": 27,
+                                "summary": "AssertionError: expected retry",
+                            },
+                            {
+                                "runner": "vitest",
+                                "name": "App > renders failures",
+                                "file": "tests/ui/App.test.tsx",
+                                "line": 41,
+                                "summary": "AssertionError: expected true to be false",
+                            },
+                        ],
+                    },
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000002",
+                    phase="hooks",
+                    event_type="hook",
+                    status="success",
+                    summary="hook passed: task ci",
+                    metadata={"command": "task ci"},
+                    timestamp="2026-07-16T10:00:08Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                analysis = store.analyze_failures(issue=126)
+
+        self.assertEqual(len(analysis["resolved_failures"]), 1)
+        self.assertEqual(
+            analysis["resolved_failures"][0]["test_failures"],
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
+        )
+        self.assertEqual(
+            analysis["resolved_failures"][0]["event_chain"][0]["test_failures"],
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
+        )
+
     def test_analyzer_reports_phase_dwell_from_event_spans(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-126"

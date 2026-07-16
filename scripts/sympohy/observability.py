@@ -338,6 +338,7 @@ class ObservationStore:
                     "failure_signatures": chain["failure_signatures"],
                     "started_at": chain["started_at"],
                     "ended_at": chain["ended_at"],
+                    "test_failures": _chain_test_failures(chain),
                     "event_chain": chain["event_chain"],
                 }
                 if chain["status"] == "resolved":
@@ -723,6 +724,7 @@ def _derive_failure_chains(events: Sequence[ObservationEvent]) -> list[dict[str,
                     "kind": observation.kind,
                     "signature": observation.signature,
                     "summary": event.summary,
+                    "test_failures": _event_test_failures(event),
                 }
             )
             if observation.terminal:
@@ -746,6 +748,7 @@ def _derive_failure_chains(events: Sequence[ObservationEvent]) -> list[dict[str,
                     "phase": event.phase,
                     "summary": event.summary,
                     "resolution_key": resolution_key,
+                    "test_failures": _event_test_failures(event),
                 }
             )
             _finalize_failure_chain(chains, active)
@@ -781,6 +784,35 @@ def _finalize_failure_chain(
     chain["failure_signatures"] = [str(item["signature"]) for item in failures]
     chain["pattern"] = " -> ".join(chain["failure_signatures"])
     chains.append(chain)
+
+
+def _chain_test_failures(chain: Mapping[str, object]) -> list[dict[str, object]]:
+    collected: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in chain.get("event_chain", []):
+        if not isinstance(item, Mapping):
+            continue
+        failures = item.get("test_failures")
+        if not isinstance(failures, Sequence) or isinstance(
+            failures, (str, bytes, bytearray)
+        ):
+            continue
+        for failure in failures:
+            if not isinstance(failure, Mapping):
+                continue
+            normalized = {
+                "runner": str(failure.get("runner", "")).strip(),
+                "name": str(failure.get("name", "")).strip(),
+                "file": str(failure.get("file", "")).strip(),
+                "line": failure.get("line"),
+                "summary": str(failure.get("summary", "")).strip(),
+            }
+            key = json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+            if key in seen:
+                continue
+            seen.add(key)
+            collected.append(normalized)
+    return collected
 
 
 def _classify_failure_event(event: ObservationEvent) -> FailureObservation | None:
@@ -901,3 +933,25 @@ def _is_failure_browser_event(event: ObservationEvent) -> bool:
 
 def _parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _event_test_failures(event: ObservationEvent) -> list[dict[str, object]]:
+    failures = event.metadata.get("test_failures")
+    if not isinstance(failures, Sequence) or isinstance(
+        failures, (str, bytes, bytearray)
+    ):
+        return []
+    normalized: list[dict[str, object]] = []
+    for failure in failures:
+        if not isinstance(failure, Mapping):
+            continue
+        normalized.append(
+            {
+                "runner": str(failure.get("runner", "")).strip(),
+                "name": str(failure.get("name", "")).strip(),
+                "file": str(failure.get("file", "")).strip(),
+                "line": failure.get("line"),
+                "summary": str(failure.get("summary", "")).strip(),
+            }
+        )
+    return normalized

@@ -33,6 +33,7 @@ from scripts.sympohy.runner import (
     _codex_json,
     _codex_exec_args,
     _ensure_draft_pull_request,
+    _extract_test_failures,
     _infer_implementation_recovery,
     _prepare_document_artifacts,
     _pull_request_exists,
@@ -325,6 +326,113 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(
             events[0]["metadata"]["failure_summary"],
             "FAILED tests/test_example.py::test_case",
+        )
+
+    def test_extract_test_failures_parses_pytest_and_vitest_output(self) -> None:
+        output = "\n".join(
+            [
+                "FAILED tests/sympohy/test_runner.py::test_resume - AssertionError: expected retry",
+                "tests/sympohy/test_runner.py:27: AssertionError",
+                "",
+                " FAIL  tests/ui/App.test.tsx > App > renders failures",
+                "AssertionError: expected true to be false",
+                " ❯ tests/ui/App.test.tsx:41:7",
+            ]
+        )
+
+        failures = _extract_test_failures(output)
+
+        self.assertEqual(
+            failures,
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
+        )
+
+    def test_run_hooks_records_structured_test_failures(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "hooks"})
+
+            def fail_hook(
+                _args: list[str],
+                *,
+                stdout: object,
+                **_kwargs: object,
+            ) -> int:
+                assert hasattr(stdout, "write")
+                stdout.write(
+                    "\n".join(
+                        [
+                            "FAILED tests/sympohy/test_runner.py::test_resume - AssertionError: expected retry",
+                            "tests/sympohy/test_runner.py:27: AssertionError",
+                            " FAIL  tests/ui/App.test.tsx > App > renders failures",
+                            "AssertionError: expected true to be false",
+                            " ❯ tests/ui/App.test.tsx:41:7",
+                        ]
+                    )
+                )
+                return 1
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                side_effect=fail_hook,
+            ):
+                result = _run_hooks(
+                    ("task ci",),
+                    1,
+                    cwd,
+                    log_dir,
+                    config=self._config(root),
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            events[0]["metadata"]["test_failures"],
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
         )
 
     def test_review_fix_loop_records_review_event(self) -> None:

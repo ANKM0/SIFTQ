@@ -3008,20 +3008,26 @@ def _run_hooks(
                 )
             if state is not None:
                 failure_summary = ""
+                test_failures: list[dict[str, object]] = []
                 if returncode != 0:
-                    failure_summary = _failure_summary(log_path.read_text(encoding="utf-8"))
+                    hook_output = log_path.read_text(encoding="utf-8")
+                    failure_summary = _failure_summary(hook_output)
+                    test_failures = _extract_test_failures(hook_output)
+                metadata: dict[str, object] = {
+                    "command": command,
+                    "hook_index": hook_index,
+                    "returncode": returncode,
+                    "failure_summary": failure_summary,
+                }
+                if test_failures:
+                    metadata["test_failures"] = test_failures
                 state.record_event(
                     event_type="hook",
                     status="success" if returncode == 0 else "retry",
                     summary=f"hook {'passed' if returncode == 0 else 'failed'}: {command}",
                     attempt=attempts,
                     duration=_elapsed_seconds(started_at),
-                    metadata={
-                        "command": command,
-                        "hook_index": hook_index,
-                        "returncode": returncode,
-                        "failure_summary": failure_summary,
-                    },
+                    metadata=metadata,
                 )
             if returncode == 0:
                 break
@@ -4174,6 +4180,134 @@ def _failure_summary(output: str | bytes | None, *, max_length: int = 240) -> st
     return summary
 
 
+def _extract_test_failures(
+    output: str | bytes | None,
+) -> list[dict[str, object]]:
+    if output is None:
+        return []
+    if isinstance(output, bytes):
+        text = output.decode("utf-8", errors="replace")
+    else:
+        text = output
+    if not text.strip():
+        return []
+    failures = _extract_pytest_failures(text)
+    failures.extend(_extract_vitest_failures(text))
+    deduped: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str, int | None, str]] = set()
+    for failure in failures:
+        key = (
+            str(failure["runner"]),
+            str(failure["name"]),
+            str(failure["file"]),
+            int(failure["line"]) if isinstance(failure.get("line"), int) else None,
+            str(failure["summary"]),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(failure)
+        if len(deduped) >= _TEST_FAILURE_MAX_ITEMS:
+            break
+    return deduped
+
+
+def _extract_pytest_failures(text: str) -> list[dict[str, object]]:
+    failures: list[dict[str, object]] = []
+    for match in re.finditer(
+        r"(?m)^FAILED\s+(?P<nodeid>\S+?)(?:\s+-\s+(?P<summary>.+))?$",
+        text,
+    ):
+        nodeid = match.group("nodeid").strip()
+        if not nodeid:
+            continue
+        file_path = nodeid.split("::", 1)[0]
+        summary = (match.group("summary") or "").strip() or "pytest failure"
+        failures.append(
+            {
+                "runner": "pytest",
+                "name": nodeid,
+                "file": file_path,
+                "line": _extract_source_line(text, file_path),
+                "summary": _truncate_text(
+                    summary,
+                    max_length=_EVENT_METADATA_MAX_STRING_LENGTH,
+                ),
+            }
+        )
+    return failures
+
+
+def _extract_vitest_failures(text: str) -> list[dict[str, object]]:
+    failures: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("FAIL "):
+            continue
+        header = stripped[len("FAIL ") :].strip()
+        if not header:
+            continue
+        file_path, name = _split_vitest_header(header)
+        failures.append(
+            {
+                "runner": "vitest",
+                "name": name,
+                "file": file_path,
+                "line": _extract_vitest_location(lines, index + 1, file_path),
+                "summary": _truncate_text(
+                    _extract_vitest_summary(lines, index + 1) or "vitest failure",
+                    max_length=_EVENT_METADATA_MAX_STRING_LENGTH,
+                ),
+            }
+        )
+    return failures
+
+
+def _split_vitest_header(header: str) -> tuple[str, str]:
+    if " > " not in header:
+        return header, header
+    file_path, _, name = header.partition(" > ")
+    return file_path.strip(), name.strip() or file_path.strip()
+
+
+def _extract_vitest_location(
+    lines: Sequence[str],
+    start_index: int,
+    file_path: str,
+) -> int | None:
+    location_re = re.compile(r"^\s*[❯>]\s+(?P<file>[^:]+):(?P<line>\d+):\d+")
+    fallback_re = re.compile(r"^\s*at\s+(?P<file>[^:]+):(?P<line>\d+):\d+")
+    for line in lines[start_index : start_index + 8]:
+        match = location_re.match(line) or fallback_re.match(line)
+        if match is None:
+            continue
+        matched_file = match.group("file").strip()
+        if matched_file == file_path:
+            return int(match.group("line"))
+    return None
+
+
+def _extract_vitest_summary(lines: Sequence[str], start_index: int) -> str:
+    for line in lines[start_index : start_index + 8]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith(("❯ ", "> ", "at ")):
+            continue
+        if stripped.startswith(("FAIL ", "stdout", "stderr")):
+            continue
+        return stripped
+    return ""
+
+
+def _extract_source_line(text: str, file_path: str) -> int | None:
+    match = re.search(rf"(?m)^{re.escape(file_path)}:(?P<line>\d+):", text)
+    if match is None:
+        return None
+    return int(match.group("line"))
+
+
 _BROWSER_OBSERVATION_ALLOWED_KEYS = frozenset(
     {
         "console_error_count",
@@ -4203,6 +4337,7 @@ _EVENT_METADATA_MAX_DEPTH = 4
 _EVENT_METADATA_MAX_KEYS = 16
 _EVENT_METADATA_MAX_ITEMS = 16
 _EVENT_METADATA_MAX_STRING_LENGTH = 240
+_TEST_FAILURE_MAX_ITEMS = 8
 _DEVELOPER_INSTRUCTION_SUMMARY_MAX_LENGTH = 160
 _DEVELOPER_INSTRUCTION_MAX_SOURCE_BYTES = 64 * 1024
 _DEVELOPER_INSTRUCTION_PRIVATE_PATH_PARTS = frozenset(
