@@ -19,4 +19,13 @@ describe("App CSS contract", () => {
       /@media \(max-width: 900px\)\s*\{[\s\S]*?\.status-drop-area\s*\{\s*min-height:\s*96px;\s*\}/
     );
   });
+
+  it("keeps task detail delete and save actions separated on desktop and mobile", () => {
+    expect(appCss).toMatch(
+      /\.task-detail-form__action-group\s*\{[\s\S]*?column-gap:\s*20px;[\s\S]*?row-gap:\s*12px;[\s\S]*?\}/
+    );
+    expect(appCss).toMatch(
+      /@media \(max-width: 720px\)\s*\{[\s\S]*?\.task-detail-form__action-group\s*\{[\s\S]*?grid-auto-flow:\s*row;[\s\S]*?width:\s*100%;[\s\S]*?\}[\s\S]*?\.task-detail-form__action-group \.tasks-page__button\s*\{[\s\S]*?width:\s*100%;[\s\S]*?\}/
+    );
+  });
 });
