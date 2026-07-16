@@ -403,14 +403,46 @@ function TasksPage({
 }: TasksPageProps) {
   const { isOver, setNodeRef } = useDroppable({ id: TASK_LIST_DROP_ID });
   const [menuTaskId, setMenuTaskId] = useState<Task["id"] | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<readonly Task["id"][]>([]);
+  const selectedCount = selectedTaskIds.length;
+
+  useEffect(() => {
+    const taskIds = new Set(tasks.map((task) => task.id));
+
+    setSelectedTaskIds((currentIds) =>
+      currentIds.filter((taskId) => taskIds.has(taskId))
+    );
+  }, [tasks]);
+
+  function handleSelectTask(taskId: Task["id"], checked: boolean) {
+    setSelectedTaskIds((currentIds) => {
+      if (checked) {
+        return currentIds.includes(taskId) ? currentIds : [...currentIds, taskId];
+      }
+
+      return currentIds.filter((candidateId) => candidateId !== taskId);
+    });
+  }
 
   return (
     <main className="matrix-page">
       <AppHeader currentPage="tasks" />
       <section aria-labelledby="tasks-page-title" className="tasks-page">
         <header className="tasks-page__header">
-          <h2 id="tasks-page-title">タスク一覧</h2>
-          <p>{tasks.length} tasks</p>
+          <div className="tasks-page__header-copy">
+            <h2 id="tasks-page-title">タスク一覧</h2>
+            <p>{tasks.length} tasks</p>
+          </div>
+          <div className="tasks-page__header-actions">
+            <p aria-live="polite">{selectedCount}件選択中</p>
+            <button
+              className="tasks-page__button tasks-page__button--danger"
+              disabled={selectedCount === 0}
+              type="button"
+            >
+              選択したタスクを削除
+            </button>
+          </div>
         </header>
         {notice !== null ? (
           <p className="tasks-page__notice" role="status">
@@ -431,9 +463,11 @@ function TasksPage({
             <TaskListCard
               key={task.id}
               isMenuOpen={menuTaskId === task.id}
+              isSelected={selectedTaskIds.includes(task.id)}
               onCloseMenu={() => setMenuTaskId(null)}
               onDeleteTask={onDeleteTask}
               onOpenMenu={() => setMenuTaskId(task.id)}
+              onSelectTask={handleSelectTask}
               onUpdateTaskStatus={onUpdateTaskStatus}
               task={task}
             />
@@ -446,18 +480,22 @@ function TasksPage({
 
 type TaskListCardProps = {
   readonly isMenuOpen: boolean;
+  readonly isSelected: boolean;
   readonly onCloseMenu: () => void;
   readonly onDeleteTask: (task: Task) => Promise<boolean>;
   readonly onOpenMenu: () => void;
+  readonly onSelectTask: (taskId: Task["id"], checked: boolean) => void;
   readonly onUpdateTaskStatus: (taskId: Task["id"], status: Task["status"]) => Promise<void>;
   readonly task: Task;
 };
 
 function TaskListCard({
   isMenuOpen,
+  isSelected,
   onCloseMenu,
   onDeleteTask,
   onOpenMenu,
+  onSelectTask,
   onUpdateTaskStatus,
   task
 }: TaskListCardProps) {
@@ -469,6 +507,7 @@ function TaskListCard({
   const className = [
     "tasks-page__card",
     `tasks-page__card--${task.status}`,
+    isSelected ? "tasks-page__card--selected" : "",
     draggable.isDragging ? "tasks-page__card--dragging" : "",
     droppable.isOver ? "tasks-page__card--drop-target" : ""
   ]
@@ -493,6 +532,13 @@ function TaskListCard({
       }}
       style={style}
     >
+      <input
+        aria-label={`${task.title} を選択`}
+        checked={isSelected}
+        className="tasks-page__checkbox"
+        type="checkbox"
+        onChange={(event) => onSelectTask(task.id, event.target.checked)}
+      />
       <button
         aria-label={`${area.label} のドラッグハンドル`}
         className="tasks-page__handle"

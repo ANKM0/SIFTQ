@@ -31,17 +31,20 @@ Task list page は `#/tasks` で開き、縦並びの draggable list card を表
 `#/tasks/:taskId` で開き、一覧から遷移して編集できる。
 
 Task list は active / done / skipped の全 task を常に表示し、status フィルタを持たない。各 card は
-area ラベルを含む drag handle、title、description、status button、`詳細`、`削除` を持つ。area は
-表示専用で、色だけに依存せず handle 内の文字ラベルで識別する。
+area ラベルを含む drag handle、task title を含む accessible name を持つ checkbox、title、description、
+status button、`詳細`、`削除` を持つ。area は表示専用で、色だけに依存せず handle 内の文字ラベルで
+識別する。header には選択件数と一括削除 button を置き、0 件選択では disabled、1 件以上選択では
+enabled にする。
 
 `description` が空のときは list で `説明なし` を表示する。detail では title、description、area、
 status を編集でき、createdAt / updatedAt を読み取り専用で表示する。detail に存在しない taskId を
 指定した場合は not found state を表示する。
 
-物理削除は list と detail の両方から実行でき、削除前に task title を含む確認を出す。削除後は
-browser storage から消え、Matrix と task list の両画面から消える。削除後は task list に戻り、
-`タスクを削除しました` 通知を表示する。通常の list 状態ではこの通知を出さず、deleted state にも
-削除済み task の placeholder は表示しない。
+物理削除は list と detail の個別操作、および list の checkbox 選択による一括削除から実行できる。
+個別削除と一括削除のどちらも削除前に task title か選択件数を含む確認を出す。削除後は browser
+storage から消え、Matrix と task list の両画面から消える。一括削除後は task list に戻り、
+`選択したタスクを削除しました` 通知を表示し、選択状態を空にする。通常の list 状態ではこの通知を
+出さず、deleted state にも削除済み task の placeholder は表示しない。
 
 ## Internal Design（内部設計）
 
@@ -49,10 +52,12 @@ browser storage から消え、Matrix と task list の両画面から消える�
 
 - `src/contracts/task.ts`: `description`, `createdAt`, `updatedAt`, `listOrder` を含む task contract。
 - `src/domain/taskRules.ts`: title / description validation、status 遷移、area 保持、listOrder 採番と正規化、
-  not found 判定、削除後遷移ルール。
-- `src/ports/taskRepository.ts`: Matrix と task list の両 UI から使う repository port。
+  not found 判定、削除後遷移ルール、bulk delete 後の listOrder / matrix order 正規化。
+- `src/ports/taskRepository.ts`: Matrix と task list の両 UI から使う repository port。bulk delete を
+  個別削除と同じ atomic mutation として扱う。
 - `src/adapters/browserTaskRepository.ts`: browser storage adapter。古い shape を初回読み込み時に補完する。
-- `src/ui/*`: Matrix page、task list page、task detail page、confirm dialog、status menu、notification。
+- `src/ui/*`: Matrix page、task list page、task detail page、confirm dialog、selection state、status menu、
+  notification。
 
 Repository では task を読み込んだ時点で旧 shape を新 shape に補完し、`createdAt` / `updatedAt` が無い場合は
 互換的に埋める。`createdAt` は不変、`updatedAt` は mutation 時に更新する。`listOrder` は task list 用の
@@ -62,7 +67,9 @@ Task list の status 変更は `areaId` を保持したまま `status` のみを
 保持していた `areaId` の Matrix area に再表示する。Task detail の area 編集は Matrix area 4 種のみを許可し、
 status が done / skipped でも area を保持する。
 
-削除は物理削除として扱い、repository から task を除去する。削除後の遷移先は task list に固定する。
+削除は物理削除として扱い、repository から task を除去する。bulk delete は選択された複数 task の id を
+一度の repository 操作で除去し、残った task の `listOrder` と active task の Matrix `order` を
+`0..n-1` に正規化する。削除後の遷移先は task list に固定する。
 
 ## Test Viewpoints（テスト観点）
 
@@ -72,15 +79,20 @@ status が done / skipped でも area を保持する。
   - `listOrder` の作成時採番、DnD 並び替え、保存
   - `status` 変更時に `areaId` が変わらないこと
   - `active` 復帰時に保持 area へ戻ること
-  - 物理削除と not found 参照
+  - 個別削除と bulk delete の物理削除
+  - bulk delete 後の `listOrder` / Matrix `order` 正規化
+  - not found 参照
 - UI tests:
-  - `#/tasks` の list 表示、全 status 表示、`説明なし`、status menu、detail 遷移、削除確認
+  - `#/tasks` の list 表示、checkbox、選択件数、bulk delete button の disabled/enabled、全 status 表示、
+    `説明なし`、status menu、detail 遷移、削除確認
   - `#/tasks/:taskId` の detail 編集、readonly timestamps、not found
   - Matrix との相互遷移
   - list からの DnD 並び替えが Matrix 表示へ影響しないこと
+  - bulk delete の cancel で選択状態が維持されること
+  - bulk delete の confirm で削除、通知、選択解除が行われること
   - list と Matrix に `createdAt` / `updatedAt` が表示されないこと
 - accessibility tests:
-  - list card の見出し、ボタン、通知、confirm 文が意味を持つこと
+  - checkbox、選択件数、一括削除 button、通知、confirm 文が意味を持つこと
   - 主要テキストが status 背景色に対して十分なコントラストを保つこと
 
 ## ADR Application（ADR 適用）

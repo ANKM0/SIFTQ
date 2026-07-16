@@ -30,6 +30,9 @@ This directory contains the low-fidelity Matrix MVP HTML wireframes.
 - `matrix-terminal-drop.html`: Done / Skipped terminal drop result with hidden terminal tasks.
 - `task-list-v3.md`: Issue #68 の Task List v3 wireframe contract。
 - `task-list.html`: 全taskを表示するdraggable list cardページ。
+- `task-list-selection.html`: checkbox 選択と一括削除 enabled 状態。
+- `task-bulk-delete-confirm.html`: 一括削除確認ダイアログ。
+- `task-list-bulk-deleted.html`: 一括削除後の成功通知付き一覧状態。
 - `task-list-deleted.html`: 物理削除後の削除成功通知付き一覧状態。
 - `task-list-dragging.html`: list card DnDでlistOrderだけを更新する並び替え状態。
 - `task-list-status-menu.html`: status buttonからstatus選択肢を表示する状態。
@@ -39,6 +42,9 @@ This directory contains the low-fidelity Matrix MVP HTML wireframes.
 - `matrix-mvp.css`: shared low-fidelity wireframe styling.
 - `task-list-v3.md`: task list / detail / delete / not found contract for Issue #68.
 - `task-list.html`: task list page with draggable list cards and status actions.
+- `task-list-selection.html`: task list selected state with bulk delete enabled.
+- `task-bulk-delete-confirm.html`: bulk delete confirmation state.
+- `task-list-bulk-deleted.html`: bulk delete success state.
 - `task-list-dragging.html`: task list drag state.
 - `task-list-status-menu.html`: task status menu state.
 - `task-list-deleted.html`: post-delete task list state with notification.
@@ -61,13 +67,13 @@ SQLite storage, or additional Matrix task card fields.
 Task List v3 wireframes は Issue #68 の UI contract を追加するが、Matrix card
 表示は変更しない。Matrix card は引き続き title-only とし、Matrix edit modal
 では title / description を編集する。task list は title, description, area,
-status, 詳細, 削除を表示する draggable list card を使う。
-task詳細は作成日時 / 更新日時をreadonly metadataとして表示し、Matrix と
-task list にはそれらの日時を表示しない。
+status, 詳細, 削除を表示する draggable list card を使い、Issue #70 では checkbox
+選択と一括削除の状態を追加する。task詳細は作成日時 / 更新日時をreadonly metadataとして表示し、
+Matrix と task list にはそれらの日時を表示しない。
 
 The task list v3 wireframes follow `docs/wireframes/task-list-v3.md`. They show
-the matrix / task list navigation links, a vertical draggable list, status
-menu, detail editor, delete confirmation, deleted notification, and not found
-state.
+the matrix / task list navigation links, a vertical draggable list, selection
+state, bulk delete confirmation, bulk delete notification, status menu, detail
+editor, delete confirmation, deleted notification, and not found state.
 
 The HTML wireframe contract is covered by `tests/docs/wireframeContract.test.ts`.

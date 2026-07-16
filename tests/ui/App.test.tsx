@@ -123,14 +123,54 @@ describe("App", () => {
       "#/tasks"
     );
     expect(screen.getAllByRole("button", { name: "Do のドラッグハンドル" })).toHaveLength(2);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     expect(screen.getByText("Visible")).toBeTruthy();
     expect(screen.getByText("Hidden")).toBeTruthy();
     expect(screen.getByText("説明なし")).toBeTruthy();
+    expect(screen.getByText("0件選択中")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "選択したタスクを削除" })).toHaveProperty(
+      "disabled",
+      true
+    );
     expect(screen.getAllByRole("button", { name: "削除" })).toHaveLength(2);
     expect(screen.queryByText("2024-01-02T03:04:05.000Z")).toBeNull();
     expect(screen.queryByText("作成日時")).toBeNull();
     expect(screen.queryByText("更新日時")).toBeNull();
     expect(screen.queryByLabelText("Task matrix")).toBeNull();
+  });
+
+  it("tracks selected tasks from the task list checkboxes", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    const bulkDeleteButton = screen.getByRole("button", { name: "選択したタスクを削除" });
+    const firstCheckbox = screen.getByRole("checkbox", { name: "Visible を選択" });
+    const secondCheckbox = screen.getByRole("checkbox", { name: "Hidden を選択" });
+
+    fireEvent.click(firstCheckbox);
+
+    expect(screen.getByText("1件選択中")).toBeTruthy();
+    expect(bulkDeleteButton).toHaveProperty("disabled", false);
+    expect(firstCheckbox).toHaveProperty("checked", true);
+    expect(secondCheckbox).toHaveProperty("checked", false);
+
+    fireEvent.click(secondCheckbox);
+
+    expect(screen.getByText("2件選択中")).toBeTruthy();
+    expect(secondCheckbox).toHaveProperty("checked", true);
+
+    fireEvent.click(firstCheckbox);
+
+    expect(screen.getByText("1件選択中")).toBeTruthy();
+    expect(firstCheckbox).toHaveProperty("checked", false);
+    expect(secondCheckbox).toHaveProperty("checked", true);
   });
 
   it("routes to the task detail page from #/tasks/:taskId", async () => {
@@ -355,6 +395,30 @@ describe("App", () => {
     );
     expect(window.confirm).toHaveBeenCalledWith('"Visible" を削除しますか?');
     expect(taskListTitles()).toEqual(["Hidden"]);
+  });
+
+  it("drops removed tasks from the local selection state", async () => {
+    seedStoredTasks(
+      task({ id: "task-1", title: "Visible", areaId: "do" }),
+      task({ id: "task-2", title: "Hidden", areaId: "done", status: "done" })
+    );
+    window.location.hash = "#/tasks";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Visible を選択" }));
+    expect(screen.getByText("1件選択中")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "削除" })[0]);
+
+    await waitFor(() => expect(screen.getByText("0件選択中")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "選択したタスクを削除" })).toHaveProperty(
+      "disabled",
+      true
+    );
+    expect(screen.queryByRole("checkbox", { name: "Visible を選択" })).toBeNull();
   });
 
   it("keeps the task list unchanged when delete confirmation is canceled", async () => {
