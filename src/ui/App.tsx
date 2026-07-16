@@ -748,9 +748,6 @@ function TaskDetailPage({
           <>
             <header className="task-detail-page__header">
               <h2 id="task-detail-title">タスク詳細</h2>
-              <a className="tasks-page__back-link" href="#/tasks">
-                タスク一覧へ戻る
-              </a>
             </header>
             {operationError !== null ? (
               <p className="matrix-page__error tasks-page__error" role="alert">
@@ -838,12 +835,21 @@ function TaskDetailPage({
                 </p>
               ) : null}
               <div className="task-detail-form__actions">
-                <button className="tasks-page__button" type="button" onClick={() => void handleDelete()}>
-                  削除
-                </button>
-                <button className="tasks-page__button tasks-page__button--primary" disabled={!canSave} type="submit">
-                  保存
-                </button>
+                <a className="tasks-page__back-link task-detail-form__back-link" href="#/tasks">
+                  タスク一覧へ戻る
+                </a>
+                <div className="task-detail-form__action-group">
+                  <button className="tasks-page__button" type="button" onClick={() => void handleDelete()}>
+                    削除
+                  </button>
+                  <button
+                    className="tasks-page__button tasks-page__button--primary"
+                    disabled={!canSave}
+                    type="submit"
+                  >
+                    保存
+                  </button>
+                </div>
               </div>
             </form>
           </>

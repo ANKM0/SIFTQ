@@ -518,7 +518,21 @@
 .task-detail-form__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.task-detail-form__back-link {
+  align-self: flex-end;
+}
+
+.task-detail-form__action-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 16px;
 }
 
 .tasks-page__button--primary {
