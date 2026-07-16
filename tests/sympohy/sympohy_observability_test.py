@@ -885,7 +885,14 @@ class SympohyObservabilityTest(unittest.TestCase):
             validation_calls: list[list[str]] = []
             push_call: dict[str, object] = {}
             git_calls: list[list[str]] = []
-            statuses = iter(["", " M docs/contributing/issue-execution.md"])
+            statuses = iter(
+                [
+                    "",
+                    "",
+                    " M docs/contributing/issue-execution.md",
+                    " M docs/contributing/issue-execution.md",
+                ]
+            )
 
             def check_call_with_heartbeat(
                 command: list[str],
