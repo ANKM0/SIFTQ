@@ -93,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
     observe_apply_parser.add_argument("--db", required=True)
     observe_apply_parser.add_argument("--issue", type=int)
     observe_apply_parser.add_argument("--run-id")
+    observe_apply_parser.add_argument("--execute", action="store_true")
 
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
@@ -199,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
                     store.apply_improvements(
                         issue=args.issue,
                         run_id=args.run_id,
-                        execute=True,
+                        execute=args.execute,
                         cwd=Path.cwd(),
                         config=config,
                     ),

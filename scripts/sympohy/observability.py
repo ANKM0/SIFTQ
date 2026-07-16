@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+import fnmatch
 import hashlib
 import json
 from pathlib import Path
@@ -31,6 +32,12 @@ _REQUIRED_EVENT_KEYS = frozenset(
 _COUNT_GROUP_FIELDS = frozenset({"event_type", "status", "phase", "run_id"})
 _PROPOSAL_TARGETS = ("prompt", "hook", "stage_gate", "docs", "skill", "test", "config")
 _LOW_RISK_APPLICATOR_TARGETS = frozenset({"docs", "prompt", "test", "config"})
+_LOW_RISK_APPLICATOR_PATHS: dict[str, tuple[str, ...]] = {
+    "docs": ("docs/**",),
+    "prompt": ("scripts/sympohy/runner.py", "tests/sympohy/**"),
+    "test": ("tests/**",),
+    "config": (".sympohy/config.yaml", "tests/sympohy/**"),
+}
 _FAILURE_KINDS = frozenset(
     {
         "hook",
@@ -1023,6 +1030,8 @@ def _execute_auto_apply_candidates(
 
     for candidate in candidates:
         before_status = _worktree_status(cwd)
+        before_paths = set(_changed_paths_from_status(before_status))
+        before_digests = _path_digests(cwd=cwd, paths=before_paths)
         log_path = log_dir / _candidate_log_name(candidate=candidate, run_id=run_id)
         _codex_text(
             _candidate_apply_prompt(
@@ -1034,13 +1043,25 @@ def _execute_auto_apply_candidates(
             config=config,
             role="fix",
         )
-        changed = _worktree_status(cwd) != before_status
+        after_status = _worktree_status(cwd)
+        changed = after_status != before_status
         record = {
             "id": str(candidate.get("id", "")),
             "category": str(candidate.get("category", "")),
             "log_path": str(log_path),
         }
         if changed:
+            changed_paths = _changed_paths_from_status(after_status)
+            candidate_paths = [
+                path
+                for path in changed_paths
+                if path not in before_paths
+                or _path_digest(cwd / path) != before_digests.get(path)
+            ]
+            _enforce_candidate_scope(
+                candidate=candidate,
+                changed_paths=candidate_paths,
+            )
             applied_candidates.append(record)
             validation_commands.extend(
                 [
@@ -1126,6 +1147,40 @@ def _changed_paths_from_status(status_output: str) -> list[str]:
             seen.add(candidate)
             paths.append(candidate)
     return paths
+
+
+def _enforce_candidate_scope(
+    *,
+    candidate: Mapping[str, object],
+    changed_paths: Sequence[str],
+) -> None:
+    category = str(candidate.get("category", "")).strip()
+    allowed_patterns = _LOW_RISK_APPLICATOR_PATHS.get(category, ())
+    if not allowed_patterns:
+        raise RuntimeError(
+            f"observe-apply candidate {candidate.get('id', '')} category {category!r} "
+            "has no executable low-risk path policy"
+        )
+    out_of_scope = [
+        path
+        for path in changed_paths
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in allowed_patterns)
+    ]
+    if out_of_scope:
+        raise RuntimeError(
+            "observe-apply rejected out-of-scope changes for "
+            f"{candidate.get('id', '')}: {', '.join(sorted(out_of_scope))}"
+        )
+
+
+def _path_digests(*, cwd: Path, paths: Sequence[str]) -> dict[str, str | None]:
+    return {path: _path_digest(cwd / path) for path in paths}
+
+
+def _path_digest(path: Path) -> str | None:
+    if not path.exists() or path.is_dir():
+        return None
+    return hashlib.sha1(path.read_bytes()).hexdigest()
 
 
 def _candidate_log_name(*, candidate: Mapping[str, object], run_id: str | None) -> str:

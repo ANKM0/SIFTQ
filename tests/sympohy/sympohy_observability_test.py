@@ -1016,6 +1016,62 @@ class SympohyObservabilityTest(unittest.TestCase):
             "verified",
         )
 
+    def test_applicator_rejects_out_of_scope_candidate_edits_before_validation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            log_dir = worktree / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            statuses = iter(
+                [
+                    "",
+                    "",
+                    " M docs/contributing/issue-execution.md\n M scripts/sympohy/runner.py",
+                ]
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                with (
+                    patch(
+                        "scripts.sympohy.runner._codex_text",
+                        return_value="",
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._worktree_status",
+                        side_effect=lambda _cwd: next(statuses),
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "observe-apply rejected out-of-scope changes .*scripts/sympohy/runner.py",
+                    ):
+                        store.apply_improvements(
+                            issue=126,
+                            execute=True,
+                            cwd=worktree,
+                            config=SimpleNamespace(base_branch="main"),
+                        )
+
     def test_apply_improvements_rejects_dirty_worktree(self) -> None:
         with TemporaryDirectory() as tmp:
             worktree = Path(tmp)
