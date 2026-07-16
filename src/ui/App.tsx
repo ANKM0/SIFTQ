@@ -463,7 +463,14 @@ function TasksPage({
             <p>{tasks.length} tasks</p>
           </div>
           <div className="tasks-page__header-actions">
-            <p aria-live="polite">{formatSelectedTaskCount(selectedCount)}</p>
+            <p
+              aria-atomic="true"
+              aria-label="現在の選択件数"
+              aria-live="polite"
+              className="tasks-page__selection-count"
+            >
+              {formatSelectedTaskCount(selectedCount)}
+            </p>
             <button
               className="tasks-page__button tasks-page__button--danger"
               disabled={selectedCount === 0}
@@ -582,7 +589,10 @@ function TaskListCard({
         <span className="tasks-page__handle-area">{area.label}</span>
       </button>
       <div className="tasks-page__body">
-        <h3 className="tasks-page__card-title">{task.title}</h3>
+        <div className="tasks-page__card-title-row">
+          <h3 className="tasks-page__card-title">{task.title}</h3>
+          {isSelected ? <span className="tasks-page__selected-badge">選択中</span> : null}
+        </div>
         <p className="tasks-page__description">{description}</p>
       </div>
       <div className="tasks-page__controls">
