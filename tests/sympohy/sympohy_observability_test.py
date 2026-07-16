@@ -457,6 +457,116 @@ class SympohyObservabilityTest(unittest.TestCase):
             ],
         )
 
+    def test_proposer_emits_improvement_candidates_from_analysis_and_chain_summary(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000001",
+                    phase="hooks",
+                    event_type="hook",
+                    status="retry",
+                    summary="hook failed: task ci",
+                    metadata={
+                        "command": "task ci",
+                        "failure_summary": "FAILED tests/sympohy/test_runner.py::test_resume",
+                        "test_failures": [
+                            {
+                                "runner": "pytest",
+                                "name": "tests/sympohy/test_runner.py::test_resume",
+                                "file": "tests/sympohy/test_runner.py",
+                                "line": 27,
+                                "summary": "AssertionError: expected retry",
+                            }
+                        ],
+                    },
+                    timestamp="2026-07-16T10:01:00Z",
+                ),
+                self._event(
+                    run_id="run-2",
+                    event_id="run-2-000002",
+                    phase="hooks",
+                    event_type="hook",
+                    status="success",
+                    summary="hook passed: task ci",
+                    metadata={"command": "task ci"},
+                    timestamp="2026-07-16T10:01:08Z",
+                ),
+                self._event(
+                    run_id="run-3",
+                    event_id="run-3-000001",
+                    phase="implement",
+                    event_type="codex",
+                    status="failure",
+                    summary="codex response could not be parsed",
+                    metadata={"role": "implementation", "parse_status": "invalid_json"},
+                    timestamp="2026-07-16T10:02:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                proposal = store.propose_improvements(issue=126)
+
+        self.assertEqual(proposal["schema_version"], 1)
+        self.assertEqual(proposal["issue"], 126)
+        self.assertIsNone(proposal["run_id"])
+        self.assertEqual(len(proposal["event_chain_summaries"]), 3)
+        self.assertEqual(
+            sorted(candidate["category"] for candidate in proposal["candidates"]),
+            ["docs", "prompt", "skill", "stage_gate", "test"],
+        )
+
+        candidates = {
+            candidate["category"]: candidate for candidate in proposal["candidates"]
+        }
+        self.assertEqual(
+            candidates["docs"]["required_validation"],
+            [
+                "task ci:markdown",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+        )
+        self.assertEqual(
+            candidates["prompt"]["evidence"]["failure_patterns"],
+            ["data:codex:implementation:invalid_json"],
+        )
+        self.assertEqual(
+            candidates["test"]["evidence"]["test_failures"],
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                }
+            ],
+        )
+        self.assertEqual(
+            proposal["event_chain_summaries"][0]["events"][0]["event_type"],
+            "hook",
+        )
+
     def test_rebuild_rejects_invalid_event_shape(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-126"

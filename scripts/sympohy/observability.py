@@ -26,6 +26,7 @@ _REQUIRED_EVENT_KEYS = frozenset(
     }
 )
 _COUNT_GROUP_FIELDS = frozenset({"event_type", "status", "phase", "run_id"})
+_PROPOSAL_TARGETS = ("prompt", "hook", "stage_gate", "docs", "skill", "test", "config")
 _FAILURE_KINDS = frozenset(
     {
         "hook",
@@ -382,6 +383,35 @@ class ObservationStore:
             ],
         }
 
+    def propose_improvements(
+        self,
+        *,
+        issue: int | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, object]:
+        analysis = self.analyze_failures(issue=issue, run_id=run_id)
+        event_chain_summaries = [
+            _summarize_failure_chain(chain, chain_status="resolved")
+            for chain in analysis["resolved_failures"]
+        ] + [
+            _summarize_failure_chain(chain, chain_status="blocked")
+            for chain in analysis["blocked_failures"]
+        ]
+
+        candidates = _propose_improvement_candidates(
+            analysis=analysis,
+            event_chain_summaries=event_chain_summaries,
+        )
+
+        return {
+            "schema_version": 1,
+            "issue": issue,
+            "run_id": run_id,
+            "analysis": analysis,
+            "event_chain_summaries": event_chain_summaries,
+            "candidates": candidates,
+        }
+
     def _analysis_events(
         self,
         *,
@@ -487,6 +517,333 @@ def _event_filters(
     if not clauses:
         return "", params
     return "WHERE " + " AND ".join(clauses), params
+
+
+def _summarize_failure_chain(
+    chain: Mapping[str, object],
+    *,
+    chain_status: str,
+) -> dict[str, object]:
+    event_chain = chain.get("event_chain", [])
+    events = event_chain if isinstance(event_chain, Sequence) else []
+    truncated = [
+        {
+            "event_id": str(event.get("event_id", "")),
+            "event_type": str(event.get("event_type", "")),
+            "status": str(event.get("status", "")),
+            "phase": event.get("phase"),
+            "summary": str(event.get("summary", "")),
+        }
+        for event in events[:3]
+        if isinstance(event, Mapping)
+    ]
+    return {
+        "issue": chain.get("issue"),
+        "run_id": chain.get("run_id"),
+        "phase": chain.get("phase"),
+        "status": chain_status,
+        "failure_count": chain.get("failure_count"),
+        "failure_kinds": list(chain.get("failure_kinds", [])),
+        "failure_signatures": list(chain.get("failure_signatures", [])),
+        "started_at": chain.get("started_at"),
+        "ended_at": chain.get("ended_at"),
+        "test_failures": list(chain.get("test_failures", [])),
+        "events": truncated,
+    }
+
+
+def _propose_improvement_candidates(
+    *,
+    analysis: Mapping[str, object],
+    event_chain_summaries: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    candidates: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+
+    blocked = [
+        chain for chain in event_chain_summaries if str(chain.get("status")) == "blocked"
+    ]
+    resolved = [
+        chain for chain in event_chain_summaries if str(chain.get("status")) == "resolved"
+    ]
+    recurring = analysis.get("recurring_event_chain_patterns", [])
+    recurring_patterns = recurring if isinstance(recurring, Sequence) else []
+
+    policy_review_blocks = [
+        chain
+        for chain in blocked
+        if "policy:stage_gate:review" in chain.get("failure_signatures", [])
+    ]
+    if policy_review_blocks:
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="docs",
+            dedupe_key="policy-review-docs",
+            title="Clarify review-stage acceptance criteria",
+            summary="Recurring review stage-gate blocks indicate missing traceability or acceptance coverage before review.",
+            impact="high",
+            confidence="high",
+            risk="low",
+            required_validation=[
+                "task ci:markdown",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+            evidence_chains=policy_review_blocks,
+        )
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="skill",
+            dedupe_key="policy-review-skill",
+            title="Strengthen implementation skill guidance before review",
+            summary="The implementation workflow should steer agents to verify AC/DoD and PR metadata before entering review.",
+            impact="medium",
+            confidence="medium",
+            risk="low",
+            required_validation=[
+                "task ci:markdown",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+            evidence_chains=policy_review_blocks,
+        )
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="stage_gate",
+            dedupe_key="policy-review-stage-gate",
+            title="Tighten review stage-gate messaging",
+            summary="Review blocks should surface the exact missing acceptance or traceability fields earlier and more explicitly.",
+            impact="medium",
+            confidence="medium",
+            risk="low",
+            required_validation=[
+                "task pytest tests/sympohy/sympohy_stage_gate_test.py",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+            evidence_chains=policy_review_blocks,
+        )
+
+    codex_or_data_failures = [
+        chain
+        for chain in blocked + resolved
+        if any(
+            kind in {"codex", "data"} for kind in _as_str_list(chain.get("failure_kinds"))
+        )
+    ]
+    if codex_or_data_failures:
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="prompt",
+            dedupe_key="codex-prompt",
+            title="Harden prompts for parseable structured output",
+            summary="Codex or parse-status failures suggest the prompt contract is underspecified for machine-readable responses.",
+            impact="high",
+            confidence="medium",
+            risk="low",
+            required_validation=[
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task ci:test",
+            ],
+            evidence_chains=codex_or_data_failures,
+        )
+
+    command_or_hook_test_failures = [
+        chain
+        for chain in blocked + resolved
+        if chain.get("test_failures")
+        and any(
+            kind in {"command", "hook"} for kind in _as_str_list(chain.get("failure_kinds"))
+        )
+    ]
+    if command_or_hook_test_failures:
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="test",
+            dedupe_key="test-fixtures",
+            title="Add regression fixtures for repeated command or hook failures",
+            summary="Observed command or hook failures already contain structured failing tests, so replay fixtures can lock the regression contract.",
+            impact="high",
+            confidence="high",
+            risk="low",
+            required_validation=[
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+                "task ci:test",
+            ],
+            evidence_chains=command_or_hook_test_failures,
+        )
+
+    recurring_retry_patterns = [
+        pattern
+        for pattern in recurring_patterns
+        if isinstance(pattern, Mapping)
+        and int(pattern.get("count", 0) or 0) > 1
+        and not str(pattern.get("pattern", "")).startswith("policy:stage_gate:")
+    ]
+    if recurring_retry_patterns:
+        matching = [
+            chain
+            for chain in blocked + resolved
+            if str(chain.get("failure_signatures", [""])[0] if chain.get("failure_signatures") else "")
+            in {str(pattern.get("pattern", "")) for pattern in recurring_retry_patterns}
+        ]
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="config",
+            dedupe_key="recurring-config",
+            title="Review retry and hook configuration for recurring failure chains",
+            summary="The same failure chain is repeating across runs, which points to configuration or retry policy that is not absorbing a known transient path.",
+            impact="medium",
+            confidence="medium",
+            risk="low",
+            required_validation=[
+                "task pytest tests/sympohy/sympohy_config_test.py",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+            evidence_chains=matching,
+        )
+
+    browser_failures = [
+        chain
+        for chain in blocked + resolved
+        if "browser" in _as_str_list(chain.get("failure_kinds"))
+    ]
+    if browser_failures:
+        _append_candidate(
+            candidates,
+            seen_ids,
+            category="hook",
+            dedupe_key="browser-hook",
+            title="Add lightweight browser checks to hooks or verifiers",
+            summary="Browser observation failures indicate the verification hooks should catch UI console or page errors earlier.",
+            impact="medium",
+            confidence="medium",
+            risk="low",
+            required_validation=[
+                "task ci:test",
+                "task pytest tests/sympohy/sympohy_observability_test.py",
+            ],
+            evidence_chains=browser_failures,
+        )
+
+    return sorted(
+        candidates,
+        key=lambda item: (
+            -_impact_rank(str(item["impact"])),
+            -_confidence_rank(str(item["confidence"])),
+            _PROPOSAL_TARGETS.index(str(item["category"]))
+            if str(item["category"]) in _PROPOSAL_TARGETS
+            else len(_PROPOSAL_TARGETS),
+            str(item["id"]),
+        ),
+    )
+
+
+def _append_candidate(
+    candidates: list[dict[str, object]],
+    seen_ids: set[str],
+    *,
+    category: str,
+    dedupe_key: str,
+    title: str,
+    summary: str,
+    impact: str,
+    confidence: str,
+    risk: str,
+    required_validation: Sequence[str],
+    evidence_chains: Sequence[Mapping[str, object]],
+) -> None:
+    candidate_id = f"{category}:{dedupe_key}"
+    if candidate_id in seen_ids:
+        return
+    seen_ids.add(candidate_id)
+    run_ids = sorted(
+        {
+            str(chain.get("run_id"))
+            for chain in evidence_chains
+            if str(chain.get("run_id", "")).strip()
+        }
+    )
+    patterns = sorted(
+        {
+            signature
+            for chain in evidence_chains
+            for signature in _as_str_list(chain.get("failure_signatures"))
+        }
+    )
+    phases = sorted(
+        {
+            str(chain.get("phase"))
+            for chain in evidence_chains
+            if str(chain.get("phase", "")).strip()
+        }
+    )
+    test_failures = _collect_test_failures(evidence_chains)
+    candidates.append(
+        {
+            "id": candidate_id,
+            "category": category,
+            "title": title,
+            "summary": summary,
+            "impact": impact,
+            "confidence": confidence,
+            "risk": risk,
+            "required_validation": list(required_validation),
+            "evidence": {
+                "run_ids": run_ids,
+                "failure_patterns": patterns,
+                "phases": phases,
+                "chain_count": len(evidence_chains),
+                "test_failures": test_failures,
+            },
+        }
+    )
+
+
+def _collect_test_failures(
+    chains: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    collected: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for chain in chains:
+        failures = chain.get("test_failures")
+        if not isinstance(failures, Sequence) or isinstance(
+            failures, (str, bytes, bytearray)
+        ):
+            continue
+        for failure in failures:
+            if not isinstance(failure, Mapping):
+                continue
+            normalized = {
+                "runner": str(failure.get("runner", "")).strip(),
+                "name": str(failure.get("name", "")).strip(),
+                "file": str(failure.get("file", "")).strip(),
+                "line": failure.get("line"),
+                "summary": str(failure.get("summary", "")).strip(),
+            }
+            key = json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+            if key in seen:
+                continue
+            seen.add(key)
+            collected.append(normalized)
+    return collected
+
+
+def _as_str_list(value: object) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return [str(item) for item in value]
+
+
+def _impact_rank(value: str) -> int:
+    return {"high": 3, "medium": 2, "low": 1}.get(value, 0)
+
+
+def _confidence_rank(value: str) -> int:
+    return {"high": 3, "medium": 2, "low": 1}.get(value, 0)
 
 
 def _write_observation_store(
