@@ -3582,6 +3582,54 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(events[1]["duration"], None)
         self.assertEqual(events[1]["metadata"], {"stage": "review"})
 
+    def test_run_state_writer_redacts_raw_browser_observation_artifacts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="implement", progress={"message": "observing browser"})
+            writer.record_event(
+                event_type="browser_observation",
+                status="observed",
+                summary="browser observation captured",
+                metadata={
+                    "console_error_count": 2,
+                    "page_error_count": 1,
+                    "storage_key_count": 4,
+                    "state_hash": "abc123",
+                    "accessibility_summary": "1 violation",
+                    "screenshot_path": "artifacts/page.png",
+                    "trace_path": "artifacts/trace.zip",
+                    "dom_dump": "<html>secret</html>",
+                    "extra_detail": {"ignored": True},
+                },
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(
+            events[0]["metadata"],
+            {
+                "console_error_count": 2,
+                "page_error_count": 1,
+                "storage_key_count": 4,
+                "state_hash": "abc123",
+                "accessibility_summary": "1 violation",
+                "redacted_artifacts": [
+                    "dom_dump",
+                    "screenshot_path",
+                    "trace_path",
+                ],
+            },
+        )
+
     def test_run_state_writer_refuses_write_after_lock_takeover(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-82"

@@ -297,6 +297,8 @@ class _RunStateWriter:
         duration: float | int | None = None,
         metadata: Mapping[str, object] | None = None,
     ) -> Mapping[str, object]:
+        if event_type == "browser_observation":
+            metadata = _sanitize_browser_observation_metadata(metadata)
         return self._event_stream.append(
             phase=self.phase,
             event_type=event_type,
@@ -4171,6 +4173,50 @@ def _failure_summary(output: str | bytes | None, *, max_length: int = 240) -> st
     if len(summary) > max_length:
         return summary[: max_length - 3] + "..."
     return summary
+
+
+_BROWSER_OBSERVATION_ALLOWED_KEYS = frozenset(
+    {
+        "console_error_count",
+        "page_error_count",
+        "storage_key_count",
+        "state_hash",
+        "accessibility_summary",
+    }
+)
+_BROWSER_OBSERVATION_FORBIDDEN_KEYS = frozenset(
+    {
+        "raw_screenshot",
+        "screenshot",
+        "screenshot_path",
+        "screenshot_file",
+        "playwright_trace",
+        "trace",
+        "trace_path",
+        "trace_file",
+        "dom_dump",
+        "dom_dump_path",
+        "dom_snapshot",
+        "dom_snapshot_path",
+    }
+)
+
+
+def _sanitize_browser_observation_metadata(
+    metadata: Mapping[str, object] | None,
+) -> dict[str, object]:
+    sanitized: dict[str, object] = {}
+    if metadata is None:
+        return sanitized
+    for key in _BROWSER_OBSERVATION_ALLOWED_KEYS:
+        if key in metadata:
+            sanitized[key] = metadata[key]
+    forbidden = sorted(
+        key for key in metadata.keys() if key in _BROWSER_OBSERVATION_FORBIDDEN_KEYS
+    )
+    if forbidden:
+        sanitized["redacted_artifacts"] = forbidden
+    return sanitized
 
 
 def _prompt_hash(prompt: str) -> str:

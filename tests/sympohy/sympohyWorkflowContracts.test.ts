@@ -100,6 +100,12 @@ describe("sympohy watcher contract", () => {
     expect(runner).toContain("\"branch\"");
     expect(runner).toContain("\"plan_reference\"");
     expect(runner).toContain("\"last_known_progress\"");
+    expect(runner).toContain("\"browser_observation\"");
+    expect(runner).toContain("\"console_error_count\"");
+    expect(runner).toContain("\"page_error_count\"");
+    expect(runner).toContain("\"storage_key_count\"");
+    expect(runner).toContain("\"state_hash\"");
+    expect(runner).toContain("\"accessibility_summary\"");
   });
 
   it("recovers implementation from saved plans and existing worktree state", () => {
