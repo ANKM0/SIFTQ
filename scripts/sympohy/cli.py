@@ -17,6 +17,7 @@ from .core import (
     validate_commit_subject,
 )
 from .github import REQUIRED_LABELS, migrate_legacy_tasks, sync_labels
+from .observability import ObservationStore, rebuild_observation_store
 from .runner import refine_issue, resume_issue, run_issue, watch
 from .stage_gate import main as stage_gate_main
 from .systemd import (
@@ -64,6 +65,20 @@ def main(argv: list[str] | None = None) -> int:
     resume_parser = subcommands.add_parser("resume")
     resume_parser.add_argument("issue")
 
+    observe_replay_parser = subcommands.add_parser("observe-replay")
+    observe_replay_parser.add_argument("--run-dir", required=True)
+    observe_replay_parser.add_argument("--db")
+
+    observe_query_parser = subcommands.add_parser("observe-query")
+    observe_query_parser.add_argument("--db", required=True)
+    observe_query_parser.add_argument("--issue", type=int)
+    observe_query_parser.add_argument("--run-id")
+    observe_query_parser.add_argument("--phase")
+    observe_query_parser.add_argument("--event-type")
+    observe_query_parser.add_argument("--status")
+    observe_query_parser.add_argument("--text")
+    observe_query_parser.add_argument("--limit", type=int, default=100)
+
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
     contract_parser.add_argument("payload")
@@ -100,6 +115,42 @@ def main(argv: list[str] | None = None) -> int:
         return resume_issue(args.issue, config)
     if args.command == "watch":
         return watch(config)
+    if args.command == "observe-replay":
+        result = rebuild_observation_store(
+            log_dir=Path(args.run_dir),
+            db_path=None if args.db is None else Path(args.db),
+        )
+        print(
+            json.dumps(
+                {
+                    "source_path": str(result.source_path),
+                    "db_path": str(result.db_path),
+                    "event_count": result.event_count,
+                    "run_count": result.run_count,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+    if args.command == "observe-query":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.search_events(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                        phase=args.phase,
+                        event_type=args.event_type,
+                        status=args.status,
+                        text=args.text,
+                        limit=args.limit,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
     if args.command == "systemd-install":
         return install_systemd_units(ROOT)
     if args.command == "systemd-start":

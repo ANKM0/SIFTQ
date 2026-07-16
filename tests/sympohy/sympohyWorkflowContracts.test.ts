@@ -6,6 +6,7 @@ import config from "../../.sympohy/config.yaml?raw";
 import taskfile from "../../Taskfile.yml?raw";
 import cli from "../../scripts/sympohy/cli.py?raw";
 import core from "../../scripts/sympohy/core.py?raw";
+import observability from "../../scripts/sympohy/observability.py?raw";
 import runner from "../../scripts/sympohy/runner.py?raw";
 
 const ciCdWorkflows = [ciWorkflow, releaseWorkflow].join("\n");
@@ -33,6 +34,8 @@ describe("sympohy Taskfile and CLI integration", () => {
     );
     expect(cli).toContain("resume");
     expect(cli).toContain("migrate");
+    expect(cli).toContain("observe-replay");
+    expect(cli).toContain("observe-query");
     expect(cli).toContain("stage-gate");
   });
 
@@ -85,6 +88,9 @@ describe("sympohy watcher contract", () => {
   it("persists run state for stale-running inspection", () => {
     expect(runner).toContain("state.json");
     expect(runner).toContain("events.jsonl");
+    expect(observability).toContain("observations.sqlite3");
+    expect(observability).toContain("search_events");
+    expect(observability).toContain("aggregate_counts");
     expect(runner).toContain("\"run_id\"");
     expect(runner).toContain("\"event_id\"");
     expect(runner).toContain("\"lock\"");
