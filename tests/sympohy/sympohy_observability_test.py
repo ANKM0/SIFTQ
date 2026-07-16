@@ -10,6 +10,131 @@ from scripts.sympohy.observability import ObservationStore, rebuild_observation_
 
 
 class SympohyObservabilityTest(unittest.TestCase):
+    def test_replay_fixture_locks_schema_compatibility_and_rebuild_determinism(self) -> None:
+        fixture_path = (
+            Path(__file__).with_name("fixtures") / "observability_replay_issue_126.jsonl"
+        )
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            (log_dir / "events.jsonl").write_text(
+                fixture_path.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+
+            first = rebuild_observation_store(log_dir=log_dir)
+            second_db = log_dir / "observations-copy.sqlite3"
+            second = rebuild_observation_store(log_dir=log_dir, db_path=second_db)
+
+            with ObservationStore(first.db_path) as store:
+                analysis = store.analyze_failures(issue=126)
+                proposal = store.propose_improvements(issue=126)
+                application = store.apply_improvements(issue=126)
+                runs = store.list_runs(issue=126)
+                final_verifier_events = store.search_events(
+                    issue=126,
+                    phase="finalize",
+                    event_type="codex",
+                    limit=10,
+                )
+                recovery_events = store.search_events(
+                    issue=126,
+                    event_type="recovery",
+                    limit=10,
+                )
+            first_dump = self._sqlite_dump(first.db_path)
+            second_dump = self._sqlite_dump(second.db_path)
+
+        self.assertEqual(first.event_count, 13)
+        self.assertEqual(first.run_count, 6)
+        self.assertEqual(second.event_count, 13)
+        self.assertEqual(first_dump, second_dump)
+        self.assertEqual(
+            [run["run_id"] for run in runs],
+            [
+                "run-browser-1",
+                "run-final-1",
+                "run-final-2",
+                "run-resume-1",
+                "run-stale-1",
+                "run-stale-2",
+            ],
+        )
+        self.assertEqual(
+            analysis["failure_kind_counts"],
+            [
+                {"kind": "recovery", "count": 2},
+                {"kind": "browser", "count": 1},
+                {"kind": "command", "count": 1},
+                {"kind": "data", "count": 1},
+                {"kind": "policy", "count": 1},
+            ],
+        )
+        self.assertEqual(
+            analysis["resolved_failures"][0]["failure_signatures"],
+            ["command:task ci"],
+        )
+        self.assertEqual(
+            sorted(
+                chain["failure_signatures"][0]
+                for chain in analysis["blocked_failures"]
+            ),
+            [
+                "browser:console=2:page=1",
+                "data:codex:final_verifier:invalid_json",
+                "policy:stage_gate:review",
+                "recovery:unsafe_recovery_blocked",
+                "recovery:unsafe_recovery_blocked",
+            ],
+        )
+        self.assertEqual(
+            analysis["recurring_event_chain_patterns"][0],
+            {
+                "pattern": "recovery:unsafe_recovery_blocked",
+                "count": 2,
+                "run_ids": ["run-stale-1", "run-stale-2"],
+            },
+        )
+        self.assertEqual(
+            [bucket["phase"] for bucket in analysis["phase_dwell"]],
+            ["finalize", "implement", "planning", "review"],
+        )
+        self.assertEqual(proposal["schema_version"], 1)
+        self.assertEqual(proposal["issue"], 126)
+        self.assertEqual(
+            sorted(candidate["category"] for candidate in proposal["candidates"]),
+            ["config", "docs", "hook", "prompt", "skill", "stage_gate", "test"],
+        )
+        self.assertEqual(application["schema_version"], 1)
+        self.assertEqual(application["stop_after"], "verified_draft_pr")
+        self.assertEqual(
+            sorted(
+                candidate["category"]
+                for candidate in application["auto_apply_candidates"]
+            ),
+            ["config", "docs", "prompt", "test"],
+        )
+        self.assertEqual(
+            sorted(
+                candidate["category"]
+                for candidate in application["manual_review_candidates"]
+            ),
+            ["hook", "skill", "stage_gate"],
+        )
+        self.assertEqual(
+            [event["metadata"]["role"] for event in final_verifier_events],
+            ["final_verifier", "final_verifier"],
+        )
+        self.assertEqual(
+            [event["metadata"]["event"] for event in recovery_events],
+            [
+                "late_phase_recovery_resumed",
+                "unsafe_recovery_blocked",
+                "unsafe_recovery_blocked",
+            ],
+        )
+
     def test_rebuilds_deterministic_store_from_event_stream(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-126"
