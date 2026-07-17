@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -129,6 +130,56 @@ class _PullRequestMergeability:
         return "GitHub reports " + ", ".join(details) + "."
 
 
+class _RunEventStream:
+    def __init__(
+        self,
+        *,
+        issue_number: int,
+        log_dir: Path,
+        run_id: str,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self.issue_number = issue_number
+        self.log_dir = log_dir
+        self.run_id = run_id
+        self._clock = clock
+        self._next_event_index = 1
+
+    @property
+    def path(self) -> Path:
+        return self.log_dir / "events.jsonl"
+
+    def append(
+        self,
+        *,
+        phase: str | None,
+        event_type: str,
+        status: str,
+        summary: str,
+        attempt: int | None = None,
+        duration: float | int | None = None,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "run_id": self.run_id,
+            "event_id": f"{self.run_id}-{self._next_event_index:06d}",
+            "issue": self.issue_number,
+            "phase": phase,
+            "event_type": event_type,
+            "status": status,
+            "attempt": attempt,
+            "duration": duration,
+            "summary": summary,
+            "metadata": dict(metadata or {}),
+            "timestamp": _isoformat_utc(self._clock()),
+        }
+        with self.path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+        self._next_event_index += 1
+        return payload
+
+
 class _RunStateWriter:
     def __init__(
         self,
@@ -158,6 +209,12 @@ class _RunStateWriter:
         self.last_known_progress: Mapping[str, object] = {}
         self.last_recovery: Mapping[str, object] | None = None
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._event_stream = _RunEventStream(
+            issue_number=issue_number,
+            log_dir=log_dir,
+            run_id=self.run_id,
+            clock=self._clock,
+        )
 
     @property
     def state_path(self) -> Path:
@@ -230,6 +287,27 @@ class _RunStateWriter:
     def heartbeat(self) -> None:
         self.write()
 
+    def record_event(
+        self,
+        *,
+        event_type: str,
+        status: str,
+        summary: str,
+        attempt: int | None = None,
+        duration: float | int | None = None,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        metadata = _sanitize_event_metadata(event_type=event_type, metadata=metadata)
+        return self._event_stream.append(
+            phase=self.phase,
+            event_type=event_type,
+            status=status,
+            summary=summary,
+            attempt=attempt,
+            duration=duration,
+            metadata=metadata,
+        )
+
     def record_recovery(
         self,
         event: str,
@@ -247,7 +325,27 @@ class _RunStateWriter:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         with (self.log_dir / "recovery.log").open("a", encoding="utf-8") as log:
             log.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+        self.record_event(
+            event_type="recovery",
+            status=_recovery_event_status(event),
+            summary=event.replace("_", " "),
+            metadata={"event": event, **dict(details or {})},
+        )
         self.write(progress=self.last_known_progress)
+
+    def record_browser_observation(
+        self,
+        *,
+        status: str,
+        summary: str,
+        metadata: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]:
+        return self.record_event(
+            event_type="browser_observation",
+            status=status,
+            summary=summary,
+            metadata=metadata,
+        )
 
 
 _ACTIVE_RUN_STATE: _RunStateWriter | None = None
@@ -279,6 +377,12 @@ def _interrupt_signal_numbers() -> tuple[int, ...]:
     return tuple(numbers)
 
 
+def _recovery_event_status(event: str) -> str:
+    if event.endswith("_blocked"):
+        return "block"
+    return "success"
+
+
 def _handle_run_interrupt(signum: int, _frame: object) -> None:
     state = _ACTIVE_RUN_STATE
     if state is not None:
@@ -287,13 +391,20 @@ def _handle_run_interrupt(signum: int, _frame: object) -> None:
 
 
 def _record_run_interrupted(state: _RunStateWriter, signum: int) -> None:
+    signal_name = _signal_name(signum)
     progress = dict(state.last_known_progress)
     progress.update(
         {
             "message": "interrupted by signal",
-            "signal": _signal_name(signum),
+            "signal": signal_name,
             "resume_action": "resume_interrupted_run",
         }
+    )
+    state.record_event(
+        event_type="command",
+        status="interrupted",
+        summary="run interrupted by signal",
+        metadata={"signal": signal_name},
     )
     state.write(status="interrupted", progress=progress)
 
@@ -360,6 +471,7 @@ def _run_stage_gate(
         "--input",
         str(input_path.resolve()),
     ]
+    started_at = time.monotonic()
     completed = subprocess.run(
         command,
         cwd=cwd,
@@ -385,6 +497,21 @@ def _run_stage_gate(
     if completed.returncode != 0 and result.get("status") == "pass":
         result["status"] = "block"
         result["reason"] = "stage gate command failed after reporting pass"
+    if state is not None:
+        stage_gate_status = str(result.get("status", "block"))
+        reason = str(result.get("reason", "")).strip()
+        state.record_event(
+            event_type="stage_gate",
+            status=stage_gate_status,
+            summary=f"{stage} stage gate {stage_gate_status}",
+            duration=_elapsed_seconds(started_at),
+            metadata={
+                "stage": stage,
+                "command": config.stage_gate_command,
+                "returncode": completed.returncode,
+                "failure_summary": reason or _failure_summary(completed.stderr),
+            },
+        )
     output_path.write_text(
         json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -473,6 +600,7 @@ def _prepare_document_artifacts(
             worktree=worktree,
             log_path=decisions_path,
             heartbeat=state.heartbeat,
+            state=state,
         )
 
     for stage in ("requirements", "design", "wireframes", "adr"):
@@ -541,6 +669,7 @@ def _prepare_document_artifacts(
                 worktree=worktree,
                 log_path=fix_log_path,
                 heartbeat=state.heartbeat,
+                state=state,
                 repair_stage=stage,
                 repair_reason=str(result.get("reason", "")),
                 previous_decisions=decisions,
@@ -568,6 +697,7 @@ def _request_artifact_decisions(
     worktree: Path,
     log_path: Path,
     heartbeat: Callable[[], None] | None,
+    state: _RunStateWriter | None = None,
     repair_stage: str | None = None,
     repair_reason: str | None = None,
     previous_decisions: Mapping[str, object] | None = None,
@@ -608,6 +738,7 @@ def _request_artifact_decisions(
         heartbeat=heartbeat,
         config=config,
         role="planning",
+        state=state,
     )
     return _artifact_decisions(payload)
 
@@ -953,6 +1084,8 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 issue,
                 terminal_name=resume_point.name,
                 phase=terminal_phase,
+                cwd=Path.cwd(),
+                state=state,
             )
         finally:
             lock.release()
@@ -1104,6 +1237,8 @@ def _reconcile_terminal_issue_state(
     *,
     terminal_name: str,
     phase: str,
+    cwd: Path,
+    state: _RunStateWriter,
 ) -> None:
     if terminal_name == "completed":
         if (
@@ -1117,7 +1252,12 @@ def _reconcile_terminal_issue_state(
                 phase=phase,
             )
         if issue.state in {"OPEN", "open"}:
-            subprocess.check_call(["gh", "issue", "close", issue_ref])
+            _check_call_with_heartbeat(
+                ["gh", "issue", "close", issue_ref],
+                cwd=cwd,
+                heartbeat=state.heartbeat,
+                state=state,
+            )
         return
 
     if terminal_name == "blocked" and (
@@ -1404,6 +1544,7 @@ def _run_issue_locked(
                 heartbeat=state.heartbeat,
                 issue_number=issue.number,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -1466,6 +1607,7 @@ def _run_issue_locked(
             heartbeat=state.heartbeat,
             config=config,
             role="planning",
+            state=state,
         )
     logical_steps = _logical_steps(plan)
     total_steps = len(logical_steps)
@@ -1599,6 +1741,7 @@ def _run_issue_locked(
                 heartbeat=state.heartbeat,
                 issue_number=issue.number,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -1694,16 +1837,37 @@ def _run_issue_locked(
                     heartbeat=state.heartbeat,
                     config=config,
                     role="implementation",
+                    state=state,
                 )
             state.write(
                 phase="hooks",
                 progress={
-                    "message": "running verification hooks",
+                    "message": "running scoped validation and repository gate",
                     "current_logical_step": index,
                     "completed_logical_steps": index,
                     "total_logical_steps": total_steps,
                 },
             )
+            if _run_preflight_validations(
+                config.ci_retry_max_attempts,
+                worktree,
+                log_dir,
+                config=config,
+                state=state,
+                logical_step=index,
+                total_logical_steps=total_steps,
+            ) != 0:
+                _block(
+                    issue_ref,
+                    phase="hooks",
+                    failed_command="scoped validation",
+                    attempts=config.ci_retry_max_attempts,
+                    cause="scoped validation still failed after retries",
+                    run_log_path=log_dir,
+                    cwd=worktree,
+                    state=state,
+                )
+                return 2
             if _run_hooks(
                 config.hooks,
                 config.ci_retry_max_attempts,
@@ -1782,6 +1946,7 @@ def _run_issue_locked(
             issue_number=issue.number,
             heartbeat=state.heartbeat,
             base_branch=config.base_branch,
+            state=state,
         )
     except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
         _block(
@@ -1977,6 +2142,7 @@ def _resume_late_phase(
                 issue_number=issue.number,
                 heartbeat=state.heartbeat,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -2118,7 +2284,12 @@ def _run_review_fix_round(
         base_branch=config.base_branch,
         existing_subjects=existing_fix_subjects,
     ):
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
         state.write(
             phase="review",
             progress={
@@ -2156,6 +2327,7 @@ def _run_review_fix_round(
         heartbeat=state.heartbeat,
         config=config,
         role="fix",
+        state=state,
     )
     if not _worktree_has_changes(cwd):
         state.write(
@@ -2175,7 +2347,12 @@ def _run_review_fix_round(
         existing_subjects=existing_fix_subjects,
     )
     if committed:
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
     state.write(
         phase="review",
         progress={
@@ -2406,6 +2583,11 @@ def _run_final_verifier_and_merge(
 
     empty_review = parse_review_json('{"findings":[]}')
     pull_request_number = _resolve_pull_request_number(worktree)
+    state.write(
+        phase="finalize",
+        progress={"message": "capturing browser observation"},
+    )
+    _record_browser_observation_boundary(state=state, log_dir=log_dir)
     verifier_attempt = 0
     while True:
         verifier_attempt += 1
@@ -2429,6 +2611,7 @@ def _run_final_verifier_and_merge(
             heartbeat=state.heartbeat,
             config=config,
             role="merge_readiness",
+            state=state,
         )
         final = _final_verifier_with_stage_status(final)
         _persist_final_verifier_artifacts(log_dir, final_verifier_path, final)
@@ -2558,16 +2741,19 @@ def _run_final_verifier_and_merge(
         ["gh", "pr", "ready"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     _check_call_with_heartbeat(
         ["gh", "pr", "checks", "--watch"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     _check_call_with_heartbeat(
         ["gh", "pr", "merge", "--squash", "--delete-branch"],
         cwd=worktree,
         heartbeat=state.heartbeat,
+        state=state,
     )
     return _finish_merged_issue(
         issue_ref,
@@ -2679,6 +2865,24 @@ def _run_final_verifier_fix_round(
         base_branch=config.base_branch,
         existing_subjects=existing_fix_subjects,
     ):
+        if _run_preflight_validations(
+            config.ci_retry_max_attempts,
+            cwd,
+            log_dir,
+            config=config,
+            state=state,
+        ) != 0:
+            _block(
+                issue_ref,
+                phase="hooks",
+                failed_command="scoped validation",
+                attempts=config.ci_retry_max_attempts,
+                cause="scoped validation still failed after final verifier fix retries",
+                run_log_path=log_dir,
+                cwd=cwd,
+                state=state,
+            )
+            return 2
         if _run_hooks(
             config.hooks,
             config.ci_retry_max_attempts,
@@ -2698,7 +2902,12 @@ def _run_final_verifier_fix_round(
                 state=state,
             )
             return 2
-        _check_call_with_heartbeat(["git", "push"], cwd=cwd, heartbeat=state.heartbeat)
+        _check_call_with_heartbeat(
+            ["git", "push"],
+            cwd=cwd,
+            heartbeat=state.heartbeat,
+            state=state,
+        )
         state.write(
             phase="finalize",
             progress={
@@ -2748,6 +2957,7 @@ def _run_final_verifier_fix_round(
         heartbeat=state.heartbeat,
         config=config,
         role="fix",
+        state=state,
     )
 
     if not _worktree_has_changes(cwd):
@@ -2760,6 +2970,25 @@ def _run_final_verifier_fix_round(
                 "final verifier fix produced no changes for commit subject: "
                 f"{subject}"
             ),
+            run_log_path=log_dir,
+            cwd=cwd,
+            state=state,
+        )
+        return 2
+
+    if _run_preflight_validations(
+        config.ci_retry_max_attempts,
+        cwd,
+        log_dir,
+        config=config,
+        state=state,
+    ) != 0:
+        _block(
+            issue_ref,
+            phase="hooks",
+            failed_command="scoped validation",
+            attempts=config.ci_retry_max_attempts,
+            cause="scoped validation still failed after final verifier fix retries",
             run_log_path=log_dir,
             cwd=cwd,
             state=state,
@@ -2797,6 +3026,7 @@ def _run_final_verifier_fix_round(
             ["git", "push"],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     state.write(
         phase="finalize",
@@ -2831,7 +3061,12 @@ def _finish_merged_issue(
     message: str,
 ) -> int:
     if worktree.exists():
-        subprocess.check_call(["git", "worktree", "remove", str(worktree)])
+        _check_call_with_heartbeat(
+            ["git", "worktree", "remove", str(worktree)],
+            cwd=Path.cwd(),
+            heartbeat=state.heartbeat,
+            state=state,
+        )
     done_progress: dict[str, object] = {"message": message}
     if total_steps is not None:
         done_progress["completed_logical_steps"] = total_steps
@@ -2847,7 +3082,12 @@ def _finish_merged_issue(
         status="sympohy:done",
         phase="finalize",
     )
-    subprocess.check_call(["gh", "issue", "close", issue_ref])
+    _check_call_with_heartbeat(
+        ["gh", "issue", "close", issue_ref],
+        cwd=Path.cwd(),
+        heartbeat=state.heartbeat,
+        state=state,
+    )
     return 0
 
 
@@ -2880,6 +3120,7 @@ def _run_hooks(
                 if total_logical_steps is not None:
                     progress["total_logical_steps"] = total_logical_steps
                 state.write(phase="hooks", progress=progress)
+            started_at = time.monotonic()
             with log_path.open("w", encoding="utf-8") as log:
                 returncode = _run_command_with_heartbeat(
                     shlex.split(command),
@@ -2888,6 +3129,29 @@ def _run_hooks(
                     stderr=subprocess.STDOUT,
                     text=True,
                     heartbeat=state.heartbeat if state is not None else None,
+                )
+            if state is not None:
+                failure_summary = ""
+                test_failures: list[dict[str, object]] = []
+                if returncode != 0:
+                    hook_output = log_path.read_text(encoding="utf-8")
+                    failure_summary = _failure_summary(hook_output)
+                    test_failures = _extract_test_failures(hook_output)
+                metadata: dict[str, object] = {
+                    "command": command,
+                    "hook_index": hook_index,
+                    "returncode": returncode,
+                    "failure_summary": failure_summary,
+                }
+                if test_failures:
+                    metadata["test_failures"] = test_failures
+                state.record_event(
+                    event_type="hook",
+                    status="success" if returncode == 0 else "retry",
+                    summary=f"hook {'passed' if returncode == 0 else 'failed'}: {command}",
+                    attempt=attempts,
+                    duration=_elapsed_seconds(started_at),
+                    metadata=metadata,
                 )
             if returncode == 0:
                 break
@@ -2903,8 +3167,137 @@ def _run_hooks(
                 heartbeat=state.heartbeat if state is not None else None,
                 config=config if state is not None else None,
                 role="fix",
+                state=state,
             )
     return 0
+
+
+def _changed_worktree_paths(cwd: Path) -> list[str]:
+    seen: set[str] = set()
+    paths: list[str] = []
+    try:
+        status_output = _worktree_status(cwd)
+    except subprocess.CalledProcessError:
+        return paths
+    for line in status_output.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:].strip()
+        if " -> " in path:
+            path = path.rsplit(" -> ", 1)[-1].strip()
+        if not path:
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        paths.append(path)
+    return paths
+
+
+def _preflight_validation_commands(changed_paths: Sequence[str]) -> list[str]:
+    commands: list[str] = []
+
+    def add(command: str) -> None:
+        if command not in commands:
+            commands.append(command)
+
+    has_frontend_changes = False
+    has_python_changes = False
+    needs_generic_pytest = False
+
+    python_test_commands = (
+        (
+            ("scripts/sympohy/runner.py", "tests/sympohy/sympohy_runner_test.py"),
+            "task pytest -- tests/sympohy/sympohy_runner_test.py",
+        ),
+        (
+            (
+                "scripts/sympohy/observability.py",
+                "tests/sympohy/sympohy_observability_test.py",
+                "tests/sympohy/fixtures/observability_replay_issue_126.jsonl",
+            ),
+            "task pytest -- tests/sympohy/sympohy_observability_test.py",
+        ),
+        (
+            ("scripts/sympohy/stage_gate.py", "tests/sympohy/sympohy_stage_gate_test.py"),
+            "task pytest -- tests/sympohy/sympohy_stage_gate_test.py",
+        ),
+        (
+            ("scripts/sympohy/config.py", "tests/sympohy/sympohy_config_test.py"),
+            "task pytest -- tests/sympohy/sympohy_config_test.py",
+        ),
+        (
+            ("scripts/sympohy/core.py", "tests/sympohy/sympohy_core_test.py"),
+            "task pytest -- tests/sympohy/sympohy_core_test.py",
+        ),
+        (
+            (
+                "scripts/sympohy/github.py",
+                "tests/sympohy/sympohy_github_test.py",
+            ),
+            "task pytest -- tests/sympohy/sympohy_github_test.py",
+        ),
+    )
+
+    for path in changed_paths:
+        if path.endswith(".md"):
+            add("task ci:markdown")
+        if path.startswith(("docs/adr/", "docs/design/", "docs/requirements/", "docs/wireframes/")):
+            add("task codd:validate")
+        if path in {"Taskfile.yml", ".github/workflows/ci.yml"}:
+            add("task ci:lint:task-refs")
+        if path in {"Taskfile.yml", ".codex/rules/siftq.rules"}:
+            add("task ci:lint:codex-task-perms")
+        if path.endswith((".ts", ".tsx", ".js", ".jsx", ".css", ".html")) or path.startswith(
+            ("src/", "tests/docs/")
+        ):
+            has_frontend_changes = True
+        if path.endswith(".py") or path.startswith("tests/sympohy/"):
+            has_python_changes = True
+            matched_python_test = False
+            for prefixes, command in python_test_commands:
+                if any(path.startswith(prefix) for prefix in prefixes):
+                    add(command)
+                    matched_python_test = True
+                    break
+            if not matched_python_test and (
+                path.startswith("scripts/sympohy/") or path.startswith("tests/sympohy/")
+            ):
+                needs_generic_pytest = True
+
+    if has_frontend_changes:
+        add("task ci:typecheck")
+        add("task ci:lint")
+        add("task ci:test")
+        add("task ci:build")
+    if has_python_changes and needs_generic_pytest:
+        add("task pytest")
+    return commands
+
+
+def _run_preflight_validations(
+    retry_max_attempts: int,
+    cwd: Path,
+    log_dir: Path,
+    *,
+    config: SympohyConfig | None = None,
+    state: _RunStateWriter | None = None,
+    logical_step: int | None = None,
+    total_logical_steps: int | None = None,
+) -> int:
+    commands = _preflight_validation_commands(_changed_worktree_paths(cwd))
+    if not commands:
+        return 0
+    return _run_hooks(
+        commands,
+        retry_max_attempts,
+        cwd,
+        log_dir,
+        config=config,
+        state=state,
+        logical_step=logical_step,
+        total_logical_steps=total_logical_steps,
+    )
 
 
 def _review_fix_loop(
@@ -2970,10 +3363,25 @@ def _review_fix_loop(
             heartbeat=state.heartbeat,
             config=config,
             role="review",
+            state=state,
         )
         review = parse_review_json(review_json)
         review_json = _review_json_with_stage_status(review)
         review_log_path.write_text(review_json, encoding="utf-8")
+        state.record_event(
+            event_type="review",
+            status=review.stage_gate_status,
+            summary=f"review round {round_index} {review.stage_gate_status}",
+            attempt=round_index,
+            metadata={
+                "reviewer_role": "adversarial-review",
+                "review_round": round_index,
+                "blocking_findings_summary": _summarize_review_findings(
+                    review.blocking_findings
+                ),
+                "finding_count": len(review.findings),
+            },
+        )
         review_result = _run_review_fix_round(
             issue_ref,
             issue,
@@ -3093,14 +3501,24 @@ def _attempt_pre_review_mergeability_autofix(
             ["git", "fetch", "origin", pull_request.base_ref],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     except subprocess.CalledProcessError as exc:
         return f"git fetch failed with exit code {exc.returncode}"
 
+    merge_command = ["git", "merge", "--no-ff", "--no-commit", merge_target]
+    merge_started_at = time.monotonic()
     merge_returncode = _run_command_with_heartbeat(
-        ["git", "merge", "--no-ff", "--no-commit", merge_target],
+        merge_command,
         cwd=cwd,
         heartbeat=state.heartbeat,
+    )
+    _record_command_event(
+        state=state,
+        args=merge_command,
+        status="success" if merge_returncode == 0 else "failed",
+        duration=_elapsed_seconds(merge_started_at),
+        returncode=merge_returncode,
     )
     if merge_returncode not in {0, 1}:
         return f"git merge exited with unexpected status {merge_returncode}"
@@ -3119,6 +3537,7 @@ def _attempt_pre_review_mergeability_autofix(
             heartbeat=state.heartbeat,
             config=config,
             role="fix",
+            state=state,
         )
 
     if _worktree_has_conflict_markers(cwd):
@@ -3150,6 +3569,7 @@ def _attempt_pre_review_mergeability_autofix(
             ["git", "push"],
             cwd=cwd,
             heartbeat=state.heartbeat,
+            state=state,
         )
     except subprocess.CalledProcessError as exc:
         return f"git push failed with exit code {exc.returncode}"
@@ -3237,6 +3657,18 @@ def _block(
             status="blocked",
             progress=progress,
         )
+        state.record_event(
+            event_type="command",
+            status="blocked",
+            summary=f"blocked: {failed_command}",
+            attempt=attempts,
+            metadata={
+                "command": failed_command,
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+                **dict(details or {}),
+            },
+        )
     detail_lines = ""
     if details:
         detail_lines = "".join(f"- {key}: {value}\n" for key, value in details.items())
@@ -3291,6 +3723,22 @@ def _block_mergeability_conflict(
                 "recommended_action": recommended_action,
             },
         )
+        state.record_event(
+            event_type="command",
+            status="blocked",
+            summary="blocked: mergeability gate",
+            attempt=1,
+            metadata={
+                "command": "mergeability gate",
+                "cause": cause,
+                "run_log_path": str(run_log_path),
+                "pull_request_number": pull_request.number,
+                "base_ref": pull_request.base_ref,
+                "head_ref": pull_request.head_ref,
+                "conflict_summary": pull_request.conflict_summary(),
+                "recommended_action": recommended_action,
+            },
+        )
     set_issue_state(
         issue_ref,
         current_labels=("sympohy:running", f"sympohy:phase:{phase}"),
@@ -3325,18 +3773,86 @@ def _codex_json(
     heartbeat: Callable[[], None] | None = None,
     config: SympohyConfig | None = None,
     role: str = "default",
+    state: _RunStateWriter | None = None,
 ) -> Mapping[str, object]:
-    output = _codex_text(
-        prompts,
-        cwd=cwd,
-        log_path=log_path,
-        heartbeat=heartbeat,
-        config=config,
+    prompt = "\n\n".join(prompts)
+    model_config = config.codex_model_for(role) if config is not None else None
+    _record_prompt_instruction_sources(state=state, cwd=cwd, prompt=prompt)
+    started_at = time.monotonic()
+    try:
+        output = _check_output_with_heartbeat(
+            _codex_exec_args(prompt, config=config, role=role),
+            cwd=cwd,
+            heartbeat=heartbeat,
+            log_path=log_path,
+        )
+    except subprocess.CalledProcessError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status="not_attempted",
+            duration=_elapsed_seconds(started_at),
+            returncode=exc.returncode,
+            failure_summary=_failure_summary(exc.output),
+        )
+        raise
+
+    parse_status = "parsed"
+    try:
+        payload = json.loads(output)
+        if not isinstance(payload, Mapping):
+            parse_status = "non_object"
+            raise ValueError("Codex JSON output must be an object")
+    except json.JSONDecodeError as exc:
+        parse_status = "invalid_json"
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status=parse_status,
+            duration=_elapsed_seconds(started_at),
+            returncode=0,
+            failure_summary=_failure_summary(str(exc)),
+        )
+        raise
+    except ValueError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status=parse_status,
+            duration=_elapsed_seconds(started_at),
+            returncode=0,
+            failure_summary=_failure_summary(str(exc)),
+        )
+        raise
+
+    _record_codex_event(
+        state=state,
         role=role,
+        model=model_config.model if model_config is not None else None,
+        reasoning_effort=(
+            model_config.reasoning_effort if model_config is not None else None
+        ),
+        prompt=prompt,
+        parse_status=parse_status,
+        duration=_elapsed_seconds(started_at),
+        returncode=0,
+        failure_summary="",
     )
-    payload = json.loads(output)
-    if not isinstance(payload, Mapping):
-        raise ValueError("Codex JSON output must be an object")
     return payload
 
 
@@ -3348,13 +3864,46 @@ def _codex_text(
     heartbeat: Callable[[], None] | None = None,
     config: SympohyConfig | None = None,
     role: str = "default",
+    state: _RunStateWriter | None = None,
 ) -> str:
     prompt = "\n\n".join(prompts)
-    output = _check_output_with_heartbeat(
-        _codex_exec_args(prompt, config=config, role=role),
-        cwd=cwd,
-        heartbeat=heartbeat,
-        log_path=log_path,
+    model_config = config.codex_model_for(role) if config is not None else None
+    _record_prompt_instruction_sources(state=state, cwd=cwd, prompt=prompt)
+    started_at = time.monotonic()
+    try:
+        output = _check_output_with_heartbeat(
+            _codex_exec_args(prompt, config=config, role=role),
+            cwd=cwd,
+            heartbeat=heartbeat,
+            log_path=log_path,
+        )
+    except subprocess.CalledProcessError as exc:
+        _record_codex_event(
+            state=state,
+            role=role,
+            model=model_config.model if model_config is not None else None,
+            reasoning_effort=(
+                model_config.reasoning_effort if model_config is not None else None
+            ),
+            prompt=prompt,
+            parse_status="not_requested",
+            duration=_elapsed_seconds(started_at),
+            returncode=exc.returncode,
+            failure_summary=_failure_summary(exc.output),
+        )
+        raise
+    _record_codex_event(
+        state=state,
+        role=role,
+        model=model_config.model if model_config is not None else None,
+        reasoning_effort=(
+            model_config.reasoning_effort if model_config is not None else None
+        ),
+        prompt=prompt,
+        parse_status="not_requested",
+        duration=_elapsed_seconds(started_at),
+        returncode=0,
+        failure_summary="",
     )
     return output
 
@@ -3510,10 +4059,60 @@ def _check_call_with_heartbeat(
     *,
     cwd: Path,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
-    returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
+    started_at = time.monotonic()
+    returncode: int | None = None
+    try:
+        returncode = _run_command_with_heartbeat(args, cwd=cwd, heartbeat=heartbeat)
+    except Exception as exc:
+        _record_command_event(
+            state=state,
+            args=args,
+            status="failed",
+            duration=_elapsed_seconds(started_at),
+            returncode=returncode,
+            failure_summary=str(exc),
+        )
+        raise
+    _record_command_event(
+        state=state,
+        args=args,
+        status="success" if returncode == 0 else "failed",
+        duration=_elapsed_seconds(started_at),
+        returncode=returncode,
+    )
     if returncode != 0:
         raise subprocess.CalledProcessError(returncode, args)
+
+
+def _record_command_event(
+    *,
+    state: _RunStateWriter | None,
+    args: Sequence[str],
+    status: str,
+    duration: float | int | None,
+    returncode: int | None,
+    failure_summary: str = "",
+) -> None:
+    if state is None:
+        return
+    command = shlex.join(str(arg) for arg in args)
+    metadata: dict[str, object] = {
+        "command": command,
+        "argv": [str(arg) for arg in args],
+    }
+    if returncode is not None:
+        metadata["returncode"] = returncode
+    if failure_summary:
+        metadata["failure_summary"] = _failure_summary(failure_summary)
+    state.record_event(
+        event_type="command",
+        status=status,
+        summary=f"command {status}: {command}",
+        duration=duration,
+        metadata=metadata,
+    )
 
 
 def _terminate_process(process: subprocess.Popen[object]) -> None:
@@ -3902,6 +4501,588 @@ def _worktree_status(cwd: Path) -> str:
     return output
 
 
+def _elapsed_seconds(started_at: float) -> float:
+    return round(time.monotonic() - started_at, 6)
+
+
+def _failure_summary(output: str | bytes | None, *, max_length: int = 240) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        text = output.decode("utf-8", errors="replace")
+    else:
+        text = output
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    summary = lines[0]
+    if len(summary) > max_length:
+        return summary[: max_length - 3] + "..."
+    return summary
+
+
+def _extract_test_failures(
+    output: str | bytes | None,
+) -> list[dict[str, object]]:
+    if output is None:
+        return []
+    if isinstance(output, bytes):
+        text = output.decode("utf-8", errors="replace")
+    else:
+        text = output
+    if not text.strip():
+        return []
+    failures = _extract_pytest_failures(text)
+    failures.extend(_extract_vitest_failures(text))
+    deduped: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str, int | None, str]] = set()
+    for failure in failures:
+        key = (
+            str(failure["runner"]),
+            str(failure["name"]),
+            str(failure["file"]),
+            int(failure["line"]) if isinstance(failure.get("line"), int) else None,
+            str(failure["summary"]),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(failure)
+        if len(deduped) >= _TEST_FAILURE_MAX_ITEMS:
+            break
+    return deduped
+
+
+def _extract_pytest_failures(text: str) -> list[dict[str, object]]:
+    failures: list[dict[str, object]] = []
+    for match in re.finditer(
+        r"(?m)^FAILED\s+(?P<nodeid>\S+?)(?:\s+-\s+(?P<summary>.+))?$",
+        text,
+    ):
+        nodeid = match.group("nodeid").strip()
+        if not nodeid:
+            continue
+        file_path = nodeid.split("::", 1)[0]
+        summary = (match.group("summary") or "").strip() or "pytest failure"
+        failures.append(
+            {
+                "runner": "pytest",
+                "name": nodeid,
+                "file": file_path,
+                "line": _extract_source_line(text, file_path),
+                "summary": _truncate_text(
+                    summary,
+                    max_length=_EVENT_METADATA_MAX_STRING_LENGTH,
+                ),
+            }
+        )
+    return failures
+
+
+def _extract_vitest_failures(text: str) -> list[dict[str, object]]:
+    failures: list[dict[str, object]] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("FAIL "):
+            continue
+        header = stripped[len("FAIL ") :].strip()
+        if not header:
+            continue
+        file_path, name = _split_vitest_header(header)
+        failures.append(
+            {
+                "runner": "vitest",
+                "name": name,
+                "file": file_path,
+                "line": _extract_vitest_location(lines, index + 1, file_path),
+                "summary": _truncate_text(
+                    _extract_vitest_summary(lines, index + 1) or "vitest failure",
+                    max_length=_EVENT_METADATA_MAX_STRING_LENGTH,
+                ),
+            }
+        )
+    return failures
+
+
+def _split_vitest_header(header: str) -> tuple[str, str]:
+    if " > " not in header:
+        return header, header
+    file_path, _, name = header.partition(" > ")
+    return file_path.strip(), name.strip() or file_path.strip()
+
+
+def _extract_vitest_location(
+    lines: Sequence[str],
+    start_index: int,
+    file_path: str,
+) -> int | None:
+    location_re = re.compile(r"^\s*[❯>]\s+(?P<file>[^:]+):(?P<line>\d+):\d+")
+    fallback_re = re.compile(r"^\s*at\s+(?P<file>[^:]+):(?P<line>\d+):\d+")
+    for line in lines[start_index : start_index + 8]:
+        match = location_re.match(line) or fallback_re.match(line)
+        if match is None:
+            continue
+        matched_file = match.group("file").strip()
+        if matched_file == file_path:
+            return int(match.group("line"))
+    return None
+
+
+def _extract_vitest_summary(lines: Sequence[str], start_index: int) -> str:
+    for line in lines[start_index : start_index + 8]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith(("❯ ", "> ", "at ")):
+            continue
+        if stripped.startswith(("FAIL ", "stdout", "stderr")):
+            continue
+        return stripped
+    return ""
+
+
+def _extract_source_line(text: str, file_path: str) -> int | None:
+    match = re.search(rf"(?m)^{re.escape(file_path)}:(?P<line>\d+):", text)
+    if match is None:
+        return None
+    return int(match.group("line"))
+
+
+_BROWSER_OBSERVATION_ALLOWED_KEYS = frozenset(
+    {
+        "console_error_count",
+        "page_error_count",
+        "storage_key_count",
+        "state_hash",
+        "accessibility_summary",
+        "source",
+        "source_path",
+        "reason",
+        "parse_error",
+    }
+)
+_BROWSER_OBSERVATION_COUNT_KEYS = frozenset(
+    {
+        "console_error_count",
+        "page_error_count",
+        "storage_key_count",
+    }
+)
+_BROWSER_OBSERVATION_FORBIDDEN_KEYS = frozenset(
+    {
+        "raw_screenshot",
+        "screenshot",
+        "screenshot_path",
+        "screenshot_file",
+        "playwright_trace",
+        "trace",
+        "trace_path",
+        "trace_file",
+        "dom_dump",
+        "dom_dump_path",
+        "dom_snapshot",
+        "dom_snapshot_path",
+    }
+)
+_EVENT_METADATA_MAX_DEPTH = 4
+_EVENT_METADATA_MAX_KEYS = 16
+_EVENT_METADATA_MAX_ITEMS = 16
+_EVENT_METADATA_MAX_STRING_LENGTH = 240
+_TEST_FAILURE_MAX_ITEMS = 8
+_DEVELOPER_INSTRUCTION_SUMMARY_MAX_LENGTH = 160
+_DEVELOPER_INSTRUCTION_MAX_SOURCE_BYTES = 64 * 1024
+_DEVELOPER_INSTRUCTION_PRIVATE_PATH_PARTS = frozenset(
+    {
+        ".git",
+        ".ssh",
+        ".aws",
+        ".config",
+    }
+)
+_DEVELOPER_INSTRUCTION_PRIVATE_PATH_PATTERNS = (
+    ".env",
+    ".env.local",
+    ".env.production",
+    "auth.json",
+    ".sympohy/config.yaml",
+)
+_DEVELOPER_INSTRUCTION_ALLOWED_SUFFIXES = frozenset({".md", ".rules"})
+
+
+def _sanitize_browser_observation_metadata(
+    metadata: Mapping[str, object] | None,
+) -> dict[str, object]:
+    sanitized: dict[str, object] = {}
+    if metadata is None:
+        return sanitized
+    for key in _BROWSER_OBSERVATION_ALLOWED_KEYS:
+        if key in metadata:
+            sanitized[key] = metadata[key]
+    forbidden = sorted(
+        key for key in metadata.keys() if key in _BROWSER_OBSERVATION_FORBIDDEN_KEYS
+    )
+    if forbidden:
+        sanitized["redacted_artifacts"] = forbidden
+    return sanitized
+
+
+def _record_browser_observation_boundary(
+    *,
+    state: _RunStateWriter,
+    log_dir: Path,
+) -> None:
+    source_path = log_dir / "browser-observation.json"
+    if not source_path.exists():
+        state.record_browser_observation(
+            status="skipped",
+            summary="browser observation source not configured",
+            metadata={
+                "source": "browser-observation.json",
+                "reason": "missing_lightweight_observation_file",
+            },
+        )
+        return
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source could not be parsed",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": str(exc),
+            },
+        )
+        return
+    if not isinstance(payload, Mapping):
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source was not an object",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": "expected JSON object",
+            },
+        )
+        return
+    try:
+        observed = _normalize_browser_observation_payload(payload)
+    except ValueError as exc:
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source had invalid lightweight metrics",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": str(exc),
+            },
+        )
+        return
+    state.record_browser_observation(
+        status="observed",
+        summary="browser observation captured",
+        metadata={
+            "source": "browser-observation.json",
+            "source_path": str(source_path),
+            **observed,
+            **{
+                key: payload[key]
+                for key in _BROWSER_OBSERVATION_FORBIDDEN_KEYS
+                if key in payload
+            },
+        },
+    )
+
+
+def capture_browser_observation(
+    *,
+    log_dir: Path,
+    source_path: Path | None = None,
+    metrics: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {}
+    if source_path is not None:
+        source_payload = json.loads(source_path.read_text(encoding="utf-8"))
+        if not isinstance(source_payload, Mapping):
+            raise ValueError("browser observation source must be a JSON object")
+        payload.update(source_payload)
+    payload.update(dict(metrics or {}))
+
+    observed = _normalize_browser_observation_payload(payload)
+    if not any(
+        key in observed
+        for key in (
+            "console_error_count",
+            "page_error_count",
+            "storage_key_count",
+            "state_hash",
+            "accessibility_summary",
+        )
+    ):
+        raise ValueError("browser observation requires at least one lightweight metric")
+    observed["source"] = "observe-browser"
+    if source_path is not None:
+        observed["source_path"] = str(source_path)
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    output_path = log_dir / "browser-observation.json"
+    tmp_path = output_path.with_suffix(".json.tmp")
+    tmp_path.write_text(
+        json.dumps(observed, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(output_path)
+    return {"path": str(output_path), "observation": observed}
+
+
+def _normalize_browser_observation_payload(
+    payload: Mapping[str, object],
+) -> dict[str, object]:
+    observed = {
+        key: payload[key]
+        for key in sorted(_BROWSER_OBSERVATION_ALLOWED_KEYS)
+        if key in payload and payload[key] is not None
+    }
+    for key in _BROWSER_OBSERVATION_COUNT_KEYS:
+        if key in observed:
+            observed[key] = _browser_observation_count(key=key, value=observed[key])
+    return observed
+
+
+def _browser_observation_count(*, key: str, value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{key} must be a non-negative integer")
+    try:
+        count = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key} must be a non-negative integer") from exc
+    if count < 0:
+        raise ValueError(f"{key} must be a non-negative integer")
+    return count
+
+
+def _sanitize_event_metadata(
+    *,
+    event_type: str,
+    metadata: Mapping[str, object] | None,
+) -> dict[str, object]:
+    if metadata is None:
+        return {}
+    if event_type == "browser_observation":
+        base = _sanitize_browser_observation_metadata(metadata)
+    else:
+        base = dict(metadata)
+    sanitized = _sanitize_metadata_value(base, depth=0)
+    if isinstance(sanitized, dict):
+        return sanitized
+    return {"value": sanitized}
+
+
+def _sanitize_metadata_value(value: object, *, depth: int) -> object:
+    if depth >= _EVENT_METADATA_MAX_DEPTH:
+        return "<redacted:depth-limit>"
+    if isinstance(value, str):
+        return _truncate_text(value, max_length=_EVENT_METADATA_MAX_STRING_LENGTH)
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int | float):
+        return value
+    if isinstance(value, Mapping):
+        sanitized: dict[str, object] = {}
+        items = list(value.items())
+        for key, item in items[:_EVENT_METADATA_MAX_KEYS]:
+            sanitized[str(key)] = _sanitize_metadata_value(item, depth=depth + 1)
+        if len(items) > _EVENT_METADATA_MAX_KEYS:
+            sanitized["redacted_keys"] = len(items) - _EVENT_METADATA_MAX_KEYS
+        return sanitized
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        sanitized_items = [
+            _sanitize_metadata_value(item, depth=depth + 1)
+            for item in value[:_EVENT_METADATA_MAX_ITEMS]
+        ]
+        if len(value) > _EVENT_METADATA_MAX_ITEMS:
+            sanitized_items.append(
+                f"<redacted:{len(value) - _EVENT_METADATA_MAX_ITEMS} more items>"
+            )
+        return sanitized_items
+    if isinstance(value, (bytes, bytearray)):
+        return f"<redacted:{type(value).__name__}:{len(value)} bytes>"
+    return _truncate_text(repr(value), max_length=_EVENT_METADATA_MAX_STRING_LENGTH)
+
+
+def _truncate_text(text: str, *, max_length: int) -> str:
+    if len(text) <= max_length:
+        return text
+    if max_length <= 3:
+        return text[:max_length]
+    return text[: max_length - 3] + "..."
+
+
+def _prompt_hash(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def _record_codex_event(
+    *,
+    state: _RunStateWriter | None,
+    role: str,
+    model: str | None,
+    reasoning_effort: str | None,
+    prompt: str,
+    parse_status: str,
+    duration: float,
+    returncode: int,
+    failure_summary: str,
+) -> None:
+    if state is None:
+        return
+    metadata = {
+        "role": role,
+        "model": model,
+        "reasoning_effort": reasoning_effort,
+        "prompt_hash": _prompt_hash(prompt),
+        "parse_status": parse_status,
+        "returncode": returncode,
+        "failure_summary": failure_summary,
+    }
+    state.record_event(
+        event_type="codex",
+        status="success" if returncode == 0 and not failure_summary else "failed",
+        summary=f"codex {role} {'completed' if returncode == 0 else 'failed'}",
+        duration=duration,
+        metadata=metadata,
+    )
+
+
+_INSTRUCTION_PATH_RE = re.compile(
+    r"(?P<path>(?:"
+    r"\.agents/[A-Za-z0-9_./-]+/SKILL\.md|"
+    r"docs/[A-Za-z0-9_./-]+\.md|"
+    r"(?:[A-Za-z0-9_./-]+/)?AGENTS\.md|"
+    r"\.codex/rules/[A-Za-z0-9_.-]+\.rules|"
+    r"\.sympohy/config\.yaml"
+    r"))"
+)
+
+
+def _record_prompt_instruction_sources(
+    *,
+    state: _RunStateWriter | None,
+    cwd: Path,
+    prompt: str,
+) -> None:
+    if state is None:
+        return
+    seen: set[str] = set()
+    for match in _INSTRUCTION_PATH_RE.finditer(prompt):
+        path_text = match.group("path")
+        if path_text in seen:
+            continue
+        seen.add(path_text)
+        source_kind = _instruction_source_kind(path_text)
+        summary = (
+            "codex prompt references repository skill instructions"
+            if source_kind == "skill"
+            else "codex prompt references repository developer instructions"
+        )
+        _record_developer_instruction_source(
+            state=state,
+            cwd=cwd,
+            source_kind=source_kind,
+            ref=path_text,
+            summary=summary,
+        )
+
+
+def _record_developer_instruction_source(
+    *,
+    state: _RunStateWriter,
+    cwd: Path,
+    source_kind: str,
+    ref: str,
+    summary: str,
+) -> None:
+    metadata = _developer_instruction_metadata(
+        cwd=cwd,
+        source_kind=source_kind,
+        ref=ref,
+        summary=summary,
+    )
+    state.record_event(
+        event_type="developer_instruction",
+        status="observed",
+        summary=f"developer instruction source observed: {metadata['ref']}",
+        metadata=metadata,
+    )
+
+
+def _instruction_source_kind(ref: str) -> str:
+    if ref.endswith("/SKILL.md"):
+        return "skill"
+    if ref.endswith(".rules"):
+        return "rule"
+    if ref.endswith("AGENTS.md"):
+        return "agent_instruction"
+    if ref == ".sympohy/config.yaml":
+        return "config"
+    return "doc"
+
+
+def _developer_instruction_metadata(
+    *,
+    cwd: Path,
+    source_kind: str,
+    ref: str,
+    summary: str,
+) -> dict[str, object]:
+    path = cwd / ref
+    source_ref = ref
+    redaction_reason = _developer_instruction_redaction_reason(path, ref=ref)
+    if redaction_reason is None:
+        sha256 = _source_sha256(path)
+    else:
+        sha256 = hashlib.sha256(ref.encode("utf-8")).hexdigest()
+        source_ref = f"<redacted:{redaction_reason}>"
+    metadata: dict[str, object] = {
+        "source_kind": source_kind,
+        "path": source_ref,
+        "ref": source_ref,
+        "sha256": sha256,
+        "summary": _truncate_text(
+            summary,
+            max_length=_DEVELOPER_INSTRUCTION_SUMMARY_MAX_LENGTH,
+        ),
+    }
+    if redaction_reason is not None:
+        metadata["redaction"] = redaction_reason
+    return metadata
+
+
+def _developer_instruction_redaction_reason(path: Path, *, ref: str) -> str | None:
+    normalized_ref = ref.strip()
+    if normalized_ref in _DEVELOPER_INSTRUCTION_PRIVATE_PATH_PATTERNS:
+        return "private_config"
+    if any(part in _DEVELOPER_INSTRUCTION_PRIVATE_PATH_PARTS for part in path.parts):
+        return "private_path"
+    if path.suffix and path.suffix not in _DEVELOPER_INSTRUCTION_ALLOWED_SUFFIXES:
+        return "unsupported_artifact_type"
+    try:
+        if path.exists() and path.stat().st_size > _DEVELOPER_INSTRUCTION_MAX_SOURCE_BYTES:
+            return "artifact_too_large"
+    except OSError:
+        return "source_unavailable"
+    return None
+
+
+def _source_sha256(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return hashlib.sha256(str(path).encode("utf-8")).hexdigest()
+
+
 def _merge_has_unmerged_paths(cwd: Path) -> bool:
     output = subprocess.check_output(
         ["git", "diff", "--name-only", "--diff-filter=U"],
@@ -4142,8 +5323,13 @@ def _resolve_resume_point_for_issue(
             },
         )
     if state is not None and state.get("status") == "blocked":
-        if "sympohy:blocked" not in names and (
-            "sympohy:running" in names or "sympohy:pending" in names
+        phase = phase_from_state(state) or _phase_from_labels(names)
+        if (
+            "sympohy:blocked" in names
+            and phase in {"review", "fix", "finalize"}
+        ) or (
+            "sympohy:blocked" not in names
+            and ("sympohy:running" in names or "sympohy:pending" in names)
         ):
             state = {**state, "status": "running"}
     return resolve_resume_point(labels, state=state)
@@ -4185,6 +5371,7 @@ def _ensure_draft_pull_request(
     cwd: Path,
     issue_number: int | None = None,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     branch = _current_branch(cwd)
     if _pull_request_exists(branch=branch, cwd=cwd):
@@ -4192,6 +5379,7 @@ def _ensure_draft_pull_request(
             cwd=cwd,
             issue_number=issue_number or _issue_number_from_branch(branch),
             heartbeat=heartbeat,
+            state=state,
         )
         return
     if issue_number is None:
@@ -4221,6 +5409,7 @@ def _ensure_draft_pull_request(
             ],
             cwd=cwd,
             heartbeat=heartbeat,
+            state=state,
         )
     finally:
         if body_file_path is not None:
@@ -4234,6 +5423,7 @@ def _push_branch_and_ensure_draft_pull_request(
     heartbeat: Callable[[], None] | None = None,
     issue_number: int | None = None,
     base_branch: str | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     if issue_number is not None and base_branch is not None:
         _ensure_initial_pull_request_commit(
@@ -4245,11 +5435,13 @@ def _push_branch_and_ensure_draft_pull_request(
         ["git", "push", "-u", "origin", branch],
         cwd=cwd,
         heartbeat=heartbeat,
+        state=state,
     )
     _ensure_draft_pull_request(
         cwd=cwd,
         issue_number=issue_number,
         heartbeat=heartbeat,
+        state=state,
     )
 
 
@@ -4284,6 +5476,7 @@ def _ensure_existing_pull_request_metadata(
     cwd: Path,
     issue_number: int | None,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     payload = json.loads(
         subprocess.check_output(
@@ -4320,6 +5513,7 @@ def _ensure_existing_pull_request_metadata(
         pull_request_number=pull_request_number,
         body=updated_body,
         heartbeat=heartbeat,
+        state=state,
     )
 
 
@@ -4392,6 +5586,7 @@ def _update_pull_request_body(
     pull_request_number: object,
     body: str,
     heartbeat: Callable[[], None] | None = None,
+    state: _RunStateWriter | None = None,
 ) -> None:
     body_file_path: Path | None = None
     try:
@@ -4413,6 +5608,7 @@ def _update_pull_request_body(
             command,
             cwd=cwd,
             heartbeat=heartbeat,
+            state=state,
         )
     finally:
         if body_file_path is not None:

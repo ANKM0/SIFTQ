@@ -6,6 +6,7 @@ import config from "../../.sympohy/config.yaml?raw";
 import taskfile from "../../Taskfile.yml?raw";
 import cli from "../../scripts/sympohy/cli.py?raw";
 import core from "../../scripts/sympohy/core.py?raw";
+import observability from "../../scripts/sympohy/observability.py?raw";
 import runner from "../../scripts/sympohy/runner.py?raw";
 
 const ciCdWorkflows = [ciWorkflow, releaseWorkflow].join("\n");
@@ -17,6 +18,11 @@ describe("sympohy Taskfile and CLI integration", () => {
       "ci:sympohy",
       "ai:sympohy",
       "ai:sympohy:refine",
+      "ai:sympohy:observe:replay",
+      "ai:sympohy:observe:query",
+      "ai:sympohy:observe:analyze",
+      "ai:sympohy:observe:propose",
+      "ai:sympohy:observe:apply",
       "ai:sympohy:doctor",
       "ai:sympohy:stage-gate",
       "ai:sympohy:labels:sync",
@@ -33,6 +39,11 @@ describe("sympohy Taskfile and CLI integration", () => {
     );
     expect(cli).toContain("resume");
     expect(cli).toContain("migrate");
+    expect(cli).toContain("observe-replay");
+    expect(cli).toContain("observe-query");
+    expect(cli).toContain("observe-analyze");
+    expect(cli).toContain("observe-propose");
+    expect(cli).toContain("observe-apply");
     expect(cli).toContain("stage-gate");
   });
 
@@ -84,15 +95,40 @@ describe("sympohy watcher contract", () => {
 
   it("persists run state for stale-running inspection", () => {
     expect(runner).toContain("state.json");
+    expect(runner).toContain("events.jsonl");
+    expect(observability).toContain("observations.sqlite3");
+    expect(observability).toContain("search_events");
+    expect(observability).toContain("aggregate_counts");
+    expect(observability).toContain("analyze_failures");
+    expect(observability).toContain("propose_improvements");
+    expect(observability).toContain("apply_improvements");
+    expect(observability).toContain("failure_kind_counts");
+    expect(observability).toContain("recurring_event_chain_patterns");
+    expect(observability).toContain("event_chain_summaries");
+    expect(observability).toContain("\"required_validation\"");
+    expect(observability).toContain("\"verified_draft_pr\"");
+    expect(observability).toContain("\"dangerous_auto_apply\"");
     expect(runner).toContain("\"run_id\"");
+    expect(runner).toContain("\"event_id\"");
     expect(runner).toContain("\"lock\"");
     expect(runner).toContain("\"phase\"");
+    expect(runner).toContain("\"event_type\"");
+    expect(runner).toContain("\"attempt\"");
+    expect(runner).toContain("\"duration\"");
+    expect(runner).toContain("\"summary\"");
+    expect(runner).toContain("\"metadata\"");
     expect(runner).toContain("\"pid\"");
     expect(runner).toContain("\"heartbeat\"");
     expect(runner).toContain("\"worktree\"");
     expect(runner).toContain("\"branch\"");
     expect(runner).toContain("\"plan_reference\"");
     expect(runner).toContain("\"last_known_progress\"");
+    expect(runner).toContain("\"browser_observation\"");
+    expect(runner).toContain("\"console_error_count\"");
+    expect(runner).toContain("\"page_error_count\"");
+    expect(runner).toContain("\"storage_key_count\"");
+    expect(runner).toContain("\"state_hash\"");
+    expect(runner).toContain("\"accessibility_summary\"");
   });
 
   it("recovers implementation from saved plans and existing worktree state", () => {

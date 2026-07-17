@@ -16,6 +16,10 @@ codd:
     - id: design:sympohy-stale-run-recovery
       relation: depends_on
       semantic: recovery
+  depended_by:
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: hardening
 ---
 
 # sympohy Terminal Resume and Review Failure Hardening Design

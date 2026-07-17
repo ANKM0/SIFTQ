@@ -22,21 +22,27 @@ from scripts.sympohy.core import (
 from scripts.sympohy.runner import (
     _IssueRunLock,
     _AmbiguousPullRequestError,
+    _block,
     _PullRequestMetadataError,
     _PullRequestMergeability,
     _RunLockedError,
     _RunStateWriter,
     _UnsafeRecoveryError,
     _attempt_pre_review_mergeability_autofix,
+    _check_call_with_heartbeat,
     _check_output_with_heartbeat,
     _commit_all_if_new,
+    _codex_json,
     _codex_exec_args,
     _ensure_draft_pull_request,
+    _extract_test_failures,
     _infer_implementation_recovery,
     _prepare_document_artifacts,
     _pull_request_exists,
     _pull_request_merged,
+    _preflight_validation_commands,
     _push_branch_and_ensure_draft_pull_request,
+    _record_browser_observation_boundary,
     _record_run_interrupted,
     _resolve_resume_point_for_issue,
     _resume_fix_phase,
@@ -48,6 +54,7 @@ from scripts.sympohy.runner import (
     _run_command_with_heartbeat,
     _run_hooks,
     _run_review_fix_round,
+    capture_browser_observation,
     ensure_worktree,
     resume_issue,
     run_issue,
@@ -83,6 +90,561 @@ class SympohyRunnerTest(unittest.TestCase):
                 'model_reasoning_effort="xhigh"',
                 "review prompt",
             ],
+        )
+
+    def test_codex_json_records_codex_and_developer_instruction_events(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            docs_path = cwd / "docs" / "contributing"
+            skill_path = cwd / ".agents" / "skills" / "feature-docs-planning"
+            docs_path.mkdir(parents=True)
+            skill_path.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (docs_path / "development-flow.md").write_text("flow", encoding="utf-8")
+            (skill_path / "SKILL.md").write_text("skill", encoding="utf-8")
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "planning"})
+
+            with patch(
+                "scripts.sympohy.runner._check_output_with_heartbeat",
+                return_value='{"artifact_decisions": {"requirements": {"mode": "not_needed", "reason": "n/a"}}}',
+            ):
+                payload = _codex_json(
+                    [
+                        "Use .agents/skills/feature-docs-planning/SKILL.md.",
+                        "Read docs/contributing/development-flow.md.",
+                    ],
+                    cwd=cwd,
+                    log_path=log_dir / "artifact-decisions.json",
+                    heartbeat=state.heartbeat,
+                    config=self._config(root),
+                    role="planning",
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertIn("artifact_decisions", payload)
+        self.assertEqual(
+            [event["event_type"] for event in events],
+            ["developer_instruction", "developer_instruction", "codex"],
+        )
+        self.assertEqual(events[0]["metadata"]["source_kind"], "skill")
+        self.assertEqual(
+            events[0]["metadata"]["path"],
+            ".agents/skills/feature-docs-planning/SKILL.md",
+        )
+        self.assertEqual(
+            events[0]["metadata"]["ref"],
+            ".agents/skills/feature-docs-planning/SKILL.md",
+        )
+        self.assertEqual(events[1]["metadata"]["source_kind"], "doc")
+        self.assertEqual(
+            events[1]["metadata"]["path"],
+            "docs/contributing/development-flow.md",
+        )
+        self.assertEqual(
+            events[1]["metadata"]["ref"],
+            "docs/contributing/development-flow.md",
+        )
+        self.assertEqual(events[2]["metadata"]["role"], "planning")
+        self.assertEqual(events[2]["metadata"]["model"], "gpt-5.5")
+        self.assertEqual(events[2]["metadata"]["reasoning_effort"], "high")
+        self.assertEqual(events[2]["metadata"]["parse_status"], "parsed")
+        self.assertEqual(events[2]["metadata"]["returncode"], 0)
+        self.assertTrue(events[2]["metadata"]["prompt_hash"])
+
+    def test_codex_json_redacts_private_config_instruction_sources(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            config_path = cwd / ".sympohy"
+            config_path.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (config_path / "config.yaml").write_text(
+                "token: super-secret\n",
+                encoding="utf-8",
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "planning"})
+
+            with patch(
+                "scripts.sympohy.runner._check_output_with_heartbeat",
+                return_value='{"artifact_decisions": {"requirements": {"mode": "not_needed", "reason": "n/a"}}}',
+            ):
+                _codex_json(
+                    [
+                        "Read .sympohy/config.yaml before continuing.",
+                    ],
+                    cwd=cwd,
+                    log_path=log_dir / "artifact-decisions.json",
+                    heartbeat=state.heartbeat,
+                    config=self._config(root),
+                    role="planning",
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        instruction_event = events[0]
+        self.assertEqual(instruction_event["event_type"], "developer_instruction")
+        self.assertEqual(instruction_event["metadata"]["source_kind"], "config")
+        self.assertEqual(
+            instruction_event["metadata"]["path"],
+            "<redacted:private_config>",
+        )
+        self.assertEqual(
+            instruction_event["metadata"]["ref"],
+            "<redacted:private_config>",
+        )
+        self.assertEqual(
+            instruction_event["metadata"]["redaction"],
+            "private_config",
+        )
+        self.assertNotIn(".sympohy/config.yaml", json.dumps(instruction_event))
+
+    def test_run_stage_gate_records_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = SympohyConfig(
+                max_workers=10,
+                base_branch="main",
+                worktree_root=root / "worktrees",
+                run_log_root=root / "runs",
+                stale_status_after_minutes=30,
+                hooks=("task ci",),
+                review_max_rounds=5,
+                retry_max_attempts=3,
+                final_verifier_fix_max_attempts=2,
+                stage_gate_command="task ai:sympohy:stage-gate",
+            )
+            worktree = root / "worktree"
+            log_dir = root / "runs" / "issue-101"
+            worktree.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=101,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="implement", progress={"message": "gate"})
+            issue = Issue(
+                number=101,
+                title="Normalize stage gate workspace",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:implement"),
+                comments=(),
+            )
+
+            with patch(
+                "scripts.sympohy.runner.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    args=["task"],
+                    returncode=0,
+                    stdout='{"status":"pass","stage":"requirements","issue":101}',
+                    stderr="",
+                ),
+            ):
+                _run_stage_gate(
+                    "requirements",
+                    config=config,
+                    issue=issue,
+                    log_dir=log_dir,
+                    context={"artifact_decisions": {}, "workspace": str(worktree)},
+                    cwd=worktree,
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "stage_gate")
+        self.assertEqual(events[0]["status"], "pass")
+        self.assertEqual(events[0]["metadata"]["stage"], "requirements")
+        self.assertEqual(events[0]["metadata"]["returncode"], 0)
+
+    def test_run_hooks_records_failure_summary_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "hooks"})
+
+            def fail_hook(
+                _args: list[str],
+                *,
+                stdout: object,
+                **_kwargs: object,
+            ) -> int:
+                assert hasattr(stdout, "write")
+                stdout.write("FAILED tests/test_example.py::test_case\nmore detail\n")
+                return 1
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                side_effect=fail_hook,
+            ):
+                result = _run_hooks(
+                    ("task ci",),
+                    1,
+                    cwd,
+                    log_dir,
+                    config=self._config(root),
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 1)
+        self.assertEqual(events[0]["event_type"], "hook")
+        self.assertEqual(events[0]["status"], "retry")
+        self.assertEqual(events[0]["metadata"]["returncode"], 1)
+        self.assertEqual(
+            events[0]["metadata"]["failure_summary"],
+            "FAILED tests/test_example.py::test_case",
+        )
+
+    def test_extract_test_failures_parses_pytest_and_vitest_output(self) -> None:
+        output = "\n".join(
+            [
+                "FAILED tests/sympohy/test_runner.py::test_resume - AssertionError: expected retry",
+                "tests/sympohy/test_runner.py:27: AssertionError",
+                "",
+                " FAIL  tests/ui/App.test.tsx > App > renders failures",
+                "AssertionError: expected true to be false",
+                " ❯ tests/ui/App.test.tsx:41:7",
+            ]
+        )
+
+        failures = _extract_test_failures(output)
+
+        self.assertEqual(
+            failures,
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
+        )
+
+    def test_preflight_validation_commands_match_changed_scope(self) -> None:
+        commands = _preflight_validation_commands(
+            [
+                "scripts/sympohy/runner.py",
+                "docs/design/sympohy-llm-loop-observability-self-improvement.md",
+                "Taskfile.yml",
+                "src/App.tsx",
+            ]
+        )
+
+        self.assertEqual(
+            commands,
+            [
+                "task pytest -- tests/sympohy/sympohy_runner_test.py",
+                "task ci:markdown",
+                "task codd:validate",
+                "task ci:lint:task-refs",
+                "task ci:lint:codex-task-perms",
+                "task ci:typecheck",
+                "task ci:lint",
+                "task ci:test",
+                "task ci:build",
+            ],
+        )
+
+    def test_run_hooks_records_structured_test_failures(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "hooks"})
+
+            def fail_hook(
+                _args: list[str],
+                *,
+                stdout: object,
+                **_kwargs: object,
+            ) -> int:
+                assert hasattr(stdout, "write")
+                stdout.write(
+                    "\n".join(
+                        [
+                            "FAILED tests/sympohy/test_runner.py::test_resume - AssertionError: expected retry",
+                            "tests/sympohy/test_runner.py:27: AssertionError",
+                            " FAIL  tests/ui/App.test.tsx > App > renders failures",
+                            "AssertionError: expected true to be false",
+                            " ❯ tests/ui/App.test.tsx:41:7",
+                        ]
+                    )
+                )
+                return 1
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                side_effect=fail_hook,
+            ):
+                result = _run_hooks(
+                    ("task ci",),
+                    1,
+                    cwd,
+                    log_dir,
+                    config=self._config(root),
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            events[0]["metadata"]["test_failures"],
+            [
+                {
+                    "runner": "pytest",
+                    "name": "tests/sympohy/test_runner.py::test_resume",
+                    "file": "tests/sympohy/test_runner.py",
+                    "line": 27,
+                    "summary": "AssertionError: expected retry",
+                },
+                {
+                    "runner": "vitest",
+                    "name": "App > renders failures",
+                    "file": "tests/ui/App.test.tsx",
+                    "line": 41,
+                    "summary": "AssertionError: expected true to be false",
+                },
+            ],
+        )
+
+    def test_run_preflight_validations_before_repository_gate_for_final_verifier_fix(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir(parents=True)
+            log_dir.mkdir(parents=True)
+            (cwd / "scripts").mkdir()
+            (cwd / "scripts" / "sympohy").mkdir()
+            (cwd / "scripts" / "sympohy" / "runner.py").write_text(
+                "changed\n",
+                encoding="utf-8",
+            )
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            issue = Issue(
+                number=82,
+                title="Verify preflight before repository gate",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:fix"),
+                comments=(),
+            )
+
+            commands_run: list[tuple[str, ...]] = []
+
+            def fake_run_hooks(
+                hooks: tuple[str, ...] | list[str],
+                *_args: object,
+                **_kwargs: object,
+            ) -> int:
+                commands_run.append(tuple(hooks))
+                return 0
+
+            with (
+                patch("scripts.sympohy.runner._worktree_has_changes", side_effect=[False, True]),
+                patch("scripts.sympohy.runner._changed_worktree_paths", return_value=["scripts/sympohy/runner.py"]),
+                patch("scripts.sympohy.runner._codex_text"),
+                patch("scripts.sympohy.runner._run_hooks", side_effect=fake_run_hooks),
+                patch("scripts.sympohy.runner._commit_all_if_new", return_value=True),
+                patch("scripts.sympohy.runner._check_call_with_heartbeat"),
+                patch("scripts.sympohy.runner.set_issue_state"),
+            ):
+                result = _run_final_verifier_fix_round(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    findings=[
+                        parse_final_verifier_block_findings(
+                            {
+                                "status": "block",
+                                "findings": [
+                                    {
+                                        "kind": "verification",
+                                        "summary": "Need regression proof",
+                                        "evidence": "task ci missing",
+                                        "suggested_fix": "Run targeted validation first",
+                                    }
+                                ],
+                            }
+                        )[0]
+                    ],
+                    fix_attempt=1,
+                    total_steps=13,
+                    existing_fix_subjects=set(),
+                )
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            commands_run,
+            [
+                ("task pytest -- tests/sympohy/sympohy_runner_test.py",),
+                ("task ci",),
+            ],
+        )
+
+    def test_block_records_terminal_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_dir = root / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            state.write(phase="hooks", progress={"message": "running hook"})
+
+            with (
+                patch("scripts.sympohy.runner.set_issue_state"),
+                patch("scripts.sympohy.runner.comment"),
+            ):
+                _block(
+                    "#82",
+                    phase="hooks",
+                    failed_command="task ci",
+                    attempts=3,
+                    cause="hook retries exhausted",
+                    run_log_path=log_dir / "hook-1-3.log",
+                    cwd=root,
+                    state=state,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[-1]["event_type"], "command")
+        self.assertEqual(events[-1]["status"], "blocked")
+        self.assertEqual(events[-1]["metadata"]["command"], "task ci")
+        self.assertEqual(events[-1]["metadata"]["cause"], "hook retries exhausted")
+
+    def test_review_fix_loop_records_review_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cwd = root / "worktree"
+            log_dir = root / "runs" / "issue-82"
+            cwd.mkdir()
+            log_dir.mkdir(parents=True)
+            state = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            issue = Issue(
+                number=82,
+                title="Review me",
+                body="",
+                labels=("sympohy:running", "sympohy:phase:review"),
+                comments=(),
+            )
+
+            with (
+                patch(
+                    "scripts.sympohy.runner._ensure_review_mergeability",
+                    return_value="91",
+                ),
+                patch(
+                    "scripts.sympohy.runner._codex_text",
+                    return_value='{"status":"retry","findings":[{"severity":"high","summary":"fix me","status":"open"}]}',
+                ),
+                patch(
+                    "scripts.sympohy.runner._run_review_fix_round",
+                    return_value=0,
+                ),
+                patch("scripts.sympohy.runner._commit_subjects", return_value=[]),
+                patch("scripts.sympohy.runner.set_issue_state"),
+            ):
+                result = _review_fix_loop(
+                    "#82",
+                    issue,
+                    self._config(root),
+                    cwd,
+                    log_dir,
+                    state,
+                    start_round=1,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result, 0)
+        review_event = events[0]
+        self.assertEqual(review_event["event_type"], "review")
+        self.assertEqual(review_event["status"], "retry")
+        self.assertEqual(review_event["attempt"], 1)
+        self.assertEqual(review_event["metadata"]["reviewer_role"], "adversarial-review")
+        self.assertEqual(
+            review_event["metadata"]["blocking_findings_summary"],
+            "high: fix me",
         )
 
     def test_run_stage_gate_writes_absolute_workspace_to_input(self) -> None:
@@ -1215,6 +1777,8 @@ class SympohyRunnerTest(unittest.TestCase):
                     return "issue-82-sympohy\n"
                 if args == ["git", "log", "--format=%s", "main..HEAD"]:
                     return ""
+                if args == ["git", "status", "--porcelain"]:
+                    return ""
                 raise AssertionError(f"unexpected check_output: {args}")
 
             with (
@@ -1277,6 +1841,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 if args == ["git", "branch", "--show-current"]:
                     return "issue-82-sympohy\n"
                 if args == ["git", "log", "--format=%s", "main..HEAD"]:
+                    return ""
+                if args == ["git", "status", "--porcelain"]:
                     return ""
                 raise AssertionError(f"unexpected check_output: {args}")
 
@@ -1484,6 +2050,60 @@ class SympohyRunnerTest(unittest.TestCase):
             recover=True,
             from_resume=True,
             resume_point="implement",
+        )
+
+    def test_resume_issue_continues_blocked_late_phase_after_manual_fix(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Resume blocked review",
+                body="",
+                labels=("sympohy:blocked", "sympohy:phase:review"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "blocked-review-run",
+                        "phase": "review",
+                        "status": "blocked",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "blocked-review-run"},
+                        "last_known_progress": {
+                            "message": "blocked",
+                            "review_round": 6,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+            resume_point="review",
         )
 
     def test_resume_issue_replans_stale_implement_before_plan_exists(self) -> None:
@@ -2455,7 +3075,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
                 patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
             ):
                 result = resume_issue("#82", config)
 
@@ -2464,6 +3087,12 @@ class SympohyRunnerTest(unittest.TestCase):
                     encoding="utf-8"
                 )
             )
+            events = [
+                json.loads(line)
+                for line in (config.run_log_root / "issue-82" / "events.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
 
         self.assertEqual(result, 0)
         run_issue.assert_not_called()
@@ -2473,7 +3102,11 @@ class SympohyRunnerTest(unittest.TestCase):
             status="sympohy:done",
             phase="finalize",
         )
-        check_call.assert_called_once_with(["gh", "issue", "close", "#82"])
+        run_command.assert_called_once()
+        self.assertEqual(run_command.call_args.args[0], ["gh", "issue", "close", "#82"])
+        self.assertEqual(events[-1]["event_type"], "command")
+        self.assertEqual(events[-1]["status"], "success")
+        self.assertEqual(events[-1]["metadata"]["command"], "gh issue close '#82'")
         self.assertEqual(state["phase"], "finalize")
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")
@@ -2542,6 +3175,23 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertTrue(completed.terminal)
         self.assertEqual(not_planned.name, "hooks")
         self.assertFalse(not_planned.terminal)
+
+    def test_resolve_resume_point_for_issue_treats_blocked_late_phase_as_resumable(
+        self,
+    ) -> None:
+        review = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:blocked"}, {"name": "sympohy:phase:review"}],
+            {"status": "blocked", "phase": "review"},
+        )
+        hooks = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:blocked"}, {"name": "sympohy:phase:hooks"}],
+            {"status": "blocked", "phase": "hooks"},
+        )
+
+        self.assertEqual(review.name, "review")
+        self.assertFalse(review.terminal)
+        self.assertEqual(hooks.name, "blocked")
+        self.assertTrue(hooks.terminal)
 
     def test_resume_issue_restores_done_finalize_labels_for_completed_issue(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -3148,6 +3798,7 @@ class SympohyRunnerTest(unittest.TestCase):
             cwd=Path("/tmp/worktree"),
             issue_number=82,
             heartbeat=None,
+            state=None,
         )
 
     def test_run_state_writer_persists_required_metadata(self) -> None:
@@ -3225,6 +3876,10 @@ class SympohyRunnerTest(unittest.TestCase):
 
             _record_run_interrupted(writer, signal.SIGTERM)
             state = json.loads((log_dir / "state.json").read_text(encoding="utf-8"))
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
 
         self.assertEqual(state["status"], "interrupted")
         self.assertEqual(state["phase"], "implement")
@@ -3235,6 +3890,9 @@ class SympohyRunnerTest(unittest.TestCase):
             state["last_known_progress"]["resume_action"],
             "resume_interrupted_run",
         )
+        self.assertEqual(events[0]["event_type"], "command")
+        self.assertEqual(events[0]["status"], "interrupted")
+        self.assertEqual(events[0]["metadata"], {"signal": "SIGTERM"})
 
     def test_run_state_writer_records_recovery_log(self) -> None:
         now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
@@ -3258,6 +3916,9 @@ class SympohyRunnerTest(unittest.TestCase):
             recovery_lines = (log_dir / "recovery.log").read_text(
                 encoding="utf-8"
             ).splitlines()
+            event_lines = (log_dir / "events.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
 
         self.assertEqual(state["last_recovery"]["event"], "implementation_recovery_inspected")
         self.assertEqual(state["last_recovery"]["completed_logical_steps"], 2)
@@ -3265,6 +3926,366 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(
             json.loads(recovery_lines[0])["event"],
             "implementation_recovery_inspected",
+        )
+        recovery_event = json.loads(event_lines[0])
+        self.assertEqual(recovery_event["run_id"], "run-82")
+        self.assertEqual(recovery_event["event_id"], "run-82-000001")
+        self.assertEqual(recovery_event["issue"], 82)
+        self.assertEqual(recovery_event["phase"], "implement")
+        self.assertEqual(recovery_event["event_type"], "recovery")
+        self.assertEqual(recovery_event["status"], "success")
+        self.assertIsNone(recovery_event["attempt"])
+        self.assertIsNone(recovery_event["duration"])
+        self.assertEqual(recovery_event["summary"], "implementation recovery inspected")
+        self.assertEqual(
+            recovery_event["metadata"],
+            {
+                "completed_logical_steps": 2,
+                "event": "implementation_recovery_inspected",
+            },
+        )
+
+    def test_run_state_writer_records_blocked_recovery_as_block_status(self) -> None:
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                run_id="run-82",
+                clock=lambda: now,
+            )
+            writer.write(phase="implement", progress={"message": "resume"})
+            writer.record_recovery(
+                "unsafe_recovery_blocked",
+                {"resume_action": "block_unsafe_resume"},
+            )
+
+            event_lines = (log_dir / "events.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+
+        recovery_event = json.loads(event_lines[0])
+        self.assertEqual(recovery_event["event_type"], "recovery")
+        self.assertEqual(recovery_event["status"], "block")
+        self.assertEqual(recovery_event["summary"], "unsafe recovery blocked")
+        self.assertEqual(
+            recovery_event["metadata"],
+            {
+                "event": "unsafe_recovery_blocked",
+                "resume_action": "block_unsafe_resume",
+            },
+        )
+        self.assertEqual(recovery_event["timestamp"], "2026-06-15T12:00:00Z")
+
+    def test_run_state_writer_appends_ldjson_events_in_order(self) -> None:
+        now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+                run_id="run-82",
+                clock=lambda: now,
+            )
+            writer.write(phase="review", progress={"message": "reviewing"})
+            writer.record_event(
+                event_type="review",
+                status="success",
+                summary="review round passed",
+                attempt=1,
+                duration=2.5,
+                metadata={"reviewer_role": "adversarial-review"},
+            )
+            writer.record_event(
+                event_type="stage_gate",
+                status="pass",
+                summary="review gate passed",
+                metadata={"stage": "review"},
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(len(events), 2)
+        self.assertEqual(
+            [event["event_id"] for event in events],
+            ["run-82-000001", "run-82-000002"],
+        )
+        self.assertEqual(events[0]["attempt"], 1)
+        self.assertEqual(events[0]["duration"], 2.5)
+        self.assertEqual(
+            events[0]["metadata"],
+            {"reviewer_role": "adversarial-review"},
+        )
+        self.assertEqual(events[1]["attempt"], None)
+        self.assertEqual(events[1]["duration"], None)
+        self.assertEqual(events[1]["metadata"], {"stage": "review"})
+
+    def test_run_state_writer_redacts_raw_browser_observation_artifacts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="implement", progress={"message": "observing browser"})
+            writer.record_event(
+                event_type="browser_observation",
+                status="observed",
+                summary="browser observation captured",
+                metadata={
+                    "console_error_count": 2,
+                    "page_error_count": 1,
+                    "storage_key_count": 4,
+                    "state_hash": "abc123",
+                    "accessibility_summary": "1 violation",
+                    "screenshot_path": "artifacts/page.png",
+                    "trace_path": "artifacts/trace.zip",
+                    "dom_dump": "<html>secret</html>",
+                    "extra_detail": {"ignored": True},
+                },
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(
+            events[0]["metadata"],
+            {
+                "console_error_count": 2,
+                "page_error_count": 1,
+                "storage_key_count": 4,
+                "state_hash": "abc123",
+                "accessibility_summary": "1 violation",
+                "redacted_artifacts": [
+                    "dom_dump",
+                    "screenshot_path",
+                    "trace_path",
+                ],
+            },
+        )
+
+    def test_check_call_with_heartbeat_records_successful_command_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "merging"})
+
+            with patch(
+                "scripts.sympohy.runner._run_command_with_heartbeat",
+                return_value=0,
+            ):
+                _check_call_with_heartbeat(
+                    ["gh", "pr", "checks", "--watch"],
+                    cwd=Path(tmp),
+                    heartbeat=writer.heartbeat,
+                    state=writer,
+                )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "command")
+        self.assertEqual(events[0]["status"], "success")
+        self.assertEqual(events[0]["metadata"]["command"], "gh pr checks --watch")
+        self.assertEqual(events[0]["metadata"]["returncode"], 0)
+
+    def test_browser_observation_boundary_records_skipped_real_run_event(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "skipped")
+        self.assertEqual(
+            events[0]["metadata"],
+            {
+                "reason": "missing_lightweight_observation_file",
+                "source": "browser-observation.json",
+            },
+        )
+
+    def test_browser_observation_boundary_records_lightweight_source(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "browser-observation.json").write_text(
+                json.dumps(
+                    {
+                        "console_error_count": 2,
+                        "page_error_count": 1,
+                        "storage_key_count": 4,
+                        "state_hash": "abc123",
+                        "accessibility_summary": "1 violation",
+                        "trace_path": "artifacts/trace.zip",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "observed")
+        self.assertEqual(events[0]["metadata"]["console_error_count"], 2)
+        self.assertEqual(events[0]["metadata"]["page_error_count"], 1)
+        self.assertEqual(events[0]["metadata"]["storage_key_count"], 4)
+        self.assertEqual(events[0]["metadata"]["state_hash"], "abc123")
+        self.assertEqual(events[0]["metadata"]["accessibility_summary"], "1 violation")
+        self.assertEqual(events[0]["metadata"]["redacted_artifacts"], ["trace_path"])
+
+    def test_browser_observation_boundary_rejects_invalid_counts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "browser-observation.json").write_text(
+                json.dumps({"console_error_count": "two"}),
+                encoding="utf-8",
+            )
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "failed")
+        self.assertIn("non-negative integer", events[0]["metadata"]["parse_error"])
+
+    def test_capture_browser_observation_writes_lightweight_sidecar(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_path = root / "browser-source.json"
+            source_path.write_text(
+                json.dumps(
+                    {
+                        "console_error_count": 2,
+                        "page_error_count": 1,
+                        "storage_key_count": 4,
+                        "state_hash": "abc123",
+                        "accessibility_summary": "1 violation",
+                        "trace_path": "artifacts/trace.zip",
+                        "dom_dump": "<html>secret</html>",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            log_dir = root / "runs" / "issue-82"
+
+            result = capture_browser_observation(
+                log_dir=log_dir,
+                source_path=source_path,
+                metrics={"page_error_count": 0},
+            )
+            payload = json.loads(
+                (log_dir / "browser-observation.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result["path"], str(log_dir / "browser-observation.json"))
+        self.assertEqual(payload["console_error_count"], 2)
+        self.assertEqual(payload["page_error_count"], 0)
+        self.assertEqual(payload["storage_key_count"], 4)
+        self.assertEqual(payload["state_hash"], "abc123")
+        self.assertEqual(payload["accessibility_summary"], "1 violation")
+        self.assertEqual(payload["source"], "observe-browser")
+        self.assertEqual(payload["source_path"], str(source_path))
+        self.assertNotIn("trace_path", payload)
+        self.assertNotIn("dom_dump", payload)
+
+    def test_capture_browser_observation_rejects_invalid_counts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "browser-source.json"
+            source_path.write_text(
+                json.dumps({"console_error_count": "two"}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "non-negative integer"):
+                capture_browser_observation(
+                    log_dir=Path(tmp) / "runs" / "issue-82",
+                    source_path=source_path,
+                )
+
+    def test_run_state_writer_truncates_oversized_event_metadata(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="implement", progress={"message": "oversized metadata"})
+            writer.record_event(
+                event_type="command",
+                status="success",
+                summary="oversized metadata captured",
+                metadata={
+                    "long_text": "x" * 400,
+                    "nested": {
+                        "items": list(range(20)),
+                    },
+                },
+            )
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(len(events[0]["metadata"]["long_text"]), 240)
+        self.assertTrue(events[0]["metadata"]["long_text"].endswith("..."))
+        self.assertEqual(len(events[0]["metadata"]["nested"]["items"]), 17)
+        self.assertEqual(
+            events[0]["metadata"]["nested"]["items"][-1],
+            "<redacted:4 more items>",
         )
 
     def test_run_state_writer_refuses_write_after_lock_takeover(self) -> None:
@@ -3810,7 +4831,6 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="99",
                 ),
                 patch("scripts.sympohy.runner.comment") as comment,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
                 patch("scripts.sympohy.runner.set_issue_state"),
             ):
                 result = _run_final_verifier_and_merge(
@@ -3822,6 +4842,12 @@ class SympohyRunnerTest(unittest.TestCase):
                     state,
                     total_steps=3,
                 )
+                recorded_events = [
+                    json.loads(line)
+                    for line in (log_dir / "events.jsonl").read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                ]
 
         self.assertEqual(result, 0)
         comment.assert_called_once()
@@ -3852,6 +4878,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 ["gh", "pr", "ready"],
                 ["gh", "pr", "checks", "--watch"],
                 ["gh", "pr", "merge", "--squash", "--delete-branch"],
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
             ],
         )
         self.assertTrue(
@@ -3860,8 +4888,23 @@ class SympohyRunnerTest(unittest.TestCase):
                 for call in run_command.call_args_list
             )
         )
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        self.assertIn(
+            ("browser_observation", "skipped"),
+            [(event["event_type"], event["status"]) for event in recorded_events],
+        )
+        command_events = [
+            event for event in recorded_events if event["event_type"] == "command"
+        ]
+        self.assertEqual(
+            [event["metadata"]["command"] for event in command_events],
+            [
+                "gh pr ready",
+                "gh pr checks --watch",
+                "gh pr merge --squash --delete-branch",
+                f"git worktree remove {str(worktree)}",
+                "gh issue close '#82'",
+            ],
+        )
 
     def test_final_verifier_block_routes_valid_findings_to_fix(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -4021,6 +5064,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 "gh pr ready",
                 "gh pr checks --watch",
                 "gh pr merge --squash --delete-branch",
+                f"git worktree remove {str(worktree)}",
+                "gh issue close #82",
             ],
         )
         review_fix_loop_mock.assert_called_once()
@@ -4718,7 +5763,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="",
                 ),
                 patch("scripts.sympohy.runner._codex_json") as codex_json,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
                 result = _run_final_verifier_and_merge(
@@ -4735,8 +5783,13 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         codex_json.assert_not_called()
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        self.assertEqual(
+            [call.args[0] for call in run_command.call_args_list],
+            [
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
+            ],
+        )
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),
@@ -4788,7 +5841,10 @@ class SympohyRunnerTest(unittest.TestCase):
                         "scripts.sympohy.runner._run_final_verifier_and_merge"
                     ) as final_merge,
                     patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-                    patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                    patch(
+                        "scripts.sympohy.runner._run_command_with_heartbeat",
+                        return_value=0,
+                    ) as run_command,
                 ):
                     result = _resume_late_phase(
                         "#82",
@@ -4813,14 +5869,19 @@ class SympohyRunnerTest(unittest.TestCase):
                 worktree_status.assert_not_called()
             review_fix_loop.assert_not_called()
             final_merge.assert_not_called()
+            self.assertEqual(
+                [call.args[0] for call in run_command.call_args_list],
+                [
+                    ["git", "worktree", "remove", str(worktree)],
+                    ["gh", "issue", "close", "#82"],
+                ],
+            )
             set_issue_state.assert_called_once_with(
                 "#82",
                 current_labels=("sympohy:running", "sympohy:phase:finalize"),
                 status="sympohy:done",
                 phase="finalize",
             )
-            check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-            check_call.assert_any_call(["gh", "issue", "close", "#82"])
             self.assertEqual(final_state["status"], "done")
             self.assertEqual(
                 final_state["last_known_progress"]["message"],
@@ -4861,7 +5922,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="",
                 ),
                 patch("scripts.sympohy.runner._codex_json") as codex_json,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
                 result = _resume_late_phase(
@@ -4880,8 +5944,13 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         codex_json.assert_not_called()
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        self.assertEqual(
+            [call.args[0] for call in run_command.call_args_list],
+            [
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
+            ],
+        )
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),
