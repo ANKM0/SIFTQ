@@ -1020,6 +1020,13 @@ def _execute_auto_apply_candidates(
             "observe-apply requires a clean worktree before edits: "
             + initial_status.strip()
         )
+    base_branch = str(getattr(config, "base_branch", "main") or "main")
+    branch = _current_branch(cwd)
+    if branch == base_branch or branch in {"main", "master"}:
+        raise RuntimeError(
+            "observe-apply --execute requires a non-base issue branch before it "
+            f"can create a verified draft PR; current branch is {branch!r}"
+        )
     initial_paths: set[str] = set()
     initial_digests: dict[str, str | None] = {}
     initial_snapshots: dict[str, bytes | None] = {}
@@ -1158,7 +1165,6 @@ def _execute_auto_apply_candidates(
         run_id=run_id,
     )
     subprocess.check_call(["git", "commit", "-m", subject], cwd=cwd)
-    branch = _current_branch(cwd)
     _push_branch_and_ensure_draft_pull_request(
         cwd=cwd,
         branch=branch,

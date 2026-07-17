@@ -1086,6 +1086,10 @@ class SympohyObservabilityTest(unittest.TestCase):
                         side_effect=codex_text,
                     ),
                     patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-126-sympohy",
+                    ),
+                    patch(
                         "scripts.sympohy.runner._worktree_status",
                         side_effect=lambda _cwd: next(statuses),
                     ),
@@ -1180,6 +1184,10 @@ class SympohyObservabilityTest(unittest.TestCase):
                     patch(
                         "scripts.sympohy.runner._check_call_with_heartbeat",
                         side_effect=validation,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-126-sympohy",
                     ),
                     patch(
                         "scripts.sympohy.runner._worktree_status",
@@ -1278,6 +1286,10 @@ class SympohyObservabilityTest(unittest.TestCase):
                         side_effect=validation,
                     ),
                     patch(
+                        "scripts.sympohy.runner._current_branch",
+                        return_value="issue-126-sympohy",
+                    ),
+                    patch(
                         "scripts.sympohy.runner._worktree_status",
                         side_effect=lambda _cwd: next(statuses),
                     ),
@@ -1292,6 +1304,48 @@ class SympohyObservabilityTest(unittest.TestCase):
 
             self.assertFalse((worktree / "docs/contributing/issue-execution.md").exists())
             self.assertFalse((worktree / "scripts/sympohy/runner.py").exists())
+
+    def test_applicator_rejects_execute_from_base_branch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            log_dir = worktree / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                with (
+                    patch("scripts.sympohy.runner._worktree_status", return_value=""),
+                    patch("scripts.sympohy.runner._current_branch", return_value="main"),
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "requires a non-base issue branch",
+                    ):
+                        store.apply_improvements(
+                            issue=126,
+                            execute=True,
+                            cwd=worktree,
+                            config=SimpleNamespace(base_branch="main"),
+                        )
 
     def test_prompt_auto_apply_scope_rejects_runner_changes(self) -> None:
         with self.assertRaisesRegex(

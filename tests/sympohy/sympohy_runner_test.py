@@ -54,6 +54,7 @@ from scripts.sympohy.runner import (
     _run_command_with_heartbeat,
     _run_hooks,
     _run_review_fix_round,
+    capture_browser_observation,
     ensure_worktree,
     resume_issue,
     run_issue,
@@ -4159,6 +4160,46 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(events[0]["metadata"]["state_hash"], "abc123")
         self.assertEqual(events[0]["metadata"]["accessibility_summary"], "1 violation")
         self.assertEqual(events[0]["metadata"]["redacted_artifacts"], ["trace_path"])
+
+    def test_capture_browser_observation_writes_lightweight_sidecar(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_path = root / "browser-source.json"
+            source_path.write_text(
+                json.dumps(
+                    {
+                        "console_error_count": 2,
+                        "page_error_count": 1,
+                        "storage_key_count": 4,
+                        "state_hash": "abc123",
+                        "accessibility_summary": "1 violation",
+                        "trace_path": "artifacts/trace.zip",
+                        "dom_dump": "<html>secret</html>",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            log_dir = root / "runs" / "issue-82"
+
+            result = capture_browser_observation(
+                log_dir=log_dir,
+                source_path=source_path,
+                metrics={"page_error_count": 0},
+            )
+            payload = json.loads(
+                (log_dir / "browser-observation.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result["path"], str(log_dir / "browser-observation.json"))
+        self.assertEqual(payload["console_error_count"], 2)
+        self.assertEqual(payload["page_error_count"], 0)
+        self.assertEqual(payload["storage_key_count"], 4)
+        self.assertEqual(payload["state_hash"], "abc123")
+        self.assertEqual(payload["accessibility_summary"], "1 violation")
+        self.assertEqual(payload["source"], "observe-browser")
+        self.assertEqual(payload["source_path"], str(source_path))
+        self.assertNotIn("trace_path", payload)
+        self.assertNotIn("dom_dump", payload)
 
     def test_run_state_writer_truncates_oversized_event_metadata(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -81,3 +81,41 @@ class SympohyCliTest(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertTrue(captured["execute"])
+
+    def test_observe_browser_writes_lightweight_metrics(self) -> None:
+        captured: dict[str, object] = {}
+
+        def capture_browser_observation(**kwargs: object) -> dict[str, object]:
+            captured.update(kwargs)
+            return {"path": "/tmp/run/browser-observation.json"}
+
+        stdout = io.StringIO()
+        with (
+            patch(
+                "scripts.sympohy.cli.capture_browser_observation",
+                side_effect=capture_browser_observation,
+            ),
+            patch("sys.stdout", stdout),
+        ):
+            exit_code = cli.main(
+                [
+                    "observe-browser",
+                    "--run-dir",
+                    "/tmp/run",
+                    "--source",
+                    "/tmp/browser.json",
+                    "--console-error-count",
+                    "2",
+                    "--state-hash",
+                    "abc123",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(captured["log_dir"], Path("/tmp/run"))
+        self.assertEqual(captured["source_path"], Path("/tmp/browser.json"))
+        self.assertEqual(
+            captured["metrics"],
+            {"console_error_count": 2, "state_hash": "abc123"},
+        )
+        self.assertEqual(json.loads(stdout.getvalue())["path"], "/tmp/run/browser-observation.json")

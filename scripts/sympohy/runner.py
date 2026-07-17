@@ -1732,6 +1732,7 @@ def _run_issue_locked(
                 heartbeat=state.heartbeat,
                 issue_number=issue.number,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -1936,6 +1937,7 @@ def _run_issue_locked(
             issue_number=issue.number,
             heartbeat=state.heartbeat,
             base_branch=config.base_branch,
+            state=state,
         )
     except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
         _block(
@@ -2131,6 +2133,7 @@ def _resume_late_phase(
                 issue_number=issue.number,
                 heartbeat=state.heartbeat,
                 base_branch=config.base_branch,
+                state=state,
             )
         except (_AmbiguousPullRequestError, _PullRequestMetadataError) as exc:
             _block(
@@ -4757,6 +4760,51 @@ def _record_browser_observation_boundary(
             **dict(payload),
         },
     )
+
+
+def capture_browser_observation(
+    *,
+    log_dir: Path,
+    source_path: Path | None = None,
+    metrics: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {}
+    if source_path is not None:
+        source_payload = json.loads(source_path.read_text(encoding="utf-8"))
+        if not isinstance(source_payload, Mapping):
+            raise ValueError("browser observation source must be a JSON object")
+        payload.update(source_payload)
+    payload.update(dict(metrics or {}))
+
+    observed = {
+        key: payload[key]
+        for key in sorted(_BROWSER_OBSERVATION_ALLOWED_KEYS)
+        if key in payload and payload[key] is not None
+    }
+    if not any(
+        key in observed
+        for key in (
+            "console_error_count",
+            "page_error_count",
+            "storage_key_count",
+            "state_hash",
+            "accessibility_summary",
+        )
+    ):
+        raise ValueError("browser observation requires at least one lightweight metric")
+    observed["source"] = "observe-browser"
+    if source_path is not None:
+        observed["source_path"] = str(source_path)
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    output_path = log_dir / "browser-observation.json"
+    tmp_path = output_path.with_suffix(".json.tmp")
+    tmp_path.write_text(
+        json.dumps(observed, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(output_path)
+    return {"path": str(output_path), "observation": observed}
 
 
 def _sanitize_event_metadata(

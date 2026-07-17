@@ -156,6 +156,8 @@ task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite
 task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --execute
+task ai:sympohy:observe:browser -- --run-dir .sympohy/runs/issue-73 --source /tmp/browser-observation.json
 task ai:sympohy:migrate -- --dry-run '#73'
 task ai:sympohy:migrate -- '#73'
 task ai:sympohy:migrate -- --all
@@ -211,6 +213,22 @@ Review which proposals stay within the low-risk applicator boundary:
 task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 ```
 
+Execute eligible proposals only from a clean, non-base issue branch. This runs
+required validation, commits the bounded change, pushes the issue branch, and
+stops after verifying a draft PR exists:
+
+```bash
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --execute
+```
+
+Write lightweight browser metrics for the final verifier to record. Hook scripts
+may pass a JSON object produced by browser checks, or pass explicit count/hash
+flags, but must not write raw screenshots, traces, or DOM dumps:
+
+```bash
+task ai:sympohy:observe:browser -- --run-dir .sympohy/runs/issue-73 --source /tmp/browser-observation.json
+```
+
 Operational rules:
 
 - `events.jsonl` is the primary audit record; `observations.sqlite3` is a
@@ -220,6 +238,8 @@ Operational rules:
 - Treat `observe-propose` and `observe-apply` output as review inputs. The
   bounded applicator stops at verified draft PR scope and does not auto-merge
   or apply broad code changes.
+- Run `observe-apply --execute` only from a clean issue branch. It rejects base
+  branches such as `main` before making self-improvement commits.
 - Use `--run-id` filters when one issue directory contains multiple runs and
   the analysis should stay scoped to a single recovery attempt.
 
