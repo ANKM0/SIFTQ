@@ -1115,9 +1115,18 @@ def _execute_auto_apply_candidates(
         unique_validation_commands.append(command)
 
     validation_results: list[dict[str, object]] = []
-    for command in unique_validation_commands:
-        _check_call_with_heartbeat(shlex.split(command), cwd=cwd)
-        validation_results.append({"command": command, "status": "passed"})
+    try:
+        for command in unique_validation_commands:
+            _check_call_with_heartbeat(shlex.split(command), cwd=cwd)
+            validation_results.append({"command": command, "status": "passed"})
+    except Exception:
+        _restore_candidate_changes(
+            cwd=cwd,
+            before_paths=initial_paths,
+            before_digests=initial_digests,
+            before_snapshots=initial_snapshots,
+        )
+        raise
     execution["validation"] = validation_results
 
     changed_paths = _changed_paths_from_status(_worktree_status(cwd))
@@ -1247,6 +1256,13 @@ def _restore_candidate_changes(
     changed_paths = _changed_paths_from_status(status)
     for path in changed_paths:
         path_obj = cwd / path
+        subprocess.run(
+            ["git", "reset", "--", path],
+            cwd=cwd,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         if path in before_paths:
             if _path_digest(path_obj) != before_digests.get(path):
                 snapshot = before_snapshots.get(path)
@@ -1257,7 +1273,14 @@ def _restore_candidate_changes(
                     path_obj.parent.mkdir(parents=True, exist_ok=True)
                     path_obj.write_bytes(snapshot)
         else:
-            if path_obj.is_file() or path_obj.is_symlink():
+            checkout = subprocess.run(
+                ["git", "checkout", "--", path],
+                cwd=cwd,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if checkout.returncode != 0 and (path_obj.is_file() or path_obj.is_symlink()):
                 path_obj.unlink(missing_ok=True)
 
 
