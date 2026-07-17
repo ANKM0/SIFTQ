@@ -304,6 +304,56 @@ describe("App", () => {
     );
   });
 
+  it("keeps the detail page tab order aligned with the visual order", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    const detailPage = screen.getByRole("heading", { name: "タスク詳細" }).closest("section");
+    const focusableElements = Array.from(
+      detailPage?.querySelectorAll<HTMLElement>(
+        'input, select, textarea, a[href], button:not([disabled])'
+      ) ?? []
+    );
+
+    expect(
+      focusableElements.map((element) => {
+        if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
+          return element.name;
+        }
+
+        if (element instanceof HTMLTextAreaElement) {
+          return element.name;
+        }
+
+        return element.textContent?.trim();
+      })
+    ).toEqual(["title", "area", "description", "status", "タスク一覧へ戻る", "削除", "保存"]);
+  });
+
+  it("renders the detail actions in the layout order used by the responsive footer", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    const actions = document.querySelector(".task-detail-form__actions");
+    const backLink = screen.getByRole("link", { name: "タスク一覧へ戻る" });
+    const actionGroup = document.querySelector(".task-detail-form__action-group");
+
+    expect(actions?.children).toHaveLength(2);
+    expect(actions?.firstElementChild).toBe(backLink);
+    expect(actions?.lastElementChild).toBe(actionGroup);
+    expect(
+      Array.from(actionGroup?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim())
+    ).toEqual(["削除", "保存"]);
+  });
+
   it("normalizes legacy terminal tasks to the fallback matrix area in detail", async () => {
     seedStoredTasks(task({ id: "task-1", title: "Finished", areaId: "done", status: "done" }));
     window.location.hash = "#/tasks/task-1";
@@ -360,6 +410,30 @@ describe("App", () => {
     expect(screen.getByDisplayValue("Updated task")).toBeTruthy();
     expect((screen.getByLabelText("area") as HTMLSelectElement).value).toBe("delegate");
     expect((screen.getByLabelText("status") as HTMLSelectElement).value).toBe("done");
+  });
+
+  it("returns to the task list from the detail back link without saving draft edits", async () => {
+    seedStoredTasks(task({ id: "task-1", title: "Visible", areaId: "do" }));
+    window.location.hash = "#/tasks/task-1";
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "タスク詳細" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("title"), {
+      target: { value: "Unsaved draft" }
+    });
+    fireEvent.click(screen.getByRole("link", { name: "タスク一覧へ戻る" }));
+    fireEvent(window, new HashChangeEvent("hashchange"));
+
+    expect(await screen.findByRole("heading", { name: "タスク一覧" })).toBeTruthy();
+    expect(window.location.hash).toBe("#/tasks");
+    expect(storedTasks()[0]).toMatchObject({
+      id: "task-1",
+      title: "Visible",
+      areaId: "do"
+    });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("deletes a task from the detail page and returns to the task list", async () => {
