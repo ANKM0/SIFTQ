@@ -3075,7 +3075,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
                 patch("scripts.sympohy.runner.run_issue", return_value=0) as run_issue,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
             ):
                 result = resume_issue("#82", config)
 
@@ -3084,6 +3087,12 @@ class SympohyRunnerTest(unittest.TestCase):
                     encoding="utf-8"
                 )
             )
+            events = [
+                json.loads(line)
+                for line in (config.run_log_root / "issue-82" / "events.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
 
         self.assertEqual(result, 0)
         run_issue.assert_not_called()
@@ -3093,7 +3102,11 @@ class SympohyRunnerTest(unittest.TestCase):
             status="sympohy:done",
             phase="finalize",
         )
-        check_call.assert_called_once_with(["gh", "issue", "close", "#82"])
+        run_command.assert_called_once()
+        self.assertEqual(run_command.call_args.args[0], ["gh", "issue", "close", "#82"])
+        self.assertEqual(events[-1]["event_type"], "command")
+        self.assertEqual(events[-1]["status"], "success")
+        self.assertEqual(events[-1]["metadata"]["command"], "gh issue close '#82'")
         self.assertEqual(state["phase"], "finalize")
         self.assertEqual(state["status"], "done")
         self.assertEqual(state["last_known_progress"]["resume_point"], "completed")

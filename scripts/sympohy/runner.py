@@ -1084,6 +1084,8 @@ def resume_issue(issue_ref: str, config: SympohyConfig) -> int:
                 issue,
                 terminal_name=resume_point.name,
                 phase=terminal_phase,
+                cwd=Path.cwd(),
+                state=state,
             )
         finally:
             lock.release()
@@ -1235,6 +1237,8 @@ def _reconcile_terminal_issue_state(
     *,
     terminal_name: str,
     phase: str,
+    cwd: Path,
+    state: _RunStateWriter,
 ) -> None:
     if terminal_name == "completed":
         if (
@@ -1248,7 +1252,12 @@ def _reconcile_terminal_issue_state(
                 phase=phase,
             )
         if issue.state in {"OPEN", "open"}:
-            subprocess.check_call(["gh", "issue", "close", issue_ref])
+            _check_call_with_heartbeat(
+                ["gh", "issue", "close", issue_ref],
+                cwd=cwd,
+                heartbeat=state.heartbeat,
+                state=state,
+            )
         return
 
     if terminal_name == "blocked" and (
