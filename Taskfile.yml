@@ -124,7 +124,6 @@ tasks:
             print
           }
         ' Taskfile.yml \
-          | grep -Ev '^ai:sympohy:observe:' \
           | sort -u > "$tasks"
         rg 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
           | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
