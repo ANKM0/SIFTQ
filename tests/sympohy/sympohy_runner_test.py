@@ -4161,6 +4161,32 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(events[0]["metadata"]["accessibility_summary"], "1 violation")
         self.assertEqual(events[0]["metadata"]["redacted_artifacts"], ["trace_path"])
 
+    def test_browser_observation_boundary_rejects_invalid_counts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-82"
+            log_dir.mkdir(parents=True)
+            (log_dir / "browser-observation.json").write_text(
+                json.dumps({"console_error_count": "two"}),
+                encoding="utf-8",
+            )
+            writer = _RunStateWriter(
+                issue_number=82,
+                log_dir=log_dir,
+                base_branch="main",
+            )
+            writer.write(phase="finalize", progress={"message": "observing browser"})
+
+            _record_browser_observation_boundary(state=writer, log_dir=log_dir)
+
+            events = [
+                json.loads(line)
+                for line in (log_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(events[0]["event_type"], "browser_observation")
+        self.assertEqual(events[0]["status"], "failed")
+        self.assertIn("non-negative integer", events[0]["metadata"]["parse_error"])
+
     def test_capture_browser_observation_writes_lightweight_sidecar(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -4200,6 +4226,20 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertEqual(payload["source_path"], str(source_path))
         self.assertNotIn("trace_path", payload)
         self.assertNotIn("dom_dump", payload)
+
+    def test_capture_browser_observation_rejects_invalid_counts(self) -> None:
+        with TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "browser-source.json"
+            source_path.write_text(
+                json.dumps({"console_error_count": "two"}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "non-negative integer"):
+                capture_browser_observation(
+                    log_dir=Path(tmp) / "runs" / "issue-82",
+                    source_path=source_path,
+                )
 
     def test_run_state_writer_truncates_oversized_event_metadata(self) -> None:
         with TemporaryDirectory() as tmp:

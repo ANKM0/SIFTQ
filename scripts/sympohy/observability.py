@@ -1762,8 +1762,10 @@ def _failure_signature(*, event: ObservationEvent, kind: str) -> str:
     if kind == "merge":
         return "merge:gh-pr"
     if kind == "browser":
-        console_errors = int(event.metadata.get("console_error_count", 0) or 0)
-        page_errors = int(event.metadata.get("page_error_count", 0) or 0)
+        console_errors = _safe_non_negative_int(
+            event.metadata.get("console_error_count", 0)
+        )
+        page_errors = _safe_non_negative_int(event.metadata.get("page_error_count", 0))
         return f"browser:console={console_errors}:page={page_errors}"
     if kind == "recovery":
         name = str(event.metadata.get("event", "")).strip() or event.summary
@@ -1817,9 +1819,19 @@ def _is_failure_browser_event(event: ObservationEvent) -> bool:
     if event.event_type != "browser_observation":
         return False
     return any(
-        int(event.metadata.get(key, 0) or 0) > 0
+        _safe_non_negative_int(event.metadata.get(key, 0)) > 0
         for key in ("console_error_count", "page_error_count")
     )
+
+
+def _safe_non_negative_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        number = int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(number, 0)
 
 
 def _parse_timestamp(value: str) -> datetime:

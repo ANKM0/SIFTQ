@@ -413,6 +413,42 @@ class SympohyObservabilityTest(unittest.TestCase):
             },
         )
 
+    def test_analyzer_tolerates_invalid_browser_count_metadata(self) -> None:
+        with TemporaryDirectory() as tmp:
+            log_dir = Path(tmp) / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="finalize",
+                    event_type="browser_observation",
+                    status="observed",
+                    summary="browser observation captured",
+                    metadata={
+                        "console_error_count": "two",
+                        "page_error_count": -1,
+                    },
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                analysis = store.analyze_failures(issue=126)
+                proposal = store.propose_improvements(issue=126)
+
+        self.assertEqual(analysis["failure_kind_counts"], [])
+        self.assertEqual(analysis["blocked_failures"], [])
+        self.assertEqual(proposal["candidates"], [])
+
     def test_analyzer_keeps_structured_test_failures_in_failure_chains(self) -> None:
         with TemporaryDirectory() as tmp:
             log_dir = Path(tmp) / "runs" / "issue-126"

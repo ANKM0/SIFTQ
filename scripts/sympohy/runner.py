@@ -4653,6 +4653,13 @@ _BROWSER_OBSERVATION_ALLOWED_KEYS = frozenset(
         "parse_error",
     }
 )
+_BROWSER_OBSERVATION_COUNT_KEYS = frozenset(
+    {
+        "console_error_count",
+        "page_error_count",
+        "storage_key_count",
+    }
+)
 _BROWSER_OBSERVATION_FORBIDDEN_KEYS = frozenset(
     {
         "raw_screenshot",
@@ -4751,13 +4758,31 @@ def _record_browser_observation_boundary(
             },
         )
         return
+    try:
+        observed = _normalize_browser_observation_payload(payload)
+    except ValueError as exc:
+        state.record_browser_observation(
+            status="failed",
+            summary="browser observation source had invalid lightweight metrics",
+            metadata={
+                "source": "browser-observation.json",
+                "source_path": str(source_path),
+                "parse_error": str(exc),
+            },
+        )
+        return
     state.record_browser_observation(
         status="observed",
         summary="browser observation captured",
         metadata={
             "source": "browser-observation.json",
             "source_path": str(source_path),
-            **dict(payload),
+            **observed,
+            **{
+                key: payload[key]
+                for key in _BROWSER_OBSERVATION_FORBIDDEN_KEYS
+                if key in payload
+            },
         },
     )
 
@@ -4776,11 +4801,7 @@ def capture_browser_observation(
         payload.update(source_payload)
     payload.update(dict(metrics or {}))
 
-    observed = {
-        key: payload[key]
-        for key in sorted(_BROWSER_OBSERVATION_ALLOWED_KEYS)
-        if key in payload and payload[key] is not None
-    }
+    observed = _normalize_browser_observation_payload(payload)
     if not any(
         key in observed
         for key in (
@@ -4805,6 +4826,32 @@ def capture_browser_observation(
     )
     tmp_path.replace(output_path)
     return {"path": str(output_path), "observation": observed}
+
+
+def _normalize_browser_observation_payload(
+    payload: Mapping[str, object],
+) -> dict[str, object]:
+    observed = {
+        key: payload[key]
+        for key in sorted(_BROWSER_OBSERVATION_ALLOWED_KEYS)
+        if key in payload and payload[key] is not None
+    }
+    for key in _BROWSER_OBSERVATION_COUNT_KEYS:
+        if key in observed:
+            observed[key] = _browser_observation_count(key=key, value=observed[key])
+    return observed
+
+
+def _browser_observation_count(*, key: str, value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{key} must be a non-negative integer")
+    try:
+        count = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key} must be a non-negative integer") from exc
+    if count < 0:
+        raise ValueError(f"{key} must be a non-negative integer")
+    return count
 
 
 def _sanitize_event_metadata(
