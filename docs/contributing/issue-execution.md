@@ -151,11 +151,11 @@ task ai:sympohy:labels:sync
 task ai:sympohy:refine -- '#73'
 task ai:sympohy -- '#73'
 task ai:sympohy:resume -- '#73'
-task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73/latest
-task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
-task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
-task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
-task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73
+task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 task ai:sympohy:migrate -- --dry-run '#73'
 task ai:sympohy:migrate -- '#73'
 task ai:sympohy:migrate -- --all
@@ -177,38 +177,38 @@ normal review, verification, or PR workflow.
 Rebuild a searchable observation store from one run directory:
 
 ```bash
-task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73/latest
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73
 ```
 
 Override the SQLite target path when needed:
 
 ```bash
-task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73/latest --db /tmp/issue-73-observations.sqlite3
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73 --db /tmp/issue-73-observations.sqlite3
 ```
 
 Inspect recorded events after replay:
 
 ```bash
-task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73 --phase review --status failure
+task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --phase review --status failure
 ```
 
 Summarize failure taxonomy, blocked chains, and recurring patterns:
 
 ```bash
-task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
+task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 ```
 
 Generate proposal JSON for docs, hooks, prompts, skills, tests, stage gates,
 or lightweight config improvements:
 
 ```bash
-task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
+task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 ```
 
 Review which proposals stay within the low-risk applicator boundary:
 
 ```bash
-task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
 ```
 
 Operational rules:

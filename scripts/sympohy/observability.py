@@ -1020,6 +1020,9 @@ def _execute_auto_apply_candidates(
             "observe-apply requires a clean worktree before edits: "
             + initial_status.strip()
         )
+    initial_paths: set[str] = set()
+    initial_digests: dict[str, str | None] = {}
+    initial_snapshots: dict[str, bytes | None] = {}
 
     log_dir = db_path.parent / "self-improvement"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -1032,24 +1035,34 @@ def _execute_auto_apply_candidates(
         before_status = _worktree_status(cwd)
         before_paths = set(_changed_paths_from_status(before_status))
         before_digests = _path_digests(cwd=cwd, paths=before_paths)
+        before_snapshots = _path_snapshots(cwd=cwd, paths=before_paths)
         log_path = log_dir / _candidate_log_name(candidate=candidate, run_id=run_id)
-        _codex_text(
-            _candidate_apply_prompt(
-                issue=issue,
-                candidate=candidate,
-            ),
-            cwd=cwd,
-            log_path=log_path,
-            config=config,
-            role="fix",
-        )
-        after_status = _worktree_status(cwd)
-        changed = after_status != before_status
         record = {
             "id": str(candidate.get("id", "")),
             "category": str(candidate.get("category", "")),
             "log_path": str(log_path),
         }
+        try:
+            _codex_text(
+                _candidate_apply_prompt(
+                    issue=issue,
+                    candidate=candidate,
+                ),
+                cwd=cwd,
+                log_path=log_path,
+                config=config,
+                role="fix",
+            )
+            after_status = _worktree_status(cwd)
+            changed = after_status != before_status
+        except Exception:
+            _restore_candidate_changes(
+                cwd=cwd,
+                before_paths=before_paths,
+                before_digests=before_digests,
+                before_snapshots=before_snapshots,
+            )
+            raise
         if changed:
             changed_paths = _changed_paths_from_status(after_status)
             candidate_paths = [
@@ -1058,10 +1071,19 @@ def _execute_auto_apply_candidates(
                 if path not in before_paths
                 or _path_digest(cwd / path) != before_digests.get(path)
             ]
-            _enforce_candidate_scope(
-                candidate=candidate,
-                changed_paths=candidate_paths,
-            )
+            try:
+                _enforce_candidate_scope(
+                    candidate=candidate,
+                    changed_paths=candidate_paths,
+                )
+            except Exception:
+                _restore_candidate_changes(
+                    cwd=cwd,
+                    before_paths=before_paths,
+                    before_digests=before_digests,
+                    before_snapshots=before_snapshots,
+                )
+                raise
             applied_candidates.append(record)
             validation_commands.extend(
                 [
@@ -1099,6 +1121,19 @@ def _execute_auto_apply_candidates(
     execution["validation"] = validation_results
 
     changed_paths = _changed_paths_from_status(_worktree_status(cwd))
+    try:
+        _enforce_applied_candidate_scope(
+            candidates=applied_candidates,
+            changed_paths=changed_paths,
+        )
+    except Exception:
+        _restore_candidate_changes(
+            cwd=cwd,
+            before_paths=initial_paths,
+            before_digests=initial_digests,
+            before_snapshots=initial_snapshots,
+        )
+        raise
     if changed_paths:
         subprocess.check_call(["git", "add", "-A", "--", *changed_paths], cwd=cwd)
     if not _worktree_has_changes(cwd):
@@ -1173,8 +1208,72 @@ def _enforce_candidate_scope(
         )
 
 
+def _enforce_applied_candidate_scope(
+    *,
+    candidates: Sequence[Mapping[str, object]],
+    changed_paths: Sequence[str],
+) -> None:
+    allowed_patterns: list[str] = []
+    candidate_ids: list[str] = []
+    for candidate in candidates:
+        category = str(candidate.get("category", "")).strip()
+        allowed_patterns.extend(_LOW_RISK_APPLICATOR_PATHS.get(category, ()))
+        candidate_id = str(candidate.get("id", "")).strip()
+        if candidate_id:
+            candidate_ids.append(candidate_id)
+    out_of_scope = [
+        path
+        for path in changed_paths
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in allowed_patterns)
+    ]
+    if out_of_scope:
+        joined_ids = ", ".join(candidate_ids) or "applied candidates"
+        raise RuntimeError(
+            "observe-apply rejected out-of-scope validation changes for "
+            f"{joined_ids}: {', '.join(sorted(out_of_scope))}"
+        )
+
+
+def _restore_candidate_changes(
+    *,
+    cwd: Path,
+    before_paths: set[str],
+    before_digests: Mapping[str, str | None],
+    before_snapshots: Mapping[str, bytes | None],
+) -> None:
+    from .runner import _worktree_status
+
+    status = _worktree_status(cwd)
+    changed_paths = _changed_paths_from_status(status)
+    for path in changed_paths:
+        path_obj = cwd / path
+        if path in before_paths:
+            if _path_digest(path_obj) != before_digests.get(path):
+                snapshot = before_snapshots.get(path)
+                if snapshot is None:
+                    if path_obj.is_file() or path_obj.is_symlink():
+                        path_obj.unlink(missing_ok=True)
+                else:
+                    path_obj.parent.mkdir(parents=True, exist_ok=True)
+                    path_obj.write_bytes(snapshot)
+        else:
+            if path_obj.is_file() or path_obj.is_symlink():
+                path_obj.unlink(missing_ok=True)
+
+
 def _path_digests(*, cwd: Path, paths: Sequence[str]) -> dict[str, str | None]:
     return {path: _path_digest(cwd / path) for path in paths}
+
+
+def _path_snapshots(*, cwd: Path, paths: Sequence[str]) -> dict[str, bytes | None]:
+    snapshots: dict[str, bytes | None] = {}
+    for path in paths:
+        path_obj = cwd / path
+        if path_obj.exists() and path_obj.is_file():
+            snapshots[path] = path_obj.read_bytes()
+        else:
+            snapshots[path] = None
+    return snapshots
 
 
 def _path_digest(path: Path) -> str | None:

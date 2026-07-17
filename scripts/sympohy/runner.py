@@ -3049,7 +3049,12 @@ def _finish_merged_issue(
     message: str,
 ) -> int:
     if worktree.exists():
-        subprocess.check_call(["git", "worktree", "remove", str(worktree)])
+        _check_call_with_heartbeat(
+            ["git", "worktree", "remove", str(worktree)],
+            cwd=Path.cwd(),
+            heartbeat=state.heartbeat,
+            state=state,
+        )
     done_progress: dict[str, object] = {"message": message}
     if total_steps is not None:
         done_progress["completed_logical_steps"] = total_steps
@@ -3065,7 +3070,12 @@ def _finish_merged_issue(
         status="sympohy:done",
         phase="finalize",
     )
-    subprocess.check_call(["gh", "issue", "close", issue_ref])
+    _check_call_with_heartbeat(
+        ["gh", "issue", "close", issue_ref],
+        cwd=Path.cwd(),
+        heartbeat=state.heartbeat,
+        state=state,
+    )
     return 0
 
 

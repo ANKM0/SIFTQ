@@ -203,27 +203,27 @@ tasks:
       - uv run python -m scripts.sympohy resume {{.CLI_ARGS}}
 
   ai:sympohy:observe:replay:
-    desc: Rebuild the observation SQLite store from a run directory event stream, for example task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73/latest.
+    desc: Rebuild the observation SQLite store from a run directory event stream, for example task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73.
     cmds:
       - uv run python -m scripts.sympohy observe-replay {{.CLI_ARGS}}
 
   ai:sympohy:observe:query:
-    desc: Query replayed observation events, for example task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73.
+    desc: Query replayed observation events, for example task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
     cmds:
       - uv run python -m scripts.sympohy observe-query {{.CLI_ARGS}}
 
   ai:sympohy:observe:analyze:
-    desc: Summarize failure taxonomy and recurring chains from a replayed observation DB, for example task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73.
+    desc: Summarize failure taxonomy and recurring chains from a replayed observation DB, for example task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
     cmds:
       - uv run python -m scripts.sympohy observe-analyze {{.CLI_ARGS}}
 
   ai:sympohy:observe:propose:
-    desc: Generate bounded self-improvement proposal JSON from a replayed observation DB, for example task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73.
+    desc: Generate bounded self-improvement proposal JSON from a replayed observation DB, for example task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
     cmds:
       - uv run python -m scripts.sympohy observe-propose {{.CLI_ARGS}}
 
   ai:sympohy:observe:apply:
-    desc: Evaluate which self-improvement proposals remain within low-risk auto-apply policy, for example task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/latest/observations.sqlite3 --issue 73.
+    desc: Evaluate which self-improvement proposals remain within low-risk auto-apply policy, for example task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
     cmds:
       - uv run python -m scripts.sympohy observe-apply {{.CLI_ARGS}}
 

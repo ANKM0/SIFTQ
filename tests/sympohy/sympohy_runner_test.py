@@ -4737,7 +4737,6 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="99",
                 ),
                 patch("scripts.sympohy.runner.comment") as comment,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
                 patch("scripts.sympohy.runner.set_issue_state"),
             ):
                 result = _run_final_verifier_and_merge(
@@ -4785,6 +4784,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 ["gh", "pr", "ready"],
                 ["gh", "pr", "checks", "--watch"],
                 ["gh", "pr", "merge", "--squash", "--delete-branch"],
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
             ],
         )
         self.assertTrue(
@@ -4806,10 +4807,10 @@ class SympohyRunnerTest(unittest.TestCase):
                 "gh pr ready",
                 "gh pr checks --watch",
                 "gh pr merge --squash --delete-branch",
+                f"git worktree remove {str(worktree)}",
+                "gh issue close '#82'",
             ],
         )
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
 
     def test_final_verifier_block_routes_valid_findings_to_fix(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -4969,6 +4970,8 @@ class SympohyRunnerTest(unittest.TestCase):
                 "gh pr ready",
                 "gh pr checks --watch",
                 "gh pr merge --squash --delete-branch",
+                f"git worktree remove {str(worktree)}",
+                "gh issue close #82",
             ],
         )
         review_fix_loop_mock.assert_called_once()
@@ -5666,7 +5669,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="",
                 ),
                 patch("scripts.sympohy.runner._codex_json") as codex_json,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
                 result = _run_final_verifier_and_merge(
@@ -5683,8 +5689,13 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         codex_json.assert_not_called()
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        self.assertEqual(
+            [call.args[0] for call in run_command.call_args_list],
+            [
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
+            ],
+        )
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),
@@ -5736,7 +5747,10 @@ class SympohyRunnerTest(unittest.TestCase):
                         "scripts.sympohy.runner._run_final_verifier_and_merge"
                     ) as final_merge,
                     patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
-                    patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                    patch(
+                        "scripts.sympohy.runner._run_command_with_heartbeat",
+                        return_value=0,
+                    ) as run_command,
                 ):
                     result = _resume_late_phase(
                         "#82",
@@ -5761,14 +5775,19 @@ class SympohyRunnerTest(unittest.TestCase):
                 worktree_status.assert_not_called()
             review_fix_loop.assert_not_called()
             final_merge.assert_not_called()
+            self.assertEqual(
+                [call.args[0] for call in run_command.call_args_list],
+                [
+                    ["git", "worktree", "remove", str(worktree)],
+                    ["gh", "issue", "close", "#82"],
+                ],
+            )
             set_issue_state.assert_called_once_with(
                 "#82",
                 current_labels=("sympohy:running", "sympohy:phase:finalize"),
                 status="sympohy:done",
                 phase="finalize",
             )
-            check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-            check_call.assert_any_call(["gh", "issue", "close", "#82"])
             self.assertEqual(final_state["status"], "done")
             self.assertEqual(
                 final_state["last_known_progress"]["message"],
@@ -5809,7 +5828,10 @@ class SympohyRunnerTest(unittest.TestCase):
                     return_value="",
                 ),
                 patch("scripts.sympohy.runner._codex_json") as codex_json,
-                patch("scripts.sympohy.runner.subprocess.check_call") as check_call,
+                patch(
+                    "scripts.sympohy.runner._run_command_with_heartbeat",
+                    return_value=0,
+                ) as run_command,
                 patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
             ):
                 result = _resume_late_phase(
@@ -5828,8 +5850,13 @@ class SympohyRunnerTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         codex_json.assert_not_called()
-        check_call.assert_any_call(["git", "worktree", "remove", str(worktree)])
-        check_call.assert_any_call(["gh", "issue", "close", "#82"])
+        self.assertEqual(
+            [call.args[0] for call in run_command.call_args_list],
+            [
+                ["git", "worktree", "remove", str(worktree)],
+                ["gh", "issue", "close", "#82"],
+            ],
+        )
         set_issue_state.assert_called_once_with(
             "#82",
             current_labels=("sympohy:running", "sympohy:phase:finalize"),

@@ -1051,14 +1051,39 @@ class SympohyObservabilityTest(unittest.TestCase):
                     "",
                     "",
                     " M docs/contributing/issue-execution.md\n M scripts/sympohy/runner.py",
+                    " M docs/contributing/issue-execution.md\n M scripts/sympohy/runner.py",
                 ]
             )
+
+            def codex_text(
+                _prompts: list[str],
+                *,
+                cwd: Path,
+                log_path: Path,
+                heartbeat: object | None = None,
+                config: object | None = None,
+                role: str = "default",
+                state: object | None = None,
+            ) -> str:
+                del heartbeat, config, role, state
+                (cwd / "docs/contributing").mkdir(parents=True, exist_ok=True)
+                (cwd / "scripts/sympohy").mkdir(parents=True, exist_ok=True)
+                (cwd / "docs/contributing/issue-execution.md").write_text(
+                    "docs change",
+                    encoding="utf-8",
+                )
+                (cwd / "scripts/sympohy/runner.py").write_text(
+                    "code change",
+                    encoding="utf-8",
+                )
+                log_path.write_text("applied", encoding="utf-8")
+                return ""
 
             with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
                 with (
                     patch(
                         "scripts.sympohy.runner._codex_text",
-                        return_value="",
+                        side_effect=codex_text,
                     ),
                     patch(
                         "scripts.sympohy.runner._worktree_status",
@@ -1075,6 +1100,105 @@ class SympohyObservabilityTest(unittest.TestCase):
                             cwd=worktree,
                             config=SimpleNamespace(base_branch="main"),
                         )
+
+            self.assertFalse((worktree / "docs/contributing/issue-execution.md").exists())
+            self.assertFalse((worktree / "scripts/sympohy/runner.py").exists())
+
+    def test_applicator_rejects_out_of_scope_validation_side_effects(self) -> None:
+        with TemporaryDirectory() as tmp:
+            worktree = Path(tmp)
+            log_dir = worktree / "runs" / "issue-126"
+            log_dir.mkdir(parents=True)
+            events = [
+                self._event(
+                    run_id="run-1",
+                    event_id="run-1-000001",
+                    phase="review",
+                    event_type="stage_gate",
+                    status="block",
+                    summary="review gate blocked",
+                    metadata={"stage": "review", "failure_summary": "missing AC"},
+                    timestamp="2026-07-16T10:00:00Z",
+                ),
+            ]
+            (log_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(event, ensure_ascii=False, sort_keys=True)
+                    for event in events
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            statuses = iter(
+                [
+                    "",
+                    "",
+                    " M docs/contributing/issue-execution.md",
+                    " M docs/contributing/issue-execution.md\n M scripts/sympohy/runner.py",
+                    " M docs/contributing/issue-execution.md\n M scripts/sympohy/runner.py",
+                ]
+            )
+
+            def codex_text(
+                _prompts: list[str],
+                *,
+                cwd: Path,
+                log_path: Path,
+                heartbeat: object | None = None,
+                config: object | None = None,
+                role: str = "default",
+                state: object | None = None,
+            ) -> str:
+                del heartbeat, config, role, state
+                (cwd / "docs/contributing").mkdir(parents=True, exist_ok=True)
+                (cwd / "docs/contributing/issue-execution.md").write_text(
+                    "docs change",
+                    encoding="utf-8",
+                )
+                log_path.write_text("applied", encoding="utf-8")
+                return ""
+
+            def validation(
+                command: list[str],
+                *,
+                cwd: Path,
+                heartbeat: object | None = None,
+            ) -> None:
+                del command, heartbeat
+                (cwd / "scripts/sympohy").mkdir(parents=True, exist_ok=True)
+                (cwd / "scripts/sympohy/runner.py").write_text(
+                    "validation side effect",
+                    encoding="utf-8",
+                )
+
+            with ObservationStore.rebuild(log_dir=log_dir)[0] as store:
+                with (
+                    patch(
+                        "scripts.sympohy.runner._codex_text",
+                        side_effect=codex_text,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._check_call_with_heartbeat",
+                        side_effect=validation,
+                    ),
+                    patch(
+                        "scripts.sympohy.runner._worktree_status",
+                        side_effect=lambda _cwd: next(statuses),
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "observe-apply rejected out-of-scope validation changes .*scripts/sympohy/runner.py",
+                    ):
+                        store.apply_improvements(
+                            issue=126,
+                            execute=True,
+                            cwd=worktree,
+                            config=SimpleNamespace(base_branch="main"),
+                        )
+
+            self.assertFalse((worktree / "docs/contributing/issue-execution.md").exists())
+            self.assertFalse((worktree / "scripts/sympohy/runner.py").exists())
 
     def test_prompt_auto_apply_scope_rejects_runner_changes(self) -> None:
         with self.assertRaisesRegex(
