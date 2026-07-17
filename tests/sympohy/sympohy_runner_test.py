@@ -2051,6 +2051,60 @@ class SympohyRunnerTest(unittest.TestCase):
             resume_point="implement",
         )
 
+    def test_resume_issue_continues_blocked_late_phase_after_manual_fix(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as tmp:
+            config = self._config(Path(tmp))
+            issue = Issue(
+                number=82,
+                title="Resume blocked review",
+                body="",
+                labels=("sympohy:blocked", "sympohy:phase:review"),
+                comments=(),
+            )
+            state_dir = config.run_log_root / "issue-82"
+            state_dir.mkdir(parents=True)
+            stale_heartbeat = datetime.now(timezone.utc) - timedelta(minutes=31)
+            (state_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "issue": 82,
+                        "run_id": "blocked-review-run",
+                        "phase": "review",
+                        "status": "blocked",
+                        "pid": os.getpid(),
+                        "heartbeat": stale_heartbeat.isoformat(),
+                        "lock": {"run_id": "blocked-review-run"},
+                        "last_known_progress": {
+                            "message": "blocked",
+                            "review_round": 6,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("scripts.sympohy.runner.fetch_issue", return_value=issue),
+                patch(
+                    "scripts.sympohy.runner.run_issue",
+                    return_value=0,
+                ) as run_issue,
+                patch("scripts.sympohy.runner.set_issue_state") as set_issue_state,
+            ):
+                result = resume_issue("#82", config)
+
+        self.assertEqual(result, 0)
+        set_issue_state.assert_not_called()
+        run_issue.assert_called_once_with(
+            "#82",
+            config,
+            recover=True,
+            from_resume=True,
+            resume_point="review",
+        )
+
     def test_resume_issue_replans_stale_implement_before_plan_exists(self) -> None:
         with TemporaryDirectory() as tmp:
             config = self._config(Path(tmp))
@@ -3107,6 +3161,23 @@ class SympohyRunnerTest(unittest.TestCase):
         self.assertTrue(completed.terminal)
         self.assertEqual(not_planned.name, "hooks")
         self.assertFalse(not_planned.terminal)
+
+    def test_resolve_resume_point_for_issue_treats_blocked_late_phase_as_resumable(
+        self,
+    ) -> None:
+        review = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:blocked"}, {"name": "sympohy:phase:review"}],
+            {"status": "blocked", "phase": "review"},
+        )
+        hooks = _resolve_resume_point_for_issue(
+            [{"name": "sympohy:blocked"}, {"name": "sympohy:phase:hooks"}],
+            {"status": "blocked", "phase": "hooks"},
+        )
+
+        self.assertEqual(review.name, "review")
+        self.assertFalse(review.terminal)
+        self.assertEqual(hooks.name, "blocked")
+        self.assertTrue(hooks.terminal)
 
     def test_resume_issue_restores_done_finalize_labels_for_completed_issue(self) -> None:
         with TemporaryDirectory() as tmp:

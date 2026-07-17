@@ -5209,8 +5209,13 @@ def _resolve_resume_point_for_issue(
             },
         )
     if state is not None and state.get("status") == "blocked":
-        if "sympohy:blocked" not in names and (
-            "sympohy:running" in names or "sympohy:pending" in names
+        phase = phase_from_state(state) or _phase_from_labels(names)
+        if (
+            "sympohy:blocked" in names
+            and phase in {"review", "fix", "finalize"}
+        ) or (
+            "sympohy:blocked" not in names
+            and ("sympohy:running" in names or "sympohy:pending" in names)
         ):
             state = {**state, "status": "running"}
     return resolve_resume_point(labels, state=state)
