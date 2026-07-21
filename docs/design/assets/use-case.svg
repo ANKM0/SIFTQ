@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="460" viewBox="0 0 920 460" role="img" aria-labelledby="title desc">
+  <title id="title">Task Management Use Case</title>
+  <desc id="desc">User goals for viewing, prioritizing, creating, editing, status changes, and area changes.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a" />
+    </marker>
+    <style>
+      .actor { fill: #f6f8fa; stroke: #57606a; stroke-width: 2; }
+      .case { fill: #ffffff; stroke: #0969da; stroke-width: 1.5; }
+      .text { fill: #24292f; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 600; text-anchor: middle; }
+      .line { fill: none; stroke: #57606a; stroke-width: 1.6; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="actor" x="35" y="200" width="110" height="60" />
+  <text class="text" x="90" y="236">User</text>
+
+  <rect class="case" x="245" y="40" width="250" height="58" />
+  <text class="text" x="370" y="75">タスクを確認する</text>
+
+  <rect class="case" x="560" y="40" width="300" height="58" />
+  <text class="text" x="710" y="75">優先度・緊急度で整理する</text>
+
+  <rect class="case" x="245" y="135" width="250" height="58" />
+  <text class="text" x="370" y="170">タスクを作成する</text>
+
+  <rect class="case" x="560" y="135" width="300" height="58" />
+  <text class="text" x="710" y="170">タスク内容を編集する</text>
+
+  <rect class="case" x="245" y="230" width="250" height="58" />
+  <text class="text" x="370" y="265">タスクの状態を変更する</text>
+
+  <rect class="case" x="560" y="230" width="300" height="58" />
+  <text class="text" x="710" y="265">タスクの象限を変更する</text>
+
+  <path class="line" d="M 145 214 C 180 120, 195 70, 245 69" />
+  <path class="line" d="M 145 219 C 280 90, 410 75, 560 69" />
+  <path class="line" d="M 145 226 C 180 175, 195 164, 245 164" />
+  <path class="line" d="M 145 231 C 285 160, 410 164, 560 164" />
+  <path class="line" d="M 145 239 C 180 255, 195 259, 245 259" />
+  <path class="line" d="M 145 246 C 285 275, 410 259, 560 259" />
+</svg>

@@ -4,255 +4,52 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SIFTQ Wireframe Index</title>
-    <link rel="stylesheet" href="./matrix-mvp.css" />
+    <link rel="stylesheet" href="./task-redesign.css" />
   </head>
   <body>
-    <main class="wire-index">
-      <header class="wire-index__header">
-        <div>
-          <h1>SIFTQ UI Wireframes</h1>
-          <p>マトリックスとタスク管理の画面状態と遷移関係</p>
-        </div>
-        <nav class="header-actions" aria-label="Primary">
-          <a href="./matrix-mvp.html">マトリックス</a>
-          <a href="./task-list.html">タスク一覧</a>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">SIFTQ Wireframes</div>
+        <nav class="nav" aria-label="Wireframe states">
+          <a class="active" href="./index.html">Index</a>
+          <a href="./matrix-page.html">Matrix</a>
+          <a href="./task-list.html">Tasks</a>
         </nav>
       </header>
-
-      <section class="wire-flow-map wire-flow-map--current" aria-label="UI state flow">
-        <svg class="wire-flow-map__lines" viewBox="0 0 1000 760" aria-hidden="true">
-          <defs>
-            <marker
-              id="arrow"
-              markerHeight="8"
-              markerWidth="8"
-              orient="auto"
-              refX="7"
-              refY="4"
-            >
-              <path d="M0,0 L8,4 L0,8 Z" />
-            </marker>
-          </defs>
-          <path class="flow-line" d="M210 90 H220" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M390 90 H400" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M570 90 H580" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M665 146 V230" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M750 90 H790" marker-end="url(#arrow)" />
-          <path class="flow-line flow-line--return" d="M580 278 C515 278 485 210 485 146" />
-          <path class="flow-line" d="M485 146 C390 258 280 365 125 460" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M210 512 H220" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M390 512 H400" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M570 512 H580" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M750 512 H760" marker-end="url(#arrow)" />
-          <path class="flow-line" d="M845 566 V630" marker-end="url(#arrow)" />
-          <path class="flow-line flow-line--return" d="M760 678 C575 728 310 722 125 556" />
-          <path class="flow-line" d="M125 566 V630" marker-end="url(#arrow)" />
-          <text class="flow-label" x="222" y="28">作成</text>
-          <text class="flow-label" x="588" y="28">ドラッグ</text>
-          <text class="flow-label" x="678" y="198">編集</text>
-          <text class="flow-label" x="790" y="28">完了/スキップ</text>
-          <text class="flow-label" x="224" y="444">並び替え</text>
-          <text class="flow-label" x="402" y="444">ステータス</text>
-          <text class="flow-label" x="590" y="444">詳細</text>
-          <text class="flow-label" x="768" y="444">削除</text>
-        </svg>
-
-        <a class="wire-flow-card wire-flow-card--empty" href="./matrix-empty.html">
-          <strong>Matrix: Empty</strong>
-          <span>空 area は中央の + から作成を開始する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--create" href="./matrix-create.html">
-          <strong>Matrix: Create</strong>
-          <span>対象 area で title を入力する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--cards" href="./matrix-with-cards.html">
-          <strong>Matrix: Cards</strong>
-          <span>作成済み card、count、title と Edit action。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--editing" href="./matrix-editing.html">
-          <strong>Matrix: Editing</strong>
-          <span>Edit action から title / description edit modal を開く。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--dragging" href="./matrix-dragging.html">
-          <strong>Matrix: Dragging</strong>
-          <span>area 内並び替え、matrix area 間移動、terminal area drop。</span>
-        </a>
-        <a
-          class="wire-flow-card wire-flow-card--terminal"
-          href="./matrix-terminal-drop.html"
-        >
-          <strong>Matrix: Terminal Drop</strong>
-          <span>Done / Skipped drop 後は matrix から非表示。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-list" href="./task-list.html">
-          <strong>タスク一覧</strong>
-          <span>全taskをlistOrder順のカードで表示する。</span>
-        </a>
-        <a
-          class="wire-flow-card wire-flow-card--task-list-selection"
-          href="./task-list-selection.html"
-        >
-          <strong>選択あり一覧</strong>
-          <span>checkbox 選択と一括削除 enabled 状態。</span>
-        </a>
-        <a
-          class="wire-flow-card wire-flow-card--task-bulk-delete"
-          href="./task-bulk-delete-confirm.html"
-        >
-          <strong>一括削除確認</strong>
-          <span>選択件数を確認し、キャンセルか削除を選ぶ。</span>
-        </a>
-        <a
-          class="wire-flow-card wire-flow-card--task-bulk-deleted"
-          href="./task-list-bulk-deleted.html"
-        >
-          <strong>一括削除後一覧</strong>
-          <span>選択したタスクを削除しました通知を表示する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-dragging" href="./task-list-dragging.html">
-          <strong>一覧並び替え</strong>
-          <span>DnDでlistOrderだけを更新する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-status" href="./task-list-status-menu.html">
-          <strong>ステータス選択</strong>
-          <span>active / done / skipped を選択する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-detail" href="./task-detail.html">
-          <strong>タスク詳細</strong>
-          <span>title、description、area、status、日時を確認・編集する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-delete" href="./task-delete-confirm.html">
-          <strong>削除確認</strong>
-          <span>削除前に確認し、実行後は一覧へ戻る。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-deleted" href="./task-list-deleted.html">
-          <strong>削除後一覧</strong>
-          <span>削除成功通知を一覧上に表示する。</span>
-        </a>
-        <a class="wire-flow-card wire-flow-card--task-not-found" href="./task-not-found.html">
-          <strong>タスク未検出</strong>
-          <span>存在しないtask詳細URLの404状態。</span>
-        </a>
-      </section>
-
-      <section class="wire-table" aria-label="State table">
-        <h2>マトリックス</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>状態</th>
-              <th>確認したいこと</th>
-              <th>次の遷移</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><a href="./matrix-empty.html">Empty</a></td>
-              <td>No cards を出さず、空 area に + を置く。</td>
-              <td>+ click → Create</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-create.html">Create</a></td>
-              <td>入力欄、disabled、error、作成位置。</td>
-              <td>Create success → Cards</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-with-cards.html">Cards</a></td>
-              <td>card 表示、Edit action、area 内表示順、長い title。</td>
-              <td>Edit → Editing / drag start → Dragging</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-editing.html">Editing</a></td>
-              <td>title / description edit modal、Save、Cancel、invalid title の disabled。</td>
-              <td>Save / Cancel → Cards</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-dragging.html">Dragging</a></td>
-              <td>drag 中、area 内並び替え、matrix area 間移動、drop target。</td>
-              <td>Drop on matrix → Cards / Drop on terminal → Terminal Drop</td>
-            </tr>
-            <tr>
-              <td><a href="./matrix-terminal-drop.html">Terminal Drop</a></td>
-              <td>Done / Skipped に count を出さず、drop 後 card を matrix から消す。</td>
-              <td>次操作待ち。復元 UI は提供しない。</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section class="wire-table" aria-label="Task management states">
-        <h2>タスク管理</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>状態</th>
-              <th>確認したいこと</th>
-              <th>次の遷移</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><a href="./task-list.html">タスク一覧</a></td>
-              <td>全taskをdraggable list cardで表示し、title、description、area、statusを確認する。</td>
-              <td>詳細 → タスク詳細 / ステータス → ステータス選択 / 削除 → 削除確認 / drag → 一覧並び替え / checkbox → 選択あり一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list-selection.html">選択あり一覧</a></td>
-              <td>checkbox 選択、選択件数、一括削除 button の enabled state を確認する。</td>
-              <td>一括削除 → 一括削除確認 / checkbox toggle → タスク一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-bulk-delete-confirm.html">一括削除確認</a></td>
-              <td>選択件数を含む確認とキャンセル時の選択維持を確認する。</td>
-              <td>削除 → 一括削除後一覧 / キャンセル → 選択あり一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list-bulk-deleted.html">一括削除後一覧</a></td>
-              <td>選択したタスクを削除しました通知を出し、選択状態を空にする。</td>
-              <td>次操作待ち</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list-dragging.html">一覧並び替え</a></td>
-              <td>全task DnDがlistOrderだけを更新し、Matrixのarea/orderへ影響しない。</td>
-              <td>Drop → タスク一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list-status-menu.html">ステータス選択</a></td>
-              <td>status buttonから active / done / skipped の選択肢を表示する。</td>
-              <td>status選択 → タスク一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-detail.html">タスク詳細</a></td>
-              <td>title、description、area、statusを編集し、作成日時 / 更新日時をreadonly表示する。</td>
-              <td>保存 / キャンセル → タスク一覧 / 削除 → 削除確認</td>
-            </tr>
-            <tr>
-              <td><a href="./task-delete-confirm.html">削除確認</a></td>
-              <td>物理削除前にtask titleを含む確認を表示する。</td>
-              <td>削除 → 削除後一覧 / キャンセル → タスク一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list-deleted.html">削除後一覧</a></td>
-              <td>削除成功通知を出し、復元操作は提供しない。</td>
-              <td>次操作待ち</td>
-            </tr>
-            <tr>
-              <td><a href="./task-not-found.html">タスク未検出</a></td>
-              <td>存在しないtask詳細URLを開いた404状態から一覧へ戻れる。</td>
-              <td>タスク一覧へ戻る → タスク一覧</td>
-            </tr>
-            <tr>
-              <td><a href="./task-list.html">Task List</a></td>
-              <td>縦並び draggable list、status menu、詳細、削除、空 description 表示。</td>
-              <td>Drag / status / detail / delete → 各状態。</td>
-            </tr>
-            <tr>
-              <td><a href="./task-detail.html">Task Detail</a></td>
-              <td>title、description、area、status、readonly timestamps。</td>
-              <td>Save / Delete / Not found → Task List。</td>
-            </tr>
-          </tbody>
-        </table>
+      <section class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Zero-base task redesign</h1>
+            <p class="muted">Low-fidelity state map for the new task workflow.</p>
+          </div>
+          <a class="button primary" href="./task-new.html">New task</a>
+        </div>
+        <div class="state-map">
+          <a class="state-card" href="./matrix-page.html">
+            <strong>Matrix page</strong>
+            <p class="muted">Four matrix areas with drag and drop.</p>
+          </a>
+          <a class="state-card" href="./task-list.html">
+            <strong>Task list</strong>
+            <p class="muted">GitHub Issues-like compact task list.</p>
+          </a>
+          <a class="state-card" href="./task-detail.html">
+            <strong>Task detail</strong>
+            <p class="muted">Edit title, description, and status.</p>
+          </a>
+          <a class="state-card" href="./task-new.html">
+            <strong>New task</strong>
+            <p class="muted">Create a task from title and description.</p>
+          </a>
+          <a class="state-card" href="./task-status-menu.html">
+            <strong>Status popover</strong>
+            <p class="muted">do / done / skip choices open in-place.</p>
+          </a>
+          <a class="state-card" href="./task-area-menu.html">
+            <strong>Area popover</strong>
+            <p class="muted">1 / 2 / 3 / 4 choices use the same popover shape.</p>
+          </a>
+        </div>
       </section>
     </main>
   </body>

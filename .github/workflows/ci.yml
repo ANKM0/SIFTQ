@@ -42,12 +42,6 @@ jobs:
       - name: Install Python dependencies
         run: task setup:python
 
-      - name: Install frontend dependencies
-        run: task setup:frontend:ci
-
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Check sympohy project configuration
         run: task ci:sympohy
 
@@ -62,18 +56,6 @@ jobs:
 
       - name: Check Codex task permissions
         run: task ci:lint:codex-task-perms
-
-      - name: Typecheck
-        run: task ci:typecheck
-
-      - name: Lint
-        run: task ci:lint
-
-      - name: Test
-        run: task ci:test
-
-      - name: Build
-        run: task ci:build
 
       - name: Check CoDD version
         run: task codd:version

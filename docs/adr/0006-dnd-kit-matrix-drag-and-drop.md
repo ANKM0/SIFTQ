@@ -4,19 +4,13 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:matrix-mvp-functional
-      relation: depends_on
-      semantic: interaction
-    - id: req:matrix-mvp-non-functional
-      relation: depends_on
-      semantic: interaction
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
   depended_by:
-    - id: design:matrix-mvp-technology-selection
-      relation: depends_on
-      semantic: decision
-    - id: design:matrix-mvp-wireframe-layout-adr
-      relation: depends_on
-      semantic: interaction
+  - id: design:matrix-mvp-wireframe-layout-adr
+    relation: depends_on
+    semantic: interaction
 ---
 
 # ADR 0006: dnd-kit for Matrix Drag and Drop

@@ -4,34 +4,25 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: design:sympohy-ticket-driven-ai-runner-adr
-      relation: depends_on
-      semantic: decision
-    - id: design:taskfile-command-runner-adr
-      relation: depends_on
-      semantic: automation
-    - id: design:branch-strategy
-      relation: depends_on
-      semantic: workflow
-    - id: design:commit-message-format
-      relation: depends_on
-      semantic: workflow
+  - id: design:sympohy-ticket-driven-ai-runner-adr
+    relation: depends_on
+    semantic: decision
+  - id: design:taskfile-command-runner-adr
+    relation: depends_on
+    semantic: automation
+  - id: design:branch-strategy
+    relation: depends_on
+    semantic: workflow
+  - id: design:commit-message-format
+    relation: depends_on
+    semantic: workflow
   depended_by:
-    - id: design:development-flow
-      relation: depends_on
-      semantic: automation
-    - id: design:sympohy-run-lifecycle-state
-      relation: depends_on
-      semantic: automation
-    - id: design:sympohy-stale-run-recovery
-      relation: depends_on
-      semantic: automation
-    - id: design:sympohy-terminal-resume-review-hardening
-      relation: depends_on
-      semantic: automation
-    - id: design:codex-configuration-memo
-      relation: depends_on
-      semantic: automation
+  - id: design:development-flow
+    relation: depends_on
+    semantic: automation
+  - id: design:codex-configuration-memo
+    relation: depends_on
+    semantic: automation
 ---
 
 # sympohy Issue Execution

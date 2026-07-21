@@ -1,0 +1,157 @@
+<mxfile host="65bd71144e">
+    <diagram id="task-management-user-story-map" name="User Story Map">
+        <mxGraphModel dx="1598" dy="1823" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="980" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="label-backbone" value="ユーザーの行動&lt;br&gt;時系列" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="50" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="label-activities" value="各ステップに必要な&lt;br&gt;行動" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="210" width="160" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="label-features" value="必要な機能" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="360" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="label-mvp" value="MVP" style="text;html=1;align=center;verticalAlign=middle;fontSize=30;fontStyle=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="1600" y="210" width="110" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="mvp-line" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#24292f;" parent="1" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="230" y="-10" as="sourcePoint"/>
+                        <mxPoint x="1560" y="-10" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="note-list-needed" value="matrix だと title のみ表示なので、&lt;br&gt;詳細を一覧で見るために必要" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=15;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="220" y="575" width="160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="note-other" value="その他" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#b7eb63;strokeColor=none;fontSize=22;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="705" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="story-1" value="既存タスク&lt;br&gt;一覧&lt;br&gt;を見る" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8f8f;strokeColor=none;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="35" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="story-2" value="タスクを&lt;br&gt;緊急度&lt;br&gt;x重要度&lt;br&gt;のどれかに&lt;br&gt;配置する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8f8f;strokeColor=none;fontSize=15;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="355" y="30" width="95" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="story-3" value="タスクを完了&lt;br&gt;or やらない&lt;br&gt;(skip)に&lt;br&gt;変更する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8f8f;strokeColor=none;fontSize=15;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="30" width="95" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="story-4" value="タスクの&lt;br&gt;内容を&lt;br&gt;更新" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8f8f;strokeColor=none;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="35" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="story-5" value="タスクを&lt;br&gt;作成する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ff8f8f;strokeColor=none;fontSize=19;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1465" y="50" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-open" value="ツールを&lt;br&gt;開く" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-think" value="優先度・&lt;br&gt;緊急度を&lt;br&gt;考える" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=17;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="355" y="185" width="95" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-dnd" value="タスクを&lt;br&gt;DnDする" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=17;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-done" value="statusを&lt;br&gt;完了に更新" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-skip" value="statusを&lt;br&gt;skipに更新" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-detail" value="タスクの&lt;br&gt;詳細を&lt;br&gt;見る" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=17;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-title" value="タイトルを&lt;br&gt;編集する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="955" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-desc" value="タスクの&lt;br&gt;description&lt;br&gt;を編集" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1065" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-status" value="タスクの&lt;br&gt;statusを&lt;br&gt;編集する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-area" value="タスクの&lt;br&gt;areaを&lt;br&gt;編集する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1300" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="act-create" value="タスクを&lt;br&gt;作成する" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=17;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1465" y="185" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-matrix" value="matrix画面を&lt;br&gt;閲覧できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-list" value="既存タスクを&lt;br&gt;閲覧できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="355" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-area-change" value="既存タスクの&lt;br&gt;配置場所を&lt;br&gt;変更できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=13;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-status-change" value="既存タスクのstatusを&lt;br&gt;完了 or skip&lt;br&gt;に変更できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=17;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="335" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-detail" value="タスクの&lt;br&gt;詳細を&lt;br&gt;見れる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=17;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-title" value="タイトルを&lt;br&gt;編集できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="955" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-desc" value="descを&lt;br&gt;編集できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1065" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-status-select" value="タスクの&lt;br&gt;statusを&lt;br&gt;選択できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-area-select" value="タスクの&lt;br&gt;areaを&lt;br&gt;選択できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1300" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="feat-create" value="新規タスクを&lt;br&gt;作成できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1465" y="335" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="out-github" value="githubと&lt;br&gt;タスクを&lt;br&gt;双方向連携&lt;br&gt;できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="475" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-list-switch-action" value="一覧&lt;br&gt;画面に&lt;br&gt;切り替え" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#73dcd6;strokeColor=none;fontSize=17;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="690" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-list-switch-feature" value="一覧画面に&lt;br&gt;切り替えれる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="810" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-search" value="検索が&lt;br&gt;できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="925" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-cui" value="CUI操作&lt;br&gt;(LLMに&lt;br&gt;操作&lt;br&gt;させたい)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=14;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="815" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-smartphone" value="スマホから&lt;br&gt;アクセス" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=15;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="815" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-status-add" value="タスクに&lt;br&gt;statusを&lt;br&gt;追加できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="490" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-area-add" value="タスクに&lt;br&gt;areaを&lt;br&gt;追加できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=16;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1300" y="490" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-status-search" value="status一覧から&lt;br&gt;statusを&lt;br&gt;検索できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=12;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="620" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="opt-area-search" value="area一覧から&lt;br&gt;areaを&lt;br&gt;検索できる" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#afa3ff;strokeColor=none;fontSize=12;align=center;verticalAlign=middle;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="1300" y="620" width="90" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=2;strokeColor=#24292f;endFill=0;" edge="1" parent="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="180" y="455" as="sourcePoint"/>
+                        <mxPoint x="1600" y="460" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="&lt;span style=&quot;color: rgb(0, 0, 0); font-family: Helvetica; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(251, 251, 251); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;&lt;font style=&quot;font-size: 24px;&quot;&gt;start&lt;/font&gt;&lt;/span&gt;" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="247.5" y="-80" width="45" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="&lt;span style=&quot;color: rgb(0, 0, 0); font-family: Helvetica; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: nowrap; background-color: rgb(251, 251, 251); text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;&lt;font style=&quot;font-size: 24px;&quot;&gt;end&lt;/font&gt;&lt;/span&gt;" style="text;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1487.5" y="-80" width="45" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;flipH=1;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;" vertex="1" parent="1">
+                    <mxGeometry x="1590" y="40" width="20" height="390" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

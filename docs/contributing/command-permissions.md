@@ -4,16 +4,13 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
   depended_by:
-    - id: design:taskfile-command-runner
-      relation: depends_on
-      semantic: permissions
-    - id: design:codex-configuration-memo
-      relation: depends_on
-      semantic: permissions
+  - id: design:codex-configuration-memo
+    relation: depends_on
+    semantic: permissions
 ---
 
 # Command Permissions

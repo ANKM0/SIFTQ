@@ -4,9 +4,9 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
 ---
 
 # ADR 0017: Real SQLite Test Strategy
