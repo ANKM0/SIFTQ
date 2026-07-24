@@ -4,16 +4,10 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:matrix-mvp-functional
-      relation: depends_on
-      semantic: architecture
-    - id: req:matrix-mvp-non-functional
-      relation: depends_on
-      semantic: architecture
-  depended_by:
-    - id: design:matrix-mvp-technology-selection
-      relation: depends_on
-      semantic: decision
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
+  depended_by: []
 ---
 
 # ADR 0005: Frontend Port Adapter Boundary

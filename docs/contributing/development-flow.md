@@ -4,12 +4,10 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:sympohy-issue-execution
-      relation: depends_on
-      semantic: automation
+  - id: design:sympohy-issue-execution
+    relation: depends_on
+    semantic: automation
+  depended_by: []
 ---
 
 # 開発フロー

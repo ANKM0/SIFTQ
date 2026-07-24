@@ -4,19 +4,13 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:branch-strategy-adr
-      relation: depends_on
-      semantic: decision
+  - id: design:branch-strategy-adr
+    relation: depends_on
+    semantic: decision
   depended_by:
-    - id: design:sympohy-issue-execution
-      relation: depends_on
-      semantic: workflow
-    - id: design:contributing-workflow-source-of-truth
-      relation: depends_on
-      semantic: workflow
+  - id: design:sympohy-issue-execution
+    relation: depends_on
+    semantic: workflow
 ---
 
 # Branch Strategy

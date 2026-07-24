@@ -4,28 +4,16 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:matrix-mvp-technology-selection
-      relation: depends_on
-      semantic: tool-selection
-    - id: design:pnpm-frontend-package-manager-adr
-      relation: depends_on
-      semantic: package-management
+  - id: design:pnpm-frontend-package-manager-adr
+    relation: depends_on
+    semantic: package-management
   depended_by:
-    - id: design:ci-cd-foundation
-      relation: depends_on
-      semantic: ci
-    - id: design:taskfile-command-runner-adr
-      relation: depends_on
-      semantic: ci
-    - id: design:taskfile-command-runner
-      relation: depends_on
-      semantic: ci
-    - id: design:adr-index
-      relation: depends_on
-      semantic: index
+  - id: design:taskfile-command-runner-adr
+    relation: depends_on
+    semantic: ci
+  - id: design:adr-index
+    relation: depends_on
+    semantic: index
 ---
 
 # ADR 0008: GitHub Actions CI/CD Toolchain

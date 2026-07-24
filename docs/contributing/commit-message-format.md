@@ -4,19 +4,13 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
   depended_by:
-    - id: design:ci-cd-foundation
-      relation: depends_on
-      semantic: workflow
-    - id: design:sympohy-issue-execution
-      relation: depends_on
-      semantic: workflow
-    - id: design:contributing-workflow-source-of-truth
-      relation: depends_on
-      semantic: workflow
+  - id: design:sympohy-issue-execution
+    relation: depends_on
+    semantic: workflow
 ---
 
 # Commit Message Format

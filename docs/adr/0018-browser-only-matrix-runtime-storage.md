@@ -4,22 +4,10 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: req:matrix-mvp-v2-browser-storage
-      relation: depends_on
-      semantic: storage
-  depended_by:
-    - id: design:matrix-mvp-technology-selection
-      relation: depends_on
-      semantic: decision
-    - id: design:matrix-mvp-v2-browser-storage
-      relation: depends_on
-      semantic: decision
-    - id: design:task-list-v3
-      relation: depends_on
-      semantic: decision
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
+  depended_by: []
 ---
 
 # ADR 0018: Browser-Only Matrix Runtime and Storage

@@ -4,16 +4,10 @@ codd:
   type: design
   status: accepted
   depends_on:
-    - id: req:matrix-mvp-functional
-      relation: depends_on
-      semantic: scope
-    - id: design:dnd-kit-matrix-drag-and-drop-adr
-      relation: depends_on
-      semantic: interaction
-  depended_by:
-    - id: design:matrix-mvp-wireframe
-      relation: depends_on
-      semantic: decision
+  - id: design:dnd-kit-matrix-drag-and-drop-adr
+    relation: depends_on
+    semantic: interaction
+  depended_by: []
 ---
 
 # ADR 0012: Matrix MVP Wireframe Layout

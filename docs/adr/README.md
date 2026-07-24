@@ -4,12 +4,10 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:adr-authoring
-      relation: depends_on
-      semantic: index
+  - id: design:adr-authoring
+    relation: depends_on
+    semantic: index
+  depended_by: []
 ---
 
 # Architecture Decision Records

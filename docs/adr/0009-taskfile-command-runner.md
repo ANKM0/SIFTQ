@@ -4,25 +4,19 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:github-actions-ci-cd-toolchain-adr
-      relation: depends_on
-      semantic: ci
+  - id: design:github-actions-ci-cd-toolchain-adr
+    relation: depends_on
+    semantic: ci
   depended_by:
-    - id: design:taskfile-command-runner
-      relation: depends_on
-      semantic: decision
-    - id: design:adr-index
-      relation: depends_on
-      semantic: index
-    - id: design:sympohy-ticket-driven-ai-runner-adr
-      relation: depends_on
-      semantic: automation
-    - id: design:sympohy-issue-execution
-      relation: depends_on
-      semantic: automation
+  - id: design:adr-index
+    relation: depends_on
+    semantic: index
+  - id: design:sympohy-ticket-driven-ai-runner-adr
+    relation: depends_on
+    semantic: automation
+  - id: design:sympohy-issue-execution
+    relation: depends_on
+    semantic: automation
 ---
 
 # ADR 0009: Taskfile for Command Runner

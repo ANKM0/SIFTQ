@@ -4,21 +4,15 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
+    - id: req:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: requirement
+    - id: req:repository-governance
       relation: depends_on
       semantic: governance
     - id: design:sympohy-issue-execution
       relation: depends_on
       semantic: automation
-    - id: design:sympohy-run-lifecycle-state
-      relation: depends_on
-      semantic: lifecycle
-    - id: design:sympohy-stale-run-recovery
-      relation: depends_on
-      semantic: recovery
-    - id: design:sympohy-terminal-resume-review-hardening
-      relation: depends_on
-      semantic: hardening
     - id: design:sympohy-llm-loop-observability-self-improvement-adr
       relation: depends_on
       semantic: decision

@@ -1,0 +1,44 @@
+%% Screen transition diagram generated from docs/wireframes/*.html.
+%% Regenerate SVG with: pnpm run docs:screen-flow:svg
+flowchart TB
+  subgraph NAV["task 一覧"]
+    direction TB
+    P01["P01 Matrix<br/>do task を area 別に整理"]
+    DND["Matrix DnD<br/>area / order 更新"]
+    P02["P02 Task list<br/>全 status の task 一覧"]
+  end
+
+  subgraph EDIT["Task 編集"]
+    direction LR
+    P04["P04 New task<br/>task 作成"]
+    P03["P03 Detail<br/>task 編集"]
+    SAVE["Save<br/>Detail に留まる"]
+    P05["P05 Status<br/>do / done / skip"]
+    P06["P06 Area<br/>1 / 2 / 3 / 4"]
+  end
+
+  P01 -->|"Tasks 押下"| P02
+  P02 -->|"Matrix 押下"| P01
+  P01 -->|"New task 押下"| P04
+  P02 -->|"New task 押下"| P04
+  P04 -->|"Cancel 押下"| P02
+  P04 -->|"Create 押下"| P03
+  P01 -->|"task card 押下"| P03
+  P02 -->|"task row 押下"| P03
+  P03 -->|"Tasks 押下"| P02
+  P03 -->|"Cancel 押下"| P02
+  P03 -->|"Save 押下"| SAVE
+  SAVE --> P03
+  P03 -->|"Status 押下"| P05
+  P05 -->|"status 選択"| P03
+  P03 -->|"Area 押下"| P06
+  P06 -->|"area 選択"| P03
+  P05 -->|"Area 押下"| P06
+  P06 -->|"Status 押下"| P05
+  P01 -.->|"ドラッグ"| DND
+  DND -.->|"ドロップ"| P01
+
+  classDef transient fill:#b7eb63,stroke:#d0d7de,stroke-width:1px,color:#24292f;
+  classDef note fill:#ddf4ff,stroke:#54aeff,stroke-width:1px,color:#24292f;
+  class P01,P02,P03,P04,P05,P06,SAVE transient;
+  class DND note;

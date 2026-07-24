@@ -4,9 +4,13 @@ codd:
   type: requirement
   status: draft
   depends_on:
-    - id: req:siftq-system
+    - id: req:repository-governance
       relation: depends_on
       semantic: governance
+  depended_by:
+    - id: design:sympohy-llm-loop-observability-self-improvement
+      relation: depends_on
+      semantic: requirement
 ---
 
 # sympohy LLM Loop Observability and Self-Improvement Requirements

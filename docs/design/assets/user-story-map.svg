@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1070" viewBox="0 -90 1780 1070" role="img" aria-labelledby="title desc">
+  <title id="title">Task Management User Story Map</title>
+  <desc id="desc">User story map for the task management redesign, based on the draft sticky-note image.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#24292f"/>
+    </marker>
+    <style>
+      text { font-family: Arial, 'Hiragino Sans', 'Yu Gothic', sans-serif; fill: #24292f; }
+      .label { font-size: 16px; }
+      .story { fill: #ff8f8f; }
+      .action { fill: #73dcd6; }
+      .feature { fill: #afa3ff; }
+      .other { fill: #b7eb63; }
+      .note { font-size: 15px; }
+      .card { filter: url(#shadow); }
+      .center { text-anchor: middle; dominant-baseline: middle; }
+      .bold { font-weight: 700; }
+    </style>
+  </defs>
+  <rect y="-90" width="1780" height="1070" fill="#f6f8fa"/>
+  <g stroke="#eaeef2" stroke-width="1">
+    <path d="M0 -80H1780M0 -40H1780M0 0H1780M0 40H1780M0 80H1780M0 120H1780M0 160H1780M0 200H1780M0 240H1780M0 280H1780M0 320H1780M0 360H1780M0 400H1780M0 440H1780M0 480H1780M0 520H1780M0 560H1780M0 600H1780M0 640H1780M0 680H1780M0 720H1780M0 760H1780M0 800H1780M0 840H1780M0 880H1780M0 920H1780M0 960H1780"/>
+    <path d="M40 -90V980M80 -90V980M120 -90V980M160 -90V980M200 -90V980M240 -90V980M280 -90V980M320 -90V980M360 -90V980M400 -90V980M440 -90V980M480 -90V980M520 -90V980M560 -90V980M600 -90V980M640 -90V980M680 -90V980M720 -90V980M760 -90V980M800 -90V980M840 -90V980M880 -90V980M920 -90V980M960 -90V980M1000 -90V980M1040 -90V980M1080 -90V980M1120 -90V980M1160 -90V980M1200 -90V980M1240 -90V980M1280 -90V980M1320 -90V980M1360 -90V980M1400 -90V980M1440 -90V980M1480 -90V980M1520 -90V980M1560 -90V980M1600 -90V980M1640 -90V980M1680 -90V980M1720 -90V980M1760 -90V980"/>
+  </g>
+  <text x="247.5" y="-55" font-size="24">start</text>
+  <text x="1487.5" y="-55" font-size="24">end</text>
+  <path d="M230 -10 L1560 -10" fill="none" stroke="#24292f" stroke-width="2" marker-end="url(#arrow)"/>
+  <text class="label" x="30" y="50"><tspan x="30" dy="0">ユーザーの行動</tspan><tspan x="30" dy="24">時系列</tspan></text>
+  <text class="label" x="30" y="210"><tspan x="30" dy="0">各ステップに必要な</tspan><tspan x="30" dy="24">行動</tspan></text>
+  <text class="label" x="30" y="360">必要な機能</text>
+  <g class="card">
+    <rect class="story" x="225" y="35" width="90" height="90"/><text class="center bold" x="270" y="80"><tspan x="270" dy="-20">既存タスク</tspan><tspan x="270" dy="22">一覧</tspan><tspan x="270" dy="22">を見る</tspan></text>
+    <rect class="story" x="355" y="30" width="95" height="100"/><text class="center bold" x="402.5" y="80"><tspan x="402.5" dy="-34">タスクを</tspan><tspan x="402.5" dy="21">緊急度</tspan><tspan x="402.5" dy="21">x重要度</tspan><tspan x="402.5" dy="21">のどれかに</tspan><tspan x="402.5" dy="21">配置する</tspan></text>
+    <rect class="story" x="610" y="30" width="95" height="100"/><text class="center bold" x="657.5" y="80"><tspan x="657.5" dy="-28">タスクを完了</tspan><tspan x="657.5" dy="22">or やらない</tspan><tspan x="657.5" dy="22">(skip)に</tspan><tspan x="657.5" dy="22">変更する</tspan></text>
+    <rect class="story" x="850" y="35" width="90" height="90"/><text class="center bold" x="895" y="80"><tspan x="895" dy="-18">タスクの</tspan><tspan x="895" dy="24">内容を</tspan><tspan x="895" dy="24">更新</tspan></text>
+    <rect class="story" x="1465" y="50" width="90" height="90"/><text class="center bold" x="1510" y="95"><tspan x="1510" dy="-12">タスクを</tspan><tspan x="1510" dy="26">作成する</tspan></text>
+  </g>
+  <g class="card">
+    <rect class="action" x="225" y="185" width="90" height="90"/><text class="center bold" x="270" y="230"><tspan x="270" dy="-12">ツールを</tspan><tspan x="270" dy="26">開く</tspan></text>
+    <rect class="action" x="355" y="185" width="95" height="90"/><text class="center bold" x="402.5" y="230"><tspan x="402.5" dy="-20">優先度・</tspan><tspan x="402.5" dy="22">緊急度を</tspan><tspan x="402.5" dy="22">考える</tspan></text>
+    <rect class="action" x="470" y="185" width="90" height="90"/><text class="center bold" x="515" y="230"><tspan x="515" dy="-12">タスクを</tspan><tspan x="515" dy="26">DnDする</tspan></text>
+    <rect class="action" x="610" y="185" width="90" height="90"/><text class="center" x="655" y="230"><tspan x="655" dy="-12">statusを</tspan><tspan x="655" dy="24">完了に更新</tspan></text>
+    <rect class="action" x="720" y="185" width="90" height="90"/><text class="center" x="765" y="230"><tspan x="765" dy="-12">statusを</tspan><tspan x="765" dy="24">skipに更新</tspan></text>
+    <rect class="action" x="850" y="185" width="90" height="90"/><text class="center bold" x="895" y="230"><tspan x="895" dy="-20">タスクの</tspan><tspan x="895" dy="22">詳細を</tspan><tspan x="895" dy="22">見る</tspan></text>
+    <rect class="action" x="955" y="185" width="90" height="90"/><text class="center" x="1000" y="230"><tspan x="1000" dy="-12">タイトルを</tspan><tspan x="1000" dy="24">編集する</tspan></text>
+    <rect class="action" x="1065" y="185" width="90" height="90"/><text class="center" x="1110" y="230"><tspan x="1110" dy="-20">タスクの</tspan><tspan x="1110" dy="22">description</tspan><tspan x="1110" dy="22">を編集</tspan></text>
+    <rect class="action" x="1180" y="185" width="90" height="90"/><text class="center" x="1225" y="230"><tspan x="1225" dy="-20">タスクの</tspan><tspan x="1225" dy="22">statusを</tspan><tspan x="1225" dy="22">編集する</tspan></text>
+    <rect class="action" x="1300" y="185" width="90" height="90"/><text class="center" x="1345" y="230"><tspan x="1345" dy="-20">タスクの</tspan><tspan x="1345" dy="22">areaを</tspan><tspan x="1345" dy="22">編集する</tspan></text>
+    <rect class="action" x="1465" y="185" width="90" height="90"/><text class="center bold" x="1510" y="230"><tspan x="1510" dy="-12">タスクを</tspan><tspan x="1510" dy="26">作成する</tspan></text>
+  </g>
+  <g class="card">
+    <rect class="feature" x="225" y="335" width="90" height="90"/><text class="center" x="270" y="380"><tspan x="270" dy="-12">matrix画面を</tspan><tspan x="270" dy="24">閲覧できる</tspan></text>
+    <rect class="feature" x="355" y="335" width="90" height="90"/><text class="center" x="400" y="380"><tspan x="400" dy="-12">既存タスクを</tspan><tspan x="400" dy="24">閲覧できる</tspan></text>
+    <rect class="feature" x="470" y="335" width="90" height="90"/><text class="center" x="515" y="380"><tspan x="515" dy="-20">既存タスクの</tspan><tspan x="515" dy="22">配置場所を</tspan><tspan x="515" dy="22">変更できる</tspan></text>
+    <rect class="feature" x="610" y="335" width="200" height="90"/><text class="center" x="710" y="380"><tspan x="710" dy="-12">既存タスクのstatusを</tspan><tspan x="710" dy="24">完了 or skip に変更できる</tspan></text>
+    <rect class="feature" x="850" y="335" width="90" height="90"/><text class="center" x="895" y="380"><tspan x="895" dy="-20">タスクの</tspan><tspan x="895" dy="22">詳細を</tspan><tspan x="895" dy="22">見れる</tspan></text>
+    <rect class="feature" x="955" y="335" width="90" height="90"/><text class="center" x="1000" y="380"><tspan x="1000" dy="-12">タイトルを</tspan><tspan x="1000" dy="24">編集できる</tspan></text>
+    <rect class="feature" x="1065" y="335" width="90" height="90"/><text class="center" x="1110" y="380"><tspan x="1110" dy="-12">descを</tspan><tspan x="1110" dy="24">編集できる</tspan></text>
+    <rect class="feature" x="1180" y="335" width="90" height="90"/><text class="center" x="1225" y="380"><tspan x="1225" dy="-20">タスクの</tspan><tspan x="1225" dy="22">statusを</tspan><tspan x="1225" dy="22">選択できる</tspan></text>
+    <rect class="feature" x="1300" y="335" width="90" height="90"/><text class="center" x="1345" y="380"><tspan x="1345" dy="-20">タスクの</tspan><tspan x="1345" dy="22">areaを</tspan><tspan x="1345" dy="22">選択できる</tspan></text>
+    <rect class="feature" x="1465" y="335" width="90" height="90"/><text class="center" x="1510" y="380"><tspan x="1510" dy="-12">新規タスクを</tspan><tspan x="1510" dy="24">作成できる</tspan></text>
+  </g>
+  <path d="M180 455 L1600 460" fill="none" stroke="#24292f" stroke-width="2"/>
+  <text class="bold" x="1645" y="245" font-size="30">MVP</text>
+  <path d="M1590 40 C1610 40 1600 120 1608 215 C1611 245 1630 245 1608 270 C1600 365 1610 430 1590 430" fill="none" stroke="#24292f" stroke-width="2"/>
+  <g class="card">
+    <rect class="feature" x="225" y="475" width="90" height="90"/><text class="center" x="270" y="520"><tspan x="270" dy="-28">githubと</tspan><tspan x="270" dy="22">タスクを</tspan><tspan x="270" dy="22">双方向連携</tspan><tspan x="270" dy="22">できる</tspan></text>
+    <rect class="action" x="225" y="690" width="90" height="90"/><text class="center bold" x="270" y="735"><tspan x="270" dy="-20">一覧</tspan><tspan x="270" dy="22">画面に</tspan><tspan x="270" dy="22">切り替え</tspan></text>
+    <rect class="feature" x="225" y="810" width="90" height="90"/><text class="center" x="270" y="855"><tspan x="270" dy="-12">一覧画面に</tspan><tspan x="270" dy="24">切り替えれる</tspan></text>
+    <rect class="feature" x="225" y="925" width="90" height="90"/><text class="center bold" x="270" y="970"><tspan x="270" dy="-12">検索が</tspan><tspan x="270" dy="26">できる</tspan></text>
+    <rect class="other" x="390" y="705" width="90" height="90"/><text class="center bold" x="435" y="750" font-size="24">その他</text>
+    <rect class="feature" x="390" y="815" width="90" height="90"/><text class="center" x="435" y="860"><tspan x="435" dy="-28">CUI操作</tspan><tspan x="435" dy="22">(LLMに</tspan><tspan x="435" dy="22">操作</tspan><tspan x="435" dy="22">させたい)</tspan></text>
+    <rect class="feature" x="500" y="815" width="90" height="90"/><text class="center" x="545" y="860"><tspan x="545" dy="-12">スマホから</tspan><tspan x="545" dy="24">アクセス</tspan></text>
+    <rect class="feature" x="1180" y="490" width="90" height="90"/><text class="center" x="1225" y="535"><tspan x="1225" dy="-20">タスクに</tspan><tspan x="1225" dy="22">statusを</tspan><tspan x="1225" dy="22">追加できる</tspan></text>
+    <rect class="feature" x="1300" y="490" width="90" height="90"/><text class="center" x="1345" y="535"><tspan x="1345" dy="-20">タスクに</tspan><tspan x="1345" dy="22">areaを</tspan><tspan x="1345" dy="22">追加できる</tspan></text>
+    <rect class="feature" x="1180" y="620" width="90" height="90"/><text class="center" x="1225" y="665" font-size="13"><tspan x="1225" dy="-20">status一覧から</tspan><tspan x="1225" dy="20">statusを</tspan><tspan x="1225" dy="20">検索できる</tspan></text>
+    <rect class="feature" x="1300" y="620" width="90" height="90"/><text class="center" x="1345" y="665" font-size="13"><tspan x="1345" dy="-20">area一覧から</tspan><tspan x="1345" dy="20">areaを</tspan><tspan x="1345" dy="20">検索できる</tspan></text>
+  </g>
+  <text class="note" x="220" y="585"><tspan x="220" dy="0">matrix だと</tspan><tspan x="220" dy="22">title のみ</tspan><tspan x="220" dy="22">表示なので、</tspan><tspan x="220" dy="22">詳細を一覧で見る</tspan><tspan x="220" dy="22">ために必要</tspan></text>
+</svg>

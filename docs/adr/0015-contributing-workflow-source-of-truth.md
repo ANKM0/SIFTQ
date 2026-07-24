@@ -4,13 +4,10 @@ codd:
   type: design
   status: draft
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-  depended_by:
-    - id: design:contributing-workflow-source-of-truth
-      relation: depends_on
-      semantic: decision
+  - id: req:repository-governance
+    relation: depends_on
+    semantic: governance
+  depended_by: []
 ---
 
 # ADR 0015: Contributing Workflow Source of Truth

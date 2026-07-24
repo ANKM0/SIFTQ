@@ -4,25 +4,13 @@ codd:
   type: design
   status: accepted
   depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
-    - id: design:taskfile-command-runner-adr
-      relation: depends_on
-      semantic: automation
+  - id: design:taskfile-command-runner-adr
+    relation: depends_on
+    semantic: automation
   depended_by:
-    - id: design:ci-cd-foundation
-      relation: depends_on
-      semantic: automation
-    - id: design:sympohy-issue-execution
-      relation: depends_on
-      semantic: decision
-    - id: design:sympohy-run-lifecycle-state
-      relation: depends_on
-      semantic: decision
-    - id: design:sympohy-stale-run-recovery
-      relation: depends_on
-      semantic: decision
+  - id: design:sympohy-issue-execution
+    relation: depends_on
+    semantic: decision
 ---
 
 # ADR 0013: sympohy for Ticket-Driven AI Runner

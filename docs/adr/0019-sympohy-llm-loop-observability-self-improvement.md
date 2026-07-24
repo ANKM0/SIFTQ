@@ -4,7 +4,7 @@ codd:
   type: design
   status: proposed
   depends_on:
-    - id: req:siftq-system
+    - id: req:repository-governance
       relation: depends_on
       semantic: governance
   depended_by:
