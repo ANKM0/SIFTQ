@@ -68,6 +68,15 @@ codd:
   - id: design:design-template
     relation: depends_on
     semantic: governance
+  - id: req:sympohy-llm-loop-observability-self-improvement
+    relation: depends_on
+    semantic: governance
+  - id: design:sympohy-llm-loop-observability-self-improvement
+    relation: depends_on
+    semantic: governance
+  - id: design:sympohy-llm-loop-observability-self-improvement-adr
+    relation: depends_on
+    semantic: governance
 ---
 
 # Repository Governance Requirements

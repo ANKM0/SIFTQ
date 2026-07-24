@@ -23,6 +23,9 @@ codd:
   - id: design:codex-configuration-memo
     relation: depends_on
     semantic: automation
+  - id: design:sympohy-llm-loop-observability-self-improvement
+    relation: depends_on
+    semantic: automation
 ---
 
 # sympohy Issue Execution
@@ -139,6 +142,13 @@ task ai:sympohy:labels:sync
 task ai:sympohy:refine -- '#73'
 task ai:sympohy -- '#73'
 task ai:sympohy:resume -- '#73'
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73
+task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --execute
+task ai:sympohy:observe:browser -- --run-dir .sympohy/runs/issue-73 --source /tmp/browser-observation.json
 task ai:sympohy:migrate -- --dry-run '#73'
 task ai:sympohy:migrate -- '#73'
 task ai:sympohy:migrate -- --all
@@ -148,6 +158,81 @@ task ai:sympohy:systemd:start
 task ai:sympohy:systemd:stop
 task ai:sympohy:systemd:status
 ```
+
+## Observability and Self-Improvement
+
+Issue #126 adds operator-facing observability commands on top of each run's
+append-only `events.jsonl` stream and replayable SQLite observation store.
+These commands are for inspection and bounded proposal generation only. They do
+not replace `state.json` as the resume source of truth and they do not bypass
+normal review, verification, or PR workflow.
+
+Rebuild a searchable observation store from one run directory:
+
+```bash
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73
+```
+
+Override the SQLite target path when needed:
+
+```bash
+task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73 --db /tmp/issue-73-observations.sqlite3
+```
+
+Inspect recorded events after replay:
+
+```bash
+task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --phase review --status failure
+```
+
+Summarize failure taxonomy, blocked chains, and recurring patterns:
+
+```bash
+task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+```
+
+Generate proposal JSON for docs, hooks, prompts, skills, tests, stage gates,
+or lightweight config improvements:
+
+```bash
+task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+```
+
+Review which proposals stay within the low-risk applicator boundary:
+
+```bash
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73
+```
+
+Execute eligible proposals only from a clean, non-base issue branch. This runs
+required validation, commits the bounded change, pushes the issue branch, and
+stops after verifying a draft PR exists:
+
+```bash
+task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --execute
+```
+
+Write lightweight browser metrics for the final verifier to record. Hook scripts
+may pass a JSON object produced by browser checks, or pass explicit count/hash
+flags, but must not write raw screenshots, traces, or DOM dumps:
+
+```bash
+task ai:sympohy:observe:browser -- --run-dir .sympohy/runs/issue-73 --source /tmp/browser-observation.json
+```
+
+Operational rules:
+
+- `events.jsonl` is the primary audit record; `observations.sqlite3` is a
+  derived cache that may be rebuilt from replay.
+- Keep raw screenshots, traces, DOM dumps, secrets, and raw developer
+  instruction text out of the persisted observation store.
+- Treat `observe-propose` and `observe-apply` output as review inputs. The
+  bounded applicator stops at verified draft PR scope and does not auto-merge
+  or apply broad code changes.
+- Run `observe-apply --execute` only from a clean issue branch. It rejects base
+  branches such as `main` before making self-improvement commits.
+- Use `--run-id` filters when one issue directory contains multiple runs and
+  the analysis should stay scoped to a single recovery attempt.
 
 ## Labels
 

@@ -17,7 +17,14 @@ from .core import (
     validate_commit_subject,
 )
 from .github import REQUIRED_LABELS, migrate_legacy_tasks, sync_labels
-from .runner import refine_issue, resume_issue, run_issue, watch
+from .observability import ObservationStore, rebuild_observation_store
+from .runner import (
+    capture_browser_observation,
+    refine_issue,
+    resume_issue,
+    run_issue,
+    watch,
+)
 from .stage_gate import main as stage_gate_main
 from .systemd import (
     install_systemd_units,
@@ -64,6 +71,45 @@ def main(argv: list[str] | None = None) -> int:
     resume_parser = subcommands.add_parser("resume")
     resume_parser.add_argument("issue")
 
+    observe_replay_parser = subcommands.add_parser("observe-replay")
+    observe_replay_parser.add_argument("--run-dir", required=True)
+    observe_replay_parser.add_argument("--db")
+
+    observe_query_parser = subcommands.add_parser("observe-query")
+    observe_query_parser.add_argument("--db", required=True)
+    observe_query_parser.add_argument("--issue", type=int)
+    observe_query_parser.add_argument("--run-id")
+    observe_query_parser.add_argument("--phase")
+    observe_query_parser.add_argument("--event-type")
+    observe_query_parser.add_argument("--status")
+    observe_query_parser.add_argument("--text")
+    observe_query_parser.add_argument("--limit", type=int, default=100)
+
+    observe_analyze_parser = subcommands.add_parser("observe-analyze")
+    observe_analyze_parser.add_argument("--db", required=True)
+    observe_analyze_parser.add_argument("--issue", type=int)
+    observe_analyze_parser.add_argument("--run-id")
+
+    observe_propose_parser = subcommands.add_parser("observe-propose")
+    observe_propose_parser.add_argument("--db", required=True)
+    observe_propose_parser.add_argument("--issue", type=int)
+    observe_propose_parser.add_argument("--run-id")
+
+    observe_apply_parser = subcommands.add_parser("observe-apply")
+    observe_apply_parser.add_argument("--db", required=True)
+    observe_apply_parser.add_argument("--issue", type=int)
+    observe_apply_parser.add_argument("--run-id")
+    observe_apply_parser.add_argument("--execute", action="store_true")
+
+    observe_browser_parser = subcommands.add_parser("observe-browser")
+    observe_browser_parser.add_argument("--run-dir", required=True)
+    observe_browser_parser.add_argument("--source")
+    observe_browser_parser.add_argument("--console-error-count", type=int)
+    observe_browser_parser.add_argument("--page-error-count", type=int)
+    observe_browser_parser.add_argument("--storage-key-count", type=int)
+    observe_browser_parser.add_argument("--state-hash")
+    observe_browser_parser.add_argument("--accessibility-summary")
+
     contract_parser = subcommands.add_parser("contract")
     contract_parser.add_argument("name")
     contract_parser.add_argument("payload")
@@ -100,6 +146,99 @@ def main(argv: list[str] | None = None) -> int:
         return resume_issue(args.issue, config)
     if args.command == "watch":
         return watch(config)
+    if args.command == "observe-replay":
+        result = rebuild_observation_store(
+            log_dir=Path(args.run_dir),
+            db_path=None if args.db is None else Path(args.db),
+        )
+        print(
+            json.dumps(
+                {
+                    "source_path": str(result.source_path),
+                    "db_path": str(result.db_path),
+                    "event_count": result.event_count,
+                    "run_count": result.run_count,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+    if args.command == "observe-query":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.search_events(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                        phase=args.phase,
+                        event_type=args.event_type,
+                        status=args.status,
+                        text=args.text,
+                        limit=args.limit,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-analyze":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.analyze_failures(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-propose":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.propose_improvements(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-apply":
+        with ObservationStore(Path(args.db)) as store:
+            print(
+                json.dumps(
+                    store.apply_improvements(
+                        issue=args.issue,
+                        run_id=args.run_id,
+                        execute=args.execute,
+                        cwd=Path.cwd(),
+                        config=config,
+                    ),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "observe-browser":
+        metrics = {
+            "console_error_count": args.console_error_count,
+            "page_error_count": args.page_error_count,
+            "storage_key_count": args.storage_key_count,
+            "state_hash": args.state_hash,
+            "accessibility_summary": args.accessibility_summary,
+        }
+        result = capture_browser_observation(
+            log_dir=Path(args.run_dir),
+            source_path=None if args.source is None else Path(args.source),
+            metrics={key: value for key, value in metrics.items() if value is not None},
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
     if args.command == "systemd-install":
         return install_systemd_units(ROOT)
     if args.command == "systemd-start":

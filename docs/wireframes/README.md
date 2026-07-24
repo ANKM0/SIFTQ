@@ -31,5 +31,3 @@ redesign.
 Status is `do`, `done`, or `skip`. Area is always `1`, `2`, `3`, or `4`.
 The matrix page renders only `do` tasks grouped by area; `skip` and `done`
 remain visible in list/detail states and keep their area.
-
-The old Matrix MVP wireframes were moved to `docs/old/wireframes/`.

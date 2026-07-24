@@ -20,11 +20,14 @@ from .core import (
     transition_labels,
     validate_commit_subject,
 )
+from .observability import ObservationStore, ReplayResult, rebuild_observation_store
 
 __all__ = [
     "PHASE_LABELS",
     "STATUS_LABELS",
     "AcceptanceSet",
+    "ObservationStore",
+    "ReplayResult",
     "ReviewFinding",
     "ReviewResult",
     "ResumePoint",
@@ -37,6 +40,7 @@ __all__ = [
     "next_retry_action",
     "phase_from_state",
     "read_run_state",
+    "rebuild_observation_store",
     "resolve_resume_point",
     "transition_labels",
     "validate_commit_subject",

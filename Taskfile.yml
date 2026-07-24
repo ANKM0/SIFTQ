@@ -42,7 +42,7 @@ tasks:
   pytest:
     desc: Run pytest with optional file targets and additional arguments (ADR 0014).
     cmds:
-      - uv run python -m pytest {{.ARGS}} {{default "tests/sympohy" .FILES}}
+      - uv run python -m pytest {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ARGS}} {{default "tests/sympohy" .FILES}}{{end}}
 
   ci:
     desc: Run the local CI gate.
@@ -218,6 +218,36 @@ tasks:
     desc: Resume a stale or interrupted sympohy run, for example task ai:sympohy:resume -- '#79'.
     cmds:
       - uv run python -m scripts.sympohy resume {{.CLI_ARGS}}
+
+  ai:sympohy:observe:replay:
+    desc: Rebuild the observation SQLite store from a run directory event stream, for example task ai:sympohy:observe:replay -- --run-dir .sympohy/runs/issue-73.
+    cmds:
+      - uv run python -m scripts.sympohy observe-replay {{.CLI_ARGS}}
+
+  ai:sympohy:observe:query:
+    desc: Query replayed observation events, for example task ai:sympohy:observe:query -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
+    cmds:
+      - uv run python -m scripts.sympohy observe-query {{.CLI_ARGS}}
+
+  ai:sympohy:observe:analyze:
+    desc: Summarize failure taxonomy and recurring chains from a replayed observation DB, for example task ai:sympohy:observe:analyze -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
+    cmds:
+      - uv run python -m scripts.sympohy observe-analyze {{.CLI_ARGS}}
+
+  ai:sympohy:observe:propose:
+    desc: Generate bounded self-improvement proposal JSON from a replayed observation DB, for example task ai:sympohy:observe:propose -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73.
+    cmds:
+      - uv run python -m scripts.sympohy observe-propose {{.CLI_ARGS}}
+
+  ai:sympohy:observe:apply:
+    desc: Evaluate or execute low-risk self-improvement proposals, for example task ai:sympohy:observe:apply -- --db .sympohy/runs/issue-73/observations.sqlite3 --issue 73 --execute.
+    cmds:
+      - uv run python -m scripts.sympohy observe-apply {{.CLI_ARGS}}
+
+  ai:sympohy:observe:browser:
+    desc: Write lightweight browser observation metrics for a run, for example task ai:sympohy:observe:browser -- --run-dir .sympohy/runs/issue-73 --source /tmp/browser-observation.json.
+    cmds:
+      - uv run python -m scripts.sympohy observe-browser {{.CLI_ARGS}}
 
   ai:sympohy:stage-gate:
     desc: Evaluate a sympohy stage gate and emit pass/retry/block JSON.
