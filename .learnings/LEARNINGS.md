@@ -10,7 +10,7 @@ Reusable project learnings recorded by agents and contributors.
 - Logged: YYYY-MM-DD
 - Priority: low | medium | high
 - Status: pending | promoted | rejected
-- Area: <docs | sympohy | frontend | ci | repo>
+- Area: <docs | taqt | frontend | ci | repo>
 
 ### Summary
 

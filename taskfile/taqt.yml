@@ -1,0 +1,53 @@
+version: "3"
+
+env:
+  PYTHONPATH: ".taqt/scripts"
+
+tasks:
+  create:
+    desc: Create a taqt task from a GitHub Issue, for example task taqt:create -- --repo ANKM0/SIFTQ --issue 123.
+    cmds:
+      - uv run python -m taqt.task_create {{.CLI_ARGS}}
+
+  run:
+    desc: Run a taqt task through the configured development feedback loop.
+    cmds:
+      - uv run python -m taqt.task_run {{.CLI_ARGS}}
+
+  watch:
+    desc: Watch GitHub Issues and create/update taqt tasks.
+    cmds:
+      - uv run python -m taqt.github_watch {{.CLI_ARGS}}
+
+  sync:
+    desc: Sync a taqt task state back to its GitHub Issue comment.
+    cmds:
+      - uv run python -m taqt.github_sync {{.CLI_ARGS}}
+
+  worktree:
+    desc: Create or print the Issue branch/worktree command for a taqt task.
+    cmds:
+      - uv run python -m taqt.git_worktree {{.CLI_ARGS}}
+
+  commit:
+    desc: Commit loop-produced workspace changes for a taqt task.
+    cmds:
+      - uv run python -m taqt.git_commit {{.CLI_ARGS}}
+
+  push:
+    desc: Push the Issue branch for a taqt task.
+    cmds:
+      - uv run python -m taqt.git_push {{.CLI_ARGS}}
+
+  pr:
+    desc: Create or print the GitHub PR command for a taqt task.
+    cmds:
+      - uv run python -m taqt.github_pr {{.CLI_ARGS}}
+
+  route:dry-run:
+    desc: Print the main post-run route commands for a taqt task without executing git or GitHub changes.
+    cmds:
+      - task taqt:worktree -- {{.CLI_ARGS}}
+      - task taqt:commit -- {{.CLI_ARGS}}
+      - task taqt:push -- {{.CLI_ARGS}}
+      - task taqt:pr -- {{.CLI_ARGS}}

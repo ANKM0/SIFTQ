@@ -1,6 +1,6 @@
 ---
 name: siftq-issue-creator
-description: Create or draft SIFTQ GitHub issues (feature, bug, or research) with AC/DoD templates and sympohy-compatible labels.
+description: Create or draft SIFTQ GitHub issues (feature, bug, or research) with AC/DoD templates and optional taqt activation labels.
 ---
 
 # SIFTQ Issue Creator
@@ -19,15 +19,21 @@ Use this skill when asked to create or draft a GitHub issue for `ANKM0/SIFTQ`.
 
 ## 2) Label rule (this repository)
 
-For issues intended to run through sympohy automation:
+Do not make a newly created issue a taqt automation target by default.
 
-- Add `sympohy:pending`
-- Add `sympohy:phase:triage`
+Add taqt labels only when the user explicitly asks for taqt automation, or when
+the issue is already intended to be picked up by a taqt watcher.
+
+For explicit taqt targets:
+
+- Add `taqt:pending`
+- Add `taqt:phase:triage`
 
 Do not add the following manually:
 
-- `sympohy:blocked`
-- `sympohy:done`
+- `taqt:blocked`
+- `taqt:running`
+- `taqt:done`
 
 These are set by workflow automation.
 

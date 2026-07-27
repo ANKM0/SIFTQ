@@ -1,14 +1,3 @@
----
-codd:
-  node_id: design:requirements-template
-  type: design
-  status: draft
-  depends_on:
-  - id: req:repository-governance
-    relation: depends_on
-    semantic: governance
----
-
 # <Feature> Requirements
 
 ## 背景

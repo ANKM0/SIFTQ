@@ -37,18 +37,11 @@ docs/adr/0002-command-permissions.md
 2. Choose the next four-digit ADR number.
 3. Copy the ADR template into `docs/adr/<number>-<short-kebab-title>.md`.
 4. Replace every placeholder in the template.
-5. Set the CoDD node id to:
-
-```text
-design:<short-kebab-title>-adr
-```
-
-6. Choose a status:
+5. Choose a status:
    - `Proposed.` for a draft decision still under review.
    - `Accepted.` for a decision that is already approved.
    - `Superseded by ADR <number>.` when replacing a prior decision.
-7. Keep the ADR focused on one decision.
-8. Run `task codd:validate` after editing.
+6. Keep the ADR focused on one decision.
 
 ## Writing Rules
 
@@ -58,13 +51,3 @@ design:<short-kebab-title>-adr
 - List consequences as specific benefits, tradeoffs, and follow-up work.
 - Do not mix implementation details that belong in a separate design document
   unless they are essential to understanding the decision.
-
-## CoDD Rules
-
-- Keep ADR files under `docs/adr/` so CoDD validates them with the rest of the
-  project documentation.
-- Use `type: design` for ADRs.
-- Keep `depends_on` relationships explicit. Governance decisions usually depend
-  on `req:siftq-system` with `semantic: governance`.
-- Add `depended_by` only when an existing document already depends on the ADR
-  and the reverse link is useful for navigation.

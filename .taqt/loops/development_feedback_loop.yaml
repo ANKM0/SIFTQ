@@ -1,0 +1,74 @@
+version: 1
+id: development_feedback_loop
+
+limits:
+  max_iterations: 12
+  max_fix_attempts: 3
+
+agents:
+  design:
+    role: design
+    writes:
+      - tmp/design/
+  test:
+    role: test_author
+    writes:
+      - tests/
+  implement:
+    role: implementation
+    writes:
+      - src/
+      - scripts/
+  checker:
+    role: checker
+    readonly: true
+
+steps:
+  - id: design
+    kind: llm
+    agent: design
+    next: test
+
+  - id: test
+    kind: llm
+    agent: test
+    next: implement
+
+  - id: implement
+    kind: llm
+    agent: implement
+    next: observe
+
+  - id: observe
+    kind: commands
+    run:
+      - task ci:markdown
+    on_success: checker
+    on_failure: decide
+
+  - id: decide
+    kind: policy
+    routes:
+      - when: implementation_feedback
+        next: implement
+      - when: test_feedback
+        next: test
+      - when: local_design_feedback
+        next: design
+      - when: specification_feedback
+        next: human
+      - when: product_feedback
+        next: human
+      - when: unknown
+        next: human
+
+  - id: checker
+    kind: llm
+    agent: checker
+    next: done
+
+  - id: done
+    kind: terminal
+
+  - id: human
+    kind: terminal

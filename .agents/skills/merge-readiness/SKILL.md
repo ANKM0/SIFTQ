@@ -1,6 +1,6 @@
 ---
 name: merge-readiness
-description: Decide whether a SIFTQ branch or pull request is ready to merge. Use when the user asks if a PR can be merged, whether a branch is merge-ready, final approval, release readiness, or a pre-merge gate that checks CI, reviews, AC/DoD, docs, tests, CoDD, and repository workflow state.
+description: Decide whether a SIFTQ branch or pull request is ready to merge. Use when the user asks if a PR can be merged, whether a branch is merge-ready, final approval, release readiness, or a pre-merge gate that checks CI, reviews, AC/DoD, docs, tests, and repository workflow state.
 ---
 
 # Merge Readiness
@@ -17,21 +17,18 @@ the output as a gate decision, not a general code review.
 3. Confirm CI and local verification evidence:
    - `task ci` or the documented equivalent for the change scope
    - targeted tests that cover the risky behavior
-   - CoDD validation when docs or graph-linked artifacts changed
 4. Confirm review state:
    - unresolved review comments
    - requested changes
    - stale approvals after new commits
 5. Confirm issue contract:
    - latest AC/DoD is satisfied
-   - requirements/design/wireframes/ADR decisions are recorded as new,
-     existing, or not needed
+   - requirements and wireframes decisions are recorded as new, existing, or
+     not needed
    - PR body and traceability mention the relevant issue and validation
 6. Confirm workflow safety:
-   - branch follows `docs/contributing/branch-strategy.md`
-   - commits follow `docs/contributing/commit-message-format.md`
    - no force-push, hard reset, or destructive cleanup is required
-   - sympohy labels and phase state are coherent if automation is involved
+   - taqt labels and phase state are coherent if automation is involved
 
 ## Decision Format
 

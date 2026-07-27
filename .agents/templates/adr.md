@@ -1,14 +1,3 @@
----
-codd:
-  node_id: design:<short-kebab-title>-adr
-  type: design
-  status: draft
-  depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
----
-
 # ADR <number>: <Title>
 
 ## Status

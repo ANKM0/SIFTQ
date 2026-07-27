@@ -42,9 +42,6 @@ jobs:
       - name: Install Python dependencies
         run: task setup:python
 
-      - name: Check sympohy project configuration
-        run: task ci:sympohy
-
       - name: Check commit messages
         run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.event.pull_request.head.sha || github.sha }}"
 
@@ -56,15 +53,3 @@ jobs:
 
       - name: Check Codex task permissions
         run: task ci:lint:codex-task-perms
-
-      - name: Check CoDD version
-        run: task codd:version
-
-      - name: Scan CoDD graph
-        run: task codd:scan
-
-      - name: Validate CoDD documents
-        run: task codd:validate
-
-      - name: Verify CoDD DAG
-        run: task codd:dag

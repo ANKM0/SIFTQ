@@ -26,9 +26,8 @@ Read the relevant core docs before acting:
   and `docs/adr/` files that are linked from the issue, AC/DoD, or changed
   code.
 
-Read `docs/contributing/issue-execution.md` only when using or updating
-`sympohy` issue automation, stale-run recovery, labels, watcher behavior, or
-review/merge automation.
+Read `docs/loop-engineering.md` when using or updating taqt issue automation,
+stale-run recovery, labels, watcher behavior, or review/merge automation.
 
 Use `.agents/skills/feature-docs-planning/` before implementation when the
 requirements, design, wireframe, or ADR handling has not been decided.

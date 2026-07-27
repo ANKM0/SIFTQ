@@ -1,21 +1,30 @@
 # SIFTQ Issue Label Policy
 
-## Required automation labels
+## Default rule
 
-- `sympohy:pending`
-  - sympohy が pick up する起動状態。
-- `sympohy:phase:triage`
-  - 新規 issue の初期実行フェーズ。
+新規 issue は、明示依頼がない限り taqt automation 対象にしません。
+
+taqt 対象にする条件は次のどちらかです。
+
+- ユーザーが issue 作成時に taqt 対象化を依頼した。
+- 既存 issue に taqt 起動 label が付与された。
+
+## Explicit taqt activation labels
+
+- `taqt:pending`
+  - taqt が pick up する起動状態。明示された taqt 対象 issue にのみ付与します。
+- `taqt:phase:triage`
+  - taqt 対象 issue の初期実行フェーズ。
 
 ## Forbidden as manual assignment
 
-- `sympohy:blocked`
-- `sympohy:running`
-- `sympohy:done`
+- `taqt:blocked`
+- `taqt:running`
+- `taqt:done`
 
-これらは原則、sympohy が状態遷移として更新します。
+これらは原則、taqt が状態遷移として更新します。
 
 ## Optional labels
 
 - 既存のプロジェクトラベル（機能種別、優先度など）があれば、内容に応じて追加可能。
-- ラベルが存在しない場合は事前に追加せず、まずは上記2つのみで開始します。
+- taqt 対象化の依頼がない場合は、taqt label を付与しません。
