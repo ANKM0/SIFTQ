@@ -11,8 +11,8 @@
 
 ## 作業フロー
 
-- loop engineering の方針は `docs/loop-engineering.md` を基準にする。
-- requirements と wireframes の扱いが未決なら `docs/loop-engineering.md` を基準に判断する。
+- loop engineering の方針は `docs/design/#134.md` を基準にする。
+- requirements と wireframes の扱いが未決なら `docs/design/#134.md` を基準に判断する。
 
 ## Codex と自動化
 
