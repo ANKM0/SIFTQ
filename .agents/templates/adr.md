@@ -1,25 +1,38 @@
-# ADR <number>: <Title>
+# ADR <number>: <title>
 
-## Status
+## 目的
+<!-- 解決したい課題はXXX。 -->
 
-Proposed.
+<目的>
 
-## Context
+## 背景
+<!-- 解決する問題の背景やチームの状況などの戦略。 -->
 
-<Describe the decision background, forces, constraints, and relevant
-alternatives.>
+<背景>
 
-## Decision
+## 制約事項
+<!-- ライブラリや設計の変更におけるトレードオフやできない事とその理由。 -->
 
-<State the decision clearly. Include the chosen approach and the main reasons
-for choosing it.>
+<制約事項>
 
-## Rejected Alternatives
+## 内容
 
-- <Document a meaningful option that was not selected and the concrete reason it was rejected.>
+### 採用した内容
+<!-- 採用した内容とその理由を記載 -->
 
-## Consequences
+- <採用した内容>
+  - <理由>
 
-- <Document the expected benefits.>
-- <Document the tradeoffs and operational impact.>
-- <Document follow-up work when needed.>
+### 採用しなかった内容
+<!-- 採用しなかった内容とその理由を記載 -->
+
+- <採用しなかった内容>
+  - <理由>
+
+## 影響範囲
+<!-- ADRの決定が及ぼす可能性のある影響範囲。 -->
+
+- <影響範囲>
+
+## 参考リンク
+<!-- ADRに関連する情報や参考にした資料へのリンク。 -->
