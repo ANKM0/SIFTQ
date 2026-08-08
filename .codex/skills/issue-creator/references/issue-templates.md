@@ -1,60 +1,15 @@
 # SIFTQ Issue Templates
 
-このテンプレートは issue の本文として利用してください。必要箇所を置換してください。
+Do not duplicate issue templates here.
 
-## Feature Change テンプレート
+See `docs/contributing/issue.md`. Use `.github/ISSUE_TEMPLATE/*.md` through
+`scripts/create_issue.py`.
 
-## 背景
-- <なぜこの issue を今やるのか>
+```bash
+uv run python scripts/create_issue.py --type feature --title "..." --dry-run
+```
 
-## 概要
-- <この issue で何を変更するのか>
+Drafted body: `--body-source <path>`.
 
-## Scope
-- やること: <この issue でやる範囲>
-- やらないこと: <この issue でやらない範囲>
-
-## AC
-- [ ] <受入条件>
-
-## DoD
-- [ ] <完了条件>
-
-## 補足情報
-- 依存: <依存>
-- 影響範囲: <影響範囲>
-- 検証コマンド: <検証コマンド>
-
----
-
-## Research テンプレート
-
-## 背景
-- <背景>
-
-## 調べたいこと
-- <調査内容>
-
-## 完了条件
-- [ ] <完了条件>
-
-## 補足情報
-- 比較候補: <比較候補>
-- 参考資料: <参考資料>
-
----
-
-## Bug テンプレート
-
-## 概要
-- <概要>
-
-## 再現手順
-- 1. <手順1>
-- 2. <手順2>
-
-## 原因(optional)
-- <原因>
-
-## 修正案(optional)
-- <修正案>
+Skill decides and drafts. Script reads template, writes body file, builds labels,
+rejects forbidden taqt labels, and prints or runs `gh issue create --body-file`.

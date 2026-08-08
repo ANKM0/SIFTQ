@@ -1,5 +1,5 @@
 ---
-name: siftq-issue-creator
+name: issue-creator
 description: Create or draft SIFTQ GitHub issues (feature, bug, or research) with AC/DoD templates and optional taqt activation labels.
 ---
 
@@ -9,35 +9,51 @@ Use this skill when asked to create or draft a GitHub issue for `ANKM0/SIFTQ`.
 
 ## 1) Issue creation workflow
 
-1. Select the template type:
+1. Read `docs/contributing/issue.md`.
+2. Select the template type:
    - Feature change
    - Bug
    - Research
-2. Generate title, background, scope, AC, DoD, and verification notes.
-3. Fill in placeholders in the selected template.
-4. Confirm labels and run `gh issue create`.
+3. Draft title, body, AC, DoD.
+4. Confirm taqt target.
+5. Review scope, AC/DoD, split need.
+6. Use `scripts/create_issue.py` for template, body file, labels, and
+   `gh issue create --body-file`.
+
+Default dry-run:
+
+```bash
+uv run python scripts/create_issue.py \
+  --type feature \
+  --title "..." \
+  --label area:docs \
+  --dry-run
+```
+
+For drafted body, pass `--body-source <path>`.
+
+Use `--execute` only after final user confirmation.
 
 ## 2) Label rule (this repository)
 
-Do not make a newly created issue a taqt automation target by default.
+New issues are not taqt targets by default.
 
-Add taqt labels only when the user explicitly asks for taqt automation, or when
-the issue is already intended to be picked up by a taqt watcher.
+Ask before taqt unless explicitly requested.
 
-For explicit taqt targets:
+For taqt, pass `--taqt`; script adds:
 
-- Add `taqt:pending`
-- Add `taqt:phase:triage`
+- `taqt:pending`
+- `taqt:phase:triage`
 
-Do not add the following manually:
+Script rejects:
 
 - `taqt:blocked`
 - `taqt:running`
 - `taqt:done`
 
-These are set by workflow automation.
+Automation sets these.
 
-If repository has additional project labels, include them as optional context labels.
+Pass optional labels with repeated `--label`.
 
 ## 3) Required output format
 
@@ -50,5 +66,6 @@ Return these exact fields:
 
 ## 4) References
 
-- [issue templates](references/issue-templates.md)
+- [issue guide](../../../docs/contributing/issue.md)
+- Canonical issue templates: `.github/ISSUE_TEMPLATE/*.md`
 - [label policy](references/issue-label-policy.md)
