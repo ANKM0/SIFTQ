@@ -1,3 +1,0 @@
-display_name: "Self Improvement"
-short_description: "Record reusable agent learnings and promote repeated lessons."
-default_prompt: "Use the self-improvement skill to record a reusable learning in .learnings and identify whether it should be promoted to a durable repository rule."
