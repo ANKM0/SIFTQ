@@ -55,16 +55,16 @@ def main(argv: list[str] | None = None) -> int:
 
     selector = str(pr["number"])
     if args.watch_checks:
-        checks = _checks_command(
+        checks_result = _run_checks(
             repo=repo,
             selector=selector,
+            cwd=args.workspace,
             watch=True,
             required=args.required_checks,
             interval=args.check_interval,
         )
-        completed = subprocess.run(checks, cwd=args.workspace, check=False)
-        if completed.returncode != 0:
-            return completed.returncode
+        if checks_result != 0:
+            return checks_result
 
     merge = _merge_command(
         repo=repo,
@@ -74,6 +74,65 @@ def main(argv: list[str] | None = None) -> int:
         auto=args.auto,
     )
     return subprocess.run(merge, cwd=args.workspace, check=False).returncode
+
+
+def _run_checks(
+    *,
+    repo: str,
+    selector: str,
+    cwd: Path,
+    watch: bool,
+    required: bool,
+    interval: int,
+) -> int:
+    checks = _checks_command(
+        repo=repo,
+        selector=selector,
+        watch=watch,
+        required=required,
+        interval=interval,
+    )
+    completed = subprocess.run(
+        checks,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode == 0:
+        print(completed.stdout, end="")
+        print(completed.stderr, end="")
+        return 0
+    if required and _is_missing_required_checks(completed):
+        fallback = _checks_command(
+            repo=repo,
+            selector=selector,
+            watch=watch,
+            required=False,
+            interval=interval,
+        )
+        print("No required checks reported; falling back to all PR checks.")
+        print(" ".join(fallback))
+        fallback_completed = subprocess.run(
+            fallback,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        print(fallback_completed.stdout, end="")
+        print(fallback_completed.stderr, end="")
+        return fallback_completed.returncode
+    print(completed.stdout, end="")
+    print(completed.stderr, end="")
+    return completed.returncode
+
+
+def _is_missing_required_checks(completed: subprocess.CompletedProcess[str]) -> bool:
+    output = f"{completed.stdout}\n{completed.stderr}".lower()
+    return "no required checks reported" in output
 
 
 def find_pr(*, repo: str, branch: str, cwd: Path) -> dict[str, object] | None:
