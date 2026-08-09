@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -25,4 +24,41 @@ def build_context(
         "step": step,
         "recent_events": events[-10:],
         "files": files,
+        "repository": _repository_context(workspace),
+        "artifacts": _artifact_context(workspace),
     }
+
+
+def _repository_context(workspace: Path) -> dict[str, str]:
+    return {
+        "branch": _run_git(["git", "branch", "--show-current"], workspace, limit=200),
+        "status": _run_git(["git", "status", "--short"], workspace, limit=4000),
+        "diff_stat": _run_git(["git", "diff", "--stat"], workspace, limit=4000),
+        "diff_name_only": _run_git(["git", "diff", "--name-only"], workspace, limit=4000),
+    }
+
+
+def _artifact_context(workspace: Path) -> list[str]:
+    artifacts = workspace / ".taqt" / "runs"
+    if not artifacts.exists():
+        return []
+    paths = [
+        path.relative_to(workspace).as_posix()
+        for path in artifacts.glob("**/*")
+        if path.is_file() and path.name in {"state.json", "events.jsonl"}
+    ]
+    return sorted(paths)[-20:]
+
+
+def _run_git(command: list[str], cwd: Path, *, limit: int) -> str:
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return completed.stderr[:limit]
+    return completed.stdout[:limit]

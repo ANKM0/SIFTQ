@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import argparse
 import shutil
 from pathlib import Path
 from typing import Any
 
 from .context import build_context
+from .guard import changed_paths, validate_agent_changes, workspace_snapshot
 from .llm import run_agent
 from .observe import run_commands
 from .policy import route_next_step
@@ -62,9 +61,11 @@ def run_loop(
         "current_step": loop_definition["steps"][0]["id"],
         "iteration": 0,
         "last_feedback": None,
+        "feedback_attempts": {},
     }
     limits = loop_definition.get("limits") if isinstance(loop_definition.get("limits"), dict) else {}
     max_iterations = int(limits.get("max_iterations", 12))
+    max_fix_attempts = int(limits.get("max_fix_attempts", 3))
 
     while state["status"] == "running":
         if state["iteration"] >= max_iterations:
@@ -93,6 +94,7 @@ def run_loop(
             state=state,
             run_dir=run_dir,
             workspace=workspace,
+            max_fix_attempts=max_fix_attempts,
         )
         state["current_step"] = next_step
         save_state(run_dir, state)
@@ -109,6 +111,7 @@ def _run_step(
     state: dict[str, Any],
     run_dir: Path,
     workspace: Path,
+    max_fix_attempts: int,
 ) -> str:
     kind = step["kind"]
     if kind == "commands":
@@ -123,10 +126,38 @@ def _run_step(
 
     if kind == "policy":
         next_step = route_next_step(step, state.get("last_feedback"))
-        append_event(run_dir, {"type": "decision", "step": step["id"], "feedback": state.get("last_feedback"), "next": next_step})
+        feedback = state.get("last_feedback") or "unknown"
+        attempts = state.setdefault("feedback_attempts", {})
+        attempts[feedback] = int(attempts.get(feedback, 0)) + 1
+        if feedback != "unknown" and attempts[feedback] > max_fix_attempts:
+            append_event(
+                run_dir,
+                {
+                    "type": "decision",
+                    "step": step["id"],
+                    "feedback": feedback,
+                    "next": "human",
+                    "reason": "max_fix_attempts exceeded",
+                },
+            )
+            return "human"
+        append_event(
+            run_dir,
+            {
+                "type": "decision",
+                "step": step["id"],
+                "feedback": feedback,
+                "attempt": attempts[feedback],
+                "next": next_step,
+            },
+        )
         return next_step
 
     if kind == "llm":
+        agents = loop_definition.get("agents") if isinstance(loop_definition.get("agents"), dict) else {}
+        agent_id = step.get("agent")
+        agent = agents.get(agent_id, {}) if isinstance(agent_id, str) else {}
+        before = workspace_snapshot(workspace)
         context = build_context(task=task, step=step, events=load_events(run_dir), workspace=workspace)
         response = run_agent(
             loop_definition=loop_definition,
@@ -135,9 +166,17 @@ def _run_step(
             context=context,
             cwd=workspace,
         )
+        after = workspace_snapshot(workspace)
+        changed = changed_paths(before, after)
+        response["changed_paths"] = [path.as_posix() for path in changed]
+        try:
+            validate_agent_changes(agent, changed)
+        except ValueError as error:
+            response["status"] = "failure"
+            response["guard_error"] = str(error)
         append_event(run_dir, {"type": "agent_response", "step": step["id"], "response": response})
         if response["status"] != "success":
-            state["last_feedback"] = "unknown"
+            state["last_feedback"] = response.get("feedback") or "unknown"
             return str(step.get("on_failure", "human"))
         return str(step.get("next", step.get("on_pass", "done")))
 

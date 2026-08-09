@@ -51,3 +51,8 @@ tasks:
       - task taqt:commit -- {{.CLI_ARGS}}
       - task taqt:push -- {{.CLI_ARGS}}
       - task taqt:pr -- {{.CLI_ARGS}}
+
+  report:
+    desc: Print a Markdown summary for a taqt run directory.
+    cmds:
+      - uv run python -m taqt.run_report {{.CLI_ARGS}}

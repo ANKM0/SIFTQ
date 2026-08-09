@@ -1,26 +1,34 @@
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
 from loop.runner import run_loop
 from loop.state import utc_now
 
-from .task_store import load_task, save_task
+from .task_store import DEFAULT_TASK_ROOT, load_task, next_pending_task, save_task
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-task-run")
-    parser.add_argument("task")
+    parser.add_argument("task", nargs="?")
+    parser.add_argument("--task-root", type=Path, default=DEFAULT_TASK_ROOT)
     parser.add_argument("--loop-root", type=Path, default=Path(".taqt/loops"))
     parser.add_argument("--runs-root", type=Path, default=Path(".taqt/runs"))
     parser.add_argument("--workspace", type=Path, default=Path("."))
     parser.add_argument("--worker-id", default="local")
+    parser.add_argument("--resume", type=Path)
     args = parser.parse_args(argv)
 
-    task_path, task = load_task(args.task)
+    if args.task:
+        task_path, task = load_task(args.task, args.task_root)
+    else:
+        selected = next_pending_task(args.task_root)
+        if selected is None:
+            print("No pending taqt tasks.")
+            return 0
+        task_path, task = selected
+
     task["status"] = "running"
-    task["worker"] = {"id": args.worker_id, "heartbeat_at": utc_now()}
+    task["worker"] = {"id": args.worker_id, "started_at": utc_now(), "heartbeat_at": utc_now()}
     save_task(task_path, task)
 
     loop_path = args.loop_root / f"{task['loop']}.yaml"
@@ -29,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         task_path=task_path,
         workspace=args.workspace,
         runs_root=args.runs_root,
+        resume_dir=args.resume,
     )
 
     if result["status"] == "done":

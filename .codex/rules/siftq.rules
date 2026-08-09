@@ -91,6 +91,7 @@ prefix_rule(pattern=["task", "taqt:commit"], decision="allow")
 prefix_rule(pattern=["task", "taqt:push"], decision="allow")
 prefix_rule(pattern=["task", "taqt:pr"], decision="allow")
 prefix_rule(pattern=["task", "taqt:route:dry-run"], decision="allow")
+prefix_rule(pattern=["task", "taqt:report"], decision="allow")
 
 # Forbidden: secrets and local credentials
 prefix_rule(pattern=["cat", ".env"], decision="forbidden")

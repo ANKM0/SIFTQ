@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 
 from .task_store import create_issue_task
@@ -12,6 +10,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--loop", default="development_feedback_loop")
     parser.add_argument("--priority", default="normal", choices=["low", "normal", "high"])
     parser.add_argument("--requirement")
+    parser.add_argument("--branch-summary")
     parser.add_argument("--id")
     args = parser.parse_args(argv)
 
@@ -21,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
         loop=args.loop,
         priority=args.priority,
         requirement=args.requirement,
+        branch_summary=args.branch_summary,
         task_id=args.id,
     )
     print(path)
