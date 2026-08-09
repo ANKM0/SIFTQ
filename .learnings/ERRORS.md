@@ -1,30 +1,21 @@
-# Error Learnings
+# Errors
 
-Command, CI, workflow, or implementation failures that produced reusable fixes.
+Command failures, API errors, and unexpected behavior captured during development.
 
-## Template
+**Areas**: docs | taqt | frontend | ci | repo
+**Statuses**: pending | in_progress | resolved | wont_fix | promoted | promoted_to_skill
 
-```md
-## ERR-YYYYMMDD-NNN: <area>
+## Status Definitions
 
-- Logged: YYYY-MM-DD
-- Priority: low | medium | high
-- Status: pending | promoted | rejected
-- Command: `<command or n/a>`
+| Status | Meaning |
+|--------|---------|
+| `pending` | Not yet addressed |
+| `in_progress` | Actively being worked on |
+| `resolved` | Issue fixed (add Resolution block) |
+| `wont_fix` | Decided not to address (reason in Resolution) |
+| `promoted` | Elevated to AGENTS.md, `.agents/skills/`, `.codex/rules/`, docs, issue templates, or PR templates |
+| `promoted_to_skill` | Extracted as a reusable skill |
 
-### Symptom
+Entry format: see the self-improvement skill's "Error Entry" section. IDs use `ERR-YYYYMMDD-XXX`.
 
-<what failed>
-
-### Cause
-
-<why it failed>
-
-### Fix
-
-<what resolved it>
-
-### Prevention
-
-<how future work should avoid it>
-```
+---

@@ -1,25 +1,20 @@
 # Feature Requests
 
-Workflow, tooling, or agent capability requests discovered during normal work.
+Missing capabilities requested by users, captured during development.
 
-## Template
+**Areas**: docs | taqt | frontend | ci | repo
+**Statuses**: pending | in_progress | resolved | wont_fix
+**Complexity**: simple | medium | complex
 
-```md
-## FR-YYYYMMDD-NNN: <area>
+## Status Definitions
 
-- Logged: YYYY-MM-DD
-- Priority: low | medium | high
-- Status: pending | promoted | rejected
+| Status | Meaning |
+|--------|---------|
+| `pending` | Not yet addressed |
+| `in_progress` | Actively being built |
+| `resolved` | Capability implemented (add Resolution block) |
+| `wont_fix` | Decided not to build (reason in Resolution) |
 
-### Request
+Entry format: see the self-improvement skill's "Feature Request Entry" section. IDs use `FEAT-YYYYMMDD-XXX`.
 
-<what capability is missing>
-
-### Context
-
-<where the need came from>
-
-### Suggested Action
-
-<how to evaluate or implement it later>
-```
+---
