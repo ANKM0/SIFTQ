@@ -778,6 +778,85 @@ def test_github_merge_finds_open_pr_by_head_branch(tmp_path: Path, monkeypatch) 
     assert kwargs["cwd"] == tmp_path
 
 
+def test_github_merge_falls_back_when_required_checks_are_not_configured(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=49,
+        loop="development_feedback_loop",
+        branch_summary="Merge Flow",
+        task_root=tmp_path,
+    )
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        if command[:3] == ["gh", "pr", "list"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout='[{"number": 149, "url": "https://example.test/pull/149", "isDraft": false}]',
+                stderr="",
+            )
+        if command[:3] == ["gh", "pr", "checks"] and "--required" in command:
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="",
+                stderr="no required checks reported on the 'dev/#49_merge_flow' branch\n",
+            )
+        return subprocess.CompletedProcess(command, 0, stdout="ci\tpass\n", stderr="")
+
+    monkeypatch.setattr("taqt.github_merge.subprocess.run", fake_run)
+
+    assert github_merge_main([str(task_path), "--workspace", str(tmp_path), "--execute"]) == 0
+
+    commands = [call[0] for call in calls]
+    assert commands[1][:4] == ["gh", "pr", "checks", "149"]
+    assert "--required" in commands[1]
+    assert commands[2][:4] == ["gh", "pr", "checks", "149"]
+    assert "--required" not in commands[2]
+    assert commands[3][:4] == ["gh", "pr", "merge", "149"]
+    assert "falling back to all PR checks" in capsys.readouterr().out
+
+
+def test_github_merge_keeps_blocking_on_other_required_check_failures(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=50,
+        loop="development_feedback_loop",
+        branch_summary="Merge Flow",
+        task_root=tmp_path,
+    )
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        if command[:3] == ["gh", "pr", "list"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout='[{"number": 150, "url": "https://example.test/pull/150", "isDraft": false}]',
+                stderr="",
+            )
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="ci failed\n")
+
+    monkeypatch.setattr("taqt.github_merge.subprocess.run", fake_run)
+
+    assert github_merge_main([str(task_path), "--workspace", str(tmp_path), "--execute"]) == 1
+
+    commands = [call[0] for call in calls]
+    assert commands[1][:4] == ["gh", "pr", "checks", "150"]
+    assert "--required" in commands[1]
+    assert len(commands) == 2
+
+
 def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
