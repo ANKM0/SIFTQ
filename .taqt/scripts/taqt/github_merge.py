@@ -78,7 +78,19 @@ def main(argv: list[str] | None = None) -> int:
 
 def find_pr(*, repo: str, branch: str, cwd: Path) -> dict[str, object] | None:
     completed = subprocess.run(
-        ["gh", "pr", "view", "--repo", repo, "--head", branch, "--json", "number,url,isDraft"],
+        [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--head",
+            branch,
+            "--state",
+            "open",
+            "--json",
+            "number,url,isDraft",
+        ],
         cwd=cwd,
         text=True,
         stdout=subprocess.PIPE,
@@ -88,7 +100,9 @@ def find_pr(*, repo: str, branch: str, cwd: Path) -> dict[str, object] | None:
     if completed.returncode != 0:
         return None
     payload = json.loads(completed.stdout)
-    return payload if isinstance(payload, dict) else None
+    if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+        return payload[0]
+    return None
 
 
 def _checks_command(

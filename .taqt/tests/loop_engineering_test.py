@@ -33,6 +33,7 @@ from taqt.git_commit import main as git_commit_main
 from taqt.git_push import main as git_push_main
 from taqt.github_pr import main as github_pr_main
 from taqt.github_merge import main as github_merge_main
+from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
 
 
@@ -693,6 +694,30 @@ def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
     output = capsys.readouterr().out
     assert "gh pr checks dev/#44_merge_flow --repo owner/repo --required --watch" in output
     assert "gh pr merge dev/#44_merge_flow --repo owner/repo --squash --delete-branch" in output
+
+
+def test_github_merge_finds_open_pr_by_head_branch(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = '[{"number": 134, "url": "https://example.test/pull/134", "isDraft": false}]'
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("taqt.github_merge.subprocess.run", fake_run)
+
+    pr = find_pr(repo="owner/repo", branch="issue-133-taqt-loop-engineering", cwd=tmp_path)
+
+    assert pr == {"number": 134, "url": "https://example.test/pull/134", "isDraft": False}
+    command, kwargs = calls[0]
+    assert command[:3] == ["gh", "pr", "list"]
+    assert "--head" in command
+    assert "issue-133-taqt-loop-engineering" in command
+    assert kwargs["cwd"] == tmp_path
 
 
 def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path, capsys) -> None:
