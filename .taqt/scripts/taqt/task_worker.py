@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cleanup-worktree", action="store_true")
     parser.add_argument("--delete-local-branch", action="store_true")
     parser.add_argument("--delete-remote-branch", action="store_true")
+    parser.add_argument("--force-worktree", action="store_true")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -75,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
             cleanup_worktree=args.cleanup_worktree,
             delete_local_branch=args.delete_local_branch,
             delete_remote_branch=args.delete_remote_branch,
+            force_worktree=args.force_worktree,
             execute=args.execute,
         )
         print(" ".join(worktree_command))
@@ -138,6 +140,7 @@ def _auto_command(
     cleanup_worktree: bool,
     delete_local_branch: bool,
     delete_remote_branch: bool,
+    force_worktree: bool,
     execute: bool,
 ) -> list[str]:
     command = [
@@ -166,6 +169,8 @@ def _auto_command(
         command.append("--delete-local-branch")
     if delete_remote_branch:
         command.append("--delete-remote-branch")
+    if force_worktree:
+        command.append("--force-worktree")
     if execute:
         command.append("--execute")
     return command

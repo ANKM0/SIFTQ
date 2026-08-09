@@ -738,13 +738,14 @@ def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path,
             str(tmp_path / "worktree"),
             "--delete-local-branch",
             "--delete-remote-branch",
+            "--force-worktree",
             "--mark-done",
         ]
     ) == 0
 
     output = capsys.readouterr().out
-    assert f"git worktree remove {tmp_path / 'worktree'}" in output
-    assert "git branch -d dev/#48_cleanup_flow" in output
+    assert f"git worktree remove --force {tmp_path / 'worktree'}" in output
+    assert "git branch -D dev/#48_cleanup_flow" in output
     assert "git push origin --delete dev/#48_cleanup_flow" in output
     assert "mark done: ISSUE-48" in output
 
@@ -872,6 +873,7 @@ def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) 
             "--merge",
             "--cleanup-worktree",
             "--delete-local-branch",
+            "--force-worktree",
             "--workspace",
             str(tmp_path / "worktree"),
         ]
@@ -882,6 +884,7 @@ def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) 
     assert "--mark-done" in output
     assert "--sync-parent" in output
     assert "--delete-local-branch" in output
+    assert "--force-worktree" in output
 
 
 def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, capsys) -> None:

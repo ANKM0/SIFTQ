@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--delete-local-branch", action="store_true")
     parser.add_argument("--delete-remote-branch", action="store_true")
+    parser.add_argument("--force-worktree", action="store_true")
     parser.add_argument("--mark-done", action="store_true")
     parser.add_argument("--sync-parent", action="store_true")
     parser.add_argument("--recover-stale", action="store_true")
@@ -41,9 +42,13 @@ def main(argv: list[str] | None = None) -> int:
     task_file, task = load_task(args.task, args.task_root)
     worktree = args.workspace or args.worktree_root / str(task["id"])
     branch = issue_branch(task)
-    commands = [["git", "worktree", "remove", str(worktree)]]
+    worktree_command = ["git", "worktree", "remove"]
+    if args.force_worktree:
+        worktree_command.append("--force")
+    worktree_command.append(str(worktree))
+    commands = [worktree_command]
     if args.delete_local_branch:
-        commands.append(["git", "branch", "-d", branch])
+        commands.append(["git", "branch", "-D", branch])
     if args.delete_remote_branch:
         commands.append(["git", "push", args.remote, "--delete", branch])
 

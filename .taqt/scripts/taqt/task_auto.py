@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cleanup-worktree", action="store_true")
     parser.add_argument("--delete-local-branch", action="store_true")
     parser.add_argument("--delete-remote-branch", action="store_true")
+    parser.add_argument("--force-worktree", action="store_true")
     parser.add_argument("--skip-run", action="store_true")
     parser.add_argument("--skip-commit", action="store_true")
     parser.add_argument("--skip-push", action="store_true")
@@ -94,6 +95,7 @@ def _build_steps(args: argparse.Namespace) -> list[list[str]]:
                 "--sync-parent",
                 *(["--delete-local-branch"] if args.delete_local_branch else []),
                 *(["--delete-remote-branch"] if args.delete_remote_branch else []),
+                *(["--force-worktree"] if args.force_worktree else []),
             ]
         )
     return steps
