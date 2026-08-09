@@ -9,9 +9,18 @@ Use this skill when running or supervising taqt tasks for SIFTQ issues.
 
 ## References
 
-1. Read `docs/loop-engineering.md` first. Treat it as the operating policy for taqt loop engineering.
-2. Read the issue body and comments. Do not start implementation unless the issue has the required readiness sections.
-3. Read `.agents/skills/self-improvement/SKILL.md` before acting on taqt self-improvement requests.
+1. Read the issue body and comments. Do not start implementation unless the issue has the required readiness sections.
+2. Read `.agents/skills/self-improvement/SKILL.md` before acting on taqt self-improvement requests.
+
+## Operating Policy
+
+- Use GitHub Issue AC/DoD as the source of implementation readiness.
+- Do not start implementation when required issue sections are missing.
+- Keep task slices close to five minutes of work when an issue contains multiple independent bullets.
+- Run each task in its own git worktree when parallel execution is possible.
+- Prefer the smallest meaningful validation first, then broader gates as needed.
+- Route unclear requirements, product decisions, repeated failures, and max-attempt exits to human triage.
+- Create a self-improvement request when a taqt event reveals a reusable operational lesson.
 
 ## Readiness
 

@@ -15,7 +15,6 @@ agents:
       - docs/wireframes/
       - docs/adr/
       - docs/contributing/
-      - docs/loop-engineering.md
   test:
     role: test_author
     adapter: codex
