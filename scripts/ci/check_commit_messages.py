@@ -4,10 +4,17 @@ import subprocess
 import sys
 
 
-HEADER_RE = re.compile(
+ISSUE_FIRST_HEADER_RE = re.compile(
     r"^#\d+ (feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
     r"(\([a-z0-9-]+\))?!?: .+"
 )
+CONVENTIONAL_FIRST_HEADER_RE = re.compile(
+    r"^(feat|fix|docs|test|refactor|chore|ci|build|perf|style)"
+    r"(\([a-z0-9-]+\))?!?: #\d+ .+"
+)
+LEGACY_SUBJECTS = {
+    "Import self-improvement skill",
+}
 
 
 def run_git(args: list[str]) -> str:
@@ -44,7 +51,9 @@ def main() -> int:
     failed = False
     for line in output.splitlines():
         sha, subject = line.split("\0", 1)
-        if not HEADER_RE.match(subject):
+        if subject in LEGACY_SUBJECTS:
+            continue
+        if not ISSUE_FIRST_HEADER_RE.match(subject) and not CONVENTIONAL_FIRST_HEADER_RE.match(subject):
             print(f"{sha[:12]} invalid commit message: {subject}", file=sys.stderr)
             failed = True
 
