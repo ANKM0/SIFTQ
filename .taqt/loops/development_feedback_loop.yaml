@@ -8,19 +8,25 @@ limits:
 agents:
   design:
     role: design
+    adapter: codex
     writes:
-      - tmp/design/
+      - docs/requirements/
+      - docs/design/
+      - docs/wireframes/
+      - docs/adr/
+      - docs/contributing/
+      - docs/loop-engineering.md
   test:
     role: test_author
+    adapter: codex
     writes:
       - tests/
   implement:
     role: implementation
-    writes:
-      - src/
-      - scripts/
+    adapter: codex
   checker:
     role: checker
+    adapter: codex
     readonly: true
 
 steps:

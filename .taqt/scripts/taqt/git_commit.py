@@ -1,4 +1,5 @@
 import argparse
+import json
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--message")
     parser.add_argument("--include", action="append", default=[])
     parser.add_argument("--allow-branch-mismatch", action="store_true")
+    parser.add_argument("--allow-unverified-run", action="store_true")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -41,6 +43,10 @@ def main(argv: list[str] | None = None) -> int:
         print(" ".join(command))
     if not args.execute:
         return 0
+    if not args.allow_unverified_run:
+        run_check = _ensure_verified_run(task)
+        if run_check != 0:
+            return run_check
     if not args.allow_branch_mismatch:
         branch_check = _ensure_expected_branch(args.workspace, issue_branch(task))
         if branch_check != 0:
@@ -78,6 +84,23 @@ def _ensure_expected_branch(workspace: Path, expected: str) -> int:
     current = completed.stdout.strip()
     if current != expected:
         print(f"Refusing to commit on branch {current!r}; expected {expected!r}.")
+        return 2
+    return 0
+
+
+def _ensure_verified_run(task: dict[str, object]) -> int:
+    run = task.get("run")
+    state_path = run.get("state_path") if isinstance(run, dict) else None
+    if not state_path:
+        print("Refusing to commit without a verified taqt run state.")
+        return 2
+    path = Path(str(state_path))
+    if not path.exists():
+        print(f"Refusing to commit because run state does not exist: {path}")
+        return 2
+    state = json.loads(path.read_text(encoding="utf-8"))
+    if state.get("status") != "done":
+        print(f"Refusing to commit because taqt run status is {state.get('status')!r}.")
         return 2
     return 0
 

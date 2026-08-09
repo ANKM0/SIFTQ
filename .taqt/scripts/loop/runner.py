@@ -100,7 +100,11 @@ def run_loop(
         save_state(run_dir, state)
 
     save_state(run_dir, state)
-    return {"status": state["status"], "run_dir": str(run_dir)}
+    return {
+        "status": state["status"],
+        "phase": state.get("current_step"),
+        "run_dir": str(run_dir),
+    }
 
 
 def _run_step(

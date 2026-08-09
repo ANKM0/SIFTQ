@@ -14,6 +14,26 @@ tasks:
     cmds:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
+  auto:
+    desc: Run a taqt task through run, commit, push, PR, and optional merge routing.
+    cmds:
+      - uv run python -m taqt.task_auto {{.CLI_ARGS}}
+
+  decompose:
+    desc: Decompose taqt tasks into child tasks capped at about five minutes each.
+    cmds:
+      - uv run python -m taqt.task_decompose {{.CLI_ARGS}}
+
+  cleanup:
+    desc: Clean up a taqt task worktree and optionally recover stale running tasks.
+    cmds:
+      - uv run python -m taqt.task_cleanup {{.CLI_ARGS}}
+
+  worker:
+    desc: Run pending taqt tasks in parallel, one git worktree per task.
+    cmds:
+      - uv run python -m taqt.task_worker {{.CLI_ARGS}}
+
   watch:
     desc: Watch GitHub Issues and create/update taqt tasks.
     cmds:
@@ -43,6 +63,11 @@ tasks:
     desc: Create or print the GitHub PR command for a taqt task.
     cmds:
       - uv run python -m taqt.github_pr {{.CLI_ARGS}}
+
+  merge:
+    desc: Check and merge the GitHub PR for a taqt task.
+    cmds:
+      - uv run python -m taqt.github_merge {{.CLI_ARGS}}
 
   route:dry-run:
     desc: Print the main post-run route commands for a taqt task without executing git or GitHub changes.

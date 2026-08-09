@@ -54,9 +54,13 @@ def run_commands(
 
 def classify_failure(command: str, stdout: str, stderr: str) -> str:
     haystack = f"{command}\n{stdout}\n{stderr}".lower()
-    if "specification" in haystack or "acceptance criteria" in haystack:
+    if "product" in haystack or "ux decision" in haystack:
+        return "product_feedback"
+    if "specification" in haystack or "acceptance criteria" in haystack or "requirements" in haystack:
         return "specification_feedback"
-    if "lint" in haystack or "typecheck" in haystack or "test" in haystack:
+    if "test" in haystack or "pytest" in haystack or "vitest" in haystack or "playwright" in haystack:
+        return "test_feedback"
+    if "lint" in haystack or "typecheck" in haystack or "build" in haystack:
         return "implementation_feedback"
     if "design" in haystack or "architecture" in haystack:
         return "local_design_feedback"

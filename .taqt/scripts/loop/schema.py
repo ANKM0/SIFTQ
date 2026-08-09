@@ -97,6 +97,9 @@ def _validate_agents(value: Any) -> set[str]:
             raise ValueError(f"agent {agent_id}.readonly must be a boolean")
         if "command" in agent and not isinstance(agent["command"], str):
             raise ValueError(f"agent {agent_id}.command must be a string")
+        for key in ("adapter", "model", "profile", "sandbox", "approval"):
+            if key in agent and not isinstance(agent[key], str):
+                raise ValueError(f"agent {agent_id}.{key} must be a string")
         writes = agent.get("writes")
         if writes is not None and (
             not isinstance(writes, list)
@@ -137,6 +140,9 @@ def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: se
             raise ValueError(f"llm step {step_id} references unknown agent: {agent}")
         if "command" in step and not isinstance(step["command"], str):
             raise ValueError(f"llm step {step_id}.command must be a string")
+        for key in ("adapter", "model", "profile", "sandbox", "approval"):
+            if key in step and not isinstance(step[key], str):
+                raise ValueError(f"llm step {step_id}.{key} must be a string")
         for key in ("next", "on_pass", "on_failure"):
             if key in step:
                 _validate_step_ref(step, key, step_ids)

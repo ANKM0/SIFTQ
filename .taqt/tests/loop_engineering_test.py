@@ -3,18 +3,37 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from loop.observe import run_commands
 from loop.runner import run_loop
+from loop.llm import run_agent
+from loop.guard import validate_write_path
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
-from taqt.task_store import create_issue_task, issue_branch, next_pending_task, upsert_issue_task
+from taqt.task_store import (
+    create_issue_task,
+    decomposition_errors,
+    issue_branch,
+    next_pending_task,
+    readiness_errors,
+    readiness_warnings,
+    save_task,
+    upsert_issue_task,
+)
+from taqt.task_auto import main as task_auto_main
+from taqt.task_cleanup import main as task_cleanup_main
+from taqt.task_decompose import main as task_decompose_main
+from taqt.task_worker import main as task_worker_main
 from taqt.git_worktree import main as git_worktree_main
 from taqt.git_commit import main as git_commit_main
 from taqt.git_push import main as git_push_main
 from taqt.github_pr import main as github_pr_main
+from taqt.github_merge import main as github_merge_main
+from taqt.github_sync import main as github_sync_main
 
 
 def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
@@ -60,7 +79,7 @@ def test_observe_classifies_failed_test_command(tmp_path: Path) -> None:
     result = run_commands(["python -c 'import sys; sys.exit(1)' # test"], cwd=tmp_path)
 
     assert result["status"] == "failure"
-    assert result["feedback"] == "implementation_feedback"
+    assert result["feedback"] == "test_feedback"
     assert result["commands"][0]["exit_code"] == 1
 
 
@@ -224,6 +243,50 @@ blocked_reason: null
     assert "readonly agent cannot write" in events
 
 
+def test_loop_guard_allows_directory_itself_for_prefix_scope() -> None:
+    validate_write_path({"writes": ["tests/"]}, Path("tests"))
+    validate_write_path({"writes": ["tests/"]}, Path("tests/example_test.py"))
+
+
+def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "codex",
+                }
+            }
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={"files": {}},
+        cwd=tmp_path,
+    )
+
+    assert response["status"] == "success"
+    command, kwargs = calls[0]
+    assert command[:2] == ["codex", "exec"]
+    assert "--cd" in command
+    assert command[command.index("--cd") + 1] == str(tmp_path.resolve())
+    assert "--sandbox" in command
+    assert "--ask-for-approval" not in command
+    assert kwargs["input"].startswith("Role: implementation")
+
+
 def test_policy_respects_max_fix_attempts(tmp_path: Path) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
@@ -245,7 +308,7 @@ steps:
   - id: decide
     kind: policy
     routes:
-      - when: implementation_feedback
+      - when: test_feedback
         next: observe
       - when: unknown
         next: human
@@ -289,7 +352,7 @@ blocked_reason: null
 
     assert result["status"] == "human"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
-    assert state["feedback_attempts"]["implementation_feedback"] == 2
+    assert state["feedback_attempts"]["test_feedback"] == 2
 
 
 def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> None:
@@ -323,6 +386,7 @@ steps:
             str(tmp_path / "runs"),
             "--workspace",
             str(tmp_path),
+            "--skip-readiness-check",
         ]
     )
 
@@ -331,6 +395,46 @@ steps:
     assert task["status"] == "blocked"
     assert task["phase"] == "human"
     assert task["blocked_reason"] == "human escalation required"
+
+
+def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> None:
+    task_path, task = create_issue_task(
+        repo="owner/repo",
+        issue_number=14,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+    task["status"] = "running"
+    task["worker"] = {"id": "other", "heartbeat_at": "2026-01-01T00:00:00+00:00"}
+    task_path.write_text(
+        yaml.safe_dump(task, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    exit_code = task_run_main([str(task_path), "--task-root", str(tmp_path), "--worker-id", "local"])
+
+    assert exit_code == 2
+
+
+def test_taqt_task_run_rejects_mismatched_resume_dir(tmp_path: Path) -> None:
+    task_path, task = create_issue_task(
+        repo="owner/repo",
+        issue_number=15,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+    task["run"]["id"] = "expected"
+    task_path.write_text(
+        yaml.safe_dump(task, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    resume_dir = tmp_path / "other"
+    resume_dir.mkdir()
+    (resume_dir / "state.json").write_text("{}", encoding="utf-8")
+
+    exit_code = task_run_main([str(task_path), "--task-root", str(tmp_path), "--resume", str(resume_dir)])
+
+    assert exit_code == 2
 
 
 def test_next_pending_task_prefers_high_priority(tmp_path: Path) -> None:
@@ -384,6 +488,173 @@ def test_upsert_issue_task_updates_issue_metadata(tmp_path: Path) -> None:
     assert updated["input"]["issue"]["body"] == "Body v2"
 
 
+def test_readiness_errors_require_acceptance_criteria_and_dod(tmp_path: Path) -> None:
+    _path, task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=13,
+        loop="development_feedback_loop",
+        issue_title="Add profile",
+        issue_body="""
+## Acceptance Criteria
+- User can save a profile.
+
+## Definition of Done
+- Tests and docs are updated.
+""",
+        task_root=tmp_path,
+    )
+
+    assert readiness_errors(task, workspace=tmp_path) == []
+    assert readiness_warnings(task, workspace=tmp_path) == []
+
+    _path, incomplete, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=14,
+        loop="development_feedback_loop",
+        issue_title="Incomplete",
+        issue_body="Need this soon.",
+        task_root=tmp_path,
+    )
+
+    assert readiness_errors(incomplete, workspace=tmp_path) == [
+        "missing issue section: AC",
+        "missing issue section: DoD",
+    ]
+
+
+def test_readiness_errors_follow_research_template(tmp_path: Path) -> None:
+    _path, task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=15,
+        loop="development_feedback_loop",
+        issue_title="Research",
+        issue_body="""
+## 調べたいこと
+- Compare options.
+
+## 完了条件
+- Decision is documented.
+""",
+        task_root=tmp_path,
+    )
+
+    assert readiness_errors(task, workspace=tmp_path) == []
+
+    _path, incomplete, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=16,
+        loop="development_feedback_loop",
+        issue_title="Research incomplete",
+        issue_body="""
+## 調べたいこと
+- Compare options.
+""",
+        task_root=tmp_path,
+    )
+
+    assert readiness_errors(incomplete, workspace=tmp_path) == ["missing issue section: 完了条件"]
+
+
+def test_readiness_warnings_follow_bug_template(tmp_path: Path) -> None:
+    _path, task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=17,
+        loop="development_feedback_loop",
+        issue_title="Bug",
+        issue_body="""
+## 概要
+Save fails.
+
+## 再現手順
+-
+""",
+        task_root=tmp_path,
+    )
+
+    assert readiness_errors(task, workspace=tmp_path) == []
+    assert readiness_warnings(task, workspace=tmp_path) == ["missing issue section: 再現手順"]
+
+
+def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=18,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    exit_code = task_run_main([str(task_path), "--task-root", str(tmp_path), "--workspace", str(tmp_path)])
+
+    assert exit_code == 2
+    task = load_document(task_path)
+    assert task["status"] == "pending"
+    assert task["phase"] == "triage"
+    assert "missing issue section: AC" in task["blocked_reason"]
+
+
+def test_task_decompose_creates_five_minute_slice_tasks(tmp_path: Path, capsys) -> None:
+    task_path, task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=19,
+        loop="development_feedback_loop",
+        issue_title="Large task",
+        issue_body="""
+## AC
+- First behavior works.
+- Second behavior works.
+
+## DoD
+- Verified.
+""",
+        task_root=tmp_path,
+    )
+
+    assert decomposition_errors(task, workspace=tmp_path) == [
+        "task requires decomposition into 2 slices capped at 5 minutes"
+    ]
+    assert task_decompose_main([str(task_path), "--task-root", str(tmp_path), "--execute"]) == 0
+
+    parent = load_document(task_path)
+    first = load_document(tmp_path / "ISSUE-19-01.yaml")
+    second = load_document(tmp_path / "ISSUE-19-02.yaml")
+    assert parent["phase"] == "decomposed"
+    assert [slice_item["task_id"] for slice_item in parent["plan"]["slices"]] == [
+        "ISSUE-19-01",
+        "ISSUE-19-02",
+    ]
+    assert first["slice"]["estimate_minutes"] == 5
+    assert first["slice"]["title"] == "First behavior works."
+    assert second["slice"]["title"] == "Second behavior works."
+    assert readiness_errors(first, workspace=tmp_path) == []
+    assert "decompose into 2 slices capped at 5 minutes" in capsys.readouterr().out
+
+
+def test_task_run_requires_decomposition_for_large_ready_task(tmp_path: Path) -> None:
+    task_path, _task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=20,
+        loop="development_feedback_loop",
+        issue_title="Large task",
+        issue_body="""
+## AC
+- First behavior works.
+- Second behavior works.
+
+## DoD
+- Verified.
+""",
+        task_root=tmp_path,
+    )
+
+    exit_code = task_run_main([str(task_path), "--task-root", str(tmp_path), "--workspace", str(tmp_path)])
+
+    assert exit_code == 2
+    task = load_document(task_path)
+    assert task["status"] == "pending"
+    assert task["phase"] == "triage"
+    assert "requires decomposition into 2 slices" in task["blocked_reason"]
+
+
 def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
@@ -403,6 +674,256 @@ def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> No
     assert "git push -u origin dev/#42_add_user" in output
     assert "gh pr create" in output
     assert "--draft" in output
+
+
+def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=44,
+        loop="development_feedback_loop",
+        branch_summary="Merge Flow",
+        task_root=tmp_path,
+    )
+
+    assert github_merge_main([str(task_path), "--strategy", "squash", "--delete-branch"]) == 0
+
+    output = capsys.readouterr().out
+    assert "gh pr checks dev/#44_merge_flow --repo owner/repo --required --watch" in output
+    assert "gh pr merge dev/#44_merge_flow --repo owner/repo --squash --delete-branch" in output
+
+
+def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=48,
+        loop="development_feedback_loop",
+        branch_summary="Cleanup Flow",
+        task_root=tmp_path,
+    )
+
+    assert task_cleanup_main(
+        [
+            str(task_path),
+            "--task-root",
+            str(tmp_path),
+            "--workspace",
+            str(tmp_path / "worktree"),
+            "--delete-local-branch",
+            "--delete-remote-branch",
+            "--mark-done",
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert f"git worktree remove {tmp_path / 'worktree'}" in output
+    assert "git branch -d dev/#48_cleanup_flow" in output
+    assert "git push origin --delete dev/#48_cleanup_flow" in output
+    assert "mark done: ISSUE-48" in output
+
+
+def test_task_cleanup_execute_marks_child_and_parent_done(tmp_path: Path, monkeypatch) -> None:
+    parent_path, _parent, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=49,
+        loop="development_feedback_loop",
+        issue_title="Large task",
+        issue_body="""
+## AC
+- First behavior works.
+- Second behavior works.
+
+## DoD
+- Verified.
+""",
+        task_root=tmp_path,
+    )
+    assert task_decompose_main([str(parent_path), "--task-root", str(tmp_path), "--execute"]) == 0
+    first_path = tmp_path / "ISSUE-49-01.yaml"
+    second_path = tmp_path / "ISSUE-49-02.yaml"
+    second = load_document(second_path)
+    second["status"] = "done"
+    second["phase"] = "done"
+    save_task(second_path, second)
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+
+    class Completed:
+        returncode = 0
+
+    monkeypatch.setattr("taqt.task_cleanup.subprocess.run", lambda *_args, **_kwargs: Completed())
+
+    assert task_cleanup_main(
+        [
+            str(first_path),
+            "--task-root",
+            str(tmp_path),
+            "--workspace",
+            str(worktree),
+            "--mark-done",
+            "--sync-parent",
+            "--execute",
+        ]
+    ) == 0
+
+    assert load_document(first_path)["status"] == "done"
+    assert load_document(parent_path)["status"] == "done"
+
+
+def test_task_cleanup_recovers_stale_running_task(tmp_path: Path) -> None:
+    task_path, task = create_issue_task(
+        repo="owner/repo",
+        issue_number=54,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+    task["status"] = "running"
+    task["phase"] = "implement"
+    state_path = tmp_path / "runs" / "ISSUE-54" / "state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps({"status": "running", "current_step": "implement"}),
+        encoding="utf-8",
+    )
+    task["run"] = {"id": "stale-run", "state_path": str(state_path), "events_path": None}
+    task["worker"] = {
+        "id": "stale-worker",
+        "started_at": "2000-01-01T00:00:00+00:00",
+        "heartbeat_at": "2000-01-01T00:00:00+00:00",
+    }
+    save_task(task_path, task)
+
+    assert task_cleanup_main(
+        [
+            "--task-root",
+            str(tmp_path),
+            "--recover-stale",
+            "--stale-minutes",
+            "1",
+            "--execute",
+        ]
+    ) == 0
+
+    recovered = load_document(task_path)
+    assert recovered["status"] == "pending"
+    assert recovered["phase"] == "triage"
+    assert "stale run recovered" in recovered["blocked_reason"]
+    recovered_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert recovered_state["status"] == "failed"
+    assert "stale run recovered" in recovered_state["blocked_reason"]
+
+
+def test_task_auto_dry_run_includes_merge_route(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=45,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    assert task_auto_main([str(task_path), "--merge", "--workspace", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "taqt.run" in output
+    assert "taqt.commit" in output
+    assert "taqt.push" in output
+    assert "taqt.pr" in output
+    assert "taqt.merge" in output
+
+
+def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=55,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    assert task_auto_main(
+        [
+            str(task_path),
+            "--merge",
+            "--cleanup-worktree",
+            "--delete-local-branch",
+            "--workspace",
+            str(tmp_path / "worktree"),
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert output.index("taqt.merge") < output.index("taqt.cleanup")
+    assert "--mark-done" in output
+    assert "--sync-parent" in output
+    assert "--delete-local-branch" in output
+
+
+def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, capsys) -> None:
+    for issue_number in (50, 51):
+        upsert_issue_task(
+            repo="owner/repo",
+            issue_number=issue_number,
+            loop="development_feedback_loop",
+            issue_title=f"Task {issue_number}",
+            issue_body="""
+## Acceptance Criteria
+- Works.
+
+## Definition of Done
+- Verified.
+""",
+            task_root=tmp_path,
+        )
+
+    assert task_worker_main(["--task-root", str(tmp_path), "--jobs", "2", "--merge"]) == 0
+
+    output = capsys.readouterr().out
+    assert output.count("git worktree add -B") == 2
+    assert ".taqt/worktrees/ISSUE-50" in output
+    assert ".taqt/worktrees/ISSUE-51" in output
+    assert output.count("taqt.task_auto") == 2
+
+
+def test_task_worker_plans_decomposed_child_tasks(tmp_path: Path, capsys) -> None:
+    task_path, _task, _created = upsert_issue_task(
+        repo="owner/repo",
+        issue_number=53,
+        loop="development_feedback_loop",
+        issue_title="Large task",
+        issue_body="""
+## AC
+- First behavior works.
+- Second behavior works.
+
+## DoD
+- Verified.
+""",
+        task_root=tmp_path,
+    )
+    assert task_decompose_main([str(task_path), "--task-root", str(tmp_path), "--execute"]) == 0
+    capsys.readouterr()
+
+    assert task_worker_main(["--task-root", str(tmp_path), "--jobs", "2"]) == 0
+
+    output = capsys.readouterr().out
+    assert ".taqt/worktrees/ISSUE-53-01" in output
+    assert ".taqt/worktrees/ISSUE-53-02" in output
+    assert "ISSUE-53: not decomposed enough" not in output
+
+
+def test_task_worker_blocks_not_ready_tasks_when_executing(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=52,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    assert task_worker_main(["--task-root", str(tmp_path), "--execute"]) == 2
+
+    task = load_document(task_path)
+    assert task["status"] == "pending"
+    assert task["phase"] == "triage"
+    assert "missing issue section: DoD" in task["blocked_reason"]
+    assert "not ready" in capsys.readouterr().out
 
 
 def test_git_commit_is_dry_run_by_default(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -428,6 +949,51 @@ def test_git_commit_is_dry_run_by_default(tmp_path: Path, monkeypatch, capsys) -
     output = capsys.readouterr().out
     assert "git add -A" in output
     assert "git commit -m #43 feat(taqt): implement development feedback loop task" in output
+
+
+def test_git_commit_execute_requires_verified_run(tmp_path: Path, monkeypatch, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=46,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    class Completed:
+        returncode = 0
+        stdout = " M file.py\n"
+        stderr = ""
+
+    def fake_run(*_args, **_kwargs):
+        return Completed()
+
+    monkeypatch.setattr("taqt.git_commit.subprocess.run", fake_run)
+
+    assert git_commit_main([str(task_path), "--workspace", str(tmp_path), "--execute", "--allow-branch-mismatch"]) == 2
+
+    assert "without a verified taqt run state" in capsys.readouterr().out
+
+
+def test_github_sync_dry_run_prints_status_phase_and_close_commands(tmp_path: Path, capsys) -> None:
+    task_path, task = create_issue_task(
+        repo="owner/repo",
+        issue_number=47,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+    task["status"] = "done"
+    task["phase"] = "done"
+    task_path.write_text(
+        yaml.safe_dump(task, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    assert github_sync_main([str(task_path), "--sync-labels", "--close-done"]) == 0
+
+    output = capsys.readouterr().out
+    assert "--add-label taqt/status/done" in output
+    assert "--add-label taqt/phase/done" in output
+    assert "gh issue close 47 --repo owner/repo" in output
 
 
 def test_run_report_renders_recent_events() -> None:

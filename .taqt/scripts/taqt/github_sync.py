@@ -5,6 +5,7 @@ import subprocess
 from .task_store import load_task
 
 STATUSES = ("pending", "running", "blocked", "done", "failed")
+PHASES = ("spec", "test", "implement", "observe", "decide", "checker", "review", "human", "done", "failed")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -13,6 +14,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pr-url")
     parser.add_argument("--sync-labels", action="store_true")
     parser.add_argument("--label-prefix", default="taqt/status/")
+    parser.add_argument("--phase-label-prefix", default="taqt/phase/")
+    parser.add_argument("--close-done", action="store_true")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -29,7 +32,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.pr_url:
         body += f"- PR: {args.pr_url}\n"
     body += f"\n<!-- taqt:{task['id']} -->\n"
-    commands = _label_commands(task, args.label_prefix) if args.sync_labels else []
+    commands = _label_commands(task, args.label_prefix, args.phase_label_prefix) if args.sync_labels else []
+    if args.close_done and task["status"] == "done":
+        commands.append(
+            [
+                "gh",
+                "issue",
+                "close",
+                str(source["issue_number"]),
+                "--repo",
+                str(source["repo"]),
+                "--comment",
+                f"Completed by taqt task {task['id']}.",
+            ]
+        )
     if not args.execute:
         print(f"{issue_ref}:")
         print(body)
@@ -48,9 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
 
-def _label_commands(task: dict[str, object], label_prefix: str) -> list[list[str]]:
+def _label_commands(task: dict[str, object], label_prefix: str, phase_label_prefix: str) -> list[list[str]]:
     source = task["source"]
     status = str(task["status"])
+    phase = str(task.get("phase") or status)
     command = [
         "gh",
         "issue",
@@ -60,10 +77,15 @@ def _label_commands(task: dict[str, object], label_prefix: str) -> list[list[str
         str(source["repo"]),
         "--add-label",
         f"{label_prefix}{status}",
+        "--add-label",
+        f"{phase_label_prefix}{phase}",
     ]
     for candidate in STATUSES:
         if candidate != status:
             command.extend(["--remove-label", f"{label_prefix}{candidate}"])
+    for candidate in PHASES:
+        if candidate != phase:
+            command.extend(["--remove-label", f"{phase_label_prefix}{candidate}"])
     return [command]
 
 

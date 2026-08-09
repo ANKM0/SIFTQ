@@ -76,7 +76,8 @@ def validate_write_path(agent: dict[str, Any], path: Path) -> None:
     normalized = path.as_posix()
     for pattern in patterns:
         prefix = str(pattern).removesuffix("**")
-        if normalized.startswith(prefix):
+        directory_prefix = prefix.removesuffix("/")
+        if normalized == directory_prefix or normalized.startswith(prefix):
             return
     raise ValueError(f"path outside agent write scope: {path}")
 
