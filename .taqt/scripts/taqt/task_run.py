@@ -14,6 +14,7 @@ from .task_store import (
     save_task,
     triage_task,
 )
+from .self_improvement import request_self_improvement
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
 
@@ -53,7 +54,17 @@ def main(argv: list[str] | None = None) -> int:
         if errors:
             reason = "; ".join(errors)
             triage_task(task_path, task, reason)
+            request = request_self_improvement(
+                task_path=task_path,
+                task=task,
+                reason=reason,
+                event="readiness_failed",
+                runs_root=args.runs_root,
+                workspace=args.workspace,
+            )
+            save_task(task_path, task)
             print(f"Task {task['id']} is not ready: {reason}")
+            print(f"Self-improvement requested: {request['request_path']}")
             return 2
         errors = decomposition_errors(task, workspace=args.workspace)
         if errors:
@@ -95,6 +106,16 @@ def main(argv: list[str] | None = None) -> int:
         "events_path": str(Path(result["run_dir"]) / "events.jsonl"),
     }
     task["worker"] = {"id": None, "heartbeat_at": None}
+    if task["status"] in {"blocked", "failed"}:
+        request_self_improvement(
+            task_path=task_path,
+            task=task,
+            reason=str(task.get("blocked_reason") or result["status"]),
+            event=f"loop_{result['status']}",
+            runs_root=args.runs_root,
+            workspace=args.workspace,
+            run_dir=Path(result["run_dir"]),
+        )
     save_task(task_path, task)
     print(result["run_dir"])
     return 0 if result["status"] in {"done", "human"} else 1

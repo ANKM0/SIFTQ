@@ -15,6 +15,7 @@ from .task_store import (
     save_task,
     triage_task,
 )
+from .self_improvement import request_self_improvement
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +53,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{task['id']}: not ready: {reason}")
             if args.execute:
                 triage_task(task_path, task, reason)
+                request_self_improvement(
+                    task_path=task_path,
+                    task=task,
+                    reason=reason,
+                    event="readiness_failed",
+                    runs_root=args.runs_root,
+                    workspace=Path("."),
+                )
+                save_task(task_path, task)
             continue
         errors = decomposition_errors(task, workspace=Path("."))
         if errors:
@@ -96,6 +106,14 @@ def main(argv: list[str] | None = None) -> int:
             task["status"] = "failed"
             task["blocked_reason"] = f"git worktree failed with exit code {completed.returncode}"
             task["worker"] = {"id": None, "heartbeat_at": None}
+            request_self_improvement(
+                task_path=task_path,
+                task=task,
+                reason=str(task["blocked_reason"]),
+                event="worktree_failed",
+                runs_root=args.runs_root,
+                workspace=Path("."),
+            )
             save_task(task_path, task)
             continue
         env = dict(os.environ)

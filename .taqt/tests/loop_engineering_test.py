@@ -35,6 +35,7 @@ from taqt.github_pr import main as github_pr_main
 from taqt.github_merge import main as github_merge_main
 from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
+from taqt.task_create import main as task_create_main
 
 
 def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
@@ -50,6 +51,46 @@ def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
     assert task["source"]["type"] == "github_issue"
     assert task["source"]["issue_number"] == 123
     assert load_document(path)["input"]["requirement"] == "docs/requirements/feature.md"
+
+
+def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = json.dumps(
+            {
+                "title": "Add taqt skill",
+                "body": "## AC\n- Works.\n\n## DoD\n- Verified.\n",
+                "labels": [{"name": "enhancement"}],
+            }
+        )
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("taqt.task_create.subprocess.run", fake_run)
+
+    assert task_create_main(
+        [
+            "--repo",
+            "owner/repo",
+            "--issue",
+            "136",
+            "--loop",
+            "development_feedback_loop",
+            "--task-root",
+            str(tmp_path),
+        ]
+    ) == 0
+
+    task = load_document(tmp_path / "ISSUE-136.yaml")
+    assert task["branch_summary"] == "Add taqt skill"
+    assert task["input"]["issue"]["body"].startswith("## AC")
+    assert task["input"]["issue"]["labels"] == ["enhancement"]
+    assert calls[0][0][:3] == ["gh", "issue", "view"]
 
 
 def test_issue_branch_uses_dev_issue_number_and_normalized_loop_purpose(tmp_path: Path) -> None:
@@ -396,6 +437,9 @@ steps:
     assert task["status"] == "blocked"
     assert task["phase"] == "human"
     assert task["blocked_reason"] == "human escalation required"
+    assert task["self_improvement"]["event"] == "loop_human"
+    assert task["self_improvement"]["run_path"]
+    assert Path(task["self_improvement"]["request_path"]).is_file()
 
 
 def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> None:
@@ -576,7 +620,7 @@ Save fails.
     assert readiness_warnings(task, workspace=tmp_path) == ["missing issue section: 再現手順"]
 
 
-def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path) -> None:
+def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=18,
@@ -584,13 +628,27 @@ def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path) 
         task_root=tmp_path,
     )
 
-    exit_code = task_run_main([str(task_path), "--task-root", str(tmp_path), "--workspace", str(tmp_path)])
+    exit_code = task_run_main(
+        [
+            str(task_path),
+            "--task-root",
+            str(tmp_path),
+            "--workspace",
+            str(tmp_path),
+            "--runs-root",
+            str(tmp_path / "runs"),
+        ]
+    )
 
     assert exit_code == 2
     task = load_document(task_path)
     assert task["status"] == "pending"
     assert task["phase"] == "triage"
     assert "missing issue section: AC" in task["blocked_reason"]
+    assert task["self_improvement"]["event"] == "readiness_failed"
+    assert task["self_improvement"]["issue_number"] == 18
+    assert Path(task["self_improvement"]["request_path"]).is_file()
+    assert "Self-improvement requested" in capsys.readouterr().out
 
 
 def test_task_decompose_creates_five_minute_slice_tasks(tmp_path: Path, capsys) -> None:
