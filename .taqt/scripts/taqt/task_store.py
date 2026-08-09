@@ -179,6 +179,9 @@ def upsert_issue_task(
 
 
 def issue_branch(task: dict[str, Any]) -> str:
+    branch = task.get("branch")
+    if isinstance(branch, str) and branch:
+        return branch
     source = task["source"]
     return f"dev/#{source['issue_number']}_{branch_purpose(task)}"
 

@@ -665,6 +665,9 @@ def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> No
     )
 
     assert issue_branch(task) == "dev/#42_add_user"
+    task["branch"] = "issue-42-explicit-branch"
+    assert issue_branch(task) == "issue-42-explicit-branch"
+    task.pop("branch")
     assert git_worktree_main([str(task_path), "--base", "main"]) == 0
     assert git_push_main([str(task_path), "--remote", "origin"]) == 0
     assert github_pr_main([str(task_path), "--base", "main", "--draft"]) == 0

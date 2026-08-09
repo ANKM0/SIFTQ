@@ -69,6 +69,9 @@ def validate_task(task: dict[str, Any]) -> None:
     branch_summary = task.get("branch_summary")
     if branch_summary is not None and not isinstance(branch_summary, str):
         raise ValueError("task.branch_summary must be a string when present")
+    branch = task.get("branch")
+    if branch is not None and not isinstance(branch, str):
+        raise ValueError("task.branch must be a string when present")
 
 
 def _validate_limits(value: Any) -> None:
