@@ -44,6 +44,11 @@ tasks:
     cmds:
       - uv run python -m taqt.github_sync {{.CLI_ARGS}}
 
+  self-improvement:
+    desc: Create a self-improvement request for a taqt task.
+    cmds:
+      - uv run python -m taqt.self_improvement {{.CLI_ARGS}}
+
   worktree:
     desc: Create or print the Issue branch/worktree command for a taqt task.
     cmds:

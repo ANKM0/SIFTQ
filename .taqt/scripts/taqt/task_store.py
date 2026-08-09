@@ -87,6 +87,9 @@ def create_issue_task(
     requirement: str | None = None,
     branch_summary: str | None = None,
     task_id: str | None = None,
+    issue_title: str | None = None,
+    issue_body: str | None = None,
+    issue_labels: list[str] | None = None,
     task_root: Path = DEFAULT_TASK_ROOT,
 ) -> tuple[Path, dict[str, Any]]:
     task_id = task_id or f"ISSUE-{issue_number}"
@@ -117,6 +120,12 @@ def create_issue_task(
         task["branch_summary"] = branch_summary
     if requirement:
         task["input"]["requirement"] = requirement
+    _merge_issue_metadata(
+        task,
+        title=issue_title,
+        body=issue_body,
+        labels=issue_labels,
+    )
     path = task_path(task_id, task_root)
     save_task(path, task)
     return path, task
