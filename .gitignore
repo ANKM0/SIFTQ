@@ -14,13 +14,7 @@ test-results/
 # Rust generated artifacts
 target/
 
-# CoDD generated artifacts
-.codd/scan/
-.codd/reports/
-.codd/extracted/
-.codd/dag.json
-docs/test/verify_report.md
-
-# sympohy local worktrees and run logs
-.sympohy/worktrees/
-.sympohy/runs/
+# taqt local state and run logs
+.taqt/tasks/
+.taqt/runs/
+.taqt/worktrees/

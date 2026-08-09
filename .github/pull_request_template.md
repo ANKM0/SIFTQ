@@ -19,8 +19,6 @@
 
 Matrix browser storage manual smoke evidence (browser storage の永続化に影響する場合は必須):
 
-- Browser-only scope note:
-  - Tauri WebView reload / F5 and `task tauri:dev` app restart persistence checks are not applicable when the change follows ADR 0018. If stale issue history adds those result lines, mark them N/A instead of leaving them pending.
 - Browser reload result:
   - [ ] task title、area、status、order が browser storage から復元される
   - Result / environment / notes:

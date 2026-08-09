@@ -1,0 +1,142 @@
+version: "3"
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install all local development dependencies.
+    deps:
+      - setup:python
+      - setup:frontend
+
+  setup:python:
+    desc: Install Python dependencies with uv.
+    cmds:
+      - uv sync --all-groups
+
+  setup:frontend:
+    desc: Install frontend dependencies with pnpm.
+    cmds:
+      - pnpm install
+
+  setup:frontend:ci:
+    desc: Install frontend dependencies from the lockfile.
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  pytest:
+    desc: Run pytest with optional file targets and additional arguments.
+    cmds:
+      - uv run python -m pytest {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ARGS}} {{.FILES}}{{end}}
+
+  ci:
+    desc: Run the local CI gate.
+    cmds:
+      - task: setup:python
+      - task: ci:commit-messages
+      - task: ci:markdown
+      - task: ci:lint:task-refs
+      - task: ci:lint:codex-task-perms
+
+  ci:commit-messages:
+    desc: Check commit message format for the current branch.
+    cmds:
+      - uv run python scripts/ci/check_commit_messages.py {{.CLI_ARGS}}
+
+  ci:markdown:
+    desc: Check Markdown formatting.
+    cmds:
+      - uv run python scripts/ci/check_markdown.py
+
+  ci:lint:task-refs:
+    desc: Check that CI task references are defined in Taskfile.yml.
+    cmds:
+      - |
+        set -eu
+        refs="$(mktemp)"
+        tasks="$(mktemp)"
+        trap 'rm -f "$refs" "$tasks"' EXIT
+
+        rg '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
+          | sed -E 's/^[[:space:]]*run:[[:space:]]*task[[:space:]]*//; s/[[:space:]].*$//; /^$/d' \
+          | sort -u > "$refs"
+        task --list --json \
+          | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
+          | sort -u > "$tasks"
+
+        missing="$(comm -23 "$refs" "$tasks")"
+        if [ -n "$missing" ]; then
+          printf 'Undefined task references in .github/workflows/ci.yml:\n%s\n' "$missing" >&2
+          exit 1
+        fi
+
+  ci:lint:codex-task-perms:
+    desc: Check that Taskfile tasks are allowed in Codex rules.
+    cmds:
+      - |
+        set -eu
+        tasks="$(mktemp)"
+        allowed="$(mktemp)"
+        trap 'rm -f "$tasks" "$allowed"' EXIT
+
+        task --list --json \
+          | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
+          | sort -u > "$tasks"
+        rg 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
+          | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
+          | sort -u > "$allowed"
+
+        missing="$(comm -23 "$tasks" "$allowed")"
+        if [ -n "$missing" ]; then
+          printf 'Taskfile tasks missing Codex task allow rules:\n%s\n' "$missing" >&2
+          exit 1
+        fi
+
+  ci:typecheck:
+    desc: Run TypeScript typecheck.
+    cmds:
+      - pnpm typecheck
+
+  ci:lint:
+    desc: Run ESLint.
+    cmds:
+      - pnpm lint
+
+  ci:test:
+    desc: Run Vitest and Playwright E2E.
+    cmds:
+      - pnpm exec playwright install chromium
+      - pnpm test
+      - |
+        set -eu
+        browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
+        if [ -z "${browser}" ]; then
+          echo "Playwright Chromium executable was not installed into ${PLAYWRIGHT_BROWSERS_PATH}." >&2
+          exit 1
+        fi
+
+        missing="$(ldd "${browser}" | awk '/not found/ { print $1 }')"
+        if [ -n "${missing}" ]; then
+          echo "Skipping Playwright E2E locally because Chromium is missing shared libraries:" >&2
+          printf '%s\n' "${missing}" >&2
+          echo "Install the Playwright Linux deps and rerun 'task ci:test' to execute E2E locally." >&2
+          if [ "${CI:-}" = "true" ]; then
+            exit 1
+          fi
+          exit 0
+        fi
+
+        pnpm test:e2e
+
+  ci:build:
+    desc: Build the frontend.
+    cmds:
+      - pnpm build
+
+  frontend:dev:
+    desc: Start the Vite development server.
+    cmds:
+      - pnpm dev

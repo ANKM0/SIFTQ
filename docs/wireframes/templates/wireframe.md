@@ -1,32 +1,4 @@
----
-codd:
-  node_id: design:wireframe-template
-  type: design
-  status: draft
-  depends_on:
-  - id: req:repository-governance
-    relation: depends_on
-    semantic: governance
----
-
 # Wireframe Template
-
-## CoDD Frontmatter
-
-Use this frontmatter shape when creating `docs/wireframes/<feature>.md`:
-
-```yaml
----
-codd:
-  node_id: design:<feature-wireframe>
-  type: design
-  status: draft
-  depends_on:
-    - id: design:<feature>
-      relation: depends_on
-      semantic: ui
----
-```
 
 # <Feature> Wireframe
 

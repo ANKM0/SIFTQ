@@ -1,36 +1,38 @@
----
-codd:
-  node_id: design:<short-kebab-title>-adr
-  type: design
-  status: draft
-  depends_on:
-    - id: req:siftq-system
-      relation: depends_on
-      semantic: governance
----
+# ADR <number>: <title>
 
-# ADR <number>: <Title>
+## 目的
+<!-- 解決したい課題はXXX。 -->
 
-## Status
+<目的>
 
-Proposed.
+## 背景
+<!-- 解決する問題の背景やチームの状況などの戦略。 -->
 
-## Context
+<背景>
 
-<Describe the decision background, forces, constraints, and relevant
-alternatives.>
+## 制約事項
+<!-- ライブラリや設計の変更におけるトレードオフやできない事とその理由。 -->
 
-## Decision
+<制約事項>
 
-<State the decision clearly. Include the chosen approach and the main reasons
-for choosing it.>
+## 内容
 
-## Rejected Alternatives
+### 採用した内容
+<!-- 採用した内容とその理由を記載 -->
 
-- <Document a meaningful option that was not selected and the concrete reason it was rejected.>
+- <採用した内容>
+  - <理由>
 
-## Consequences
+### 採用しなかった内容
+<!-- 採用しなかった内容とその理由を記載 -->
 
-- <Document the expected benefits.>
-- <Document the tradeoffs and operational impact.>
-- <Document follow-up work when needed.>
+- <採用しなかった内容>
+  - <理由>
+
+## 影響範囲
+<!-- ADRの決定が及ぼす可能性のある影響範囲。 -->
+
+- <影響範囲>
+
+## 参考リンク
+<!-- ADRに関連する情報や参考にした資料へのリンク。 -->

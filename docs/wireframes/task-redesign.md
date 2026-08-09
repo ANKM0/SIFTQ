@@ -1,24 +1,3 @@
----
-codd:
-  node_id: design:zero-base-task-wireframe-contract
-  type: design
-  status: draft
-  depends_on:
-    - id: design:zero-base-task-wireframe
-      relation: depends_on
-      semantic: ui
-  depended_by:
-    - id: design:task-management-screens
-      relation: depends_on
-      semantic: ui
-    - id: design:task-management-domain
-      relation: depends_on
-      semantic: ui
-    - id: design:task-management-user-story-map
-      relation: depends_on
-      semantic: ux
----
-
 # Zero-base Task Wireframe
 
 ## Target HTML（対象HTML）

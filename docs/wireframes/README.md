@@ -1,18 +1,3 @@
----
-codd:
-  node_id: design:zero-base-task-wireframe
-  type: design
-  status: draft
-  depends_on:
-  - id: req:repository-governance
-    relation: depends_on
-    semantic: governance
-  depended_by:
-  - id: design:zero-base-task-wireframe-contract
-    relation: depends_on
-    semantic: ui
----
-
 # Zero-base Task Wireframes
 
 This directory contains the new low-fidelity wireframes for the zero-base task

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-EXCLUDED_DIRS = {".git", ".venv", ".codd", ".sympohy", "node_modules", "dist"}
+def repository_root() -> Path:
+    for path in Path(__file__).resolve().parents:
+        if (path / "pyproject.toml").is_file() and (path / "package.json").is_file():
+            return path
+    raise RuntimeError("repository root not found")
+
+
+ROOT = repository_root()
+EXCLUDED_DIRS = {".git", ".venv", "node_modules", "dist"}
 
 
 def markdown_files() -> list[Path]:

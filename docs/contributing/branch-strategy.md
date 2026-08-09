@@ -1,77 +1,14 @@
----
-codd:
-  node_id: design:branch-strategy
-  type: design
-  status: draft
-  depends_on:
-  - id: design:branch-strategy-adr
-    relation: depends_on
-    semantic: decision
-  depended_by:
-  - id: design:sympohy-issue-execution
-    relation: depends_on
-    semantic: workflow
----
+# ブランチ
 
-# Branch Strategy
+- 永続ブランチは main のみ。
+- 開発ブランチは issue ごとの dev ブランチとして作成する。
+- dev ブランチは `dev/#{issue番号}_{変更概要}` で命名する。
+  - 例: `dev/#123_add_user`
+- `{変更概要}` は、ブランチの目的が一目でわかる短い英語の説明にする。
+- `{変更概要}` は lower_snake_case で記載する。
+- dev ブランチは main ブランチから作成して main ブランチにマージする。
 
-## Source of Truth
-
-This document is the canonical source for SIFTQ branch strategy rules.
-Issue #103 keeps the durable rule text here so contributors and
-implementation-time agent workflows use the same branch strategy reference.
-
-SIFTQ uses short-lived issue branches created from `main`. Completed work is
-merged back into `main` through pull requests after review and required checks.
-
-## Flow
-
-1. Update `main`.
-2. Create a branch for one GitHub issue.
-3. Implement and commit focused changes on that branch.
-4. Push the branch to `origin`.
-5. Open a pull request targeting `main`.
-6. Merge the pull request after review and checks pass.
-7. Delete the branch after merge unless it is still needed for follow-up work.
-
-## Branch Names
-
-Use this format:
-
-```text
-issue-<issue-number>-<short-kebab-description>
-```
-
-Examples:
-
-```text
-issue-11-branch-strategy-docs-skills
-issue-8-commit-format-docs-skills
-```
-
-## Commands
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c issue-<issue-number>-<short-kebab-description>
-```
-
-After committing:
-
-```bash
-git push -u origin "$(git branch --show-current)"
-```
-
-## Rules
-
-- Do not commit directly to `main` for issue work.
-- Keep one issue's work in one branch unless the issue is split intentionally.
-- Keep branch names lowercase and hyphenated.
-- Use the repository commit message format documented in
-  `docs/contributing/commit-message-format.md`.
-
-## Agent Reference
-
-Implementation-time agents must use this document as the branch strategy
-reference.
+| ブランチ名 | 役割 | 命名規則 |
+| --- | --- | --- |
+| main | メインブランチ | main |
+| dev | issue ごとの開発ブランチ | `dev/#{issue番号}_{変更概要}` |

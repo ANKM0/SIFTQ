@@ -1,4 +1,4 @@
 interface:
   display_name: "Issue Implementation"
-  short_description: "Follow SIFTQ issue implementation workflow."
-  default_prompt: "Use $issue-implementation to implement a SIFTQ issue while following the repository docs."
+  short_description: "Follow SIFTQ branch, commit, and PR docs."
+  default_prompt: "Use $issue-implementation to implement an issue and prepare its commit and PR."

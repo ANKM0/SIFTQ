@@ -5,9 +5,6 @@ SPA built with React, TypeScript, Vite, and dnd-kit. Task state is persisted in
 browser storage so the matrix can be used in a browser without a native app
 shell.
 
-The repository also uses CoDD (Coherence-Driven Development) to keep
-requirements, design notes, implementation, and tests traceable.
-
 ## Setup
 
 Use the `Yoriwake-base` release as the standard WSL development environment:
@@ -80,53 +77,11 @@ task ci:test
 task ci:build
 ```
 
-Common CoDD commands:
+## Loop Engineering
 
-```bash
-task codd:version
-task codd:scan
-task codd:validate
-task codd:dag
-task codd:elicit
-```
-
-## sympohy Issue Automation
-
-SIFTQ uses `sympohy` as repository-local development tooling for GitHub
-Issue-driven work. It replaces the older TAKT/taqt task workflow; those
-references remain only to describe the historical migration.
-Generated worktrees and logs stay under `.sympohy/worktrees/` and `.sympohy/runs/`,
-which are intentionally ignored by Git.
-
-For sympohy-only setup or revalidation, run:
-
-```bash
-task setup:sympohy
-task ai:sympohy:doctor
-```
-
-Common single-issue workflow commands:
-
-```bash
-task ai:sympohy:refine -- '#73'
-task ai:sympohy -- '#73'
-task ai:sympohy:resume -- '#73'
-```
-
-Common migration and watcher commands:
-
-```bash
-task ai:sympohy:labels:sync
-task ai:sympohy:migrate -- --dry-run '#73'
-task ai:sympohy:migrate -- '#73'
-task ai:sympohy:migrate -- --all
-task ai:sympohy:watch
-task ai:sympohy:systemd:install
-task ai:sympohy:systemd:status
-```
-
-See `docs/contributing/issue-execution.md` for setup requirements, label
-semantics, migration notes, and the full task workflow.
+The loop engineering direction is tracked in `docs/design/#134.md`. taqt
+is the main task/workflow owner, while GitHub monitoring and other external
+integrations are script adapters.
 
 ## CI Checks
 
@@ -135,7 +90,6 @@ Run the same local checks before opening or updating a pull request:
 ```bash
 task setup:python
 task setup:frontend:ci
-task ci:sympohy
 task ci
 ```
 
@@ -144,14 +98,5 @@ task ci
 - `src/`: React application source.
 - `tests/`: repository-level tests.
 - `docs/requirements/`: product and system requirements.
-- `docs/design/`: feature-level design documents and design templates.
-- `docs/adr/`: accepted architecture decisions.
-- `.codd/`: local CoDD configuration.
-- `.sympohy/`: sympohy configuration and systemd templates.
-
-## Contributor Docs
-
-- Branch strategy: [docs/contributing/branch-strategy.md](docs/contributing/branch-strategy.md)
-- Commit messages: [docs/contributing/commit-message-format.md](docs/contributing/commit-message-format.md)
-- Issue execution: [docs/contributing/issue-execution.md](docs/contributing/issue-execution.md)
-- MVP spec flow: [docs/contributing/mvp-spec-flow.md](docs/contributing/mvp-spec-flow.md)
+- `docs/wireframes/`: UI wireframes and wireframe templates.
+- `docs/design/`: PR-scoped design docs.
