@@ -140,3 +140,8 @@ tasks:
     desc: Start the Vite development server.
     cmds:
       - pnpm dev
+
+  self-improvement:scan:
+    desc: Scan Codex sessions for recurring improvement candidates; add --execute to create Issues.
+    cmds:
+      - uv run python -m taqt.session_improvement {{.CLI_ARGS}}
