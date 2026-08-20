@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json",
     "docs:flow:svg": "mmdc -i docs/contributing/assets/development-flow.mmd -o docs/contributing/assets/development-flow.svg",
-    "docs:screen-flow:svg": "mmdc -c docs/requirements/assets/screen-flow-mermaid.json -i docs/requirements/assets/screen-flow.mmd -o docs/requirements/assets/screen-flow.svg"
+    "docs:screen-flow:svg": "mmdc -c docs/requirements/assets/screen-flow-mermaid.json -i docs/requirements/assets/screen-flow.mmd -o docs/requirements/assets/screen-flow.svg",
+    "docs:app-architecture:svg": "mmdc -p docs/contributing/assets/app-architecture-puppeteer.json -c docs/contributing/assets/app-architecture-mermaid.json -i docs/contributing/assets/app-architecture.mmd -o docs/contributing/assets/app-architecture.svg"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
