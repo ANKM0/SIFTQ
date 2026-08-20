@@ -1,0 +1,8 @@
+{
+  "minLines": 5,
+  "minTokens": 30,
+  "format": ["typescript", "tsx"],
+  "ignore": ["**/*.d.ts", "**/node_modules/**", "**/dist/**", "**/test/**", "**/tests/**"],
+  "reporters": ["console"],
+  "threshold": 0
+}
