@@ -1,0 +1,65 @@
+%% Lightweight application architecture.
+%% Arrows show use / dependency direction.
+%% Regenerate SVG with: pnpm run docs:app-architecture:svg
+block-beta
+  columns 5
+
+  block:DRIVER_PORT:2
+    columns 2
+    Browser["Browser"] Terminal["Terminal"]
+  end
+  space
+  block:EXTERNAL:2
+    columns 2
+    DB["DB"] SaaS["SaaS"]
+  end
+
+  block:PRESENTATION:2
+    columns 2
+    controller["controller"] cmd["cmd"]
+  end
+  space
+  block:GATEWAY:2
+    columns 2
+    dbAdapter["DB adapter"] saasAdapter["SaaS adapter"]
+  end
+
+  block:USECASE_LAYER:5
+    columns 5
+    space usecase["usecase"] space repository["repository"] space
+  end
+
+  block:DOMAIN:5
+    columns 5
+    space:2 entity["entity"] space:2
+  end
+
+  Browser --> controller
+  Terminal --> cmd
+  controller --> usecase
+  cmd --> usecase
+  usecase --> repository
+  usecase --> entity
+  repository --> entity
+  repository --> dbAdapter
+  repository --> saasAdapter
+  dbAdapter --> DB
+  saasAdapter --> SaaS
+
+  style Browser fill:#ffffff,stroke:#777,color:#666;
+  style Terminal fill:#ffffff,stroke:#777,color:#666;
+  style DB fill:#ffffff,stroke:#777,color:#666;
+  style SaaS fill:#ffffff,stroke:#777,color:#666;
+  style controller fill:#b6d7a8,stroke:#6f8f66,color:#4d6847;
+  style cmd fill:#b6d7a8,stroke:#6f8f66,color:#4d6847;
+  style dbAdapter fill:#b6d7a8,stroke:#6f8f66,color:#4d6847;
+  style saasAdapter fill:#b6d7a8,stroke:#6f8f66,color:#4d6847;
+  style usecase fill:#ea9999,stroke:#9f5454,color:#6b3a3a;
+  style repository fill:#ea9999,stroke:#9f5454,color:#6b3a3a;
+  style entity fill:#ffe599,stroke:#ad8b2f,color:#6f5b22;
+  style DRIVER_PORT fill:#f2f2f2,stroke:#f2f2f2,color:#666;
+  style EXTERNAL fill:#f2f2f2,stroke:#f2f2f2,color:#666;
+  style PRESENTATION fill:#d9ead3,stroke:#d9ead3,color:#666;
+  style GATEWAY fill:#d9ead3,stroke:#d9ead3,color:#666;
+  style USECASE_LAYER fill:#f4cccc,stroke:#f4cccc,color:#666;
+  style DOMAIN fill:#fff2cc,stroke:#fff2cc,color:#666;
