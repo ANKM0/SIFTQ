@@ -32,11 +32,10 @@
 ### 制約事項
 <!-- ライブラリや設計の変更におけるトレードオフやできない事とその理由。 -->
 
-- MVP では CUI、Cloudflare/TanStack、同期、API を実装しない。
-- 保存形式は未決だが、MVP では browser storage を具体実装として使う。
+- CUI は実装しない。task データの正本は ADR 0007 に従い Cloudflare D1 とし、Worker を経由して操作する。
 - 将来差し替えを見越した repository interface や storage adapter は先に作らない。
 - 実装速度を落とす過剰な層分割は避ける。
-- Cloudflare/TanStack 採用延期の判断は ADR 0005 の責務である。
+- D1 を正本とする判断は ADR 0007 の責務である。
 
 ## 参考リンク
 <!-- ADRに関連する情報や参考にした資料へのリンク。 -->
@@ -45,3 +44,4 @@
 - [Task Management 要求分析](../requirements/requirements-analysis.md)
 - [小規模から成長させるアプリケーションアーキテクチャ](https://note.com/suwash/n/n869c06c749e6)
 - [ADR 0005: 個人向け自動同期まで Cloudflare/TanStack 採用を延期する](0005-defer-cloudflare-tanstack-until-personal-sync.md)
+- [ADR 0007: Cloudflare D1 を唯一の正本 DB として採用する](0007-adopt-cloudflare-d1-as-system-of-record.md)
