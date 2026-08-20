@@ -41,4 +41,25 @@ Docker build fails on Apple Silicon due to platform mismatch
 ...
 ```
 
+## [LRN-20260820-001] correction
+
+**Logged**: 2026-08-20T22:49:00+09:00
+**Priority**: medium
+**Status**: pending
+**Area**: repo
+
+### Summary
+反復する失敗への昇格先である「task」は GitHub Task ではなく Taskfile の `task` コマンドを指す。
+
+### Details
+セッションログから反復するコマンド失敗を検出した場合、再現可能な操作を `Taskfile.yml` / `taskfile/` に Task として集約する。GitHub Issue や taqt task の作成を意味すると解釈しない。
+
+### Suggested Action
+自己改善の集計・昇格ルールでは、反復失敗を `task <name>` にする候補として扱う。Taskfile に追加した場合は、既存の `ci:lint:task-refs` と `ci:lint:codex-task-perms` を通す。
+
+### Metadata
+- Source: user_feedback
+- Related Files: Taskfile.yml, taskfile/core.yml, .agents/skills/self-improvement/SKILL.md
+- Tags: taskfile, recurring-failure, command
+
 ---
