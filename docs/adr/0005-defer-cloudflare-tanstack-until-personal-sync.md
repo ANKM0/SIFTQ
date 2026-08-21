@@ -1,5 +1,7 @@
 # ADR 0005: 個人向け自動同期まで Cloudflare/TanStack 採用を延期する
 
+> Status: Superseded by [ADR 0007](0007-adopt-cloudflare-d1-as-system-of-record.md).
+
 ## 決定
 <!-- 決定事項、採用した内容とその理由を記載 -->
 

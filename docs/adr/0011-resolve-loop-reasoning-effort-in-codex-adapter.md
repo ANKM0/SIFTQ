@@ -1,4 +1,4 @@
-# ADR 0007: Resolve loop reasoning effort in Codex adapter
+# ADR 0011: Resolve loop reasoning effort in Codex adapter
 
 ## 目的
 <!-- 解決したい課題はXXX。 -->

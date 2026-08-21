@@ -38,17 +38,8 @@ jobs:
         with:
           node-version: 26
 
-      - name: Install Python dependencies
-        run: task setup:python
-
       - name: Check commit messages
         run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.event.pull_request.head.sha || github.sha }}"
 
-      - name: Check Markdown
-        run: task ci:markdown
-
-      - name: Check CI task references
-        run: task ci:lint:task-refs
-
-      - name: Check Codex task permissions
-        run: task ci:lint:codex-task-perms
+      - name: Run CI gate
+        run: task ci

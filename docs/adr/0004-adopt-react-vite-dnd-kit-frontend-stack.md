@@ -1,5 +1,7 @@
 # ADR 0004: フロントエンドスタックとして React / Vite / dnd-kit を採用する
 
+> Superseded by [ADR 0009](0009-adopt-hono-htmx-html-driven-ui.md).
+
 ## 決定
 <!-- 決定事項、採用した内容とその理由を記載 -->
 
