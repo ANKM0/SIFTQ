@@ -4,10 +4,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .github_labels import enabled_error
 from .task_store import (
     DEFAULT_TASK_ROOT,
     PRIORITY_ORDER,
     decomposition_errors,
+    block_task,
     issue_branch,
     list_tasks,
     readiness_errors,
@@ -47,6 +49,12 @@ def main(argv: list[str] | None = None) -> int:
     for task_path, task in selected:
         worker_id = f"{args.worker_id}-{task['id']}"
         worktree = args.worktree_root / str(task["id"])
+        if args.execute:
+            label_error = enabled_error(task)
+            if label_error:
+                print(f"{task['id']}: {label_error}")
+                block_task(task_path, task, label_error)
+                continue
         errors = readiness_errors(task, workspace=Path("."))
         if errors:
             reason = "; ".join(errors)
