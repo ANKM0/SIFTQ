@@ -222,12 +222,87 @@ def _write_design_decision_artifact(
 ) -> str:
     artifact = run_dir / "artifacts" / "design-decision.md"
     artifact.parent.mkdir(parents=True, exist_ok=True)
+    problem = _artifact_value(
+        response,
+        ("problem", "issue", "challenge"),
+        "未記載",
+    )
+    constraints = _artifact_value(
+        response,
+        ("constraints", "constraint"),
+        "未記載",
+    )
+    selected_option = _artifact_value(
+        response,
+        ("selected_option", "adopted_option", "decision", "summary"),
+        "未記載",
+    )
+    rationale = _artifact_value(
+        response,
+        ("rationale", "reason", "decision_rationale"),
+        "未記載",
+    )
+    rejected_options = _artifact_value(
+        response,
+        ("rejected_options", "rejected_option", "alternatives_rejected"),
+        "未記載",
+    )
+    rejected_rationale = _artifact_value(
+        response,
+        ("rejected_rationale", "rejection_reason", "rejected_reasons"),
+        "未記載",
+    )
+    impact_scope = _artifact_value(
+        response,
+        ("impact_scope", "impact", "scope"),
+        "未記載",
+    )
+    validation_result = _artifact_value(
+        response,
+        ("validation_result", "validation", "verification", "tests"),
+        "未記載",
+    )
+    open_items = _artifact_value(
+        response,
+        ("open_items", "unresolved", "open_questions"),
+        "なし",
+    )
+    human_escalation = _artifact_value(
+        response,
+        ("human_escalation", "escalation", "escalate_to_human"),
+        "なし",
+    )
     content = "\n".join(
         [
             "# Design decision",
             "",
             f"- task: `{task.get('id')}`",
             f"- step: `{step.get('id')}`",
+            "",
+            "## 課題・制約",
+            "",
+            f"- 課題: {problem}",
+            f"- 制約: {constraints}",
+            "",
+            "## 採用案と理由",
+            "",
+            f"- 採用案: {selected_option}",
+            f"- 理由: {rationale}",
+            "",
+            "## 却下案と理由",
+            "",
+            f"- 却下案: {rejected_options}",
+            f"- 理由: {rejected_rationale}",
+            "",
+            "## 影響範囲・検証結果",
+            "",
+            f"- 影響範囲: {impact_scope}",
+            f"- 検証結果: {validation_result}",
+            "",
+            "## 未決事項または人間へのエスカレーション",
+            "",
+            f"- 未決事項: {open_items}",
+            f"- 人間へのエスカレーション: {human_escalation}",
             "",
             "## Agent response",
             "",
@@ -239,6 +314,21 @@ def _write_design_decision_artifact(
     )
     artifact.write_text(content, encoding="utf-8")
     return "artifacts/design-decision.md"
+
+
+def _artifact_value(
+    response: dict[str, Any],
+    keys: tuple[str, ...],
+    default: str,
+) -> str:
+    for key in keys:
+        value = response.get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return default
 
 
 if __name__ == "__main__":

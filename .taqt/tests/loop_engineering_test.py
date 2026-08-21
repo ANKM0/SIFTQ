@@ -11,7 +11,7 @@ from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
 from loop.llm import run_agent
 from loop.observe import run_commands
-from loop.runner import run_loop
+from loop.runner import _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
@@ -239,8 +239,41 @@ input: {}
 
     artifact = Path(result["run_dir"]) / "artifacts" / "design-decision.md"
     assert result["status"] == "done"
-    assert artifact.read_text(encoding="utf-8")
-    assert "Use the run artifact" in artifact.read_text(encoding="utf-8")
+    content = artifact.read_text(encoding="utf-8")
+    assert content
+    assert "Use the run artifact" in content
+    assert "## 課題・制約" in content
+    assert "## 採用案と理由" in content
+    assert "## 却下案と理由" in content
+    assert "## 影響範囲・検証結果" in content
+    assert "## 未決事項または人間へのエスカレーション" in content
+
+
+def test_design_decision_artifact_renders_structured_response_fields(tmp_path: Path) -> None:
+    _write_design_decision_artifact(
+        tmp_path,
+        task={"id": "ISSUE-166-02"},
+        step={"id": "design"},
+        response={
+            "problem": "Missing decision structure",
+            "constraints": "Keep the run self-contained",
+            "selected_option": "Use Markdown sections",
+            "rationale": "Readable in reports",
+            "rejected_options": ["Only JSON"],
+            "rejected_rationale": "Harder to review",
+            "impact_scope": "Run artifacts",
+            "validation_result": "Integration test",
+            "open_items": "None",
+            "human_escalation": "None",
+        },
+    )
+
+    content = (tmp_path / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
+    assert "Missing decision structure" in content
+    assert "Use Markdown sections" in content
+    assert "Only JSON" in content
+    assert "Integration test" in content
+    assert "None" in content
 
 
 def test_loop_schema_rejects_unknown_step_reference() -> None:
