@@ -15,6 +15,13 @@
 - 検証コマンドの正は Taskfile、CI、hook に置く。
 - 変更範囲に対して最小の意味ある検証を実行する。
 
+## AI 実装の品質
+
+- `any`、non-null assertion、型アサーション、lint 無効化で型・lint の失敗を回避しない。設計または型ガードで直す。
+- 例外は設定ファイルに対象を限定し、理由と削除条件を記す。インラインの無効化コメントは追加しない。
+- ロジックを追加・変更したら、同時にテストを追加・更新する。入出力規則は副作用から分離し、pure 関数としてテスト可能にする。
+- 新しい共通 helper を作る前に既存実装を検索し、知識の重複を作らない。
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

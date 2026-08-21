@@ -36,10 +36,16 @@ tasks:
     desc: Run the local CI gate.
     cmds:
       - task: setup:python
-      - task: ci:commit-messages
+      - task: setup:frontend:ci
       - task: ci:markdown
       - task: ci:lint:task-refs
       - task: ci:lint:codex-task-perms
+      - task: ci:lint
+      - task: ci:typecheck
+      - task: ci:test
+      - task: ci:build
+      - task: ci:duplicate
+      - task: ci:dead-code
 
   ci:commit-messages:
     desc: Check commit message format for the current branch.
@@ -98,7 +104,12 @@ tasks:
   ci:typecheck:
     desc: Run TypeScript typecheck.
     cmds:
-      - pnpm typecheck
+      - |
+        if [ ! -d src ]; then
+          echo "Skipping TypeScript typecheck: src/ does not exist yet."
+          exit 0
+        fi
+        pnpm typecheck
 
   ci:lint:
     desc: Run ESLint.
@@ -108,9 +119,13 @@ tasks:
   ci:test:
     desc: Run Vitest and Playwright E2E.
     cmds:
-      - pnpm exec playwright install chromium
-      - pnpm test
       - |
+        if [ ! -d src ]; then
+          echo "Skipping frontend tests: src/ does not exist yet."
+          exit 0
+        fi
+        pnpm exec playwright install chromium
+        pnpm test
         set -eu
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
@@ -134,9 +149,39 @@ tasks:
   ci:build:
     desc: Build the frontend.
     cmds:
-      - pnpm build
+      - |
+        if [ ! -f src/main.tsx ]; then
+          echo "Skipping frontend build: src/main.tsx does not exist yet."
+          exit 0
+        fi
+        pnpm build
+
+  ci:duplicate:
+    desc: Reject duplicated production TypeScript code.
+    cmds:
+      - |
+        if [ ! -d src ]; then
+          echo "Skipping duplication scan: src/ does not exist yet."
+          exit 0
+        fi
+        pnpm exec jscpd src --config .jscpd.json
+
+  ci:dead-code:
+    desc: Reject unused frontend exports, files, and types.
+    cmds:
+      - |
+        if [ ! -d src ]; then
+          echo "Skipping dead-code scan: src/ does not exist yet."
+          exit 0
+        fi
+        pnpm exec knip --config knip.json
 
   frontend:dev:
     desc: Start the Vite development server.
     cmds:
       - pnpm dev
+
+  self-improvement:scan:
+    desc: Scan Codex sessions for recurring improvement candidates; add --execute to create Issues.
+    cmds:
+      - uv run python -m taqt.session_improvement {{.CLI_ARGS}}
