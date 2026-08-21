@@ -3,7 +3,7 @@
 ## 決定
 
 - task データの唯一の正本 DB として Cloudflare D1 を採用する。
-- クライアントから D1 を直接操作せず、`React SPA -> Cloudflare Worker -> D1` の経路にする。
+- クライアントから D1 を直接操作せず、`Browser -> Cloudflare Worker (Hono) -> D1` の経路にする。
 - SQLite WASM + OPFS は正本に採用しない。オフライン利用が必要になった場合だけ、ローカルキャッシュとして再評価する。
 - Read Replication は、計測で読み取りのレイテンシまたはスループットが課題になった時点で有効化する。利用時は Sessions API を必須とし、更新直後に最新状態が必要な読み取りは primary を使う。
 
@@ -32,8 +32,10 @@
 
 - D1 の更新は primary に集約される。Read Replication は読み取りだけを高速化する。
 - 認証、schema、API、オフライン時の振る舞いは後続の Design Doc で決定する。
+- UI の構成は [ADR 0009](0009-adopt-hono-htmx-html-driven-ui.md) に従う。
 
 ## 参考リンク
 
 - [Cloudflare D1 overview](https://developers.cloudflare.com/d1/)
 - [Cloudflare D1 global read replication](https://developers.cloudflare.com/d1/best-practices/read-replication/)
+- [ADR 0009: Hono / HTMX による HTML 駆動 UI を採用する](0009-adopt-hono-htmx-html-driven-ui.md)
