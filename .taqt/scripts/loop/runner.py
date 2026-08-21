@@ -1,4 +1,5 @@
 import argparse
+import json
 import shutil
 from pathlib import Path
 from typing import Any
@@ -178,6 +179,20 @@ def _run_step(
         except ValueError as error:
             response["status"] = "failure"
             response["guard_error"] = str(error)
+        if response["status"] == "success" and _is_design_step(step, agent_id, agent):
+            try:
+                artifact_path = _write_design_decision_artifact(
+                    run_dir,
+                    task=task,
+                    step=step,
+                    response=response,
+                )
+            except OSError as error:
+                response["status"] = "failure"
+                response["feedback"] = "implementation_feedback"
+                response["artifact_error"] = str(error)
+            else:
+                response["artifact_path"] = artifact_path
         append_event(run_dir, {"type": "agent_response", "step": step["id"], "response": response})
         if response["status"] != "success":
             state["last_feedback"] = response.get("feedback") or "unknown"
@@ -188,6 +203,42 @@ def _run_step(
         return step["id"]
 
     raise ValueError(f"unsupported step kind: {kind}")
+
+
+def _is_design_step(step: dict[str, Any], agent_id: object, agent: dict[str, Any]) -> bool:
+    return (
+        step.get("id") == "design"
+        or agent_id == "design"
+        or agent.get("role") == "design"
+    )
+
+
+def _write_design_decision_artifact(
+    run_dir: Path,
+    *,
+    task: dict[str, Any],
+    step: dict[str, Any],
+    response: dict[str, Any],
+) -> str:
+    artifact = run_dir / "artifacts" / "design-decision.md"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    content = "\n".join(
+        [
+            "# Design decision",
+            "",
+            f"- task: `{task.get('id')}`",
+            f"- step: `{step.get('id')}`",
+            "",
+            "## Agent response",
+            "",
+            "```json",
+            json.dumps(response, ensure_ascii=False, indent=2, sort_keys=True),
+            "```",
+            "",
+        ]
+    )
+    artifact.write_text(content, encoding="utf-8")
+    return "artifacts/design-decision.md"
 
 
 if __name__ == "__main__":

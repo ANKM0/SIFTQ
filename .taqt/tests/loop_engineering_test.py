@@ -191,6 +191,58 @@ blocked_reason: null
     assert state["status"] == "done"
 
 
+def test_loop_runner_writes_design_decision_artifact_after_success(tmp_path: Path) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    runs_root = tmp_path / "runs"
+    loop_path.write_text(
+        """
+version: 1
+id: design-artifact
+agents:
+  design:
+    role: design
+steps:
+  - id: design
+    kind: llm
+    agent: design
+    command: >-
+      python -c 'import json; print(json.dumps({"status": "success", "summary": "Use the run artifact"}))'
+    next: done
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-166-01
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 166
+status: pending
+phase: spec
+priority: high
+loop: design-artifact
+input: {}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root,
+    )
+
+    artifact = Path(result["run_dir"]) / "artifacts" / "design-decision.md"
+    assert result["status"] == "done"
+    assert artifact.read_text(encoding="utf-8")
+    assert "Use the run artifact" in artifact.read_text(encoding="utf-8")
+
+
 def test_loop_schema_rejects_unknown_step_reference() -> None:
     try:
         validate_loop_definition(
