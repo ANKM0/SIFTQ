@@ -124,8 +124,12 @@ tasks:
           echo "Skipping frontend tests: src/ does not exist yet."
           exit 0
         fi
-        pnpm exec playwright install chromium
         pnpm test
+        if ! find tests/e2e -type f -print -quit 2>/dev/null | grep -q .; then
+          echo "Skipping Playwright E2E: no test files found."
+          exit 0
+        fi
+        pnpm exec playwright install chromium
         set -eu
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
