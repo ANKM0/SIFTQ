@@ -5,6 +5,9 @@ from typing import Any
 import yaml
 
 
+REASONING_EFFORTS = {"none", "low", "medium", "high", "xhigh", "max"}
+
+
 def load_document(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() == ".json":
@@ -103,6 +106,7 @@ def _validate_agents(value: Any) -> set[str]:
         for key in ("adapter", "model", "profile", "sandbox", "approval"):
             if key in agent and not isinstance(agent[key], str):
                 raise ValueError(f"agent {agent_id}.{key} must be a string")
+        _validate_reasoning_effort(agent, f"agent {agent_id}")
         writes = agent.get("writes")
         if writes is not None and (
             not isinstance(writes, list)
@@ -146,10 +150,21 @@ def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: se
         for key in ("adapter", "model", "profile", "sandbox", "approval"):
             if key in step and not isinstance(step[key], str):
                 raise ValueError(f"llm step {step_id}.{key} must be a string")
+        _validate_reasoning_effort(step, f"llm step {step_id}")
         for key in ("next", "on_pass", "on_failure"):
             if key in step:
                 _validate_step_ref(step, key, step_ids)
         return
+
+
+def _validate_reasoning_effort(payload: dict[str, Any], subject: str) -> None:
+    if "reasoning_effort" not in payload:
+        return
+    value = payload["reasoning_effort"]
+    if not isinstance(value, str):
+        raise ValueError(f"{subject}.reasoning_effort must be a string")
+    if value not in REASONING_EFFORTS:
+        raise ValueError(f"{subject}.reasoning_effort is invalid: {value}")
 
 
 def _validate_step_ref(payload: dict[str, Any], key: str, step_ids: set[str]) -> None:
