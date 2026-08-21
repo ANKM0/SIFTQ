@@ -10,3 +10,4 @@
 | [ADR 0004: フロントエンドスタックとして React / Vite / dnd-kit を採用する](0004-adopt-react-vite-dnd-kit-frontend-stack.md) | Accepted. | フロントエンドは React、build/dev server は Vite、drag and drop は dnd-kit を使う。 |
 | [ADR 0005: 個人向け自動同期まで Cloudflare/TanStack 採用を延期する](0005-defer-cloudflare-tanstack-until-personal-sync.md) | Accepted. | Cloudflare/TanStack は MVP では採用せず、個人向け自動同期が必要になった時点で再評価する。 |
 | [ADR 0006: アーキテクチャとして、軽量アプリケーションアーキテクチャを採用する](0006-adopt-lightweight-application-architecture.md) | Accepted. | Task Management MVP は domain rule と入出力を分離しつつ、MVP では repository interface や storage adapter を先に作らない。 |
+| [ADR 0007: Resolve loop reasoning effort in Codex adapter](0007-resolve-loop-reasoning-effort-in-codex-adapter.md) | Accepted. | reasoning effort は step、agent、環境変数の順で解決し、指定時だけ Codex の config override に渡す。 |

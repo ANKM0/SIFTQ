@@ -11,6 +11,7 @@ from loop.observe import run_commands
 from loop.runner import run_loop
 from loop.llm import run_agent
 from loop.guard import validate_write_path
+from loop.context import build_context
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
@@ -214,6 +215,155 @@ def test_loop_schema_rejects_unknown_step_reference() -> None:
         raise AssertionError("expected schema validation failure")
 
 
+def test_loop_schema_allows_model_and_reasoning_effort_for_agents_and_llm_steps(
+    tmp_path: Path,
+) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: configured-agent
+agents:
+  implement:
+    role: implementation
+    adapter: codex
+    model: gpt-5.6-luna
+    reasoning_effort: xhigh
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    model: gpt-5.6-sol
+    reasoning_effort: high
+    next: done
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+
+    loop = load_document(loop_path)
+    validate_loop_definition(loop)
+
+    assert loop["agents"]["implement"]["model"] == "gpt-5.6-luna"
+    assert loop["agents"]["implement"]["reasoning_effort"] == "xhigh"
+    assert loop["steps"][0]["model"] == "gpt-5.6-sol"
+    assert loop["steps"][0]["reasoning_effort"] == "high"
+
+
+def test_development_feedback_loop_uses_luna_workers_and_sol_checker() -> None:
+    loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop.yaml"
+
+    agents = load_document(loop_path)["agents"]
+
+    assert agents["design"]["model"] == "gpt-5.6-luna"
+    assert agents["design"]["reasoning_effort"] == "xhigh"
+    assert agents["test"]["model"] == "gpt-5.6-luna"
+    assert agents["test"]["reasoning_effort"] == "xhigh"
+    assert agents["implement"]["model"] == "gpt-5.6-luna"
+    assert agents["implement"]["reasoning_effort"] == "max"
+    assert agents["checker"]["model"] == "gpt-5.6-sol"
+    assert agents["checker"]["reasoning_effort"] == "high"
+
+
+def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps() -> None:
+    invalid_agent = {
+        "version": 1,
+        "id": "invalid-agent-effort",
+        "agents": {
+            "implement": {
+                "adapter": "codex",
+                "reasoning_effort": "fast",
+            }
+        },
+        "steps": [{"id": "done", "kind": "terminal"}],
+    }
+    invalid_step = {
+        "version": 1,
+        "id": "invalid-step-effort",
+        "steps": [
+            {
+                "id": "implement",
+                "kind": "llm",
+                "reasoning_effort": "fast",
+                "next": "done",
+            },
+            {"id": "done", "kind": "terminal"},
+        ],
+    }
+    invalid_agent_type = {
+        "version": 1,
+        "id": "invalid-agent-effort-type",
+        "agents": {
+            "implement": {
+                "adapter": "codex",
+                "reasoning_effort": 1,
+            }
+        },
+        "steps": [{"id": "done", "kind": "terminal"}],
+    }
+    invalid_step_type = {
+        "version": 1,
+        "id": "invalid-step-effort-type",
+        "steps": [
+            {
+                "id": "implement",
+                "kind": "llm",
+                "reasoning_effort": ["high"],
+                "next": "done",
+            },
+            {"id": "done", "kind": "terminal"},
+        ],
+    }
+    invalid_agent_null = {
+        "version": 1,
+        "id": "invalid-agent-effort-null",
+        "agents": {"implement": {"adapter": "codex", "reasoning_effort": None}},
+        "steps": [{"id": "done", "kind": "terminal"}],
+    }
+    invalid_step_null = {
+        "version": 1,
+        "id": "invalid-step-effort-null",
+        "steps": [
+            {"id": "implement", "kind": "llm", "reasoning_effort": None, "next": "done"},
+            {"id": "done", "kind": "terminal"},
+        ],
+    }
+
+    for loop, expected_message in (
+        (invalid_agent, "reasoning_effort is invalid: fast"),
+        (invalid_step, "reasoning_effort is invalid: fast"),
+        (invalid_agent_type, "reasoning_effort must be a string"),
+        (invalid_step_type, "reasoning_effort must be a string"),
+        (invalid_agent_null, "reasoning_effort must be a string"),
+        (invalid_step_null, "reasoning_effort must be a string"),
+    ):
+        try:
+            validate_loop_definition(loop)
+        except ValueError as error:
+            assert expected_message in str(error)
+        else:
+            raise AssertionError("expected schema validation failure")
+
+
+def test_context_truncates_large_agent_events(tmp_path: Path) -> None:
+    context = build_context(
+        task={"id": "ISSUE-1", "input": {}},
+        step={"id": "test"},
+        events=[
+            {
+                "type": "agent_response",
+                "response": {"stderr": "x" * 2_000_000, "status": "failure"},
+            }
+        ],
+        workspace=tmp_path,
+    )
+
+    event = context["recent_events"][0]
+    assert event["response"]["status"] == "failure"
+    assert len(event["response"]["stderr"]) == 2_001
+
+
 def test_loop_guard_blocks_readonly_agent_workspace_changes(tmp_path: Path) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
@@ -327,6 +477,85 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert "--sandbox" in command
     assert "--ask-for-approval" not in command
     assert kwargs["input"].startswith("Role: implementation")
+
+
+def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return Completed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+    monkeypatch.setenv("LOOP_CODEX_REASONING_EFFORT", "low")
+
+    cases = [
+        ({"reasoning_effort": "high"}, {"reasoning_effort": "xhigh"}, "high"),
+        ({}, {"reasoning_effort": "xhigh"}, "xhigh"),
+        ({}, {}, "low"),
+    ]
+    for step_overrides, agent_overrides, expected_effort in cases:
+        run_agent(
+            loop_definition={
+                "agents": {
+                    "implement": {
+                        "role": "implementation",
+                        "adapter": "codex",
+                        **agent_overrides,
+                    }
+                }
+            },
+            task={"id": "ISSUE-1"},
+            step={"id": "implement", "agent": "implement", **step_overrides},
+            context={},
+            cwd=tmp_path,
+        )
+        command = calls[-1]
+        assert command[command.index("-c") + 1] == f"model_reasoning_effort={expected_effort}"
+
+
+def test_codex_agent_adapter_uses_codex_default_reasoning_effort_when_unspecified(
+    tmp_path: Path, monkeypatch
+) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return Completed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+    monkeypatch.delenv("LOOP_CODEX_REASONING_EFFORT", raising=False)
+    monkeypatch.delenv("LOOP_CODEX_EXTRA_ARGS", raising=False)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "codex",
+                }
+            }
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={},
+        cwd=tmp_path,
+    )
+
+    assert response["status"] == "success"
+    command = calls[0]
+    assert "-c" not in command
+    assert not any(argument.startswith("model_reasoning_effort=") for argument in command)
 
 
 def test_policy_respects_max_fix_attempts(tmp_path: Path) -> None:
