@@ -1,6 +1,12 @@
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
+
+
+MAX_RECENT_EVENTS = 10
+MAX_EVENT_CHARS = 12000
+MAX_EVENT_STRING_CHARS = 2000
 
 
 def build_context(
@@ -22,7 +28,7 @@ def build_context(
     return {
         "task": task,
         "step": step,
-        "recent_events": events[-10:],
+        "recent_events": [_compact_event(event) for event in events[-MAX_RECENT_EVENTS:]],
         "files": files,
         "repository": _repository_context(workspace),
         "artifacts": _artifact_context(workspace),
@@ -62,3 +68,26 @@ def _run_git(command: list[str], cwd: Path, *, limit: int) -> str:
     if completed.returncode != 0:
         return completed.stderr[:limit]
     return completed.stdout[:limit]
+
+
+def _compact_event(event: dict[str, Any]) -> dict[str, Any]:
+    compacted = _truncate_strings(event)
+    serialized = json.dumps(compacted, ensure_ascii=False, sort_keys=True)
+    if len(serialized) <= MAX_EVENT_CHARS:
+        return compacted
+    return {
+        "type": event.get("type"),
+        "step": event.get("step"),
+        "created_at": event.get("created_at"),
+        "summary": serialized[:MAX_EVENT_CHARS] + "…",
+    }
+
+
+def _truncate_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return value[:MAX_EVENT_STRING_CHARS] + ("…" if len(value) > MAX_EVENT_STRING_CHARS else "")
+    if isinstance(value, list):
+        return [_truncate_strings(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _truncate_strings(item) for key, item in value.items()}
+    return value
