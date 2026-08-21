@@ -7,9 +7,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
+from loop.llm import run_agent
 from loop.observe import run_commands
 from loop.runner import run_loop
-from loop.llm import run_agent
 from loop.guard import validate_write_path
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
@@ -310,6 +311,7 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
                 "implement": {
                     "role": "implementation",
                     "adapter": "codex",
+                    "reasoning_effort": "high",
                 }
             }
         },
@@ -325,8 +327,27 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert "--cd" in command
     assert command[command.index("--cd") + 1] == str(tmp_path.resolve())
     assert "--sandbox" in command
+    assert command[command.index("-c") + 1] == "model_reasoning_effort=high"
     assert "--ask-for-approval" not in command
     assert kwargs["input"].startswith("Role: implementation")
+
+
+def test_build_context_compacts_large_events(tmp_path: Path) -> None:
+    event = {
+        "type": "agent_response",
+        "step": "implement",
+        "created_at": "2026-08-22T00:00:00Z",
+        "message": "x" * (MAX_EVENT_STRING_CHARS + 1),
+        "details": {str(index): "y" * MAX_EVENT_STRING_CHARS for index in range(7)},
+    }
+
+    context = build_context(task={}, step={}, events=[event], workspace=tmp_path)
+
+    compacted = context["recent_events"][0]
+    assert compacted["type"] == "agent_response"
+    assert compacted["step"] == "implement"
+    assert len(compacted["summary"]) <= MAX_EVENT_CHARS + 1
+    assert compacted["summary"].endswith("…")
 
 
 def test_policy_respects_max_fix_attempts(tmp_path: Path) -> None:

@@ -91,6 +91,13 @@ def _run_codex(
     model = step.get("model") or agent.get("model") or os.environ.get("LOOP_CODEX_MODEL")
     if model:
         command.extend(["--model", str(model)])
+    reasoning_effort = (
+        step.get("reasoning_effort")
+        or agent.get("reasoning_effort")
+        or os.environ.get("LOOP_CODEX_REASONING_EFFORT")
+    )
+    if reasoning_effort:
+        command.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
     profile = step.get("profile") or agent.get("profile") or os.environ.get("LOOP_CODEX_PROFILE")
     if profile:
         command.extend(["--profile", str(profile)])

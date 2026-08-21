@@ -9,7 +9,10 @@ agents:
   design:
     role: design
     adapter: codex
+    model: gpt-5.6-luna
+    reasoning_effort: xhigh
     writes:
+      - .taqt/loops/
       - docs/requirements/
       - docs/design/
       - docs/wireframes/
@@ -18,14 +21,21 @@ agents:
   test:
     role: test_author
     adapter: codex
+    model: gpt-5.6-luna
+    reasoning_effort: xhigh
     writes:
       - tests/
+      - .taqt/tests/
   implement:
     role: implementation
     adapter: codex
+    model: gpt-5.6-luna
+    reasoning_effort: max
   checker:
     role: checker
     adapter: codex
+    model: gpt-5.6-sol
+    reasoning_effort: high
     readonly: true
 
 steps:
