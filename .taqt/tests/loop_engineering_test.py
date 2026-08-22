@@ -403,6 +403,66 @@ def test_development_feedback_loop_uses_luna_workers_and_sol_checker() -> None:
     assert agents["checker"]["reasoning_effort"] == "high"
 
 
+def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
+    loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop_deepseek.yaml"
+
+    loop = load_document(loop_path)
+    validate_loop_definition(loop)
+
+    assert loop["id"] == "development_feedback_loop_deepseek"
+    agents = loop["agents"]
+    steps = loop["steps"]
+    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
+    assert {"decompose", "orchestrate", "judge"}.isdisjoint(agents)
+    assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
+
+    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["reasoning_effort"] == "medium"
+    assert agents["test"]["model"] == "deepseek-v4-flash"
+    assert agents["test"]["reasoning_effort"] == "low"
+    assert agents["implement"]["model"] == "deepseek-v4-flash"
+    assert agents["implement"]["reasoning_effort"] == "low"
+    assert agents["fix"]["model"] == "deepseek-v4-flash"
+    assert agents["fix"]["reasoning_effort"] == "low"
+    assert agents["checker"]["model"] == "deepseek-v4-pro"
+    assert agents["checker"]["reasoning_effort"] == "medium"
+
+    step_ids = [step["id"] for step in steps]
+    assert step_ids.index("design") < step_ids.index("test")
+    assert step_ids.index("test") < step_ids.index("implement")
+    assert step_ids.index("implement") < step_ids.index("observe")
+    assert step_ids.index("checker") < step_ids.index("done")
+
+    design = next(step for step in steps if step["id"] == "design")
+    assert design["kind"] == "llm"
+    assert design["next"] == "test"
+
+    checker = next(step for step in steps if step["id"] == "checker")
+    assert checker["kind"] == "llm"
+    assert checker["next"] == "done"
+    assert checker["on_failure"] == "fix"
+
+
+def test_deepseek_loop_observe_and_decide_are_model_free() -> None:
+    loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop_deepseek.yaml"
+
+    loop = load_document(loop_path)
+    validate_loop_definition(loop)
+
+    steps = {step["id"]: step for step in loop["steps"]}
+    model_keys = {"agent", "model", "reasoning_effort"}
+
+    observe = steps["observe"]
+    assert observe["kind"] == "commands"
+    assert "run" in observe and observe["run"]
+    assert model_keys.isdisjoint(observe)
+
+    decide = steps["decide"]
+    assert decide["kind"] == "policy"
+    assert "routes" in decide and decide["routes"]
+    assert model_keys.isdisjoint(decide)
+
+
 def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps() -> None:
     invalid_agent = {
         "version": 1,
