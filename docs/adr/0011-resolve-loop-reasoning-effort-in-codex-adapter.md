@@ -43,10 +43,8 @@ loop YAML は agent / step 単位の設定を持つが、`reasoning_effort` の�
 - `.taqt/scripts/loop/schema.py`
 - `.taqt/scripts/loop/llm.py`
 - `.taqt/tests/loop_engineering_test.py`
-- `docs/design/#165.md`
 
 ## 参考リンク
 <!-- ADRに関連する情報や参考にした資料へのリンク。 -->
 
-- [Design Doc #165](../design/%23165.md)
 - [Issue #165](https://github.com/ANKM0/SIFTQ/issues/165)

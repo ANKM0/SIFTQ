@@ -31,7 +31,7 @@
 ### 制約事項
 
 - 更新 SQL は `WHERE id = ? AND owner_id = ? AND version = ?` を条件に含め、成功時に version を 1 増やす。
-- `409 Conflict` の API 形式、競合 UI、再試行の詳細は後続の Design Doc で決定する。
+- `409 Conflict` の API 形式、競合 UI、再試行の詳細は後続の要求または ADR で決定する。
 
 ## 参考リンク
 

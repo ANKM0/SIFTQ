@@ -14,7 +14,6 @@ agents:
     writes:
       - .taqt/loops/
       - docs/requirements/
-      - docs/design/
       - docs/wireframes/
       - docs/adr/
       - docs/contributing/

@@ -55,6 +55,13 @@ def _event_line(event: dict[str, Any]) -> str:
             f"- agent `{event.get('step')}`: "
             f"{response.get('status')} ({response.get('mode')})"
         )
+    if event_type == "design_artifact":
+        artifact_path = event.get("artifact_path")
+        return (
+            f"- design artifact `{event.get('step')}`: "
+            f"[{artifact_path}]({artifact_path}) "
+            f"({event.get('status')}) / {event.get('summary')}"
+        )
     if event_type == "terminal":
         return f"- terminal `{event.get('step')}`"
     return f"- {event_type}: `{event.get('step') or event.get('reason')}`"

@@ -12,7 +12,7 @@ from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
 from loop.llm import run_agent
 from loop.observe import run_commands
-from loop.runner import run_loop
+from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
@@ -203,6 +203,129 @@ blocked_reason: null
     assert result["status"] == "done"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "done"
+
+
+def test_loop_runner_writes_design_decision_artifact_after_success(tmp_path: Path) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    runs_root = tmp_path / "runs"
+    loop_path.write_text(
+        """
+version: 1
+id: design-artifact
+agents:
+  design:
+    role: design
+steps:
+  - id: design
+    kind: llm
+    agent: design
+    command: >-
+      python -c 'import json; print(json.dumps({"status": "success", "summary": "Use the run artifact"}))'
+    next: done
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-166-01
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 166
+status: pending
+phase: spec
+priority: high
+loop: design-artifact
+input: {}
+""",
+        encoding="utf-8",
+    )
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root,
+    )
+
+    artifact = Path(result["run_dir"]) / "artifacts" / "design-decision.md"
+    assert result["status"] == "done"
+    content = artifact.read_text(encoding="utf-8")
+    assert content
+    assert "Use the run artifact" in content
+    assert "## 課題・制約" in content
+    assert "## 採用案と理由" in content
+    assert "## 却下案と理由" in content
+    assert "## 影響範囲・検証結果" in content
+    assert "## 未決事項または人間へのエスカレーション" in content
+
+    events = [
+        json.loads(line)
+        for line in (artifact.parent.parent / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    artifact_event = next(event for event in events if event["type"] == "design_artifact")
+    assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
+    assert artifact_event["summary"] == "Use the run artifact"
+    assert artifact_event["status"] == "created"
+
+
+def test_loop_runner_does_not_record_created_event_when_artifact_write_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    def fail_write(*args, **kwargs):
+        raise OSError("artifact unavailable")
+
+    monkeypatch.setattr("loop.runner._write_design_decision_artifact", fail_write)
+
+    next_step = _run_step(
+        loop_definition={"agents": {"design": {"role": "design"}}},
+        task={"id": "ISSUE-166-03"},
+        step={"id": "design", "kind": "llm", "agent": "design", "on_failure": "human"},
+        state={},
+        run_dir=run_dir,
+        workspace=tmp_path,
+        max_fix_attempts=3,
+    )
+
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    assert next_step == "human"
+    assert not any(event["type"] == "design_artifact" for event in events)
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    assert response_event["response"]["status"] == "failure"
+    assert response_event["response"]["artifact_error"] == "artifact unavailable"
+
+
+def test_design_decision_artifact_renders_structured_response_fields(tmp_path: Path) -> None:
+    _write_design_decision_artifact(
+        tmp_path,
+        task={"id": "ISSUE-166-02"},
+        step={"id": "design"},
+        response={
+            "problem": "Missing decision structure",
+            "constraints": "Keep the run self-contained",
+            "selected_option": "Use Markdown sections",
+            "rationale": "Readable in reports",
+            "rejected_options": ["Only JSON"],
+            "rejected_rationale": "Harder to review",
+            "impact_scope": "Run artifacts",
+            "validation_result": "Integration test",
+            "open_items": "None",
+            "human_escalation": "None",
+        },
+    )
+
+    content = (tmp_path / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
+    assert "Missing decision structure" in content
+    assert "Use Markdown sections" in content
+    assert "Only JSON" in content
+    assert "Integration test" in content
+    assert "None" in content
 
 
 def test_loop_schema_rejects_unknown_step_reference() -> None:
@@ -1446,3 +1569,73 @@ def test_run_report_renders_recent_events() -> None:
 
     assert "# taqt run ISSUE-1" in report
     assert "implementation_feedback -> human" in report
+
+
+def test_run_report_renders_design_artifact_reference() -> None:
+    report = render_report(
+        {
+            "task_id": "ISSUE-166",
+            "status": "done",
+            "current_step": "done",
+            "iteration": 1,
+            "last_feedback": None,
+        },
+        [
+            {
+                "type": "design_artifact",
+                "step": "design",
+                "artifact_path": "artifacts/design-decision.md",
+                "summary": "Use the run artifact",
+                "status": "created",
+            }
+        ],
+    )
+
+    assert "[artifacts/design-decision.md](artifacts/design-decision.md)" in report
+    assert "(created) / Use the run artifact" in report
+
+
+def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    old_design_doc = repository_root / "docs/design/#134.md"
+    adr_0002 = repository_root / "docs/adr/0002-separate-adr-and-design-docs.md"
+    adr_0012 = repository_root / "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md"
+    adr_index = repository_root / "docs/adr/README.md"
+    design_root = repository_root / "docs/design"
+    design_script = repository_root / "scripts/create_design_doc.py"
+    design_skill = repository_root / ".agents/skills/design-doc-authoring"
+    loop_definition = repository_root / ".taqt/loops/development_feedback_loop.yaml"
+    readme = repository_root / "README.md"
+    future_readme = repository_root / "docs/future/README.md"
+    wireframe = repository_root / "docs/wireframes/task-redesign.md"
+
+    assert not old_design_doc.exists()
+    assert "> Status: Superseded by [ADR 0012]" in adr_0002.read_text(encoding="utf-8")
+
+    migrated_policy = adr_0012.read_text(encoding="utf-8")
+    assert "GitHub Issue を要求" in migrated_policy
+    assert "`state.json`、`events.jsonl`、artifact" in migrated_policy
+    assert "script adapter" in migrated_policy
+
+    assert "ADR 0002" in adr_index.read_text(encoding="utf-8")
+    assert "Superseded by ADR 0012" in adr_index.read_text(encoding="utf-8")
+    assert not design_root.exists()
+    assert not design_script.exists()
+    assert not design_skill.exists()
+    assert "docs/design/" not in loop_definition.read_text(encoding="utf-8")
+    adr_0011 = repository_root / "docs/adr/0011-resolve-loop-reasoning-effort-in-codex-adapter.md"
+    adr_0011_text = adr_0011.read_text(encoding="utf-8")
+    assert "Design Doc #165" not in adr_0011_text
+    assert "https://github.com/ANKM0/SIFTQ/issues/165" in adr_0011_text
+    readme_text = readme.read_text(encoding="utf-8")
+    assert "docs/design/" not in readme_text
+    assert ".taqt/runs/" in readme_text
+    assert "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md" in readme_text
+    future_text = future_readme.read_text(encoding="utf-8")
+    assert "docs/design/" not in future_text
+    assert "docs/requirements/" in future_text
+    assert "docs/adr/" in future_text
+    assert "taqt run artifact" in future_text
+    wireframe_text = wireframe.read_text(encoding="utf-8")
+    assert "external design document" not in wireframe_text
+    assert "requirements" in wireframe_text

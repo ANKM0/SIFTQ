@@ -73,4 +73,4 @@ replace old wireframe contract tests with checks for:
 ## Open Questions（未決事項）
 
 - Exact status names may be adjusted by the new requirements.
-- Exact route paths are deferred to the external design document.
+- Exact route paths are deferred to the requirements.
