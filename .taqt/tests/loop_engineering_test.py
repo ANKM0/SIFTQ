@@ -11,7 +11,7 @@ from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
 from loop.llm import run_agent
 from loop.observe import run_commands
-from loop.runner import _write_design_decision_artifact, run_loop
+from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
@@ -256,6 +256,35 @@ input: {}
     assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
     assert artifact_event["summary"] == "Use the run artifact"
     assert artifact_event["status"] == "created"
+
+
+def test_loop_runner_does_not_record_created_event_when_artifact_write_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    def fail_write(*args, **kwargs):
+        raise OSError("artifact unavailable")
+
+    monkeypatch.setattr("loop.runner._write_design_decision_artifact", fail_write)
+
+    next_step = _run_step(
+        loop_definition={"agents": {"design": {"role": "design"}}},
+        task={"id": "ISSUE-166-03"},
+        step={"id": "design", "kind": "llm", "agent": "design", "on_failure": "human"},
+        state={},
+        run_dir=run_dir,
+        workspace=tmp_path,
+        max_fix_attempts=3,
+    )
+
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    assert next_step == "human"
+    assert not any(event["type"] == "design_artifact" for event in events)
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    assert response_event["response"]["status"] == "failure"
+    assert response_event["response"]["artifact_error"] == "artifact unavailable"
 
 
 def test_design_decision_artifact_renders_structured_response_fields(tmp_path: Path) -> None:
