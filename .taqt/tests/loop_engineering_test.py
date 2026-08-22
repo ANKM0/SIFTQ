@@ -38,6 +38,7 @@ from taqt.github_merge import main as github_merge_main
 from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
 from taqt.task_create import main as task_create_main
+from taqt.deepseek import ensure_codex_home
 
 
 @pytest.fixture(autouse=True)
@@ -203,6 +204,103 @@ blocked_reason: null
     assert result["status"] == "done"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "done"
+
+
+def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: Path) -> None:
+    config_path = ensure_codex_home(tmp_path / "deepseek-home")
+    config = config_path.read_text(encoding="utf-8")
+    catalog = json.loads((config_path.parent / "models.json").read_text(encoding="utf-8"))
+
+    assert 'model = "deepseek-v4-flash"' in config
+    assert 'base_url = "https://api.deepseek.com/"' in config
+    assert 'wire_api = "responses"' in config
+    assert 'env_key = "DEEPSEEK_API_KEY"' in config
+    assert "experimental_bearer_token" not in config
+    assert "DEEPSEEK_API_KEY" not in json.dumps(catalog)
+    assert catalog["models"][0]["slug"] == "deepseek-v4-flash"
+
+
+def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    loop = load_document(repository_root / ".taqt/loops/development_feedback_loop_deepseek.yaml")
+
+    validate_loop_definition(loop)
+    assert {agent["model"] for agent in loop["agents"].values()} == {"deepseek-v4-flash"}
+
+
+def test_loop_runner_resumes_from_last_failed_llm_step(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    runs_root = tmp_path / "runs"
+    loop_path.write_text(
+        """
+version: 1
+id: resume-loop
+agents:
+  implement:
+    role: implementation
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    next: done
+    on_failure: human
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-176
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 176
+status: pending
+phase: spec
+priority: normal
+loop: resume-loop
+input: {}
+run:
+  id: null
+  state_path: null
+  events_path: null
+worker:
+  id: null
+  heartbeat_at: null
+blocked_reason: null
+""",
+        encoding="utf-8",
+    )
+    responses = iter(
+        [
+            {"status": "failure", "feedback": "implementation_feedback"},
+            {"status": "success"},
+        ]
+    )
+    monkeypatch.setattr("loop.runner.run_agent", lambda **_kwargs: next(responses))
+
+    first = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root,
+    )
+    first_state = json.loads((Path(first["run_dir"]) / "state.json").read_text(encoding="utf-8"))
+    assert first["status"] == "human"
+    assert first_state["last_failed_step"] == "implement"
+
+    resumed = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root,
+        resume_dir=Path(first["run_dir"]),
+    )
+    assert resumed["status"] == "done"
 
 
 def test_loop_runner_writes_design_decision_artifact_after_success(tmp_path: Path) -> None:
@@ -605,6 +703,7 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
         step={"id": "implement", "agent": "implement"},
         context={"files": {}},
         cwd=tmp_path,
+        child_environment={"DEEPSEEK_API_KEY": "secret", "CODEX_HOME": "/tmp/deepseek"},
     )
 
     assert response["status"] == "success"
@@ -616,6 +715,8 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert command[command.index("-c") + 1] == "model_reasoning_effort=high"
     assert "--ask-for-approval" not in command
     assert kwargs["input"].startswith("Role: implementation")
+    assert kwargs["env"]["DEEPSEEK_API_KEY"] == "secret"
+    assert kwargs["env"]["CODEX_HOME"] == "/tmp/deepseek"
 
 
 def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:

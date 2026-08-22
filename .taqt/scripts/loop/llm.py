@@ -3,7 +3,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .guard import validate_commands
 
@@ -15,6 +15,7 @@ def run_agent(
     step: dict[str, Any],
     context: dict[str, Any],
     cwd: Path,
+    child_environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     agents = loop_definition.get("agents") if isinstance(loop_definition.get("agents"), dict) else {}
     agent_id = step.get("agent")
@@ -31,7 +32,15 @@ def run_agent(
         "prompt": _build_prompt(task=task, step=step, agent=agent, context=context),
     }
     if adapter == "codex" and not command:
-        return _run_codex(payload=payload, agent_id=agent_id, agent=agent, step=step, cwd=cwd, timeout_seconds=timeout_seconds)
+        return _run_codex(
+            payload=payload,
+            agent_id=agent_id,
+            agent=agent,
+            step=step,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            child_environment=child_environment,
+        )
 
     if not command:
         return {
@@ -78,6 +87,7 @@ def _run_codex(
     step: dict[str, Any],
     cwd: Path,
     timeout_seconds: int,
+    child_environment: Mapping[str, str] | None,
 ) -> dict[str, Any]:
     workspace = cwd.resolve()
     command = [
@@ -114,6 +124,7 @@ def _run_codex(
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env={**os.environ, **(child_environment or {})},
             timeout=timeout_seconds,
             check=False,
         )

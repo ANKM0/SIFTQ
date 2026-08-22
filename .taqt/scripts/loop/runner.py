@@ -2,7 +2,7 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .context import build_context
 from .guard import changed_paths, validate_agent_changes, workspace_snapshot
@@ -43,6 +43,7 @@ def run_loop(
     workspace: Path,
     runs_root: Path,
     resume_dir: Path | None = None,
+    child_environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     loop_definition = load_document(loop_path)
     validate_loop_definition(loop_definition)
@@ -64,6 +65,10 @@ def run_loop(
         "last_feedback": None,
         "feedback_attempts": {},
     }
+    if resume_dir and state.get("last_failed_step"):
+        state["current_step"] = state["last_failed_step"]
+        state["status"] = "running"
+        state["loop_id"] = loop_definition["id"]
     limits = loop_definition.get("limits") if isinstance(loop_definition.get("limits"), dict) else {}
     max_iterations = int(limits.get("max_iterations", 12))
     max_fix_attempts = int(limits.get("max_fix_attempts", 3))
@@ -96,6 +101,7 @@ def run_loop(
             run_dir=run_dir,
             workspace=workspace,
             max_fix_attempts=max_fix_attempts,
+            child_environment=child_environment,
         )
         state["current_step"] = next_step
         save_state(run_dir, state)
@@ -117,6 +123,7 @@ def _run_step(
     run_dir: Path,
     workspace: Path,
     max_fix_attempts: int,
+    child_environment: Mapping[str, str] | None = None,
 ) -> str:
     kind = step["kind"]
     if kind == "commands":
@@ -170,6 +177,7 @@ def _run_step(
             step=step,
             context=context,
             cwd=workspace,
+            child_environment=child_environment,
         )
         after = workspace_snapshot(workspace)
         changed = changed_paths(before, after)
@@ -210,6 +218,7 @@ def _run_step(
         append_event(run_dir, {"type": "agent_response", "step": step["id"], "response": response})
         if response["status"] != "success":
             state["last_feedback"] = response.get("feedback") or "unknown"
+            state["last_failed_step"] = step["id"]
             return str(step.get("on_failure", "human"))
         return str(step.get("next", step.get("on_pass", "done")))
 

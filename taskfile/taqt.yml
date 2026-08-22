@@ -14,6 +14,11 @@ tasks:
     cmds:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
+  run:deepseek:
+    desc: Run or resume a taqt task with the DeepSeek Codex provider.
+    cmds:
+      - uv run python -m taqt.task_run --deepseek {{.CLI_ARGS}}
+
   auto:
     desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.
     cmds:
