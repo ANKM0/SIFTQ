@@ -193,6 +193,20 @@ def _run_step(
                 response["artifact_error"] = str(error)
             else:
                 response["artifact_path"] = artifact_path
+                append_event(
+                    run_dir,
+                    {
+                        "type": "design_artifact",
+                        "step": step["id"],
+                        "artifact_path": artifact_path,
+                        "summary": _artifact_value(
+                            response,
+                            ("summary", "selected_option", "decision"),
+                            "未記載",
+                        ),
+                        "status": "created",
+                    },
+                )
         append_event(run_dir, {"type": "agent_response", "step": step["id"], "response": response})
         if response["status"] != "success":
             state["last_feedback"] = response.get("feedback") or "unknown"

@@ -248,6 +248,15 @@ input: {}
     assert "## 影響範囲・検証結果" in content
     assert "## 未決事項または人間へのエスカレーション" in content
 
+    events = [
+        json.loads(line)
+        for line in (artifact.parent.parent / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    artifact_event = next(event for event in events if event["type"] == "design_artifact")
+    assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
+    assert artifact_event["summary"] == "Use the run artifact"
+    assert artifact_event["status"] == "created"
+
 
 def test_design_decision_artifact_renders_structured_response_fields(tmp_path: Path) -> None:
     _write_design_decision_artifact(
