@@ -9,7 +9,7 @@ agents:
   design:
     role: design
     adapter: codex
-    model: deepseek-v4-flash
+    model: deepseek-v4-pro
     reasoning_effort: high
     writes:
       - .taqt/loops/
@@ -17,6 +17,18 @@ agents:
       - docs/wireframes/
       - docs/adr/
       - docs/contributing/
+  decompose:
+    role: task_decomposer
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+  orchestrate:
+    role: orchestrator
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
   test:
     role: test_author
     adapter: codex
@@ -30,10 +42,21 @@ agents:
     adapter: codex
     model: deepseek-v4-flash
     reasoning_effort: high
+  fix:
+    role: implementation_fixer
+    adapter: codex
+    model: deepseek-v4-flash
+    reasoning_effort: high
   checker:
     role: checker
     adapter: codex
-    model: deepseek-v4-flash
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+  judge:
+    role: final_judge
+    adapter: codex
+    model: deepseek-v4-pro
     reasoning_effort: high
     readonly: true
 
@@ -41,6 +64,16 @@ steps:
   - id: design
     kind: llm
     agent: design
+    next: decompose
+
+  - id: decompose
+    kind: llm
+    agent: decompose
+    next: orchestrate
+
+  - id: orchestrate
+    kind: llm
+    agent: orchestrate
     next: test
 
   - id: test
@@ -64,13 +97,19 @@ steps:
     on_success: checker
     on_failure: decide
 
+  - id: fix
+    kind: llm
+    agent: fix
+    next: observe
+    on_failure: human
+
   - id: decide
     kind: policy
     routes:
       - when: implementation_feedback
-        next: implement
+        next: fix
       - when: test_feedback
-        next: test
+        next: fix
       - when: local_design_feedback
         next: design
       - when: specification_feedback
@@ -83,7 +122,14 @@ steps:
   - id: checker
     kind: llm
     agent: checker
+    next: judge
+    on_failure: fix
+
+  - id: judge
+    kind: llm
+    agent: judge
     next: done
+    on_failure: fix
 
   - id: done
     kind: terminal

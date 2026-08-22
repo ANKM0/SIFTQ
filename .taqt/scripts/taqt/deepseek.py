@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 
 
-MODEL = "deepseek-v4-flash"
+FLASH_MODEL = "deepseek-v4-flash"
+PRO_MODEL = "deepseek-v4-pro"
+MODELS = (FLASH_MODEL, PRO_MODEL)
 DEFAULT_HOME = Path.home() / ".codex-deepseek"
 
 
@@ -20,11 +22,8 @@ def ensure_codex_home(codex_home: Path) -> Path:
         pass
 
     models_path = codex_home / "models.json"
-    if not models_path.exists():
-        models_path.write_text(
-            json.dumps({"models": [_model_catalog()]}, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+    _ensure_models_catalog(models_path)
+    if models_path.exists():
         _restrict_file(models_path)
 
     config_path = codex_home / "config.toml"
@@ -37,7 +36,7 @@ def ensure_codex_home(codex_home: Path) -> Path:
 def _config_text(models_path: Path) -> str:
     return "\n".join(
         [
-            f'model = "{MODEL}"',
+            f'model = "{FLASH_MODEL}"',
             'model_provider = "deepseek"',
             'preferred_auth_method = "apikey"',
             'forced_login_method = "api"',
@@ -54,9 +53,36 @@ def _config_text(models_path: Path) -> str:
     )
 
 
-def _model_catalog() -> dict[str, object]:
+def _ensure_models_catalog(models_path: Path) -> None:
+    if models_path.exists():
+        try:
+            catalog = json.loads(models_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"invalid DeepSeek model catalog: {models_path}") from error
+        if not isinstance(catalog, dict) or not isinstance(catalog.get("models"), list):
+            raise ValueError(f"invalid DeepSeek model catalog: {models_path}")
+    else:
+        catalog = {"models": []}
+
+    entries = catalog["models"]
+    slugs = {
+        entry.get("slug")
+        for entry in entries
+        if isinstance(entry, dict) and isinstance(entry.get("slug"), str)
+    }
+    missing = [model for model in MODELS if model not in slugs]
+    if missing:
+        entries.extend(_model_catalog(model) for model in missing)
+        models_path.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+
+def _model_catalog(model: str) -> dict[str, object]:
+    is_pro = model == PRO_MODEL
     return {
-        "slug": MODEL,
+        "slug": model,
         "prefer_websockets": False,
         "support_verbosity": True,
         "default_verbosity": "low",
@@ -76,8 +102,10 @@ def _model_catalog() -> dict[str, object]:
         "auto_compact_token_limit": None,
         "reasoning_summary_format": "experimental",
         "default_reasoning_summary": "none",
-        "display_name": "DeepSeek-V4-Flash",
-        "description": "DeepSeek V4 Flash for taqt coding tasks.",
+        "display_name": "DeepSeek-V4-Pro" if is_pro else "DeepSeek-V4-Flash",
+        "description": "DeepSeek V4 Pro for planning and review."
+        if is_pro
+        else "DeepSeek V4 Flash for taqt coding tasks.",
         "default_reasoning_level": "high",
         "supported_reasoning_levels": [
             {"effort": "low", "description": "Fast responses with lighter reasoning"},

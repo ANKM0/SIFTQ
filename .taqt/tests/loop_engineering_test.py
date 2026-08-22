@@ -217,7 +217,10 @@ def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: P
     assert 'env_key = "DEEPSEEK_API_KEY"' in config
     assert "experimental_bearer_token" not in config
     assert "DEEPSEEK_API_KEY" not in json.dumps(catalog)
-    assert catalog["models"][0]["slug"] == "deepseek-v4-flash"
+    assert {model["slug"] for model in catalog["models"]} == {
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+    }
 
 
 def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
@@ -225,7 +228,10 @@ def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
     loop = load_document(repository_root / ".taqt/loops/development_feedback_loop_deepseek.yaml")
 
     validate_loop_definition(loop)
-    assert {agent["model"] for agent in loop["agents"].values()} == {"deepseek-v4-flash"}
+    assert loop["agents"]["design"]["model"] == "deepseek-v4-pro"
+    assert loop["agents"]["implement"]["model"] == "deepseek-v4-flash"
+    assert loop["agents"]["checker"]["model"] == "deepseek-v4-pro"
+    assert loop["agents"]["judge"]["model"] == "deepseek-v4-pro"
 
 
 def test_loop_runner_resumes_from_last_failed_llm_step(tmp_path: Path, monkeypatch) -> None:
