@@ -79,8 +79,9 @@ task ci:build
 
 ## Loop Engineering
 
-The loop engineering direction is tracked in `docs/design/#134.md`. taqt
-is the main task/workflow owner, while GitHub monitoring and other external
+The loop engineering direction is recorded in
+`docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md`. taqt is the
+main task/workflow owner, while GitHub monitoring and other external
 integrations are script adapters.
 
 ## CI Checks

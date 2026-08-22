@@ -1,5 +1,7 @@
 # ADR 0002: ADRとDesign Docを分けて記録する
 
+> Status: Superseded by [ADR 0012](0012-adopt-taqt-centered-loop-engineering-policy.md).
+
 ## 目的
 <!-- 解決したい課題はXXX。 -->
 
