@@ -19,3 +19,4 @@ target/
 .taqt/tasks/
 .taqt/runs/
 .taqt/worktrees/
+.taqt/config/active.yaml

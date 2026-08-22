@@ -39,6 +39,7 @@ from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
 from taqt.task_create import main as task_create_main
 from taqt.deepseek import ensure_codex_home
+from taqt.profiles import load_profiles, resolve_profile
 
 
 @pytest.fixture(autouse=True)
@@ -107,6 +108,57 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
     assert task["input"]["issue"]["body"].startswith("## AC")
     assert task["input"]["issue"]["labels"] == ["enhancement", "taqt:enabled"]
     assert calls[0][0][:3] == ["gh", "issue", "view"]
+
+
+def test_task_create_uses_profile_loop_when_loop_omitted(tmp_path: Path, monkeypatch) -> None:
+    loop_root = tmp_path / "loops"
+    loop_root.mkdir()
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "taqt.task_create._fetch_issue",
+        lambda *_args: {
+            "title": "Use DeepSeek profile",
+            "body": "",
+            "labels": ["taqt:enabled"],
+        },
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_create_issue_task(**kwargs):
+        calls.append(kwargs)
+        return (tmp_path / "ISSUE-136.yaml", {"id": "ISSUE-136"})
+
+    monkeypatch.setattr("taqt.task_create.create_issue_task", fake_create_issue_task)
+
+    exit_code = task_create_main(
+        [
+            "--repo",
+            "owner/repo",
+            "--issue",
+            "136",
+            "--id",
+            "ISSUE-136",
+            "--profile",
+            "deepseek",
+            "--loop-root",
+            str(loop_root),
+            "--task-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls[0]["loop"] == "development_feedback_loop_deepseek"
 
 
 def test_issue_branch_uses_dev_issue_number_and_normalized_loop_purpose(tmp_path: Path) -> None:
@@ -234,6 +286,67 @@ def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
     assert loop["agents"]["implement"]["model"] == "deepseek-v4-flash"
     assert loop["agents"]["checker"]["model"] == "deepseek-v4-pro"
     assert loop["agents"]["judge"]["model"] == "deepseek-v4-pro"
+
+
+def test_load_profiles_reads_loop_and_deepseek_settings(tmp_path: Path) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+    codex_home: ~/.codex-deepseek
+    env_key: DEEPSEEK_API_KEY
+""",
+        encoding="utf-8",
+    )
+
+    profiles = load_profiles(loop_root)
+
+    assert profiles["main"]["loop"] == "development_feedback_loop"
+    assert profiles["deepseek"]["loop"] == "development_feedback_loop_deepseek"
+    assert profiles["deepseek"]["codex_home"] == "~/.codex-deepseek"
+
+
+def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "config" / "active.yaml").write_text(
+        "active_profile: deepseek\n",
+        encoding="utf-8",
+    )
+
+    assert resolve_profile(loop_root) == "deepseek"
+    assert resolve_profile(loop_root, "main") == "main"
+
+
+def test_resolve_profile_rejects_unknown_profile(tmp_path: Path) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        resolve_profile(loop_root, "deepseek")
 
 
 def test_loop_runner_resumes_from_last_failed_llm_step(tmp_path: Path, monkeypatch) -> None:
@@ -719,7 +832,8 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert command[:2] == ["codex", "exec"]
     assert "--cd" in command
     assert command[command.index("--cd") + 1] == str(tmp_path.resolve())
-    assert "--sandbox" in command
+    assert "--approve-for-me" in command
+    assert "--sandbox" not in command
     assert command[command.index("-c") + 1] == "model_reasoning_effort=high"
     assert "--ask-for-approval" not in command
     assert kwargs["input"].startswith("Role: implementation")
@@ -895,6 +1009,19 @@ def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> No
     task_root = tmp_path / "tasks"
     loop_root.mkdir()
     task_root.mkdir()
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+    codex_home: ~/.codex-deepseek
+    env_key: DEEPSEEK_API_KEY
+""",
+        encoding="utf-8",
+    )
     (loop_root / "development_feedback_loop.yaml").write_text(
         """
 version: 1
@@ -933,6 +1060,78 @@ steps:
     assert task["self_improvement"]["event"] == "loop_human"
     assert task["self_improvement"]["run_path"]
     assert Path(task["self_improvement"]["request_path"]).is_file()
+
+
+def test_taqt_task_run_deepseek_profile_injects_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    loop_root = tmp_path / "loops"
+    task_root = tmp_path / "tasks"
+    deepseek_home = tmp_path / "deepseek-home"
+    runs_root = tmp_path / "runs"
+    loop_root.mkdir()
+    task_root.mkdir()
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+    codex_home: ~/.codex-deepseek
+    env_key: DEEPSEEK_API_KEY
+""",
+        encoding="utf-8",
+    )
+    (loop_root / "development_feedback_loop_deepseek.yaml").write_text(
+        """
+version: 1
+id: development_feedback_loop_deepseek
+steps:
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=21,
+        loop="development_feedback_loop",
+        task_root=task_root,
+    )
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "secret")
+
+    calls: list[dict[str, object]] = []
+
+    def fake_run_loop(**kwargs):
+        calls.append(kwargs)
+        return {"status": "done", "run_dir": str(runs_root / "run")}
+
+    monkeypatch.setattr("taqt.task_run.run_loop", fake_run_loop)
+
+    exit_code = task_run_main(
+        [
+            str(task_path),
+            "--loop-root",
+            str(loop_root),
+            "--runs-root",
+            str(runs_root),
+            "--workspace",
+            str(tmp_path),
+            "--skip-readiness-check",
+            "--profile",
+            "deepseek",
+            "--codex-home",
+            str(deepseek_home),
+        ]
+    )
+
+    assert exit_code == 0
+    assert calls[0]["loop_path"].name == "development_feedback_loop_deepseek.yaml"
+    assert calls[0]["child_environment"]["DEEPSEEK_API_KEY"] == "secret"
+    assert calls[0]["child_environment"]["CODEX_HOME"] == str(deepseek_home)
 
 
 def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> None:

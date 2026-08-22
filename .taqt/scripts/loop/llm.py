@@ -93,10 +93,9 @@ def _run_codex(
     command = [
         "codex",
         "exec",
+        "--approve-for-me",
         "--cd",
         str(workspace),
-        "--sandbox",
-        str(step.get("sandbox") or agent.get("sandbox") or "workspace-write"),
     ]
     model = step.get("model") or agent.get("model") or os.environ.get("LOOP_CODEX_MODEL")
     if model:

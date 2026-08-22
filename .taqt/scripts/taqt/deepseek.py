@@ -53,6 +53,15 @@ def _config_text(models_path: Path) -> str:
     )
 
 
+def write_codex_profile_config(target: Path) -> None:
+    codex_home = default_codex_home()
+    ensure_codex_home(codex_home)
+    models_path = codex_home / "models.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(_config_text(models_path), encoding="utf-8")
+    _restrict_file(target)
+
+
 def _ensure_models_catalog(models_path: Path) -> None:
     if models_path.exists():
         try:
