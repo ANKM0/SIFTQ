@@ -1587,7 +1587,10 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     adr_0002 = repository_root / "docs/adr/0002-separate-adr-and-design-docs.md"
     adr_0012 = repository_root / "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md"
     adr_index = repository_root / "docs/adr/README.md"
-    design_index = repository_root / "docs/design/README.md"
+    design_root = repository_root / "docs/design"
+    design_script = repository_root / "scripts/create_design_doc.py"
+    design_skill = repository_root / ".agents/skills/design-doc-authoring"
+    loop_definition = repository_root / ".taqt/loops/development_feedback_loop.yaml"
     readme = repository_root / "README.md"
 
     assert not old_design_doc.exists()
@@ -1600,7 +1603,14 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
 
     assert "ADR 0002" in adr_index.read_text(encoding="utf-8")
     assert "Superseded by ADR 0012" in adr_index.read_text(encoding="utf-8")
-    assert "[#134]" not in design_index.read_text(encoding="utf-8")
+    assert not design_root.exists()
+    assert not design_script.exists()
+    assert not design_skill.exists()
+    assert "docs/design/" not in loop_definition.read_text(encoding="utf-8")
+    adr_0011 = repository_root / "docs/adr/0011-resolve-loop-reasoning-effort-in-codex-adapter.md"
+    adr_0011_text = adr_0011.read_text(encoding="utf-8")
+    assert "Design Doc #165" not in adr_0011_text
+    assert "https://github.com/ANKM0/SIFTQ/issues/165" in adr_0011_text
     assert "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md" in readme.read_text(
         encoding="utf-8"
     )

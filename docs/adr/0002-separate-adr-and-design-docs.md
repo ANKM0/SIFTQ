@@ -2,6 +2,10 @@
 
 > Status: Superseded by [ADR 0012](0012-adopt-taqt-centered-loop-engineering-policy.md).
 
+この ADR は過去の運用判断の記録として保持する。現在の要求は
+`docs/requirements/`、恒久的な判断は `docs/adr/`、実行時の設計判断と検証結果は
+taqt run artifact を正本とする。
+
 ## 目的
 <!-- 解決したい課題はXXX。 -->
 
@@ -29,7 +33,7 @@ ADR と Design Doc の使い分けを定義し、設計検討と意思決定の�
 
 - ADR と Design Doc を別の文書種別として扱う。ADR は横断的な意思決定、Design Doc は機能や設計検討を記録する。
   - ADR は横断的な意思決定、Design Doc は機能や設計検討を記録するため。
-- Design Doc は PR ごとに 1 つ作成し、`docs/design/#<pr-number>.md` に置く。
+- 当時は Design Doc を PR ごとに 1 つ作成し、機能単位の設計検討を記録した。
   - 設計検討を実装単位と紐づけ、PR review から参照しやすくするため。
 - Design Doc の検討中に横断的な意思決定が発生した場合は、別途 ADR を作成して相互参照する。
   - 機能固有の検討と長期的な意思決定を混ぜないため。
@@ -45,9 +49,9 @@ ADR と Design Doc の使い分けを定義し、設計検討と意思決定の�
 ## 影響範囲
 <!-- ADRの決定が及ぼす可能性のある影響範囲。 -->
 
-- `docs/design/`
-- `.agents/skills/design-doc-authoring/`
-- `scripts/create_design_doc.py`
+- `docs/requirements/`
+- `docs/adr/`
+- `.taqt/runs/*/artifacts/`
 - 今後の feature-level design と architecture decision の記録方法
 
 ## 参考リンク

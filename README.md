@@ -100,4 +100,5 @@ task ci
 - `tests/`: repository-level tests.
 - `docs/requirements/`: product and system requirements.
 - `docs/wireframes/`: UI wireframes and wireframe templates.
-- `docs/design/`: PR-scoped design docs.
+- `.taqt/runs/`: run state, events, and design decision artifacts.
+- `docs/adr/`: architecture and repository-wide decisions.

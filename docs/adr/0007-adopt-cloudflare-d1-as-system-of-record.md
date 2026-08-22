@@ -23,7 +23,7 @@
 ### 制約事項
 
 - UI は [ADR 0009](0009-adopt-hono-htmx-html-driven-ui.md) に従い、`Browser -> Cloudflare Worker (Hono) -> D1` の経路で実装する。
-- 認証、schema、API、オフライン利用、性能最適化は後続の要求または Design Doc で決定する。
+- 認証、schema、API、オフライン利用、性能最適化は後続の要求または ADR で決定する。
 
 ## 参考リンク
 

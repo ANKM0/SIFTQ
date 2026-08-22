@@ -19,15 +19,15 @@
   - worker、phase、run state、観測結果を Issue 上で管理すると、再試行と自動処理の状態を追跡しにくいため。
 - loop runner が GitHub 監視や同期を直接担当する。
   - 外部連携の変更が loop 実行ロジックへ波及し、runner の責務が広がるため。
-- PR ごとの Design Doc を実行時の設計判断の正本として残す。
+- PR ごとの設計文書を実行時の設計判断の正本として残す。
   - run と判断・検証結果の対応が分断され、再試行を含む時系列を追跡しにくいため。
 
 ## 補足情報
 
 ### 背景
 
-- この方針は、旧 Design Doc #134 に記録されていた taqt-centered loop engineering の恒久的な判断を ADR に移管したものである。
-- Issue #166 で run artifact への設計判断の保存と参照を追加し、PR 単位の Design Doc 運用を廃止する。
+- この方針は、Issue #134 に記録されていた taqt-centered loop engineering の恒久的な判断を ADR に移管したものである。
+- Issue #166 で run artifact への設計判断の保存と参照を追加し、PR 単位の設計文書運用を廃止する。
 
 ### 制約事項
 
