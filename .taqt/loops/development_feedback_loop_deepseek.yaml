@@ -10,30 +10,19 @@ agents:
     role: design
     adapter: codex
     model: deepseek-v4-pro
-    reasoning_effort: high
+    reasoning_effort: medium
     writes:
       - .taqt/loops/
+      - .taqt/tests/
       - docs/requirements/
       - docs/wireframes/
       - docs/adr/
       - docs/contributing/
-  decompose:
-    role: task_decomposer
-    adapter: codex
-    model: deepseek-v4-pro
-    reasoning_effort: high
-    readonly: true
-  orchestrate:
-    role: orchestrator
-    adapter: codex
-    model: deepseek-v4-pro
-    reasoning_effort: high
-    readonly: true
   test:
     role: test_author
     adapter: codex
     model: deepseek-v4-flash
-    reasoning_effort: high
+    reasoning_effort: low
     writes:
       - tests/
       - .taqt/tests/
@@ -41,39 +30,23 @@ agents:
     role: implementation
     adapter: codex
     model: deepseek-v4-flash
-    reasoning_effort: high
+    reasoning_effort: low
   fix:
     role: implementation_fixer
     adapter: codex
     model: deepseek-v4-flash
-    reasoning_effort: high
+    reasoning_effort: low
   checker:
     role: checker
     adapter: codex
     model: deepseek-v4-pro
-    reasoning_effort: high
-    readonly: true
-  judge:
-    role: final_judge
-    adapter: codex
-    model: deepseek-v4-pro
-    reasoning_effort: high
+    reasoning_effort: medium
     readonly: true
 
 steps:
   - id: design
     kind: llm
     agent: design
-    next: decompose
-
-  - id: decompose
-    kind: llm
-    agent: decompose
-    next: orchestrate
-
-  - id: orchestrate
-    kind: llm
-    agent: orchestrate
     next: test
 
   - id: test
@@ -122,12 +95,6 @@ steps:
   - id: checker
     kind: llm
     agent: checker
-    next: judge
-    on_failure: fix
-
-  - id: judge
-    kind: llm
-    agent: judge
     next: done
     on_failure: fix
 
