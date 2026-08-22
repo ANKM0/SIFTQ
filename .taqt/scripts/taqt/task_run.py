@@ -4,9 +4,11 @@ from pathlib import Path
 from loop.runner import run_loop
 from loop.state import utc_now
 
+from .github_labels import enabled_error
 from .task_store import (
     DEFAULT_TASK_ROOT,
     decomposition_errors,
+    block_task,
     load_task,
     next_pending_task,
     readiness_errors,
@@ -49,6 +51,11 @@ def main(argv: list[str] | None = None) -> int:
         if resume_error:
             print(resume_error)
             return 2
+    label_error = enabled_error(task)
+    if label_error:
+        block_task(task_path, task, label_error)
+        print(f"Task {task['id']} is blocked: {label_error}")
+        return 2
     if not args.skip_readiness_check and task.get("status") != "running":
         errors = readiness_errors(task, workspace=args.workspace)
         if errors:
@@ -89,6 +96,12 @@ def main(argv: list[str] | None = None) -> int:
         runs_root=args.runs_root,
         resume_dir=args.resume,
     )
+
+    label_error = enabled_error(task)
+    if label_error:
+        block_task(task_path, task, label_error)
+        print(f"Task {task['id']} is blocked: {label_error}")
+        return 2
 
     if result["status"] == "done":
         task["status"] = "done"

@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from .github_labels import enabled_error
+from .task_store import block_task, load_task
 from .task_cleanup import main as cleanup_main
 from .git_commit import main as commit_main
 from .git_push import main as push_main
@@ -37,6 +39,13 @@ def main(argv: list[str] | None = None) -> int:
         for step in steps:
             print(" ".join(step))
         return 0
+
+    task_path, task = load_task(args.task)
+    label_error = enabled_error(task)
+    if label_error:
+        block_task(task_path, task, label_error)
+        print(f"Task {task['id']} is blocked: {label_error}")
+        return 2
 
     for step in steps:
         exit_code = _run_step(step)

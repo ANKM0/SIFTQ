@@ -3,6 +3,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from .github_labels import ENABLED_LABEL
 from .task_store import DEFAULT_TASK_ROOT, upsert_issue_task
 
 
@@ -29,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
         str(args.limit),
         "--json",
         "number,title,body,labels",
+        "--label",
+        ENABLED_LABEL,
     ]
     for label in args.label:
         gh_args.extend(["--label", label])

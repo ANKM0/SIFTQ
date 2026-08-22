@@ -12,8 +12,8 @@ TEMPLATE_FILES = {
     "bug": "bug_report.md",
     "research": "research.md",
 }
-TAQT_LABELS = ("taqt:pending", "taqt:phase:triage")
-FORBIDDEN_LABELS = {"taqt:blocked", "taqt:running", "taqt:done"}
+TAQT_LABELS = ("taqt:enabled",)
+FORBIDDEN_LABELS = {"taqt:pending", "taqt:phase:triage", "taqt:blocked", "taqt:running", "taqt:done"}
 
 
 def repository_root() -> Path:
@@ -109,7 +109,7 @@ def parser() -> argparse.ArgumentParser:
     argument_parser.add_argument(
         "--taqt",
         action="store_true",
-        help="Add taqt activation labels: taqt:pending and taqt:phase:triage.",
+        help="Add the taqt activation label: taqt:enabled.",
     )
     argument_parser.add_argument(
         "--body-file",

@@ -3,7 +3,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from .task_store import issue_branch, issue_ref, load_task
+from .github_labels import enabled_error
+from .task_store import block_task, issue_branch, issue_ref, load_task
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -15,7 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
-    _path, task = load_task(args.task)
+    task_path, task = load_task(args.task)
     source = task["source"]
     branch = issue_branch(task)
     title = f"#{source['issue_number']} development feedback loop"
@@ -45,6 +46,11 @@ def main(argv: list[str] | None = None) -> int:
     print(" ".join(_quote(part) for part in command))
     if not args.execute:
         return 0
+    label_error = enabled_error(task)
+    if label_error:
+        block_task(task_path, task, label_error)
+        print(label_error)
+        return 2
     existing = _find_existing_pr(repo=str(source["repo"]), branch=branch, cwd=args.workspace)
     if existing is not None:
         edit_command = [

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import yaml
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -39,6 +40,19 @@ from taqt.github_sync import main as github_sync_main
 from taqt.task_create import main as task_create_main
 
 
+@pytest.fixture(autouse=True)
+def allow_enabled_label(monkeypatch) -> None:
+    for module in (
+        "taqt.task_run",
+        "taqt.task_worker",
+        "taqt.task_auto",
+        "taqt.git_commit",
+        "taqt.git_push",
+        "taqt.github_pr",
+    ):
+        monkeypatch.setattr(f"{module}.enabled_error", lambda _task: None)
+
+
 def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
     path, task = create_issue_task(
         repo="owner/repo",
@@ -63,7 +77,7 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
             {
                 "title": "Add taqt skill",
                 "body": "## AC\n- Works.\n\n## DoD\n- Verified.\n",
-                "labels": [{"name": "enhancement"}],
+                "labels": [{"name": "enhancement"}, {"name": "taqt:enabled"}],
             }
         )
         stderr = ""
@@ -90,7 +104,7 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
     task = load_document(tmp_path / "ISSUE-136.yaml")
     assert task["branch_summary"] == "Add taqt skill"
     assert task["input"]["issue"]["body"].startswith("## AC")
-    assert task["input"]["issue"]["labels"] == ["enhancement"]
+    assert task["input"]["issue"]["labels"] == ["enhancement", "taqt:enabled"]
     assert calls[0][0][:3] == ["gh", "issue", "view"]
 
 
@@ -1512,7 +1526,7 @@ def test_git_commit_execute_requires_verified_run(tmp_path: Path, monkeypatch, c
     assert "without a verified taqt run state" in capsys.readouterr().out
 
 
-def test_github_sync_dry_run_prints_status_phase_and_close_commands(tmp_path: Path, capsys) -> None:
+def test_github_sync_dry_run_prints_progress_comment_only(tmp_path: Path, capsys) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=47,
@@ -1526,12 +1540,12 @@ def test_github_sync_dry_run_prints_status_phase_and_close_commands(tmp_path: Pa
         encoding="utf-8",
     )
 
-    assert github_sync_main([str(task_path), "--sync-labels", "--close-done"]) == 0
+    assert github_sync_main([str(task_path)]) == 0
 
     output = capsys.readouterr().out
-    assert "--add-label taqt/status/done" in output
-    assert "--add-label taqt/phase/done" in output
-    assert "gh issue close 47 --repo owner/repo" in output
+    assert "taqt task update" in output
+    assert "gh issue edit" not in output
+    assert "gh issue close" not in output
 
 
 def test_run_report_renders_recent_events() -> None:

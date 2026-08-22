@@ -13,18 +13,18 @@ taqt 対象にする条件は次のどちらかです。
 
 `--taqt` は明示依頼時だけ。script が付ける。
 
-- `taqt:pending`
-  - taqt が pick up する起動状態。明示された taqt 対象 issue にのみ付与します。
-- `taqt:phase:triage`
-  - taqt 対象 issue の初期実行フェーズ。
+- `taqt:enabled`
+  - taqt の実行を明示的に許可する固定 label。状態や phase を表しません。
 
 ## Forbidden as manual assignment
 
+- `taqt:pending`
+- `taqt:phase:triage`
 - `taqt:blocked`
 - `taqt:running`
 - `taqt:done`
 
-taqt が更新する。script は受け取るとエラー。
+これらは使用しない。script は受け取るとエラー。
 
 ## Optional labels
 

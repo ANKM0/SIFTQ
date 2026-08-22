@@ -3,7 +3,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from .task_store import issue_branch, load_task
+from .github_labels import enabled_error
+from .task_store import block_task, issue_branch, load_task
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -17,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
-    _path, task = load_task(args.task)
+    task_path, task = load_task(args.task)
     subject = args.message or _default_subject(task)
     status = subprocess.run(
         ["git", "status", "--porcelain"],
@@ -43,6 +44,11 @@ def main(argv: list[str] | None = None) -> int:
         print(" ".join(command))
     if not args.execute:
         return 0
+    label_error = enabled_error(task)
+    if label_error:
+        block_task(task_path, task, label_error)
+        print(label_error)
+        return 2
     if not args.allow_unverified_run:
         run_check = _ensure_verified_run(task)
         if run_check != 0:

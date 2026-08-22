@@ -40,18 +40,17 @@ New issues are not taqt targets by default.
 
 Ask before taqt unless explicitly requested.
 
-For taqt, pass `--taqt`; script adds:
-
-- `taqt:pending`
-- `taqt:phase:triage`
+For taqt, pass `--taqt`; script adds `taqt:enabled`.
 
 Script rejects:
 
+- `taqt:pending`
+- `taqt:phase:triage`
 - `taqt:blocked`
 - `taqt:running`
 - `taqt:done`
 
-Automation sets these.
+These labels are not used.
 
 Pass optional labels with repeated `--label`.
 

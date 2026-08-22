@@ -5,17 +5,17 @@ env:
 
 tasks:
   create:
-    desc: Create a taqt task from a GitHub Issue, for example task taqt:create -- --repo ANKM0/SIFTQ --issue 123.
+    desc: Create a taqt task from a taqt:enabled GitHub Issue.
     cmds:
       - uv run python -m taqt.task_create {{.CLI_ARGS}}
 
   run:
-    desc: Run a taqt task through the configured development feedback loop.
+    desc: Run a taqt:enabled task through the configured development feedback loop.
     cmds:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
   auto:
-    desc: Run a taqt task through run, commit, push, PR, and optional merge routing.
+    desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.
     cmds:
       - uv run python -m taqt.task_auto {{.CLI_ARGS}}
 
@@ -30,17 +30,17 @@ tasks:
       - uv run python -m taqt.task_cleanup {{.CLI_ARGS}}
 
   worker:
-    desc: Run pending taqt tasks in parallel, one git worktree per task.
+    desc: Run pending taqt:enabled tasks in parallel, one git worktree per task.
     cmds:
       - uv run python -m taqt.task_worker {{.CLI_ARGS}}
 
   watch:
-    desc: Watch GitHub Issues and create/update taqt tasks.
+    desc: Watch taqt:enabled GitHub Issues and create/update taqt tasks.
     cmds:
       - uv run python -m taqt.github_watch {{.CLI_ARGS}}
 
   sync:
-    desc: Sync a taqt task state back to its GitHub Issue comment.
+    desc: Sync a taqt task progress comment to its GitHub Issue.
     cmds:
       - uv run python -m taqt.github_sync {{.CLI_ARGS}}
 
