@@ -6,12 +6,13 @@ from pathlib import Path
 FLASH_MODEL = "deepseek-v4-flash"
 PRO_MODEL = "deepseek-v4-pro"
 MODELS = (FLASH_MODEL, PRO_MODEL)
-DEFAULT_HOME = Path.home() / ".codex-deepseek"
 
 
 def default_codex_home() -> Path:
     configured = os.environ.get("TAQT_DEEPSEEK_CODEX_HOME")
-    return Path(configured).expanduser() if configured else DEFAULT_HOME
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".codex-deepseek"
 
 
 def ensure_codex_home(codex_home: Path) -> Path:
@@ -53,10 +54,10 @@ def _config_text(models_path: Path) -> str:
     )
 
 
-def write_codex_profile_config(target: Path) -> None:
-    codex_home = default_codex_home()
-    ensure_codex_home(codex_home)
-    models_path = codex_home / "models.json"
+def write_codex_profile_config(target: Path, *, codex_home: Path | None = None) -> None:
+    home = codex_home or default_codex_home()
+    ensure_codex_home(home)
+    models_path = home / "models.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(_config_text(models_path), encoding="utf-8")
     _restrict_file(target)

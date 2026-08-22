@@ -20,3 +20,4 @@ target/
 .taqt/runs/
 .taqt/worktrees/
 .taqt/config/active.yaml
+.taqt/codex-home/

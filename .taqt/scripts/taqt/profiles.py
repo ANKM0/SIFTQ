@@ -3,6 +3,8 @@ from typing import Any
 
 import yaml
 
+from .deepseek import default_codex_home
+
 
 DEFAULT_PROFILE = "main"
 PROFILES_FILE_NAME = "profiles.yaml"
@@ -53,3 +55,29 @@ def resolve_profile(loop_root: Path, requested: str | None = None) -> str:
         available = ", ".join(sorted(profiles))
         raise ValueError(f"unknown taqt profile: {profile}; available: {available}")
     return profile
+
+
+def resolve_codex_home(
+    profile_spec: dict[str, Any],
+    workspace: Path,
+    *,
+    profile: str,
+    override: Path | None = None,
+) -> Path:
+    """Resolve the Codex home directory for a profile.
+
+    Priority: CLI override, then the profile's ``codex_home`` setting
+    (absolute and tilde paths preserved, relative paths resolved against
+    ``workspace``), then the profile-specific default.
+    """
+    if override is not None:
+        return Path(override)
+    configured = profile_spec.get("codex_home")
+    if isinstance(configured, str) and configured:
+        expanded = Path(configured).expanduser()
+        if expanded.is_absolute():
+            return expanded
+        return workspace / expanded
+    if profile == "deepseek":
+        return default_codex_home()
+    return Path.home() / ".codex"
