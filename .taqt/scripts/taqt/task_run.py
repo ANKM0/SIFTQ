@@ -1,4 +1,6 @@
 import argparse
+import getpass
+import os
 from pathlib import Path
 
 from loop.runner import run_loop
@@ -17,6 +19,8 @@ from .task_store import (
     triage_task,
 )
 from .self_improvement import request_self_improvement
+from .deepseek import default_codex_home, ensure_codex_home
+from .profiles import load_profiles, resolve_profile
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
 
@@ -30,8 +34,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workspace", type=Path, default=Path("."))
     parser.add_argument("--worker-id", default="local")
     parser.add_argument("--resume", type=Path)
+    parser.add_argument("--profile")
+    parser.add_argument("--codex-home", type=Path)
     parser.add_argument("--skip-readiness-check", action="store_true")
     args = parser.parse_args(argv)
+
+    try:
+        profile = resolve_profile(args.loop_root, args.profile)
+        profiles = load_profiles(args.loop_root)
+    except ValueError as error:
+        print(error)
+        return 2
+    profile_spec = profiles[profile]
 
     if args.task:
         task_path, task = load_task(args.task, args.task_root)
@@ -84,18 +98,41 @@ def main(argv: list[str] | None = None) -> int:
         for warning in warnings:
             print(f"Task {task['id']} readiness warning: {warning}")
 
+    loop_name = str(profile_spec["loop"])
+    loop_path = args.loop_root / f"{loop_name}.yaml"
+    deepseek_api_key = ""
+    deepseek_codex_home = Path()
+    if profile == "deepseek":
+        env_key = str(profile_spec.get("env_key") or "DEEPSEEK_API_KEY")
+        deepseek_api_key = os.environ.get(env_key) or _prompt_api_key()
+        if not deepseek_api_key:
+            print(f"{env_key} is required.")
+            return 2
+        deepseek_codex_home = _codex_home(profile_spec, args.codex_home)
+        ensure_codex_home(deepseek_codex_home)
+
     task["status"] = "running"
     task["worker"] = {"id": args.worker_id, "started_at": utc_now(), "heartbeat_at": utc_now()}
     save_task(task_path, task)
 
-    loop_path = args.loop_root / f"{task['loop']}.yaml"
-    result = run_loop(
-        loop_path=loop_path,
-        task_path=task_path,
-        workspace=args.workspace,
-        runs_root=args.runs_root,
-        resume_dir=args.resume,
-    )
+    if profile == "deepseek":
+        result = _run_with_environment(
+            loop_path=loop_path,
+            task_path=task_path,
+            workspace=args.workspace,
+            runs_root=args.runs_root,
+            resume_dir=args.resume,
+            api_key=deepseek_api_key,
+            codex_home=deepseek_codex_home,
+        )
+    else:
+        result = run_loop(
+            loop_path=loop_path,
+            task_path=task_path,
+            workspace=args.workspace,
+            runs_root=args.runs_root,
+            resume_dir=args.resume,
+        )
 
     label_error = enabled_error(task)
     if label_error:
@@ -155,6 +192,32 @@ def _resume_error(task: dict[str, object], resume_dir: Path) -> str | None:
     if task.get("status") in TERMINAL_STATUSES and not expected_id:
         return f"Task {task['id']} has terminal status {task.get('status')} and no resumable run."
     return None
+
+
+def _prompt_api_key() -> str:
+    try:
+        return getpass.getpass("DeepSeek API key: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+
+def _codex_home(profile_spec: dict[str, object], override: Path | None) -> Path:
+    if override is not None:
+        return override
+    configured = profile_spec.get("codex_home")
+    if isinstance(configured, str) and configured:
+        return Path(configured).expanduser()
+    return default_codex_home()
+
+
+def _run_with_environment(*, api_key: str, codex_home: Path, **kwargs: object) -> dict[str, object]:
+    return run_loop(
+        **kwargs,
+        child_environment={
+            "DEEPSEEK_API_KEY": api_key,
+            "CODEX_HOME": str(codex_home),
+        },
+    )
 
 
 if __name__ == "__main__":

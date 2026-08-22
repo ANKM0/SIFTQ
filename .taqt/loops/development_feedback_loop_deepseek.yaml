@@ -1,0 +1,138 @@
+version: 1
+id: development_feedback_loop_deepseek
+
+limits:
+  max_iterations: 12
+  max_fix_attempts: 3
+
+agents:
+  design:
+    role: design
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    writes:
+      - .taqt/loops/
+      - docs/requirements/
+      - docs/wireframes/
+      - docs/adr/
+      - docs/contributing/
+  decompose:
+    role: task_decomposer
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+  orchestrate:
+    role: orchestrator
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+  test:
+    role: test_author
+    adapter: codex
+    model: deepseek-v4-flash
+    reasoning_effort: high
+    writes:
+      - tests/
+      - .taqt/tests/
+  implement:
+    role: implementation
+    adapter: codex
+    model: deepseek-v4-flash
+    reasoning_effort: high
+  fix:
+    role: implementation_fixer
+    adapter: codex
+    model: deepseek-v4-flash
+    reasoning_effort: high
+  checker:
+    role: checker
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+  judge:
+    role: final_judge
+    adapter: codex
+    model: deepseek-v4-pro
+    reasoning_effort: high
+    readonly: true
+
+steps:
+  - id: design
+    kind: llm
+    agent: design
+    next: decompose
+
+  - id: decompose
+    kind: llm
+    agent: decompose
+    next: orchestrate
+
+  - id: orchestrate
+    kind: llm
+    agent: orchestrate
+    next: test
+
+  - id: test
+    kind: llm
+    agent: test
+    next: implement
+
+  - id: implement
+    kind: llm
+    agent: implement
+    next: observe
+
+  - id: observe
+    kind: commands
+    run:
+      - task ci:markdown
+      - task ci:typecheck
+      - task ci:lint
+      - task ci:test
+      - task ci:build
+    on_success: checker
+    on_failure: decide
+
+  - id: fix
+    kind: llm
+    agent: fix
+    next: observe
+    on_failure: human
+
+  - id: decide
+    kind: policy
+    routes:
+      - when: implementation_feedback
+        next: fix
+      - when: test_feedback
+        next: fix
+      - when: local_design_feedback
+        next: design
+      - when: specification_feedback
+        next: human
+      - when: product_feedback
+        next: human
+      - when: unknown
+        next: human
+
+  - id: checker
+    kind: llm
+    agent: checker
+    next: judge
+    on_failure: fix
+
+  - id: judge
+    kind: llm
+    agent: judge
+    next: done
+    on_failure: fix
+
+  - id: done
+    kind: terminal
+
+  - id: human
+    kind: terminal

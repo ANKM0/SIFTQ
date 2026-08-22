@@ -1,0 +1,7 @@
+profiles:
+  main:
+    loop: development_feedback_loop
+  deepseek:
+    loop: development_feedback_loop_deepseek
+    codex_home: ~/.codex-deepseek
+    env_key: DEEPSEEK_API_KEY

@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from .github_labels import ENABLED_LABEL
+from .profiles import load_profiles, resolve_profile
 from .task_store import DEFAULT_TASK_ROOT, create_issue_task, upsert_issue_task
 
 
@@ -11,13 +12,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-task-create")
     parser.add_argument("--repo", required=True)
     parser.add_argument("--issue", required=True, type=int)
-    parser.add_argument("--loop", default="development_feedback_loop")
+    parser.add_argument("--loop")
+    parser.add_argument("--profile")
+    parser.add_argument("--loop-root", type=Path, default=Path(".taqt/loops"))
     parser.add_argument("--priority", default="normal", choices=["low", "normal", "high"])
     parser.add_argument("--requirement")
     parser.add_argument("--branch-summary")
     parser.add_argument("--id")
     parser.add_argument("--task-root", type=Path, default=DEFAULT_TASK_ROOT)
     args = parser.parse_args(argv)
+
+    try:
+        profile = resolve_profile(args.loop_root, args.profile)
+        profiles = load_profiles(args.loop_root)
+    except ValueError as error:
+        print(error)
+        return 2
+    loop = args.loop or str(profiles[profile]["loop"])
 
     issue = _fetch_issue(args.repo, args.issue)
     if issue is None:
@@ -30,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         path, _task = create_issue_task(
             repo=args.repo,
             issue_number=args.issue,
-            loop=args.loop,
+            loop=loop,
             priority=args.priority,
             requirement=args.requirement,
             branch_summary=args.branch_summary or issue.get("title"),
@@ -44,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         path, _task, _created = upsert_issue_task(
             repo=args.repo,
             issue_number=args.issue,
-            loop=args.loop,
+            loop=loop,
             priority=args.priority,
             requirement=args.requirement,
             branch_summary=args.branch_summary,
