@@ -1555,3 +1555,52 @@ def test_run_report_renders_recent_events() -> None:
 
     assert "# taqt run ISSUE-1" in report
     assert "implementation_feedback -> human" in report
+
+
+def test_run_report_renders_design_artifact_reference() -> None:
+    report = render_report(
+        {
+            "task_id": "ISSUE-166",
+            "status": "done",
+            "current_step": "done",
+            "iteration": 1,
+            "last_feedback": None,
+        },
+        [
+            {
+                "type": "design_artifact",
+                "step": "design",
+                "artifact_path": "artifacts/design-decision.md",
+                "summary": "Use the run artifact",
+                "status": "created",
+            }
+        ],
+    )
+
+    assert "[artifacts/design-decision.md](artifacts/design-decision.md)" in report
+    assert "(created) / Use the run artifact" in report
+
+
+def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    old_design_doc = repository_root / "docs/design/#134.md"
+    adr_0002 = repository_root / "docs/adr/0002-separate-adr-and-design-docs.md"
+    adr_0012 = repository_root / "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md"
+    adr_index = repository_root / "docs/adr/README.md"
+    design_index = repository_root / "docs/design/README.md"
+    readme = repository_root / "README.md"
+
+    assert not old_design_doc.exists()
+    assert "> Status: Superseded by [ADR 0012]" in adr_0002.read_text(encoding="utf-8")
+
+    migrated_policy = adr_0012.read_text(encoding="utf-8")
+    assert "GitHub Issue を要求" in migrated_policy
+    assert "`state.json`、`events.jsonl`、artifact" in migrated_policy
+    assert "script adapter" in migrated_policy
+
+    assert "ADR 0002" in adr_index.read_text(encoding="utf-8")
+    assert "Superseded by ADR 0012" in adr_index.read_text(encoding="utf-8")
+    assert "[#134]" not in design_index.read_text(encoding="utf-8")
+    assert "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md" in readme.read_text(
+        encoding="utf-8"
+    )
