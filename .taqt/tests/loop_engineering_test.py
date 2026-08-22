@@ -1592,6 +1592,7 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     design_skill = repository_root / ".agents/skills/design-doc-authoring"
     loop_definition = repository_root / ".taqt/loops/development_feedback_loop.yaml"
     readme = repository_root / "README.md"
+    future_readme = repository_root / "docs/future/README.md"
 
     assert not old_design_doc.exists()
     assert "> Status: Superseded by [ADR 0012]" in adr_0002.read_text(encoding="utf-8")
@@ -1611,6 +1612,12 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     adr_0011_text = adr_0011.read_text(encoding="utf-8")
     assert "Design Doc #165" not in adr_0011_text
     assert "https://github.com/ANKM0/SIFTQ/issues/165" in adr_0011_text
-    assert "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md" in readme.read_text(
-        encoding="utf-8"
-    )
+    readme_text = readme.read_text(encoding="utf-8")
+    assert "docs/design/" not in readme_text
+    assert ".taqt/runs/" in readme_text
+    assert "docs/adr/0012-adopt-taqt-centered-loop-engineering-policy.md" in readme_text
+    future_text = future_readme.read_text(encoding="utf-8")
+    assert "docs/design/" not in future_text
+    assert "docs/requirements/" in future_text
+    assert "docs/adr/" in future_text
+    assert "taqt run artifact" in future_text
