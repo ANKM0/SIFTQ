@@ -1593,6 +1593,7 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     loop_definition = repository_root / ".taqt/loops/development_feedback_loop.yaml"
     readme = repository_root / "README.md"
     future_readme = repository_root / "docs/future/README.md"
+    wireframe = repository_root / "docs/wireframes/task-redesign.md"
 
     assert not old_design_doc.exists()
     assert "> Status: Superseded by [ADR 0012]" in adr_0002.read_text(encoding="utf-8")
@@ -1621,3 +1622,6 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     assert "docs/requirements/" in future_text
     assert "docs/adr/" in future_text
     assert "taqt run artifact" in future_text
+    wireframe_text = wireframe.read_text(encoding="utf-8")
+    assert "external design document" not in wireframe_text
+    assert "requirements" in wireframe_text
