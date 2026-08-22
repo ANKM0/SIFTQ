@@ -221,6 +221,8 @@ def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: P
         "deepseek-v4-flash",
         "deepseek-v4-pro",
     }
+    assert all("base_instructions" in model for model in catalog["models"])
+    assert all("instructions_template" in model["model_messages"] for model in catalog["models"])
 
 
 def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:

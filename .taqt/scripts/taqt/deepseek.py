@@ -70,9 +70,27 @@ def _ensure_models_catalog(models_path: Path) -> None:
         for entry in entries
         if isinstance(entry, dict) and isinstance(entry.get("slug"), str)
     }
+    changed = False
     missing = [model for model in MODELS if model not in slugs]
     if missing:
         entries.extend(_model_catalog(model) for model in missing)
+        changed = True
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        model = entry.get("slug")
+        if model not in MODELS:
+            continue
+        defaults = _model_catalog(str(model))
+        for key in ("base_instructions", "model_messages"):
+            if key not in entry or (key == "model_messages" and not isinstance(entry[key], dict)):
+                entry[key] = defaults[key]
+                changed = True
+        model_messages = entry.get("model_messages")
+        if isinstance(model_messages, dict) and "instructions_template" not in model_messages:
+            model_messages["instructions_template"] = defaults["model_messages"]["instructions_template"]
+            changed = True
+    if changed:
         models_path.write_text(
             json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
@@ -119,7 +137,10 @@ def _model_catalog(model: str) -> dict[str, object]:
         "availability_nux": None,
         "upgrade": None,
         "priority": 1,
-        "model_messages": None,
+        "base_instructions": "You are a coding agent. Complete the assigned task using the repository and return the requested JSON result.",
+        "model_messages": {
+            "instructions_template": "You are a coding agent. Complete the assigned task using the repository and return the requested JSON result.",
+        },
         "experimental_supported_tools": [],
         "supports_search_tool": True,
         "supports_reasoning_summaries": True,
