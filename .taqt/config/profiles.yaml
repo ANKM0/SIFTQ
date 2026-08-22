@@ -1,7 +1,8 @@
 profiles:
   main:
     loop: development_feedback_loop
+    codex_home: .taqt/codex-home/main
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
+    codex_home: .taqt/codex-home/deepseek
     env_key: DEEPSEEK_API_KEY

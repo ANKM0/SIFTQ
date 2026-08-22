@@ -10,7 +10,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / ".taqt" / "scripts"))
 
 from taqt.deepseek import write_codex_profile_config
-from taqt.profiles import ACTIVE_FILE_NAME, load_profiles, config_dir
+from taqt.profiles import (
+    ACTIVE_FILE_NAME,
+    load_profiles,
+    resolve_codex_home,
+    config_dir,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,6 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     set_parser = subparsers.add_parser("set")
     set_parser.add_argument("profile")
     subparsers.add_parser("show")
+    path_parser = subparsers.add_parser("path")
+    path_parser.add_argument("profile")
     args = parser.parse_args(argv)
 
     loop_root = REPO_ROOT / ".taqt" / "loops"
@@ -33,11 +40,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unknown taqt profile: {profile}; available: {available}")
         return 2
 
+    if args.command == "path":
+        print(resolve_codex_home(profiles[profile], REPO_ROOT, profile=profile))
+        return 0
+
+    codex_home = resolve_codex_home(profiles[profile], REPO_ROOT, profile=profile)
     if profile == "deepseek":
-        _backup_codex_config()
-        write_codex_profile_config(_codex_config_path())
+        write_codex_profile_config(codex_home / "config.toml", codex_home=codex_home)
     else:
-        if not _install_main_codex_config():
+        if not _install_main_codex_config(codex_home):
             return 2
 
     _write_active_profile(loop_root, profile)
@@ -67,27 +78,17 @@ def _write_active_profile(loop_root: Path, profile: str) -> None:
     )
 
 
-def _codex_config_path() -> Path:
-    return Path.home() / ".codex" / "config.toml"
-
-
-def _backup_codex_config() -> None:
-    target = _codex_config_path()
-    backup = target.with_suffix(".toml.bak")
-    if target.exists() and not backup.exists():
-        shutil.copyfile(target, backup)
-
-
-def _install_main_codex_config() -> bool:
-    target = _codex_config_path()
-    main_template = target.parent / "config.main.toml"
-    fallback = target.parent / "backup-deepseek" / "config.toml"
+def _install_main_codex_config(codex_home: Path) -> bool:
+    target = codex_home / "config.toml"
+    source_dir = Path.home() / ".codex"
+    main_template = source_dir / "config.main.toml"
+    fallback = source_dir / "backup-deepseek" / "config.toml"
     if main_template.exists():
-        _backup_codex_config()
+        target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(main_template, target)
         return True
     if fallback.exists():
-        _backup_codex_config()
+        target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(fallback, target)
         return True
     print(

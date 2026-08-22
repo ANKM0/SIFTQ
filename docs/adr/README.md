@@ -16,3 +16,8 @@
 | [ADR 0010: Vite+ と Bun を初期開発ツールチェーンとして採用する](0010-adopt-vite-plus-and-bun-toolchain.md) | Accepted. | Vite+ を開発ツールチェーン、Bun をパッケージマネージャに採用する。 |
 | [ADR 0011: Resolve loop reasoning effort in Codex adapter](0011-resolve-loop-reasoning-effort-in-codex-adapter.md) | Accepted. | reasoning effort は step、agent、環境変数の順で解決し、指定時だけ Codex の config override に渡す。 |
 | [ADR 0012: taqt 中心の loop engineering 実行方針](0012-adopt-taqt-centered-loop-engineering-policy.md) | Accepted. | Issue を要求の正本、taqt run を実行記録とし、外部連携を script adapter に分離する。 |
+| [ADR 0013: worktree ごとの graphify 更新 Task](0013-worktree-scoped-graphify-update-task.md) | Accepted. | `task graphify:update` は worktree root を更新し、runtime 不在時は導入方法を含むエラーで止める。 |
+| [ADR 0014: `repo:pull-main` の pull と graphify 更新](0014-repo-pull-main-guards.md) | Accepted. | main 以外または dirty worktree では pull せず、pull が成功して HEAD が更新された場合だけ graphify を更新する。 |
+| [ADR 0015: worktree ごとの Codex 設定保存先と起動 Task](0015-worktree-scoped-codex-home.md) | Accepted. | `CODEX_HOME` を worktree root 基準の profile 別パスへ解決し、Codex 起動 Task と profile 切替が同じ保存先を使う。 |
+| [ADR 0016: worktree ごとの `git pull` 振り分け shell function](0016-worktree-scoped-git-pull-shell-function.md) | Accepted. | Yoriwake の interactive shell で、SIFTQ worktree 内の引数なし `git pull` だけを `task repo:pull-main` へ振り分ける。 |
+| [ADR 0017: `.learnings` を共有追跡成果物として維持する](0017-keep-learnings-tracked-as-shared-artifacts.md) | Accepted. | `.learnings/LEARNINGS.md` など 3 ファイルは追跡対象かつ PR レビュー・マージ対象のまま維持し、`.learnings/` は ignore しない。 |

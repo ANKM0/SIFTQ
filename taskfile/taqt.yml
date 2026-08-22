@@ -23,13 +23,17 @@ tasks:
     desc: Switch Codex and taqt to the main/OpenAI profile.
     cmds:
       - uv run python scripts/switch_codex_profile.py set main
-      - codex login
+      - |
+        export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path main)"
+        codex login
 
   switch:deepseek:
     desc: Switch Codex and taqt to the DeepSeek profile.
     cmds:
       - uv run python scripts/switch_codex_profile.py set deepseek
-      - codex logout
+      - |
+        export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)"
+        codex logout
 
   auto:
     desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.

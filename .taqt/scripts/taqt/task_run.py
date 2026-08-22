@@ -19,8 +19,8 @@ from .task_store import (
     triage_task,
 )
 from .self_improvement import request_self_improvement
-from .deepseek import default_codex_home, ensure_codex_home
-from .profiles import load_profiles, resolve_profile
+from .deepseek import ensure_codex_home
+from .profiles import load_profiles, resolve_codex_home, resolve_profile
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
 
@@ -100,39 +100,34 @@ def main(argv: list[str] | None = None) -> int:
 
     loop_name = str(profile_spec["loop"])
     loop_path = args.loop_root / f"{loop_name}.yaml"
-    deepseek_api_key = ""
-    deepseek_codex_home = Path()
+    codex_home = resolve_codex_home(
+        profile_spec,
+        args.workspace,
+        profile=profile,
+        override=args.codex_home,
+    )
+    child_environment: dict[str, str] = {"CODEX_HOME": str(codex_home)}
     if profile == "deepseek":
         env_key = str(profile_spec.get("env_key") or "DEEPSEEK_API_KEY")
-        deepseek_api_key = os.environ.get(env_key) or _prompt_api_key()
-        if not deepseek_api_key:
+        api_key = os.environ.get(env_key) or _prompt_api_key()
+        if not api_key:
             print(f"{env_key} is required.")
             return 2
-        deepseek_codex_home = _codex_home(profile_spec, args.codex_home)
-        ensure_codex_home(deepseek_codex_home)
+        ensure_codex_home(codex_home)
+        child_environment["DEEPSEEK_API_KEY"] = api_key
 
     task["status"] = "running"
     task["worker"] = {"id": args.worker_id, "started_at": utc_now(), "heartbeat_at": utc_now()}
     save_task(task_path, task)
 
-    if profile == "deepseek":
-        result = _run_with_environment(
-            loop_path=loop_path,
-            task_path=task_path,
-            workspace=args.workspace,
-            runs_root=args.runs_root,
-            resume_dir=args.resume,
-            api_key=deepseek_api_key,
-            codex_home=deepseek_codex_home,
-        )
-    else:
-        result = run_loop(
-            loop_path=loop_path,
-            task_path=task_path,
-            workspace=args.workspace,
-            runs_root=args.runs_root,
-            resume_dir=args.resume,
-        )
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=args.workspace,
+        runs_root=args.runs_root,
+        resume_dir=args.resume,
+        child_environment=child_environment,
+    )
 
     label_error = enabled_error(task)
     if label_error:
@@ -199,25 +194,6 @@ def _prompt_api_key() -> str:
         return getpass.getpass("DeepSeek API key: ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
-
-
-def _codex_home(profile_spec: dict[str, object], override: Path | None) -> Path:
-    if override is not None:
-        return override
-    configured = profile_spec.get("codex_home")
-    if isinstance(configured, str) and configured:
-        return Path(configured).expanduser()
-    return default_codex_home()
-
-
-def _run_with_environment(*, api_key: str, codex_home: Path, **kwargs: object) -> dict[str, object]:
-    return run_loop(
-        **kwargs,
-        child_environment={
-            "DEEPSEEK_API_KEY": api_key,
-            "CODEX_HOME": str(codex_home),
-        },
-    )
 
 
 if __name__ == "__main__":

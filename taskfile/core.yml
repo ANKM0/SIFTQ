@@ -27,6 +27,25 @@ tasks:
     cmds:
       - pnpm install --frozen-lockfile
 
+  graphify:update:
+    desc: Update the graphify knowledge graph for the worktree root.
+    cmds:
+      - |
+        set -eu
+        if ! command -v graphify >/dev/null 2>&1; then
+          echo "graphify runtime is not available." >&2
+          echo "Install it with one of the following commands and rerun:" >&2
+          echo "  uv tool install graphifyy" >&2
+          echo "  python3 -m pip install graphifyy" >&2
+          exit 1
+        fi
+        graphify update {{.ROOT_DIR}}
+
+  repo:pull-main:
+    desc: Pull main only from a clean main worktree, then update graphify when HEAD moves.
+    cmds:
+      - uv run python scripts/repo_pull_main.py
+
   pytest:
     desc: Run pytest with optional file targets and additional arguments.
     cmds:
