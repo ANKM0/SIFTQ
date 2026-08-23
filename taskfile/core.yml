@@ -18,12 +18,12 @@ tasks:
       - uv sync --all-groups
 
   setup:frontend:
-    desc: Install frontend dependencies with pnpm.
+    desc: Install Node dependencies with pnpm.
     cmds:
       - pnpm install
 
   setup:frontend:ci:
-    desc: Install frontend dependencies from the lockfile.
+    desc: Install Node dependencies from the lockfile.
     cmds:
       - pnpm install --frozen-lockfile
 
@@ -140,7 +140,7 @@ tasks:
     cmds:
       - |
         if [ ! -d src ]; then
-          echo "Skipping frontend tests: src/ does not exist yet."
+          echo "Skipping Worker tests: src/ does not exist yet."
           exit 0
         fi
         pnpm test
@@ -190,7 +190,7 @@ tasks:
         pnpm exec jscpd src --config .jscpd.json
 
   ci:dead-code:
-    desc: Reject unused frontend exports, files, and types.
+    desc: Reject unused TypeScript exports, files, and types.
     cmds:
       - |
         if [ ! -d src ]; then
