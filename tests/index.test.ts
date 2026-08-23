@@ -3,6 +3,8 @@ import app from "../src/index";
 
 const HTMX_SCRIPT_URL =
   "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
+const SORTABLE_SCRIPT_URL =
+  "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js";
 const HX_REQUEST = { "HX-Request": "true" };
 
 async function requestBody(path: string, init?: RequestInit): Promise<string> {
@@ -23,6 +25,18 @@ async function createTask(title: string): Promise<{ id: string; title: string }>
   return { id, title };
 }
 
+function matrixAreaTaskIds(body: string, area: number): string[] {
+  const section = body.match(
+    new RegExp(
+      `<section class="matrix-area" data-area="${area}">([\\s\\S]*?)</section>`,
+    ),
+  );
+  const ids = [...(section?.[1]?.matchAll(/data-task-id="([^"]+)"/g) ?? [])];
+  return ids
+    .map((match) => match[1])
+    .filter((id): id is string => id !== undefined);
+}
+
 describe("GET / (Matrix)", () => {
   it("returns a full page with HTMX and no React client root", async () => {
     const response = await app.request("/");
@@ -33,6 +47,12 @@ describe("GET / (Matrix)", () => {
     expect(body).toContain("<html");
     expect(body).toContain('<main id="page">');
     expect(body).toContain(HTMX_SCRIPT_URL);
+    expect(body).toContain(SORTABLE_SCRIPT_URL);
+    expect(body).toContain("Sortable.create(list");
+    expect(body).toContain('addEventListener("htmx:load", initMatrixSortable)');
+    expect(body).toContain('data-sortable-group="matrix"');
+    expect(body).toContain('data-task-id="seed-1"');
+    expect(body).toContain('data-area="1"');
     expect(body).toContain('hx-get="/tasks/new"');
     expect(body).toContain('hx-target="#page"');
     expect(body).toContain('hx-swap="innerHTML"');
@@ -244,6 +264,114 @@ describe("area change", () => {
     expect(body).toContain(`hx-get="/tasks/${id}/area/menu"`);
     expect(body).not.toContain("<html");
     expect(body).not.toContain("<script");
+  });
+});
+
+describe("matrix move across areas", () => {
+  it("moves a task to another area through the move endpoint", async () => {
+    const { id } = await createTask(`move area ${Date.now()}`);
+    const response = await app.request(`/tasks/${id}/move`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        ...HX_REQUEST,
+      },
+      body: new URLSearchParams({ area: "4", order: "0" }).toString(),
+    });
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain('data-sortable-group="matrix"');
+    expect(body).not.toContain("<html");
+    expect(body).not.toContain("<script");
+    expect(matrixAreaTaskIds(body, 4)).toContain(id);
+    expect(matrixAreaTaskIds(body, 1)).not.toContain(id);
+
+    const matrixBody = await requestBody("/", { headers: HX_REQUEST });
+    expect(matrixAreaTaskIds(matrixBody, 4)).toContain(id);
+    expect(matrixAreaTaskIds(matrixBody, 1)).not.toContain(id);
+  });
+});
+
+describe("matrix move inside an area", () => {
+  it("reorders tasks inside the same area through the move endpoint", async () => {
+    const first = await createTask(`move first ${Date.now()}`);
+    const second = await createTask(`move second ${Date.now()}`);
+    const before = await requestBody("/", { headers: HX_REQUEST });
+    const beforeIds = matrixAreaTaskIds(before, 1);
+    const firstIndex = beforeIds.indexOf(first.id);
+    const secondIndex = beforeIds.indexOf(second.id);
+
+    expect(firstIndex).toBeGreaterThanOrEqual(0);
+    expect(secondIndex).toBeGreaterThan(firstIndex);
+
+    const response = await app.request(`/tasks/${first.id}/move`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        ...HX_REQUEST,
+      },
+      body: new URLSearchParams({
+        area: "1",
+        order: String(secondIndex),
+      }).toString(),
+    });
+    const body = await response.text();
+    const afterIds = matrixAreaTaskIds(body, 1);
+
+    expect(response.status).toBe(200);
+    expect(afterIds.indexOf(first.id)).toBeGreaterThan(
+      afterIds.indexOf(second.id),
+    );
+  });
+});
+
+describe("matrix move validation", () => {
+  it("rejects invalid move input and leaves the task in its area", async () => {
+    const { id } = await createTask(`invalid move ${Date.now()}`);
+    const response = await app.request(`/tasks/${id}/move`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        ...HX_REQUEST,
+      },
+      body: new URLSearchParams({ area: "9", order: "0" }).toString(),
+    });
+
+    expect(response.status).toBe(400);
+
+    const matrixBody = await requestBody("/", { headers: HX_REQUEST });
+    expect(matrixAreaTaskIds(matrixBody, 1)).toContain(id);
+  });
+
+  it("rejects an invalid order and leaves the task in its area", async () => {
+    const { id } = await createTask(`invalid order ${Date.now()}`);
+    const response = await app.request(`/tasks/${id}/move`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        ...HX_REQUEST,
+      },
+      body: new URLSearchParams({ area: "1", order: "abc" }).toString(),
+    });
+
+    expect(response.status).toBe(400);
+
+    const matrixBody = await requestBody("/", { headers: HX_REQUEST });
+    expect(matrixAreaTaskIds(matrixBody, 1)).toContain(id);
+  });
+
+  it("returns 404 when the task does not exist", async () => {
+    const response = await app.request("/tasks/missing-task/move", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        ...HX_REQUEST,
+      },
+      body: new URLSearchParams({ area: "1", order: "0" }).toString(),
+    });
+
+    expect(response.status).toBe(404);
   });
 });
 

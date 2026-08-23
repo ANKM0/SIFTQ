@@ -50,6 +50,40 @@ export function changeTaskArea(task: Task, area: TaskArea): Task {
   return { ...task, area };
 }
 
+export function moveTask(
+  tasks: readonly Task[],
+  taskId: string,
+  area: TaskArea,
+  order: number,
+): Task[] {
+  const task = tasks.find((candidate) => candidate.id === taskId);
+  if (!task) return [...tasks];
+
+  const areaTasks = tasks
+    .filter(
+      (candidate) =>
+        candidate.id !== taskId &&
+        candidate.status === "do" &&
+        candidate.area === area,
+    )
+    .sort((a, b) => a.order - b.order);
+  const safeOrder = Number.isInteger(order) ? order : 0;
+  const targetIndex = Math.max(0, Math.min(safeOrder, areaTasks.length));
+  areaTasks.splice(targetIndex, 0, { ...task, area, order: targetIndex });
+
+  const reorderedAreaTasks = areaTasks.map((candidate, index) => ({
+    ...candidate,
+    order: index,
+  }));
+  const otherTasks = tasks.filter(
+    (candidate) =>
+      candidate.id !== taskId &&
+      !(candidate.status === "do" && candidate.area === area),
+  );
+
+  return [...otherTasks, ...reorderedAreaTasks];
+}
+
 export function sortForMatrix(tasks: readonly Task[]): Task[] {
   return tasks
     .filter((task) => task.status === "do")

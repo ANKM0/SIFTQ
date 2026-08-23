@@ -3,6 +3,7 @@ import {
   changeTaskArea,
   changeTaskStatus,
   createTask,
+  moveTask,
   seedTasks,
   sortForMatrix,
   updateTask,
@@ -57,6 +58,65 @@ describe("changeTaskArea", () => {
 
     expect(moved.area).toBe(4);
     expect(moved.status).toBe("do");
+  });
+});
+
+describe("moveTask", () => {
+  it("reorders tasks inside the same area without mutating the input", () => {
+    const tasks: Task[] = [
+      { ...baseTask, id: "a", area: 1, order: 0 },
+      { ...baseTask, id: "b", area: 1, order: 1 },
+    ];
+
+    const moved = moveTask(tasks, "a", 1, 1);
+
+    expect(moved.map((task) => task.id)).toEqual(["b", "a"]);
+    expect(moved.filter((task) => task.area === 1).map((task) => task.order)).toEqual([
+      0, 1,
+    ]);
+    expect(tasks.map((task) => task.id)).toEqual(["a", "b"]);
+  });
+
+  it("moves a task to another area and normalizes the target order", () => {
+    const tasks: Task[] = [
+      { ...baseTask, id: "a", area: 1, order: 0 },
+      { ...baseTask, id: "b", area: 1, order: 1 },
+      { ...baseTask, id: "c", area: 2, order: 0 },
+    ];
+
+    const moved = moveTask(tasks, "b", 2, 0);
+
+    expect(moved.find((task) => task.id === "b")).toMatchObject({
+      area: 2,
+      order: 0,
+    });
+    expect(
+      moved
+        .filter((task) => task.area === 2)
+        .map((task) => task.id),
+    ).toEqual(["b", "c"]);
+  });
+
+  it("returns a copy unchanged when the task is missing", () => {
+    const tasks: Task[] = [{ ...baseTask }];
+
+    const moved = moveTask(tasks, "missing", 2, 0);
+
+    expect(moved).toEqual(tasks);
+    expect(moved).not.toBe(tasks);
+  });
+
+  it("clamps an out-of-range order to the end of the area list", () => {
+    const tasks: Task[] = [
+      { ...baseTask, id: "a", area: 1, order: 0 },
+      { ...baseTask, id: "b", area: 1, order: 1 },
+      { ...baseTask, id: "c", area: 1, order: 2 },
+    ];
+
+    const moved = moveTask(tasks, "a", 1, 99);
+
+    expect(moved.map((task) => task.id)).toEqual(["b", "c", "a"]);
+    expect(moved.map((task) => task.order)).toEqual([0, 1, 2]);
   });
 });
 
