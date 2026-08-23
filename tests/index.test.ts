@@ -11,6 +11,7 @@ describe("GET /", () => {
     const body = await response.text();
 
     expect(body).toContain("SIFTQ");
+    expect(body).toContain("<h1>SIFTQ</h1>");
     expect(body).not.toMatch(/\bid=["']root["']/i);
     expect(body).not.toContain("createRoot");
     expect(body).not.toMatch(/<script\b/i);
