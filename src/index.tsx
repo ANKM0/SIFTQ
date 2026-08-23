@@ -10,14 +10,46 @@ import {
   createTask,
   isTaskArea,
   isTaskStatus,
+  moveTask,
   seedTasks,
   sortForMatrix,
   updateTask,
 } from "./task";
-import type { Task } from "./task";
+import type { Task, TaskArea } from "./task";
 
 const HTMX_SCRIPT =
   "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
+const SORTABLE_SCRIPT =
+  "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js";
+const MATRIX_DND_SCRIPT = [
+  "function initMatrixSortable() {",
+  '  var lists = document.querySelectorAll(".matrix-cards[data-sortable-group]");',
+  '  if (typeof Sortable === "undefined") return;',
+  '  lists.forEach(function (list) {',
+  "    if (Sortable.get(list)) return;",
+  '    Sortable.create(list, {',
+  '      group: "matrix",',
+  "      animation: 150,",
+  '      onEnd: function (evt) {',
+  "        var card = evt.item;",
+  "        var target = evt.to;",
+  '        var taskId = card.getAttribute("data-task-id");',
+  '        var area = target.getAttribute("data-area");',
+  "        if (!taskId || area === null) return;",
+  '        fetch("/tasks/" + encodeURIComponent(taskId) + "/move", {',
+  '          method: "POST",',
+  '          headers: { "Content-Type": "application/x-www-form-urlencoded" },',
+  '          body: "area=" + encodeURIComponent(area) + "&order=" + encodeURIComponent(String(evt.newIndex))',
+  "        }).then(function (response) {",
+  "          if (!response.ok) window.location.reload();",
+  "        }).catch(function () { window.location.reload(); });",
+  "      }",
+  "    });",
+  "  });",
+  "}",
+  'document.addEventListener("DOMContentLoaded", initMatrixSortable);',
+  'document.addEventListener("htmx:load", initMatrixSortable);',
+].join("\n");
 
 const store: Task[] = seedTasks();
 
@@ -28,6 +60,8 @@ const Layout: FC = ({ children }) => (
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>SIFTQ</title>
       <script src={HTMX_SCRIPT} defer></script>
+      <script src={SORTABLE_SCRIPT} defer></script>
+      <script dangerouslySetInnerHTML={{ __html: MATRIX_DND_SCRIPT }}></script>
     </head>
     <body>
       <main id="page">{children}</main>
@@ -82,6 +116,23 @@ function replaceInStore(tasks: Task[], task: Task, updated: Task) {
   tasks[index] = updated;
 }
 
+function commitTaskMeta(c: Context, task: Task, updated: Task) {
+  replaceInStore(store, task, updated);
+  return c.html(<TaskMeta task={updated} />);
+}
+
+function parseTaskOrder(value: unknown): number | null {
+  if (typeof value !== "string" || value === "") return null;
+  const order = Number(value);
+  if (!Number.isInteger(order) || order < 0) return null;
+  return order;
+}
+
+function parseTaskArea(value: unknown): TaskArea | null {
+  const area = parseTaskOrder(value);
+  return area !== null && isTaskArea(area) ? area : null;
+}
+
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
@@ -92,11 +143,19 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
         {TASK_AREAS.map((area) => (
           <section class="matrix-area" data-area={area}>
             <h2>Area {area}</h2>
-            <div class="matrix-cards">
+            <div
+              class="matrix-cards"
+              data-area={area}
+              data-sortable-group="matrix"
+            >
               {matrixTasks
                 .filter((task) => task.area === area)
                 .map((task) => (
-                  <a class="task-card" {...pageNav(`/tasks/${task.id}`)}>
+                  <a
+                    class="task-card"
+                    data-task-id={task.id}
+                    {...pageNav(`/tasks/${task.id}`)}
+                  >
                     {task.title}
                   </a>
                 ))}
@@ -324,8 +383,7 @@ app.post("/tasks/:id/status", async (c) => {
     return c.html(<TaskMeta task={task} />);
   }
   const updated = changeTaskStatus(task, status);
-  replaceInStore(store, task, updated);
-  return c.html(<TaskMeta task={updated} />);
+  return commitTaskMeta(c, task, updated);
 });
 
 app.post("/tasks/:id/area", async (c) => {
@@ -337,8 +395,25 @@ app.post("/tasks/:id/area", async (c) => {
     return c.html(<TaskMeta task={task} />);
   }
   const updated = changeTaskArea(task, area);
-  replaceInStore(store, task, updated);
-  return c.html(<TaskMeta task={updated} />);
+  return commitTaskMeta(c, task, updated);
+});
+
+app.post("/tasks/:id/move", async (c) => {
+  const task = store.find((t) => t.id === c.req.param("id"));
+  if (!task) return c.notFound();
+  const body = await c.req.parseBody();
+  const area = parseTaskArea(body["area"]);
+  const order = parseTaskOrder(body["order"]);
+  if (area === null || order === null) {
+    return c.text("Invalid move input", 400);
+  }
+  const movedTasks = moveTask(store, task.id, area, order);
+  const updates = new Map(movedTasks.map((moved) => [moved.id, moved]));
+  for (const current of store) {
+    const updated = updates.get(current.id);
+    if (updated) replaceInStore(store, current, updated);
+  }
+  return c.html(<MatrixPage tasks={store} />);
 });
 
 export default app;
