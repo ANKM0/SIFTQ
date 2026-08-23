@@ -10,7 +10,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 960 }
   },
   webServer: {
-    command: "pnpm vite --host 127.0.0.1 --port 4173",
+    command: "pnpm dev --local --ip 127.0.0.1 --port 4173",
     port: 4173,
     reuseExistingServer: !process.env["CI"]
   },

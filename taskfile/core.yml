@@ -170,11 +170,11 @@ tasks:
         pnpm test:e2e
 
   ci:build:
-    desc: Build the frontend.
+    desc: Build the Worker.
     cmds:
       - |
-        if [ ! -f src/main.tsx ]; then
-          echo "Skipping frontend build: src/main.tsx does not exist yet."
+        if [ ! -f src/index.tsx ]; then
+          echo "Skipping Worker build: src/index.tsx does not exist yet."
           exit 0
         fi
         pnpm build
@@ -200,7 +200,7 @@ tasks:
         pnpm exec knip --config knip.json
 
   frontend:dev:
-    desc: Start the Vite development server.
+    desc: Start the Worker development server.
     cmds:
       - pnpm dev
 
