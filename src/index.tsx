@@ -24,6 +24,25 @@ const HTMX_SCRIPT =
 const SORTABLE_SCRIPT =
   "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js";
 const MATRIX_DND_SCRIPT = [
+  "function showDndConflict() {",
+  '  var notice = document.getElementById("dnd-conflict");',
+  "  if (notice) notice.hidden = false;",
+  "}",
+  "function restoreMatrix() {",
+  '  fetch("/", { headers: { "HX-Request": "true" } })',
+  "    .then(function (response) {",
+  "      if (!response.ok) { location.reload(); return null; }",
+  "      return response.text();",
+  "    })",
+  "    .then(function (html) {",
+  "      if (html === null) return;",
+  '      var page = document.getElementById("page");',
+  "      if (page) page.innerHTML = html;",
+  "      showDndConflict();",
+  "      initMatrixSortable();",
+  "    })",
+  "    .catch(function () { location.reload(); });",
+  "}",
   "function initMatrixSortable() {",
   '  var lists = document.querySelectorAll(".matrix-cards[data-sortable-group]");',
   '  if (typeof Sortable === "undefined") return;',
@@ -44,7 +63,7 @@ const MATRIX_DND_SCRIPT = [
   '          headers: { "Content-Type": "application/x-www-form-urlencoded" },',
   '          body: "area=" + encodeURIComponent(area) + "&order=" + encodeURIComponent(String(evt.newIndex)) + "&version=" + encodeURIComponent(version)',
         "        }).then(function (response) {",
-        "          if (!response.ok) { window.location.reload(); return null; }",
+        "          if (!response.ok) { showDndConflict(); restoreMatrix(); return null; }",
         "          return response.text();",
         "        }).then(function (html) {",
         "          if (html === null) return;",
@@ -218,6 +237,9 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
     <>
       <h1>Matrix</h1>
       <NewTaskLink />
+      <p id="dnd-conflict" class="error" hidden>
+        Task was updated elsewhere. The Matrix was restored to the latest state.
+      </p>
       <div class="matrix">
         {TASK_AREAS.map((area) => (
           <section class="matrix-area" data-area={area}>
