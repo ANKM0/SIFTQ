@@ -42,20 +42,52 @@ function render(c: Context, content: JSX.Element) {
   return c.html(<Layout>{content}</Layout>);
 }
 
+function pageNav(path: string) {
+  return {
+    href: path,
+    "hx-get": path,
+    "hx-target": "#page",
+    "hx-swap": "innerHTML",
+    "hx-push-url": "true",
+  };
+}
+
+function NewTaskLink() {
+  return <a {...pageNav("/tasks/new")}>New task</a>;
+}
+
+function TitleField({ value }: { value?: string }) {
+  return (
+    <label>
+      Title
+      <input type="text" name="title" value={value} maxlength={256} required />
+    </label>
+  );
+}
+
+async function readTaskInput(c: Context) {
+  const body = await c.req.parseBody();
+  const title = typeof body["title"] === "string" ? body["title"].trim() : "";
+  const description =
+    typeof body["description"] === "string" ? body["description"] : "";
+  return { title, description };
+}
+
+function isInvalidTaskTitle(title: string): boolean {
+  return title === "" || title.length > 256;
+}
+
+function replaceInStore(tasks: Task[], task: Task, updated: Task) {
+  const index = tasks.indexOf(task);
+  tasks[index] = updated;
+}
+
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
     <>
       <h1>Matrix</h1>
-      <a
-        href="/tasks/new"
-        hx-get="/tasks/new"
-        hx-target="#page"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-      >
-        New task
-      </a>
+      <NewTaskLink />
       <div class="matrix">
         {TASK_AREAS.map((area) => (
           <section class="matrix-area" data-area={area}>
@@ -64,14 +96,7 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
               {matrixTasks
                 .filter((task) => task.area === area)
                 .map((task) => (
-                  <a
-                    class="task-card"
-                    href={`/tasks/${task.id}`}
-                    hx-get={`/tasks/${task.id}`}
-                    hx-target="#page"
-                    hx-swap="innerHTML"
-                    hx-push-url="true"
-                  >
+                  <a class="task-card" {...pageNav(`/tasks/${task.id}`)}>
                     {task.title}
                   </a>
                 ))}
@@ -87,26 +112,11 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
   return (
     <>
       <h1>Tasks</h1>
-      <a
-        href="/tasks/new"
-        hx-get="/tasks/new"
-        hx-target="#page"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-      >
-        New task
-      </a>
+      <NewTaskLink />
       <ul class="task-list">
         {tasks.map((task) => (
           <li class="task-row">
-            <a
-              class="task-link"
-              href={`/tasks/${task.id}`}
-              hx-get={`/tasks/${task.id}`}
-              hx-target="#page"
-              hx-swap="innerHTML"
-              hx-push-url="true"
-            >
+            <a class="task-link" {...pageNav(`/tasks/${task.id}`)}>
               <span class="task-id">{task.id}</span>
               <span class="task-title">{task.title}</span>
               <span class="task-area">Area {task.area}</span>
@@ -124,10 +134,7 @@ function NewTaskForm({ error }: { error?: string }) {
     <>
       <h1>New task</h1>
       <form hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
-        <label>
-          Title
-          <input type="text" name="title" maxlength={256} required />
-        </label>
+        <TitleField />
         {error ? <p class="error">{error}</p> : null}
         <label>
           Description
@@ -181,16 +188,7 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
     <>
       <h1>{task.title}</h1>
       <form hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
-        <label>
-          Title
-          <input
-            type="text"
-            name="title"
-            value={task.title}
-            maxlength={256}
-            required
-          />
-        </label>
+        <TitleField value={task.title} />
         {error ? <p class="error">{error}</p> : null}
         <label>
           Description
@@ -203,61 +201,60 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
   );
 }
 
-function StatusMenu({ task }: { task: Task }) {
+function OptionMenu({
+  title,
+  values,
+  postPath,
+  valueKey,
+  cancelPath,
+}: {
+  title: string;
+  values: readonly (string | number)[];
+  postPath: string;
+  valueKey: string;
+  cancelPath: string;
+}) {
   return (
     <aside id="task-meta">
-      <p class="menu-title">Change status</p>
-      {TASK_STATUSES.map((status) => (
+      <p class="menu-title">{title}</p>
+      {values.map((value) => (
         <button
           class="menu-option"
           type="button"
-          hx-post={`/tasks/${task.id}/status`}
-          hx-vals={JSON.stringify({ status })}
+          hx-post={postPath}
+          hx-vals={JSON.stringify({ [valueKey]: value })}
           hx-target="#task-meta"
           hx-swap="innerHTML"
         >
-          {status}
+          {value}
         </button>
       ))}
-      <a
-        href={`/tasks/${task.id}`}
-        hx-get={`/tasks/${task.id}`}
-        hx-target="#page"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-      >
-        Cancel
-      </a>
+      <a {...pageNav(cancelPath)}>Cancel</a>
     </aside>
+  );
+}
+
+function StatusMenu({ task }: { task: Task }) {
+  return (
+    <OptionMenu
+      title="Change status"
+      values={TASK_STATUSES}
+      postPath={`/tasks/${task.id}/status`}
+      valueKey="status"
+      cancelPath={`/tasks/${task.id}`}
+    />
   );
 }
 
 function AreaMenu({ task }: { task: Task }) {
   return (
-    <aside id="task-meta">
-      <p class="menu-title">Change area</p>
-      {TASK_AREAS.map((area) => (
-        <button
-          class="menu-option"
-          type="button"
-          hx-post={`/tasks/${task.id}/area`}
-          hx-vals={JSON.stringify({ area })}
-          hx-target="#task-meta"
-          hx-swap="innerHTML"
-        >
-          {area}
-        </button>
-      ))}
-      <a
-        href={`/tasks/${task.id}`}
-        hx-get={`/tasks/${task.id}`}
-        hx-target="#page"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-      >
-        Cancel
-      </a>
-    </aside>
+    <OptionMenu
+      title="Change area"
+      values={TASK_AREAS}
+      postPath={`/tasks/${task.id}/area`}
+      valueKey="area"
+      cancelPath={`/tasks/${task.id}`}
+    />
   );
 }
 
@@ -288,11 +285,8 @@ app.get("/tasks/:id/area/menu", (c) => {
 });
 
 app.post("/tasks", async (c) => {
-  const body = await c.req.parseBody();
-  const title = typeof body["title"] === "string" ? body["title"].trim() : "";
-  const description =
-    typeof body["description"] === "string" ? body["description"] : "";
-  if (title === "" || title.length > 256) {
+  const { title, description } = await readTaskInput(c);
+  if (isInvalidTaskTitle(title)) {
     return c.html(
       <NewTaskForm error="Title is required and must be 256 characters or fewer." />
     );
@@ -307,11 +301,8 @@ app.post("/tasks", async (c) => {
 app.post("/tasks/:id", async (c) => {
   const task = store.find((t) => t.id === c.req.param("id"));
   if (!task) return c.notFound();
-  const body = await c.req.parseBody();
-  const title = typeof body["title"] === "string" ? body["title"].trim() : "";
-  const description =
-    typeof body["description"] === "string" ? body["description"] : "";
-  if (title === "" || title.length > 256) {
+  const { title, description } = await readTaskInput(c);
+  if (isInvalidTaskTitle(title)) {
     return c.html(
       <DetailPage
         task={task}
@@ -320,8 +311,7 @@ app.post("/tasks/:id", async (c) => {
     );
   }
   const updated = updateTask(task, { title, description });
-  const index = store.indexOf(task);
-  store[index] = updated;
+  replaceInStore(store, task, updated);
   return c.html(<DetailPage task={updated} />);
 });
 
@@ -334,8 +324,7 @@ app.post("/tasks/:id/status", async (c) => {
     return c.html(<TaskMeta task={task} />);
   }
   const updated = changeTaskStatus(task, status);
-  const index = store.indexOf(task);
-  store[index] = updated;
+  replaceInStore(store, task, updated);
   return c.html(<TaskMeta task={updated} />);
 });
 
@@ -348,8 +337,7 @@ app.post("/tasks/:id/area", async (c) => {
     return c.html(<TaskMeta task={task} />);
   }
   const updated = changeTaskArea(task, area);
-  const index = store.indexOf(task);
-  store[index] = updated;
+  replaceInStore(store, task, updated);
   return c.html(<TaskMeta task={updated} />);
 });
 
