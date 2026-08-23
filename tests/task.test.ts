@@ -4,7 +4,6 @@ import {
   changeTaskStatus,
   createTask,
   moveTask,
-  seedTasks,
   sortForMatrix,
   updateTask,
 } from "../src/task";
@@ -17,6 +16,7 @@ const baseTask: Task = {
   status: "do",
   area: 1,
   order: 0,
+  version: 1,
 };
 
 describe("createTask", () => {
@@ -26,6 +26,7 @@ describe("createTask", () => {
     expect(task.title).toBe("Write tests");
     expect(task.status).toBe("do");
     expect(task.area).toBe(1);
+    expect(task.version).toBe(1);
     expect(task.id.length).toBeGreaterThan(0);
   });
 });
@@ -36,6 +37,7 @@ describe("updateTask", () => {
 
     expect(updated.title).toBe("renamed");
     expect(updated.description).toBe("desc");
+    expect(updated.version).toBe(baseTask.version);
     expect(baseTask.title).toBe("base");
     expect(baseTask.description).toBe("");
   });
@@ -137,17 +139,5 @@ describe("sortForMatrix", () => {
       "a2",
       "a3",
     ]);
-  });
-});
-
-describe("seedTasks", () => {
-  it("returns only tasks with valid status and area values", () => {
-    const tasks = seedTasks();
-
-    for (const task of tasks) {
-      expect(["do", "done", "skip"]).toContain(task.status);
-      expect([1, 2, 3, 4]).toContain(task.area);
-      expect(task.title.length).toBeGreaterThan(0);
-    }
   });
 });

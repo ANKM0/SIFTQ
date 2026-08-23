@@ -8,6 +8,7 @@ export interface Task {
   status: TaskStatus;
   area: TaskArea;
   order: number;
+  version: number;
 }
 
 export const TASK_STATUSES: readonly TaskStatus[] = ["do", "done", "skip"];
@@ -32,6 +33,7 @@ export function createTask(input: {
     status: "do",
     area: 1,
     order: 0,
+    version: 1,
   };
 }
 
@@ -88,49 +90,4 @@ export function sortForMatrix(tasks: readonly Task[]): Task[] {
   return tasks
     .filter((task) => task.status === "do")
     .sort((a, b) => a.area - b.area || a.order - b.order);
-}
-
-export function seedTasks(): Task[] {
-  return [
-    {
-      id: "seed-1",
-      title: "Set up D1 database",
-      description: "Create the schema and bindings.",
-      status: "do",
-      area: 1,
-      order: 0,
-    },
-    {
-      id: "seed-2",
-      title: "Adopt version optimistic locking",
-      description: "Add version column and conflict handling.",
-      status: "do",
-      area: 1,
-      order: 1,
-    },
-    {
-      id: "seed-3",
-      title: "Move Matrix to HTMX partial updates",
-      description: "Replace React SPA with Hono JSX + HTMX.",
-      status: "do",
-      area: 2,
-      order: 0,
-    },
-    {
-      id: "seed-4",
-      title: "Add SortableJS drag and drop",
-      description: "Reorder the Matrix with SortableJS.",
-      status: "do",
-      area: 3,
-      order: 0,
-    },
-    {
-      id: "seed-5",
-      title: "Review ADR 0007",
-      description: "Confirm D1 as the system of record.",
-      status: "done",
-      area: 4,
-      order: 0,
-    },
-  ];
 }
