@@ -158,6 +158,19 @@ describe("GET / (Matrix)", () => {
     expect(body).not.toContain("<script");
     expect(body).not.toContain('id="page"');
   });
+
+  it("serves DnD client code that reverts the Matrix and notifies on move conflict", async () => {
+    const body = await requestBody("/");
+
+    // The DnD client must surface the conflict instead of silently reloading.
+    expect(body).toContain("dnd-conflict");
+    // The Matrix is re-fetched as an HTMX fragment to restore the server state.
+    expect(body).toContain('fetch("/"');
+    expect(body).toContain("HX-Request");
+    expect(body).not.toContain(
+      "if (!response.ok) { window.location.reload(); return null; }",
+    );
+  });
 });
 
 describe("GET /tasks (list)", () => {
@@ -635,7 +648,10 @@ describe("matrix move conflict", () => {
         version: "1",
       }).toString(),
     });
+    const body = await response.text();
 
     expect(response.status).toBe(409);
+    expect(body).toContain("Task was updated elsewhere.");
+    expect(body).toContain(`hx-get="/tasks/${id}"`);
   });
 });
