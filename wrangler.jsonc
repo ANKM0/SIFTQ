@@ -2,5 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "siftq",
   "main": "src/index.tsx",
-  "compatibility_date": "2025-06-01"
+  "compatibility_date": "2025-06-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "siftq",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

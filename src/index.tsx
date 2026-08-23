@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
+import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
   TASK_STATUSES,
@@ -11,11 +12,12 @@ import {
   isTaskArea,
   isTaskStatus,
   moveTask,
-  seedTasks,
   sortForMatrix,
   updateTask,
 } from "./task";
 import type { Task, TaskArea } from "./task";
+import { D1TaskRepository } from "./task-repository";
+import type { TaskRepository } from "./task-repository";
 
 const HTMX_SCRIPT =
   "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
@@ -34,15 +36,33 @@ const MATRIX_DND_SCRIPT = [
   "        var card = evt.item;",
   "        var target = evt.to;",
   '        var taskId = card.getAttribute("data-task-id");',
+  '        var version = card.getAttribute("data-version");',
   '        var area = target.getAttribute("data-area");',
-  "        if (!taskId || area === null) return;",
+  "        if (!taskId || !version || area === null) return;",
   '        fetch("/tasks/" + encodeURIComponent(taskId) + "/move", {',
   '          method: "POST",',
   '          headers: { "Content-Type": "application/x-www-form-urlencoded" },',
-  '          body: "area=" + encodeURIComponent(area) + "&order=" + encodeURIComponent(String(evt.newIndex))',
-  "        }).then(function (response) {",
-  "          if (!response.ok) window.location.reload();",
-  "        }).catch(function () { window.location.reload(); });",
+  '          body: "area=" + encodeURIComponent(area) + "&order=" + encodeURIComponent(String(evt.newIndex)) + "&version=" + encodeURIComponent(version)',
+        "        }).then(function (response) {",
+        "          if (!response.ok) { window.location.reload(); return null; }",
+        "          return response.text();",
+        "        }).then(function (html) {",
+        "          if (html === null) return;",
+        '          var parser = new DOMParser();',
+        '          var doc = parser.parseFromString(html, "text/html");',
+        '          doc.querySelectorAll(".task-card").forEach(function (fresh) {',
+        '            var id = fresh.getAttribute("data-task-id");',
+        '            var nextVersion = fresh.getAttribute("data-version");',
+        '            if (!id || !nextVersion) return;',
+        '            var cards = document.querySelectorAll(".task-card");',
+        '            for (var i = 0; i < cards.length; i += 1) {',
+        '              if (cards[i].getAttribute("data-task-id") === id) {',
+        '                cards[i].setAttribute("data-version", nextVersion);',
+        '                break;',
+        '              }',
+        '            }',
+        "          });",
+        "        }).catch(function () { window.location.reload(); });",
   "      }",
   "    });",
   "  });",
@@ -51,7 +71,52 @@ const MATRIX_DND_SCRIPT = [
   'document.addEventListener("htmx:load", initMatrixSortable);',
 ].join("\n");
 
-const store: Task[] = seedTasks();
+type Env = {
+  DB?: D1Database;
+  TASK_REPOSITORY?: TaskRepository;
+};
+
+type AppEnv = {
+  Bindings: Env;
+};
+
+function taskRepository(c: Context<AppEnv>): TaskRepository {
+  if (c.env.TASK_REPOSITORY) return c.env.TASK_REPOSITORY;
+  if (!c.env.DB) throw new Error("D1 binding is not configured");
+  return new D1TaskRepository(c.env.DB);
+}
+
+async function findTask(
+  c: Context<AppEnv>,
+  id: string,
+): Promise<Task | undefined> {
+  return taskRepository(c).find(id);
+}
+
+async function persistTask(
+  c: Context<AppEnv>,
+  updated: Task,
+): Promise<Task | null> {
+  const result = await taskRepository(c).update(updated);
+  return result === "conflict" ? null : result;
+}
+
+async function conflictResponse(
+  c: Context<AppEnv>,
+  taskId: string,
+): Promise<Response> {
+  return await c.html(<ConflictPage taskId={taskId} />, 409);
+}
+
+async function persistTaskMeta(
+  c: Context<AppEnv>,
+  task: Task,
+  updated: Task,
+): Promise<Response> {
+  const saved = await persistTask(c, updated);
+  if (saved === null) return await conflictResponse(c, task.id);
+  return await c.html(<TaskMeta task={saved} />);
+}
 
 const Layout: FC = ({ children }) => (
   <html lang="ja">
@@ -99,26 +164,33 @@ function TitleField({ value }: { value?: string }) {
   );
 }
 
-async function readTaskInput(c: Context) {
-  const body = await c.req.parseBody();
+type ParsedBody = Record<string, unknown>;
+
+function readTaskFields(body: ParsedBody): {
+  title: string;
+  description: string;
+} {
   const title = typeof body["title"] === "string" ? body["title"].trim() : "";
   const description =
     typeof body["description"] === "string" ? body["description"] : "";
   return { title, description };
 }
 
+async function readTaskInput(c: Context) {
+  const body = await c.req.parseBody();
+  return readTaskFields(body);
+}
+
+async function readTaskUpdateInput(c: Context) {
+  const body = await c.req.parseBody();
+  return {
+    ...readTaskFields(body),
+    version: parseTaskVersion(body["version"]),
+  };
+}
+
 function isInvalidTaskTitle(title: string): boolean {
   return title === "" || title.length > 256;
-}
-
-function replaceInStore(tasks: Task[], task: Task, updated: Task) {
-  const index = tasks.indexOf(task);
-  tasks[index] = updated;
-}
-
-function commitTaskMeta(c: Context, task: Task, updated: Task) {
-  replaceInStore(store, task, updated);
-  return c.html(<TaskMeta task={updated} />);
 }
 
 function parseTaskOrder(value: unknown): number | null {
@@ -126,6 +198,13 @@ function parseTaskOrder(value: unknown): number | null {
   const order = Number(value);
   if (!Number.isInteger(order) || order < 0) return null;
   return order;
+}
+
+function parseTaskVersion(value: unknown): number | null {
+  if (typeof value !== "string" || value === "") return null;
+  const version = Number(value);
+  if (!Number.isInteger(version) || version < 1) return null;
+  return version;
 }
 
 function parseTaskArea(value: unknown): TaskArea | null {
@@ -154,6 +233,7 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
                   <a
                     class="task-card"
                     data-task-id={task.id}
+                    data-version={task.version}
                     {...pageNav(`/tasks/${task.id}`)}
                   >
                     {task.title}
@@ -248,6 +328,7 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
       <h1>{task.title}</h1>
       <form hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
         <TitleField value={task.title} />
+        <input type="hidden" name="version" value={task.version} />
         {error ? <p class="error">{error}</p> : null}
         <label>
           Description
@@ -260,18 +341,29 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
   );
 }
 
+function ConflictPage({ taskId }: { taskId: string }) {
+  return (
+    <div class="error">
+      <p>Task was updated elsewhere.</p>
+      <a {...pageNav(`/tasks/${taskId}`)}>Load latest</a>
+    </div>
+  );
+}
+
 function OptionMenu({
   title,
   values,
   postPath,
   valueKey,
   cancelPath,
+  version,
 }: {
   title: string;
   values: readonly (string | number)[];
   postPath: string;
   valueKey: string;
   cancelPath: string;
+  version: number;
 }) {
   return (
     <aside id="task-meta">
@@ -281,7 +373,7 @@ function OptionMenu({
           class="menu-option"
           type="button"
           hx-post={postPath}
-          hx-vals={JSON.stringify({ [valueKey]: value })}
+          hx-vals={JSON.stringify({ [valueKey]: value, version })}
           hx-target="#task-meta"
           hx-swap="innerHTML"
         >
@@ -301,6 +393,7 @@ function StatusMenu({ task }: { task: Task }) {
       postPath={`/tasks/${task.id}/status`}
       valueKey="status"
       cancelPath={`/tasks/${task.id}`}
+      version={task.version}
     />
   );
 }
@@ -313,32 +406,39 @@ function AreaMenu({ task }: { task: Task }) {
       postPath={`/tasks/${task.id}/area`}
       valueKey="area"
       cancelPath={`/tasks/${task.id}`}
+      version={task.version}
     />
   );
 }
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
-app.get("/", (c) => render(c, <MatrixPage tasks={store} />));
+app.get("/", async (c) => {
+  const tasks = await taskRepository(c).list();
+  return render(c, <MatrixPage tasks={tasks} />);
+});
 
-app.get("/tasks", (c) => render(c, <ListPage tasks={store} />));
+app.get("/tasks", async (c) => {
+  const tasks = await taskRepository(c).list();
+  return render(c, <ListPage tasks={tasks} />);
+});
 
 app.get("/tasks/new", (c) => render(c, <NewTaskForm />));
 
-app.get("/tasks/:id", (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+app.get("/tasks/:id", async (c) => {
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
   return render(c, <DetailPage task={task} />);
 });
 
-app.get("/tasks/:id/status/menu", (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+app.get("/tasks/:id/status/menu", async (c) => {
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
   return c.html(<StatusMenu task={task} />);
 });
 
-app.get("/tasks/:id/area/menu", (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+app.get("/tasks/:id/area/menu", async (c) => {
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
   return c.html(<AreaMenu task={task} />);
 });
@@ -351,16 +451,17 @@ app.post("/tasks", async (c) => {
     );
   }
   const task = createTask({ title, description });
-  store.push(task);
-  return c.html(<DetailPage task={task} />, 201, {
+  const created = await taskRepository(c).insert(task);
+  return c.html(<DetailPage task={created} />, 201, {
     "HX-Push-Url": `/tasks/${task.id}`,
   });
 });
 
 app.post("/tasks/:id", async (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
-  const { title, description } = await readTaskInput(c);
+  const { title, description, version } = await readTaskUpdateInput(c);
+  if (version === null) return c.text("Invalid version", 400);
   if (isInvalidTaskTitle(title)) {
     return c.html(
       <DetailPage
@@ -369,51 +470,75 @@ app.post("/tasks/:id", async (c) => {
       />
     );
   }
-  const updated = updateTask(task, { title, description });
-  replaceInStore(store, task, updated);
-  return c.html(<DetailPage task={updated} />);
+  const updated = { ...updateTask(task, { title, description }), version };
+  const saved = await persistTask(c, updated);
+  if (saved === null) return conflictResponse(c, task.id);
+  return c.html(<DetailPage task={saved} />);
 });
 
 app.post("/tasks/:id/status", async (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
   const body = await c.req.parseBody();
   const status = body["status"];
-  if (!isTaskStatus(status)) {
-    return c.html(<TaskMeta task={task} />);
+  const version = parseTaskVersion(body["version"]);
+  if (!isTaskStatus(status) || version === null) {
+    return c.text("Invalid status", 400);
   }
-  const updated = changeTaskStatus(task, status);
-  return commitTaskMeta(c, task, updated);
+  const updated = { ...changeTaskStatus(task, status), version };
+  return persistTaskMeta(c, task, updated);
 });
 
 app.post("/tasks/:id/area", async (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+  const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
   const body = await c.req.parseBody();
-  const area = Number(body["area"]);
-  if (!isTaskArea(area)) {
-    return c.html(<TaskMeta task={task} />);
-  }
-  const updated = changeTaskArea(task, area);
-  return commitTaskMeta(c, task, updated);
+  const area = parseTaskArea(body["area"]);
+  const version = parseTaskVersion(body["version"]);
+  if (area === null || version === null) return c.text("Invalid area", 400);
+  const updated = { ...changeTaskArea(task, area), version };
+  return persistTaskMeta(c, task, updated);
 });
 
 app.post("/tasks/:id/move", async (c) => {
-  const task = store.find((t) => t.id === c.req.param("id"));
+  const id = c.req.param("id");
+  const task = await findTask(c, id);
   if (!task) return c.notFound();
   const body = await c.req.parseBody();
   const area = parseTaskArea(body["area"]);
   const order = parseTaskOrder(body["order"]);
-  if (area === null || order === null) {
+  const version = parseTaskVersion(body["version"]);
+  if (area === null || order === null || version === null) {
     return c.text("Invalid move input", 400);
   }
-  const movedTasks = moveTask(store, task.id, area, order);
-  const updates = new Map(movedTasks.map((moved) => [moved.id, moved]));
-  for (const current of store) {
-    const updated = updates.get(current.id);
-    if (updated) replaceInStore(store, current, updated);
+  if (task.version !== version) {
+    return conflictResponse(c, task.id);
   }
-  return c.html(<MatrixPage tasks={store} />);
+
+  const repo = taskRepository(c);
+  const tasks = await repo.list();
+  const current = tasks.find((candidate) => candidate.id === task.id);
+  if (!current || current.version !== version) {
+    return conflictResponse(c, task.id);
+  }
+  const movedTasks = moveTask(tasks, current.id, area, order);
+  const changed = movedTasks.filter((moved) => {
+    const before = tasks.find((candidate) => candidate.id === moved.id);
+    return (
+      before !== undefined &&
+      (before.area !== moved.area || before.order !== moved.order)
+    );
+  });
+  const result = await repo.move(changed);
+  if (result === "conflict") {
+    return conflictResponse(c, task.id);
+  }
+  const versions = new Map(result.map((moved) => [moved.id, moved.version]));
+  const renderedTasks = movedTasks.map((moved) => {
+    const version = versions.get(moved.id);
+    return version === undefined ? moved : { ...moved, version };
+  });
+  return c.html(<MatrixPage tasks={renderedTasks} />);
 });
 
 export default app;
