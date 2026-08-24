@@ -21,3 +21,16 @@
 | [ADR 0015: worktree ごとの Codex 設定保存先と起動 Task](0015-worktree-scoped-codex-home.md) | Accepted. | `CODEX_HOME` を worktree root 基準の profile 別パスへ解決し、Codex 起動 Task と profile 切替が同じ保存先を使う。 |
 | [ADR 0016: worktree ごとの `git pull` 振り分け shell function](0016-worktree-scoped-git-pull-shell-function.md) | Accepted. | Yoriwake の interactive shell で、SIFTQ worktree 内の引数なし `git pull` だけを `task repo:pull-main` へ振り分ける。 |
 | [ADR 0017: `.learnings` を共有追跡成果物として維持する](0017-keep-learnings-tracked-as-shared-artifacts.md) | Accepted. | `.learnings/LEARNINGS.md` など 3 ファイルは追跡対象かつ PR レビュー・マージ対象のまま維持し、`.learnings/` は ignore しない。 |
+| [ADR 0018: Adopt HTML-driven UI with JSON only for DnD](0018-adopt-html-driven-ui-with-json-only-for-dnd.md) | Accepted. | 画面・フォームは HTML 駆動、JSON は DnD 確定のみに限定する。 |
+| [ADR 0019: Keep internal HTTP API private](0019-keep-internal-http-api-private.md) | Accepted. | API は公開せず内部 IF とし、HTML UI と `/api` を分離する。 |
+| [ADR 0020: Adopt resource-oriented REST for internal API](0020-adopt-resource-oriented-rest-for-internal-api.md) | Accepted. | 内部 API にリソース指向 REST を採用し、BFF / RPC / GraphQL を採用しない。 |
+| [ADR 0021: Define HTTP API contract conventions](0021-define-http-api-contract-conventions.md) | Accepted. | 内部 API の route / method / 成功レスポンスとバージョン方針を定める。 |
+| [ADR 0022: Persist DnD through bulk reorder endpoint](0022-persist-dnd-through-bulk-reorder-endpoint.md) | Accepted. | DnD 永続化は一括 `POST /api/tasks/reorder` に分け、batch で原子的に更新する。 |
+| [ADR 0023: Adopt RFC 9457 error body](0023-adopt-rfc9457-error-body.md) | Accepted. | JSON エラー body に RFC 9457 を採用し、code / message と項目単位エラーを分ける。 |
+| [ADR 0024: Map errors to standard HTTP status codes](0024-map-errors-to-standard-http-status-codes.md) | Accepted. | エラーは標準 HTTP status にマップし、詳細は body の code で表現する。 |
+| [ADR 0025: Define HTML and JSON error handling behavior](0025-define-html-and-json-error-handling-behavior.md) | Accepted. | HTML / JSON のエラー表現を分離し、内部エラー露出と 401 / 403 の共通挙動を定める。 |
+| [ADR 0026: Define task data model](0026-define-task-data-model.md) | Accepted. | task の識別子・所有者・時刻・順序と D1 の型を定める。 |
+| [ADR 0027: Adopt D1 SQL migration management](0027-adopt-d1-sql-migration-management.md) | Accepted. | Cloudflare 公式 SQL migration + Wrangler で schema を管理する。 |
+| [ADR 0028: Adopt common UI state and feedback rules](0028-adopt-common-ui-state-and-feedback-rules.md) | Accepted. | 全画面の 4 状態と通知の表示時間・閉じ方を定める。 |
+| [ADR 0029: Adopt Result type in domain and usecase](0029-adopt-result-type-in-domain-usecase.md) | Accepted. | domain / usecase は期待される失敗を inline union の `Result<T, E>` で返す。 |
+| [ADR 0030: Adopt static component catalog](0030-adopt-static-component-catalog.md) | Accepted. | Hono JSX component を static HTML catalog 化し、Review 済み component を再利用する。 |
