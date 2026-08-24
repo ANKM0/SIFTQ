@@ -21,6 +21,8 @@ uv run python scripts/create_adr.py --title "..." --slug "..." --dry-run
 
 ## Writing Rules
 
+- One ADR records one responsibility. Do not combine multiple responsibilities in one ADR.
+- If decisions belong to different responsibilities, split them into separate ADRs.
 - Keep it concise.
 - Use concrete context.
 - State the decision directly.
