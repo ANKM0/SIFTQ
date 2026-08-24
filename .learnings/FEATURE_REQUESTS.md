@@ -19,27 +19,28 @@ Entry format: see the self-improvement skill's "Feature Request Entry" section. 
 
 ---
 
-## [FEAT-20260820-001] session-driven-self-improvement
+## [FEAT-20260822-001] encrypted-codex-session-backup
 
-**Logged**: 2026-08-20T22:55:00+09:00
+**Logged**: 2026-08-22T15:38:00+09:00
 **Priority**: high
 **Status**: pending
 **Area**: repo
 
 ### Requested Capability
-Codex のローカルセッションを自動集計し、反復するコマンド失敗やユーザー訂正を検知して、改善候補の GitHub Issue を自動作成する。
+Codex のローカル生セッションをクライアント側で暗号化し、このリポジトリへコミットしてリモートへ同期する。
 
 ### User Context
-反復失敗は Taskfile の `task` コマンドへ、反復指摘は rule または skill へ昇格し、同じ失敗を減らしたい。
+PC 障害時にも、ローカルのセッション全記録を復元できるようにし、LLM が過去の会話を必要時に振り返って改善へ役立てられるようにする。
 
 ### Complexity Estimate
-complex
+medium
 
 ### Suggested Implementation
-Codex session を repository / worktree 単位で走査し、候補を `.learnings/` に証跡付きで蓄積する。3回・2タスク・30日以内の昇格条件を満たした候補だけを GitHub Issue として idempotent に作成する。Issue 作成後の Taskfile・rule・skill 変更は既存 taqt workflow で実施する。
+平文を作業ツリーへ書き込まず、完了したセッションごとに zstd 圧縮してから age などの公開鍵暗号で暗号化し、専用ディレクトリへ `.jsonl.zst.age` として出力する。秘密鍵はリポジトリ外かつ別経路で保管する。暗号化アーカイブを必要時に局所復号・検索する仕組み、定期同期スクリプト、復元手順を追加する。
 
 ### Metadata
 - Frequency: first_time
-- Related Features: self-improvement, taqt:self-improvement, taqt:watch
+- Related Features: session-driven-self-improvement
 
 ---
+
