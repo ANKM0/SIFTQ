@@ -26,6 +26,7 @@ LLM / 人間レビューを減らし、レビュー観点を「ルール＋テ�
 - 8観点を「ルール＋テスト＋閾値」で `task ci` に落とす。
 - 新設タスク: `ci:requirements` / `ci:architecture` / `ci:glossary` / `ci:security` / `ci:performance` / `ci:docs`。
 - 高速 lint: `ci:lint:python`（ruff）と `ci:lint:ts-fast`（oxlint）を `ci` と loop に含める。
+- 依存方向・循環依存は `ci:architecture`（dependency-cruiser）、結合度は `ci:architecture:metrics` で確認する。
 - loop の `observe` に追加し、`checker` 前段で実行する。
 - ツール選定: 既存・高速ツールを優先する。TS/TSX は Biome / oxlint、Python は ruff で代用できるルールを置き換え、残りを ESLint / `scripts/ci/` で補う。
 - 言語構成: AST 系ルールは TypeScript、リポジトリ横断チェックは Python。TS 一本化はしない。
