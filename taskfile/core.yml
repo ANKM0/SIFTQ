@@ -101,9 +101,15 @@ tasks:
       - uv run python scripts/ci/check_requirements.py
 
   ci:architecture:
-    desc: Reject unexpected imports and layer-boundary violations.
+    desc: Reject unexpected imports, dependency-direction, and cycle violations.
     cmds:
+      - pnpm exec depcruise src --config .dependency-cruiser.cjs
       - uv run python scripts/ci/check_architecture.py
+
+  ci:architecture:metrics:
+    desc: Print dependency stability metrics with dependency-cruiser.
+    cmds:
+      - pnpm exec depcruise src --config .dependency-cruiser.cjs --metrics --output-type json
 
   ci:glossary:
     desc: Reject glossary term variants in documentation.

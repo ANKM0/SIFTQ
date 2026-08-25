@@ -3,7 +3,9 @@ import sonarjs from "eslint-plugin-sonarjs";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", "report", "target", "tmp"] },
+  {
+    ignores: ["dist", "coverage", "report", "target", "tmp", ".dependency-cruiser.cjs"]
+  },
   js.configs.recommended,
   ...tseslint.configs.strict,
   sonarjs.configs.recommended,
