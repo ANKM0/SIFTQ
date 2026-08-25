@@ -1,0 +1,8 @@
+[
+  {
+    "path": "src/index.tsx",
+    "pattern": "dangerouslySetInnerHTML",
+    "reason": "静的な DnD スクリプトを埋め込むため。ユーザー入力を含まない。",
+    "removal": "スクリプトを外部 bundle に移し、dangerouslySetInnerHTML を廃止する。"
+  }
+]

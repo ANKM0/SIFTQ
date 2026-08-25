@@ -1,0 +1,8 @@
+[
+  {
+    "path": "src/task-repository.ts",
+    "pattern": "unbounded_all",
+    "reason": "owner_id = ? で利用者単位に絞り込み済みのため、無制限スキャンではない。",
+    "removal": "owner_id を複数化または廃止する際に LIMIT を追加する。"
+  }
+]

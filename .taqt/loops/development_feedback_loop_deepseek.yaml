@@ -65,6 +65,8 @@ steps:
       - task ci:markdown
       - task ci:typecheck
       - task ci:lint
+      - task ci:security
+      - task ci:performance
       - task ci:test
       - task ci:build
     on_success: checker
