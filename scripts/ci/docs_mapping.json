@@ -1,0 +1,10 @@
+[
+  {
+    "pattern": "taskfile/",
+    "required": "docs/memo.md"
+  },
+  {
+    "pattern": "scripts/ci/",
+    "required": "docs/memo.md"
+  }
+]

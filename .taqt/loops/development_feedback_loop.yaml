@@ -59,8 +59,14 @@ steps:
       - task ci:markdown
       - task ci:typecheck
       - task ci:lint
+      - task ci:lint:python
+      - task ci:lint:ts-fast
       - task ci:security
       - task ci:performance
+      - task ci:requirements
+      - task ci:architecture
+      - task ci:glossary
+      - task ci:docs
       - task ci:test
       - task ci:build
     on_success: checker

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-EXCLUDED_DIRS = {".git", ".venv", "node_modules", "dist", "coverage", "tmp"}
+EXCLUDED_DIRS = {".git", ".venv", "node_modules", "dist", "coverage"}
 
 
 def repository_root() -> Path:
