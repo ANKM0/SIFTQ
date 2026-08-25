@@ -16,20 +16,20 @@
     "docs:app-architecture:svg": "mmdc -p docs/contributing/assets/app-architecture-puppeteer.json -c docs/contributing/assets/app-architecture-mermaid.json -i docs/contributing/assets/app-architecture.mmd -o docs/contributing/assets/app-architecture.svg"
   },
   "dependencies": {
-    "hono": "^4.12.22"
+    "hono": "^4.13.4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.29.0",
-    "@cloudflare/workers-types": "^5.20260820.1",
-    "@mermaid-js/mermaid-cli": "^11.15.0",
-    "@playwright/test": "^1.57.0",
-    "eslint": "^9.29.0",
+    "@cloudflare/workers-types": "^5.20260822.1",
+    "@eslint/js": "^9.39.4",
+    "@mermaid-js/mermaid-cli": "^11.16.0",
+    "@playwright/test": "^1.61.1",
+    "eslint": "^9.39.4",
     "eslint-plugin-sonarjs": "^4.2.0",
     "jscpd": "^5.0.16",
     "knip": "^6.32.2",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.34.1",
-    "vitest": "^3.2.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^3.2.7",
     "wrangler": "^4.125.0"
   }
 }

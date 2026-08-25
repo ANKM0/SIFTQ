@@ -60,6 +60,8 @@ tasks:
       - task: ci:lint:task-refs
       - task: ci:lint:codex-task-perms
       - task: ci:lint
+      - task: ci:security
+      - task: ci:performance
       - task: ci:typecheck
       - task: ci:test
       - task: ci:build
@@ -75,6 +77,17 @@ tasks:
     desc: Check Markdown formatting.
     cmds:
       - uv run python scripts/ci/check_markdown.py
+
+  ci:security:
+    desc: Reject vulnerable dependencies and dangerous code patterns.
+    cmds:
+      - pnpm audit --audit-level high --ignore-unfixable
+      - uv run python scripts/ci/check_security_patterns.py
+
+  ci:performance:
+    desc: Reject D1 query anti-patterns.
+    cmds:
+      - uv run python scripts/ci/check_db_queries.py
 
   ci:lint:task-refs:
     desc: Check that CI task references are defined in Taskfile.yml.
