@@ -5,6 +5,8 @@ providers:
   - id: ollama:chat:llama3.1
     config:
       temperature: 0.3
+evaluateOptions:
+  cache: true
 tests: file://gold/review-classification/cases.jsonl
 defaultTest:
   assert:

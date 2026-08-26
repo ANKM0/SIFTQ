@@ -126,6 +126,7 @@ tasks:
     env:
       PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
     cmds:
+      - uv run python scripts/ci/llm_eval_budget.py --limit-file eval/budget.json --spent-file tmp/llm-eval-spent.json
       - bunx promptfoo@0.122.0 eval --config eval/promptfoo/promptfooconfig.yaml
 
   eval:review:
@@ -133,6 +134,7 @@ tasks:
     env:
       PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
     cmds:
+      - uv run python scripts/ci/llm_eval_budget.py --limit-file eval/budget.json --spent-file tmp/llm-eval-spent.json
       - bunx promptfoo@0.122.0 eval --config eval/promptfooconfig.real.yaml
 
   ci:lint:task-refs:

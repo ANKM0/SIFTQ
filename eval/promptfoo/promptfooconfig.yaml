@@ -3,6 +3,8 @@ prompts:
   - file://prompts/smoke.md
 providers:
   - id: echo
+evaluateOptions:
+  cache: true
 tests:
   - description: プロンプトが描画され echo で返る smoke
     vars:
