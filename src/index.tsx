@@ -16,7 +16,7 @@ import {
   sortForMatrix,
 } from "./task";
 import type { Task } from "./task";
-import { Layout } from "./components/Layout";
+import { Layout, MATRIX_DND_SCRIPT } from "./components/Layout";
 import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
@@ -193,11 +193,14 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
     <>
       <h1>Matrix</h1>
       <NewTaskLink />
+      <p id="dnd-conflict" class="error" hidden>
+        Task was updated elsewhere. The Matrix was restored to the latest state.
+      </p>
       <div class="matrix">
         {TASK_AREAS.map((area) => (
           <section key={area} class="matrix-area" data-area={area}>
             <h2>Area {area}</h2>
-            <div class="matrix-cards" data-area={area}>
+            <div class="matrix-cards" data-area={area} data-sortable-group="matrix">
               {matrixTasks
                 .filter((task) => task.area === area)
                 .map((task) => (
@@ -300,6 +303,12 @@ app.get("/", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
   return renderPage(c, <MatrixPage tasks={result.value} />);
+});
+
+app.get("/matrix-dnd.js", (c) => {
+  return c.body(MATRIX_DND_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
 });
 
 app.get("/api/tasks", async (c) => {
