@@ -1,0 +1,44 @@
+name: LLM Eval
+
+on:
+  push:
+    paths:
+      - 'eval/**'
+      - 'taskfile/core.yml'
+      - '.github/workflows/llm-eval.yml'
+  pull_request:
+    paths:
+      - 'eval/**'
+      - 'taskfile/core.yml'
+      - '.github/workflows/llm-eval.yml'
+
+permissions:
+  contents: read
+
+env:
+  UV_CACHE_DIR: /tmp/uv-cache
+
+jobs:
+  llm-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install aqua
+        uses: aquaproj/aqua-installer@v3.1.2
+        with:
+          aqua_version: v2.59.0
+
+      - name: Install repository tools
+        run: aqua install
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Run LLM eval smoke
+        run: task ci:llm-eval

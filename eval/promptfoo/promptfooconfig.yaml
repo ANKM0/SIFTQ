@@ -1,0 +1,13 @@
+description: LLM精度検証 smoke eval（CIでは echo provider で配線を検証する）
+prompts:
+  - file://prompts/smoke.md
+providers:
+  - id: echo
+tests:
+  - description: プロンプトが描画され echo で返る smoke
+    vars:
+      subject: "メモリ上限を超えるファイルで OOM リスク"
+      description: "チケット本文からレビュー指摘を分類する"
+    assert:
+      - type: contains
+        value: "review comment classifier"

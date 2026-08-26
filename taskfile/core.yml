@@ -121,6 +121,13 @@ tasks:
     cmds:
       - uv run python scripts/ci/check_docs.py
 
+  ci:llm-eval:
+    desc: Run the LLM evaluation smoke suite.
+    env:
+      PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
+    cmds:
+      - bunx promptfoo@0.122.0 eval --config eval/promptfoo/promptfooconfig.yaml
+
   ci:lint:task-refs:
     desc: Check that CI task references are defined in Taskfile.yml.
     cmds:
