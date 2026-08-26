@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>SIFTQ Component Catalog</title>
+  </head>
+  <body>
+    <h1>SIFTQ Component Catalog</h1>
+    <section>
+      <h2>Layout</h2>
+      <p>HTMX を読み込む共通レイアウト。page content を main#page に描画する。</p>
+    </section>
+    <section>
+      <h2>TaskCard</h2>
+      <a class="task-card" data-task-id="example" data-version="1" href="/tasks/example">
+        <span class="task-title">Example task</span>
+      </a>
+    </section>
+    <section>
+      <h2>TaskRow</h2>
+      <ul>
+        <li class="task-row">
+          <a class="task-link" href="/tasks/example">
+            <span class="task-id">example</span>
+            <span class="task-title">Example task</span>
+            <span class="task-area">Area 1</span>
+            <span class="task-status">do</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+    <section>
+      <h2>TaskMeta</h2>
+      <aside id="task-meta">
+        <dl>
+          <div class="meta-row"><dt>Status</dt><dd>do</dd></div>
+          <div class="meta-row"><dt>Area</dt><dd>1</dd></div>
+        </dl>
+      </aside>
+    </section>
+    <section>
+      <h2>OptionMenu</h2>
+      <aside id="task-meta">
+        <p class="menu-title">Change status</p>
+        <button class="menu-option" type="button">do</button>
+        <button class="menu-option" type="button">done</button>
+        <button class="menu-option" type="button">skip</button>
+      </aside>
+    </section>
+  </body>
+</html>
