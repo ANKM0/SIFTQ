@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.6.0",
+  "packageManager": "bun@1.4.0",
   "scripts": {
     "dev": "wrangler dev",
     "build": "tsc -p tsconfig.json && wrangler deploy --dry-run",
-    "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
+    "lint": "vp lint .",
+    "test": "vp test run --passWithNoTests",
     "test:e2e": "playwright test --pass-with-no-tests",
     "typecheck": "tsc -p tsconfig.json",
     "docs:flow:svg": "mmdc -i docs/contributing/assets/development-flow.mmd -o docs/contributing/assets/development-flow.svg",
@@ -20,18 +20,26 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260822.1",
-    "@eslint/js": "^9.39.4",
     "@mermaid-js/mermaid-cli": "^11.16.0",
+    "@types/node": "^26.2.0",
     "@playwright/test": "^1.61.1",
     "dependency-cruiser": "^18.2.0",
-    "eslint": "^9.39.4",
     "eslint-plugin-sonarjs": "^4.2.0",
     "jscpd": "^5.0.16",
     "knip": "^6.32.2",
-    "oxlint": "^1.80.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.4",
-    "vitest": "^3.2.7",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
+    "vite-plus": "0.3.0",
+    "vitest": "4.1.11",
     "wrangler": "^4.125.0"
-  }
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
+    "vitest": "4.1.11"
+  },
+  "trustedDependencies": [
+    "esbuild",
+    "puppeteer",
+    "workerd"
+  ]
 }

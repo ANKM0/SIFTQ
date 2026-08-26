@@ -25,13 +25,15 @@ dependencies:
 ```bash
 git clone git@github.com:ANKM0/SIFTQ.git
 cd SIFTQ
+curl -fsSL https://bun.sh/install | bash
+curl -fsSL https://vite.plus | bash
 aqua install
 task setup
 ```
 
 If you are using an existing Linux or WSL environment instead of the base
-template, install the tools managed by `aqua.yaml` first, then run the same
-`task setup` command.
+template, install Bun, Vite+, and the tools managed by `aqua.yaml` first, then
+run the same `task setup` command.
 
 ## Development
 
@@ -44,13 +46,13 @@ task frontend:dev
 Apply the local D1 migrations:
 
 ```bash
-pnpm exec wrangler d1 migrations apply siftq --local
+bun x wrangler d1 migrations apply siftq --local
 ```
 
 Run the unit tests:
 
 ```bash
-pnpm test
+vp test run --passWithNoTests
 ```
 
 Common checks:

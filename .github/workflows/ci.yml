@@ -27,16 +27,13 @@ jobs:
       - name: Install repository tools
         run: aqua install
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.6.0
-          run_install: false
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@v1.18.0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2.2.0
         with:
-          node-version: 26
+          bun-version: 1.4.0
 
       - name: Check commit messages
         run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.event.pull_request.head.sha || github.sha }}"
