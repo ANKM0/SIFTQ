@@ -53,6 +53,7 @@ export const Layout: FC = ({ children }) => (
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>SIFTQ</title>
+      <link rel="stylesheet" href="/styles.css" />
       <script src={HTMX_SCRIPT} defer></script>
       <script src={SORTABLE_SCRIPT} defer></script>
       <script src="/matrix-dnd.js" defer></script>

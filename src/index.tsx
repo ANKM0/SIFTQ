@@ -23,6 +23,7 @@ import { TaskMeta } from "./components/TaskMeta";
 import { OptionMenu } from "./components/OptionMenu";
 import { D1TaskRepository } from "./task-repository";
 import type { TaskRepository } from "./task-repository";
+import { STYLES_CSS } from "./styles";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
@@ -190,7 +191,7 @@ function parseTaskArea(value: unknown): Task["area"] | null {
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
-    <>
+    <div class="page page--matrix" data-state="normal">
       <h1>Matrix</h1>
       <NewTaskLink />
       <p id="dnd-conflict" class="error" hidden>
@@ -210,13 +211,13 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
           </section>
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
 function ListPage({ tasks }: { tasks: readonly Task[] }) {
   return (
-    <>
+    <div class="page page--list" data-state="normal">
       <h1>Tasks</h1>
       <NewTaskLink />
       <ul class="task-list">
@@ -224,13 +225,13 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
           <TaskRow key={task.id} task={task} />
         ))}
       </ul>
-    </>
+    </div>
   );
 }
 
 function NewTaskForm({ error }: { error?: string }) {
   return (
-    <>
+    <div class="page page--new" data-state="normal">
       <h1>New task</h1>
       <form hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
         <TitleField />
@@ -241,13 +242,13 @@ function NewTaskForm({ error }: { error?: string }) {
         </label>
         <button type="submit">Create</button>
       </form>
-    </>
+    </div>
   );
 }
 
 function DetailPage({ task, error }: { task: Task; error?: string }) {
   return (
-    <>
+    <div class="page page--detail" data-state="normal">
       <h1>{task.title}</h1>
       <form hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
         <TitleField value={task.title} />
@@ -260,7 +261,7 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
         <button type="submit">Save</button>
       </form>
       <TaskMeta task={task} />
-    </>
+    </div>
   );
 }
 
@@ -309,6 +310,10 @@ app.get("/matrix-dnd.js", (c) => {
   return c.body(MATRIX_DND_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
+});
+
+app.get("/styles.css", (c) => {
+  return c.body(STYLES_CSS, 200, { "content-type": "text/css" });
 });
 
 app.get("/api/tasks", async (c) => {
