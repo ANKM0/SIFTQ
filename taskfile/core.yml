@@ -18,14 +18,14 @@ tasks:
       - uv sync --all-groups
 
   setup:frontend:
-    desc: Install Node dependencies with pnpm.
+    desc: Install frontend dependencies with Bun.
     cmds:
-      - pnpm install
+      - bun install
 
   setup:frontend:ci:
-    desc: Install Node dependencies from the lockfile.
+    desc: Install frontend dependencies from the lockfile.
     cmds:
-      - pnpm install --frozen-lockfile
+      - bun install --frozen-lockfile
 
   graphify:update:
     desc: Update the graphify knowledge graph for the worktree root.
@@ -87,7 +87,7 @@ tasks:
   ci:security:
     desc: Reject vulnerable dependencies and dangerous code patterns.
     cmds:
-      - pnpm audit --audit-level high --ignore-unfixable
+      - bun audit --audit-level high
       - uv run python scripts/ci/check_security_patterns.py
 
   ci:performance:
@@ -103,13 +103,13 @@ tasks:
   ci:architecture:
     desc: Reject unexpected imports, dependency-direction, and cycle violations.
     cmds:
-      - pnpm exec depcruise src --config .dependency-cruiser.cjs
+      - vp exec depcruise src --config .dependency-cruiser.cjs
       - uv run python scripts/ci/check_architecture.py
 
   ci:architecture:metrics:
     desc: Print dependency stability metrics with dependency-cruiser.
     cmds:
-      - pnpm exec depcruise src --config .dependency-cruiser.cjs --metrics --output-type json
+      - vp exec depcruise src --config .dependency-cruiser.cjs --metrics --output-type json
 
   ci:glossary:
     desc: Reject glossary term variants in documentation.
@@ -173,12 +173,12 @@ tasks:
           echo "Skipping TypeScript typecheck: src/ does not exist yet."
           exit 0
         fi
-        pnpm typecheck
+        vp run typecheck
 
   ci:lint:
-    desc: Run ESLint.
+    desc: Run Vite+ lint.
     cmds:
-      - pnpm lint
+      - vp lint .
 
   ci:lint:python:
     desc: Run ruff on scripts/ci with the safe pyflakes rule set.
@@ -186,9 +186,9 @@ tasks:
       - uv run ruff check scripts/ci --select E4,E7,E9,F
 
   ci:lint:ts-fast:
-    desc: Run oxlint on src and tests.
+    desc: Run fast lint on src and tests.
     cmds:
-      - pnpm exec oxlint src tests
+      - vp lint src tests
 
   ci:test:
     desc: Run Vitest and Playwright E2E.
@@ -198,12 +198,12 @@ tasks:
           echo "Skipping Worker tests: src/ does not exist yet."
           exit 0
         fi
-        pnpm test
+        vp test run --passWithNoTests
         if ! find tests/e2e -type f -print -quit 2>/dev/null | grep -q .; then
           echo "Skipping Playwright E2E: no test files found."
           exit 0
         fi
-        pnpm exec playwright install chromium
+        vp exec playwright install chromium
         set -eu
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
@@ -222,7 +222,7 @@ tasks:
           exit 0
         fi
 
-        pnpm test:e2e
+        vp run test:e2e
 
   ci:build:
     desc: Build the Worker.
@@ -232,7 +232,7 @@ tasks:
           echo "Skipping Worker build: src/index.tsx does not exist yet."
           exit 0
         fi
-        pnpm build
+        vp run build
 
   ci:duplicate:
     desc: Reject duplicated production TypeScript code.
@@ -242,7 +242,7 @@ tasks:
           echo "Skipping duplication scan: src/ does not exist yet."
           exit 0
         fi
-        pnpm exec jscpd src --config .jscpd.json
+        vp exec jscpd src --config .jscpd.json
 
   ci:dead-code:
     desc: Reject unused TypeScript exports, files, and types.
@@ -252,12 +252,12 @@ tasks:
           echo "Skipping dead-code scan: src/ does not exist yet."
           exit 0
         fi
-        pnpm exec knip --config knip.json
+        vp exec knip --config knip.json
 
   frontend:dev:
     desc: Start the Worker development server.
     cmds:
-      - pnpm dev
+      - vp run dev
 
   self-improvement:scan:
     desc: Scan Codex sessions for recurring improvement candidates; add --execute to create Issues.
