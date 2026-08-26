@@ -1,0 +1,5 @@
+{"subject": "メモリ上限を超えるファイルで OOM リスク", "description": "大きなCSVを一括で読み込む処理があり、メモリ上限を超えるとOOMになる可能性があります。ストリーム処理に変更したほうがよいです。", "expected_categories": ["design", "coding"]}
+{"subject": "本番リリース連絡", "description": "本日20時に本番リリースを実施しました。影響範囲はありません。", "expected_categories": ["none"]}
+{"subject": "証明書の更新作業", "description": "TLS証明書の有効期限が近いため更新しました。設定変更の報告です。", "expected_categories": ["none"]}
+{"subject": "テスト環境変更で失敗", "description": "テスト環境のDBを変更した影響で、結合テストが失敗しています。テストデータの初期化処理を見直してください。", "expected_categories": ["testing", "coding"]}
+{"subject": "API設計のレビュー指摘", "description": "APIのレスポンス形式が画面ごとにバラバラです。共通のエラー形式に統一すべきです。", "expected_categories": ["design"]}
