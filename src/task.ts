@@ -4,6 +4,8 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const TASK_AREAS = [1, 2, 3, 4] as const;
 export type TaskArea = (typeof TASK_AREAS)[number];
 
+export const TASK_TITLE_MAX_CODE_POINTS = 256;
+
 export type Task = {
   id: string;
   owner_id: string;
@@ -43,6 +45,15 @@ export function isTaskStatus(value: unknown): value is TaskStatus {
 
 export function isTaskArea(value: unknown): value is TaskArea {
   return typeof value === "number" && TASK_AREAS.some((area) => area === value);
+}
+
+export function titleCodePointLength(title: string): number {
+  return Array.from(title).length;
+}
+
+export function isTaskTitleValid(title: string): boolean {
+  const length = titleCodePointLength(title);
+  return length >= 1 && length <= TASK_TITLE_MAX_CODE_POINTS;
 }
 
 export type CreateTaskInput = {
