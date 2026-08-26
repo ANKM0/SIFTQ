@@ -11,23 +11,23 @@ export interface TaskRepository {
 }
 
 export class D1TaskRepository implements TaskRepository {
-  list(): Promise<Result<Task[], RepositoryError>> {
+  async list(): Promise<Result<Task[], RepositoryError>> {
     throw new Error("not implemented");
   }
 
-  find(_id: string, _owner_id: string): Promise<Result<Task | undefined, RepositoryError>> {
+  async find(_id: string, _owner_id: string): Promise<Result<Task | undefined, RepositoryError>> {
     throw new Error("not implemented");
   }
 
-  insert(_task: Task): Promise<Result<Task, RepositoryError>> {
+  async insert(_task: Task): Promise<Result<Task, RepositoryError>> {
     throw new Error("not implemented");
   }
 
-  update(_task: Task): Promise<Result<Task, RepositoryError>> {
+  async update(_task: Task): Promise<Result<Task, RepositoryError>> {
     throw new Error("not implemented");
   }
 
-  move(_tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
+  async move(_tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
     throw new Error("not implemented");
   }
 }
