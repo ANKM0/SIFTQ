@@ -81,7 +81,9 @@ describe("BDD-TM-008: domain reorder", () => {
 
     const moved = moveTask(tasks, "task-1", 2, 0);
 
-    const movedTask = moved.find((task) => task.id === "task-1");
+    expect(moved.ok).toBe(true);
+    if (!moved.ok) return;
+    const movedTask = moved.value.find((task) => task.id === "task-1");
     expect(movedTask).toBeDefined();
     expect(movedTask?.area).toBe(2);
     expect(movedTask?.order).toBe(0);
