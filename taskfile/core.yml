@@ -222,6 +222,7 @@ tasks:
           exit 0
         fi
 
+        bun x wrangler d1 migrations apply siftq --local
         vp run test:e2e
 
   ci:build:
