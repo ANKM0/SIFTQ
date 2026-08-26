@@ -62,27 +62,82 @@ export type CreateTaskInput = {
   description: string;
 };
 
-export function createTask(_input: CreateTaskInput): Result<Task, DomainError> {
-  throw new Error("not implemented");
+export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
+  if (!isTaskTitleValid(input.title)) {
+    return err({ code: "INVALID_TITLE" });
+  }
+
+  const now = new Date().toISOString();
+  return ok({
+    id: crypto.randomUUID(),
+    owner_id: input.owner_id,
+    title: input.title,
+    description: input.description,
+    status: "do",
+    area: 1,
+    order: 1,
+    version: 1,
+    created_at: now,
+    updated_at: now,
+  });
 }
 
-export function changeTaskStatus(_task: Task, _status: TaskStatus): Result<Task, DomainError> {
-  throw new Error("not implemented");
+export function changeTaskStatus(task: Task, status: TaskStatus): Result<Task, DomainError> {
+  return ok({ ...task, status });
 }
 
-export function changeTaskArea(_task: Task, _area: TaskArea): Result<Task, DomainError> {
-  throw new Error("not implemented");
+export function changeTaskArea(task: Task, area: TaskArea): Result<Task, DomainError> {
+  return ok({ ...task, area });
 }
 
-export function sortForMatrix(_tasks: readonly Task[]): Task[] {
-  throw new Error("not implemented");
+export function sortForMatrix(tasks: readonly Task[]): Task[] {
+  return tasks
+    .filter((task) => task.status === "do")
+    .sort((left, right) => left.area - right.area || left.order - right.order);
 }
 
 export function moveTask(
-  _tasks: readonly Task[],
-  _id: string,
-  _area: TaskArea,
-  _order: number,
-): Task[] {
-  throw new Error("not implemented");
+  tasks: readonly Task[],
+  id: string,
+  area: TaskArea,
+  order: number,
+): Result<Task[], DomainError> {
+  const target = tasks.find((task) => task.id === id);
+  if (!target) {
+    return err({ code: "NOT_FOUND" });
+  }
+  if (!Number.isInteger(order) || order < 0) {
+    return err({ code: "INVALID_ORDER" });
+  }
+
+  const sourceArea = target.area;
+  const rest = tasks.filter((task) => task.id !== id).map((task) => ({ ...task }));
+  const destination = rest
+    .filter((task) => task.area === area)
+    .sort((left, right) => left.order - right.order);
+  const clampedOrder = Math.min(order, destination.length);
+
+  for (const task of destination) {
+    if (task.order >= clampedOrder) {
+      task.order += 1;
+    }
+  }
+
+  const moved = { ...target, area, order: clampedOrder };
+  const normalizedDestination = [...destination, moved]
+    .sort((left, right) => left.order - right.order)
+    .map((task, index) => ({ ...task, order: index }));
+
+  const remaining = rest.filter((task) => task.area !== area);
+  if (sourceArea === area) {
+    return ok([...remaining, ...normalizedDestination]);
+  }
+
+  const normalizedSource = remaining
+    .filter((task) => task.area === sourceArea)
+    .sort((left, right) => left.order - right.order)
+    .map((task, index) => ({ ...task, order: index }));
+  const untouched = remaining.filter((task) => task.area !== sourceArea);
+
+  return ok([...untouched, ...normalizedSource, ...normalizedDestination]);
 }
