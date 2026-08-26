@@ -11,6 +11,8 @@ on:
       - 'eval/**'
       - 'taskfile/core.yml'
       - '.github/workflows/llm-eval.yml'
+  schedule:
+    - cron: '0 18 * * *'
 
 permissions:
   contents: read
