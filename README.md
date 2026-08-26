@@ -47,31 +47,11 @@ Apply the local D1 migrations:
 pnpm exec wrangler d1 migrations apply siftq --local
 ```
 
-Manual Matrix MVP browser smoke check:
+Run the unit tests:
 
-- Open the local Worker URL printed by `task frontend:dev`.
-- Confirm Area 1-4 are visible.
-- Create cards from multiple matrix area forms and confirm each card appears
-  at the bottom of the selected area.
-- Confirm blank titles cannot be submitted, duplicate titles are allowed, and
-  titles over 256 characters are blocked without truncation.
-- Drag cards within an area and between matrix areas, then confirm the visible
-  order stays stable after each drop.
-- Open a task detail page, change its status or area, and confirm the task meta
-  fragment updates via HTMX without a full page reload.
-- Drop a card on `Done` and `Skipped`, then confirm it disappears from the
-  matrix display.
-- Confirm a long 256-character title wraps inside the card without overlapping
-  nearby controls or changing the page into an unusable layout.
-- Restart `task frontend:dev`, then confirm the same active task titles, areas,
-  statuses, and order are restored from D1.
-
-Automated coverage includes Hono route and HTMX fragment tests, D1 repository
-and optimistic-locking conflict tests, and the repository-level contracts in
-`tests/` (`removal-contract.test.ts`, `docs-contract.test.ts`). `task ci:test`
-and `task ci` run the Vitest suite; Playwright E2E runs only when `tests/e2e`
-contains test files, and skips locally when Chromium shared libraries are
-missing while staying enforced in CI.
+```bash
+pnpm test
+```
 
 Common checks:
 
@@ -101,9 +81,9 @@ task ci
 
 ## Repository Structure
 
-- `src/`: Worker application source (Hono JSX UI and D1 task repository).
+- `src/`: Worker application source.
 - `migrations/`: D1 schema migrations.
-- `tests/`: repository-level tests.
+- `tests/`: unit tests.
 - `docs/requirements/`: product and system requirements.
 - `docs/wireframes/`: UI wireframes and wireframe templates.
 - `.taqt/runs/`: run state, events, and design decision artifacts.
