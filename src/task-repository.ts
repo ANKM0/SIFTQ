@@ -1,0 +1,33 @@
+import type { DomainError, Result, Task } from "./task";
+
+export type RepositoryError = DomainError;
+
+export interface TaskRepository {
+  list(): Promise<Result<Task[], RepositoryError>>;
+  find(id: string, owner_id: string): Promise<Result<Task | undefined, RepositoryError>>;
+  insert(task: Task): Promise<Result<Task, RepositoryError>>;
+  update(task: Task): Promise<Result<Task, RepositoryError>>;
+  move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>>;
+}
+
+export class D1TaskRepository implements TaskRepository {
+  list(): Promise<Result<Task[], RepositoryError>> {
+    throw new Error("not implemented");
+  }
+
+  find(_id: string, _owner_id: string): Promise<Result<Task | undefined, RepositoryError>> {
+    throw new Error("not implemented");
+  }
+
+  insert(_task: Task): Promise<Result<Task, RepositoryError>> {
+    throw new Error("not implemented");
+  }
+
+  update(_task: Task): Promise<Result<Task, RepositoryError>> {
+    throw new Error("not implemented");
+  }
+
+  move(_tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
+    throw new Error("not implemented");
+  }
+}

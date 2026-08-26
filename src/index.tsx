@@ -1,6 +1,13 @@
 import { Hono } from "hono";
+import type { TaskRepository } from "./task-repository";
 
-const app = new Hono();
+type Env = {
+  Bindings: {
+    TASK_REPOSITORY?: TaskRepository;
+  };
+};
+
+const app = new Hono<Env>();
 
 app.get("/", (c) => c.text("ok"));
 
