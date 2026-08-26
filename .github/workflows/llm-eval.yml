@@ -1,0 +1,53 @@
+name: LLM Eval
+
+on:
+  push:
+    paths:
+      - 'eval/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'eval/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+env:
+  UV_CACHE_DIR: /tmp/uv-cache
+
+jobs:
+  llm-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install aqua
+        uses: aquaproj/aqua-installer@v3.1.2
+        with:
+          aqua_version: v2.59.0
+
+      - name: Install repository tools
+        run: aqua install
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run LLM eval smoke
+        run: task ci:llm-eval

@@ -1,6 +1,11 @@
 allowBuilds:
+  '@playwright/browser-chromium': false
+  '@swc/core': true
   esbuild: true
+  onnxruntime-node: false
+  protobufjs: false
   puppeteer: true
+  sharp: false
   workerd: true
 minimumReleaseAgeExclude:
   - vite@6.4.3
