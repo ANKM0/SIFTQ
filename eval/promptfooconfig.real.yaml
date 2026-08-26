@@ -1,0 +1,12 @@
+description: レビューコメント分類の実評価（ローカルOllama想定）
+prompts:
+  - file://promptfoo/prompts/review-classification.md
+providers:
+  - id: ollama:chat:llama3.1
+    config:
+      temperature: 0.3
+tests: file://gold/review-classification/cases.jsonl
+defaultTest:
+  assert:
+    - type: llm-rubric
+      value: file://rubrics/review-classification.md
