@@ -12,6 +12,7 @@ tmp/
 playwright-report/
 test-results/
 graphify-out/
+eval/.generated-providers.yaml
 
 # Rust generated artifacts
 target/

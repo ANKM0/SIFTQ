@@ -130,11 +130,12 @@ tasks:
       - bunx promptfoo@0.122.0 eval --config eval/promptfoo/promptfooconfig.yaml
 
   eval:review:
-    desc: Run the real review classification eval with a local Ollama provider.
+    desc: Run the real review classification eval using the active Codex provider.
     env:
       PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
     cmds:
       - uv run python scripts/ci/llm_eval_budget.py --limit-file eval/budget.json --spent-file tmp/llm-eval-spent.json
+      - uv run python scripts/ci/llm_eval_provider.py
       - bunx promptfoo@0.122.0 eval --config eval/promptfooconfig.real.yaml
 
   ci:lint:task-refs:
