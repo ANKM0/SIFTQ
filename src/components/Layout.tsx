@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import type { JSX } from "hono/jsx/jsx-runtime";
 
 const HTMX_SCRIPT = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
 const SORTABLE_SCRIPT = "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js";
@@ -47,7 +48,10 @@ export const MATRIX_DND_SCRIPT = [
   'document.addEventListener("htmx:load", initMatrixSortable);',
 ].join("\n");
 
-export const Layout: FC = ({ children }) => (
+export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> = ({
+  active,
+  children,
+}) => (
   <html lang="ja">
     <head>
       <meta charset="UTF-8" />
@@ -59,6 +63,17 @@ export const Layout: FC = ({ children }) => (
       <script src="/matrix-dnd.js" defer></script>
     </head>
     <body>
+      <header class="topbar">
+        <div class="brand">SIFTQ</div>
+        <nav class="nav" aria-label="Primary">
+          <a class={active === "matrix" ? "active" : undefined} href="/">
+            Matrix
+          </a>
+          <a class={active === "tasks" ? "active" : undefined} href="/tasks">
+            Tasks
+          </a>
+        </nav>
+      </header>
       <main id="page">{children}</main>
     </body>
   </html>

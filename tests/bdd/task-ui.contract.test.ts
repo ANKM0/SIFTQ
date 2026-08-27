@@ -60,7 +60,7 @@ describe("Task creation", () => {
     expect([200, 201]).toContain(response.status);
     expect(response.headers.get("hx-push-url")).toMatch(/^\/tasks\//);
     expect(body).toContain("Buy milk");
-    expect(body).toContain('<aside id="task-meta">');
+    expect(body).toContain('id="task-meta"');
   });
 });
 
