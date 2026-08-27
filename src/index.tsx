@@ -145,6 +145,28 @@ function TitleField({ value }: { value?: string }) {
   );
 }
 
+function DescriptionField({ children }: { children?: string }) {
+  return (
+    <label>
+      Description
+      <textarea name="description">{children}</textarea>
+    </label>
+  );
+}
+
+function TaskFormActions({ submitLabel }: { submitLabel: string }) {
+  return (
+    <div class="form-actions">
+      <a class="button" href="/tasks">
+        Cancel
+      </a>
+      <button class="button primary" type="submit">
+        {submitLabel}
+      </button>
+    </div>
+  );
+}
+
 type ParsedBody = Record<string, unknown>;
 
 function readTaskFields(body: ParsedBody): {
@@ -264,18 +286,8 @@ function NewTaskForm({ error }: { error?: string }) {
         <form class="form-panel" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
           <TitleField />
           {error ? <p class="error">{error}</p> : null}
-          <label>
-            Description
-            <textarea name="description"></textarea>
-          </label>
-          <div class="form-actions">
-            <a class="button" href="/tasks">
-              Cancel
-            </a>
-            <button class="button primary" type="submit">
-              Create
-            </button>
-          </div>
+          <DescriptionField />
+          <TaskFormActions submitLabel="Create" />
         </form>
         <aside class="side-panel">
           <div class="meta-row">
@@ -312,18 +324,8 @@ function DetailPage({ task, error }: { task: Task; error?: string }) {
           <TitleField value={task.title} />
           <input type="hidden" name="version" value={task.version} />
           {error ? <p class="error">{error}</p> : null}
-          <label>
-            Description
-            <textarea name="description">{task.description}</textarea>
-          </label>
-          <div class="form-actions">
-            <a class="button" href="/tasks">
-              Cancel
-            </a>
-            <button class="button primary" type="submit">
-              Save
-            </button>
-          </div>
+          <DescriptionField>{task.description}</DescriptionField>
+          <TaskFormActions submitLabel="Save" />
         </form>
         <TaskMeta task={task} />
       </div>
