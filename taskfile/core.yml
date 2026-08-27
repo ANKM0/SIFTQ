@@ -8,12 +8,13 @@ tasks:
 
   setup:
     desc: Install all local development tools and dependencies.
-    deps:
-      - setup:aqua
-      - setup:bun
-      - setup:vite-plus
-      - setup:python
-      - setup:frontend
+    cmds:
+      - task: setup:aqua
+      - task: setup:unzip
+      - task: setup:bun
+      - task: setup:vite-plus
+      - task: setup:python
+      - task: setup:frontend
 
   setup:aqua:
     desc: Install repository CLI tools with aqua.
@@ -29,6 +30,8 @@ tasks:
 
   setup:bun:
     desc: Install Bun if missing.
+    deps:
+      - setup:unzip
     cmds:
       - |
         set -eu
@@ -42,6 +45,24 @@ tasks:
           exit 1
         fi
         curl -fsSL https://bun.sh/install | bash
+
+  setup:unzip:
+    desc: Install unzip if missing.
+    cmds:
+      - |
+        set -eu
+        if command -v unzip >/dev/null 2>&1; then
+          exit 0
+        fi
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y unzip
+        else
+          echo "unzip is required to install Bun." >&2
+          echo "Run the following command, then rerun 'task setup':" >&2
+          echo "  sudo apt-get update && sudo apt-get install -y unzip" >&2
+          exit 1
+        fi
 
   setup:vite-plus:
     desc: Install Vite+ if missing.
