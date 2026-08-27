@@ -10,7 +10,7 @@ tasks:
     desc: Install all local development tools and dependencies.
     cmds:
       - task: setup:aqua
-      - task: setup:unzip
+      - task: setup:ouch
       - task: setup:bun
       - task: setup:vite-plus
       - task: setup:python
@@ -31,7 +31,7 @@ tasks:
   setup:bun:
     desc: Install Bun if missing.
     deps:
-      - setup:unzip
+      - setup:ouch
     cmds:
       - |
         set -eu
@@ -39,30 +39,82 @@ tasks:
           echo "Bun is already installed."
           exit 0
         fi
-        if ! command -v unzip >/dev/null 2>&1; then
-          echo "unzip is required to install Bun." >&2
-          echo "Install unzip first, then rerun 'task setup'." >&2
+        if ! command -v ouch >/dev/null 2>&1; then
+          echo "ouch is required to install Bun." >&2
+          echo "Run 'task setup:ouch' first, then rerun 'task setup'." >&2
           exit 1
         fi
-        curl -fsSL https://bun.sh/install | bash
+        tmpdir="$(mktemp -d)"
+        trap 'rm -rf "$tmpdir"' EXIT
+        cat > "$tmpdir/unzip" <<'EOF'
+        #!/bin/sh
+        set -eu
+        out=
+        file=
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --)
+              shift
+              break
+              ;;
+            -*)
+              opts=${1#-}
+              while [ -n "$opts" ]; do
+                opt=${opts%"${opts#?}"}
+                rest=${opts#?}
+                case "$opt" in
+                  o|q) ;;
+                  d)
+                    if [ -n "$rest" ]; then
+                      out="$rest"
+                      rest=
+                    else
+                      shift
+                      out="$1"
+                    fi
+                    ;;
+                  *)
+                    echo "unsupported unzip option: -$opt" >&2
+                    exit 2
+                    ;;
+                esac
+                opts="$rest"
+              done
+              ;;
+            *)
+              file="$1"
+              ;;
+          esac
+          shift
+        done
+        [ -n "$file" ] || {
+          echo "no archive specified" >&2
+          exit 2
+        }
+        if [ -n "$out" ]; then
+          exec ouch decompress "$file" --dir "$out" --yes --quiet
+        fi
+        exec ouch decompress "$file" --yes --quiet
+        EOF
+        chmod +x "$tmpdir/unzip"
+        curl -fsSL https://bun.sh/install -o "$tmpdir/install.sh"
+        PATH="$tmpdir:$PATH" bash "$tmpdir/install.sh"
 
-  setup:unzip:
-    desc: Install unzip if missing.
+  setup:ouch:
+    desc: Ensure ouch is installed via aqua.
     cmds:
       - |
         set -eu
-        if command -v unzip >/dev/null 2>&1; then
+        if command -v ouch >/dev/null 2>&1; then
+          echo "ouch is already installed."
           exit 0
         fi
-        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-          sudo apt-get update
-          sudo apt-get install -y unzip
-        else
-          echo "unzip is required to install Bun." >&2
-          echo "Run the following command, then rerun 'task setup':" >&2
-          echo "  sudo apt-get update && sudo apt-get install -y unzip" >&2
+        if ! command -v aqua >/dev/null 2>&1; then
+          echo "aqua is not installed." >&2
+          echo "Install aqua first, then rerun 'task setup'." >&2
           exit 1
         fi
+        aqua install
 
   setup:vite-plus:
     desc: Install Vite+ if missing.

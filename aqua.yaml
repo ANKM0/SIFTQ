@@ -17,3 +17,4 @@ packages:
 - name: nodejs/node@v26.3.0
 - name: go-task/task@v3.51.1
 - name: BurntSushi/ripgrep@14.1.1
+- name: ouch-org/ouch@0.8.1
