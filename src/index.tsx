@@ -5,7 +5,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
-  TASK_STATUSES,
   changeTaskArea,
   changeTaskStatus,
   createTask,
@@ -115,7 +114,8 @@ function renderPage(c: Context<AppEnv>, content: JSX.Element) {
   if (c.req.header("HX-Request")) {
     return c.html(content);
   }
-  return c.html(<Layout>{content}</Layout>);
+  const active = c.req.path === "/" ? "matrix" : "tasks";
+  return c.html(<Layout active={active}>{content}</Layout>);
 }
 
 function pageNav(path: string) {
@@ -129,7 +129,11 @@ function pageNav(path: string) {
 }
 
 function NewTaskLink() {
-  return <a {...pageNav("/tasks/new")}>New task</a>;
+  return (
+    <a class="button primary" {...pageNav("/tasks/new")}>
+      New task
+    </a>
+  );
 }
 
 function TitleField({ value }: { value?: string }) {
@@ -138,6 +142,28 @@ function TitleField({ value }: { value?: string }) {
       Title
       <input type="text" name="title" value={value} maxlength={256} required />
     </label>
+  );
+}
+
+function DescriptionField({ children }: { children?: string }) {
+  return (
+    <label>
+      Description
+      <textarea name="description">{children}</textarea>
+    </label>
+  );
+}
+
+function TaskFormActions({ submitLabel }: { submitLabel: string }) {
+  return (
+    <div class="form-actions">
+      <a class="button" href="/tasks">
+        Cancel
+      </a>
+      <button class="button primary" type="submit">
+        {submitLabel}
+      </button>
+    </div>
   );
 }
 
@@ -192,15 +218,31 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
     <div class="page page--matrix" data-state="normal">
-      <h1>Matrix</h1>
-      <NewTaskLink />
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Matrix</h1>
+          <p class="muted">Organize tasks by urgency and importance.</p>
+        </div>
+        <NewTaskLink />
+      </div>
       <p id="dnd-conflict" class="error" hidden>
         Task was updated elsewhere. The Matrix was restored to the latest state.
       </p>
-      <div class="matrix">
+      <div class="matrix matrix-axis" aria-label="Four status matrix">
+        <div class="axis-line axis-line--horizontal" aria-hidden="true">
+          <span>緊急度</span>
+        </div>
+        <div class="axis-line axis-line--vertical" aria-hidden="true">
+          <span>重要度</span>
+        </div>
         {TASK_AREAS.map((area) => (
-          <section key={area} class="matrix-area" data-area={area}>
-            <h2>Area {area}</h2>
+          <section
+            key={area}
+            class={`area area--quadrant area--q${area}`}
+            aria-labelledby={`area-${area}`}
+            data-drop-area={area}
+          >
+            <h2 id={`area-${area}`}>{area}</h2>
             <div class="matrix-cards" data-area={area} data-sortable-group="matrix">
               {matrixTasks
                 .filter((task) => task.area === area)
@@ -218,13 +260,18 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
 function ListPage({ tasks }: { tasks: readonly Task[] }) {
   return (
     <div class="page page--list" data-state="normal">
-      <h1>Tasks</h1>
-      <NewTaskLink />
-      <ul class="task-list">
-        {tasks.map((task) => (
-          <TaskRow key={task.id} task={task} />
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Tasks</h1>
+          <p class="muted">GitHub Issues-like list without search in this scope.</p>
+        </div>
+        <NewTaskLink />
+      </div>
+      <div class="list" aria-label="Task list">
+        {tasks.map((task, index) => (
+          <TaskRow key={task.id} task={task} issueNumber={index + 1} />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -232,16 +279,33 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
 function NewTaskForm({ error }: { error?: string }) {
   return (
     <div class="page page--new" data-state="normal">
-      <h1>New task</h1>
-      <form hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
-        <TitleField />
-        {error ? <p class="error">{error}</p> : null}
-        <label>
-          Description
-          <textarea name="description"></textarea>
-        </label>
-        <button type="submit">Create</button>
-      </form>
+      <div class="page-header">
+        <h1 class="page-title">New task</h1>
+      </div>
+      <div class="detail-grid">
+        <form class="form-panel" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
+          <TitleField />
+          {error ? <p class="error">{error}</p> : null}
+          <DescriptionField />
+          <TaskFormActions submitLabel="Create" />
+        </form>
+        <aside class="side-panel">
+          <div class="meta-row">
+            <h2>Status</h2>
+            <span class="meta-caret" aria-hidden="true">
+              ▾
+            </span>
+          </div>
+          <span class="status status--do">do</span>
+          <div class="meta-row meta-row--spaced">
+            <h2>Area</h2>
+            <span class="meta-caret" aria-hidden="true">
+              ▾
+            </span>
+          </div>
+          <span class="status area-badge">1</span>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -249,18 +313,22 @@ function NewTaskForm({ error }: { error?: string }) {
 function DetailPage({ task, error }: { task: Task; error?: string }) {
   return (
     <div class="page page--detail" data-state="normal">
-      <h1>{task.title}</h1>
-      <form hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
-        <TitleField value={task.title} />
-        <input type="hidden" name="version" value={task.version} />
-        {error ? <p class="error">{error}</p> : null}
-        <label>
-          Description
-          <textarea name="description">{task.description}</textarea>
-        </label>
-        <button type="submit">Save</button>
-      </form>
-      <TaskMeta task={task} />
+      <div class="page-header">
+        <h1 class="page-title">Task detail</h1>
+        <a class="button" href="/tasks">
+          Tasks
+        </a>
+      </div>
+      <div class="detail-grid">
+        <form class="form-panel" hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
+          <TitleField value={task.title} />
+          <input type="hidden" name="version" value={task.version} />
+          {error ? <p class="error">{error}</p> : null}
+          <DescriptionField>{task.description}</DescriptionField>
+          <TaskFormActions submitLabel="Save" />
+        </form>
+        <TaskMeta task={task} />
+      </div>
     </div>
   );
 }
@@ -275,29 +343,11 @@ function ConflictPage({ taskId }: { taskId: string }) {
 }
 
 function StatusMenu({ task }: { task: Task }) {
-  return (
-    <OptionMenu
-      title="Change status"
-      values={TASK_STATUSES}
-      postPath={`/tasks/${task.id}/status`}
-      valueKey="status"
-      cancelPath={`/tasks/${task.id}`}
-      version={task.version}
-    />
-  );
+  return <OptionMenu task={task} open="status" />;
 }
 
 function AreaMenu({ task }: { task: Task }) {
-  return (
-    <OptionMenu
-      title="Change area"
-      values={TASK_AREAS}
-      postPath={`/tasks/${task.id}/area`}
-      valueKey="area"
-      cancelPath={`/tasks/${task.id}`}
-      version={task.version}
-    />
-  );
+  return <OptionMenu task={task} open="area" />;
 }
 
 app.get("/", async (c) => {
