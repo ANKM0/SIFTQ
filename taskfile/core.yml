@@ -7,10 +7,52 @@ tasks:
       - task --list
 
   setup:
-    desc: Install all local development dependencies.
+    desc: Install all local development tools and dependencies.
     deps:
+      - setup:aqua
+      - setup:bun
+      - setup:vite-plus
       - setup:python
       - setup:frontend
+
+  setup:aqua:
+    desc: Install repository CLI tools with aqua.
+    cmds:
+      - |
+        set -eu
+        if ! command -v aqua >/dev/null 2>&1; then
+          echo "aqua is not installed." >&2
+          echo "Install aqua first, then rerun 'task setup'." >&2
+          exit 1
+        fi
+        aqua install
+
+  setup:bun:
+    desc: Install Bun if missing.
+    cmds:
+      - |
+        set -eu
+        if command -v bun >/dev/null 2>&1 || [ -x "$HOME/.bun/bin/bun" ]; then
+          echo "Bun is already installed."
+          exit 0
+        fi
+        if ! command -v unzip >/dev/null 2>&1; then
+          echo "unzip is required to install Bun." >&2
+          echo "Install unzip first, then rerun 'task setup'." >&2
+          exit 1
+        fi
+        curl -fsSL https://bun.sh/install | bash
+
+  setup:vite-plus:
+    desc: Install Vite+ if missing.
+    cmds:
+      - |
+        set -eu
+        if command -v vp >/dev/null 2>&1 || [ -x "$HOME/.local/share/vite-plus/bin/vp" ]; then
+          echo "Vite+ is already installed."
+          exit 0
+        fi
+        curl -fsSL https://vite.plus | bash
 
   setup:python:
     desc: Install Python dependencies with uv.
@@ -20,7 +62,16 @@ tasks:
   setup:frontend:
     desc: Install frontend dependencies with Bun.
     cmds:
-      - bun install
+      - |
+        set -eu
+        if command -v bun >/dev/null 2>&1; then
+          bun install
+        elif [ -x "$HOME/.bun/bin/bun" ]; then
+          "$HOME/.bun/bin/bun" install
+        else
+          echo "Bun is not installed. Run 'task setup:bun' first." >&2
+          exit 1
+        fi
 
   setup:frontend:ci:
     desc: Install frontend dependencies from the lockfile.
@@ -272,10 +323,19 @@ tasks:
         fi
         vp exec knip --config knip.json
 
-  frontend:dev:
+  dev:
     desc: Start the Worker development server.
     cmds:
-      - vp run dev
+      - |
+        set -eu
+        if command -v vp >/dev/null 2>&1; then
+          vp run dev
+        elif [ -x "$HOME/.local/share/vite-plus/bin/vp" ]; then
+          "$HOME/.local/share/vite-plus/bin/vp" run dev
+        else
+          echo "Vite+ is not installed. Run 'task setup:vite-plus' first." >&2
+          exit 1
+        fi
 
   self-improvement:scan:
     desc: Scan Codex sessions for recurring improvement candidates; add --execute to create Issues.
