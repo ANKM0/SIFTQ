@@ -32,6 +32,19 @@ describe("Matrix page", () => {
     expect(fragmentBody).not.toContain("<html");
     expect(fragmentBody).toContain("Matrix");
   });
+
+  it("renders four quadrants with axes and title-only cards", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
+
+    const body = await (await request("/")).text();
+
+    expect(body).toContain('class="area area--quadrant area--q1"');
+    expect(body).toContain('class="area area--quadrant area--q4"');
+    expect(body).toContain("axis-line--horizontal");
+    expect(body).toContain("axis-line--vertical");
+    expect(body).toContain('data-task-id="task-1"');
+    expect(body).not.toContain("status--do");
+  });
 });
 
 describe("Task list page", () => {
@@ -45,6 +58,18 @@ describe("Task list page", () => {
     expect(response.status).toBe(200);
     expect(body).toContain("done-1");
     expect(body).toContain("skip-1");
+  });
+
+  it("renders compact issues-like rows with area and status badges", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", area: 2 }));
+
+    const body = await (await request("/tasks")).text();
+
+    expect(body).toContain('class="task-row"');
+    expect(body).toContain("#1");
+    expect(body).toContain("seed task");
+    expect(body).toContain("status area-badge");
+    expect(body).toContain("status--do");
   });
 });
 
@@ -61,6 +86,16 @@ describe("Task creation", () => {
     expect(response.headers.get("hx-push-url")).toMatch(/^\/tasks\//);
     expect(body).toContain("Buy milk");
     expect(body).toContain('id="task-meta"');
+  });
+
+  it("renders the new task wireframe with cancel and side metadata", async () => {
+    const body = await (await request("/tasks/new")).text();
+
+    expect(body).toContain("New task");
+    expect(body).toContain("Cancel");
+    expect(body).toContain("Create");
+    expect(body).toContain("status status--do");
+    expect(body).toContain("status area-badge");
   });
 });
 
@@ -84,5 +119,19 @@ describe("Task detail and metadata menus", () => {
     expect(areaMenu.status).toBe(200);
     expect(areaBody).toContain("1");
     expect(areaBody).toContain("4");
+  });
+
+  it("renders popovers with selected and suggestion groups", async () => {
+    await repo.insert(taskFixture({ id: "task-1", area: 1, status: "do" }));
+
+    const statusBody = await (await request("/tasks/task-1/status/menu")).text();
+    expect(statusBody).toContain("Apply status to this task");
+    expect(statusBody).toContain("Selected status");
+    expect(statusBody).toContain("Suggestions");
+    expect(statusBody).toContain('hx-target="#task-meta"');
+
+    const areaBody = await (await request("/tasks/task-1/area/menu")).text();
+    expect(areaBody).toContain("Apply area to this task");
+    expect(areaBody).toContain("Selected area");
   });
 });
