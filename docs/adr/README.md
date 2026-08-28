@@ -34,3 +34,4 @@
 | [ADR 0028: Adopt common UI state and feedback rules](0028-adopt-common-ui-state-and-feedback-rules.md) | Accepted. | 全画面の 4 状態と通知の表示時間・閉じ方を定める。 |
 | [ADR 0029: Adopt Result type in domain and usecase](0029-adopt-result-type-in-domain-usecase.md) | Accepted. | domain / usecase は期待される失敗を inline union の `Result<T, E>` で返す。 |
 | [ADR 0030: Adopt static component catalog](0030-adopt-static-component-catalog.md) | Accepted. | Hono JSX component を static HTML catalog 化し、Review 済み component を再利用する。 |
+| [ADR 0031: Adopt Cloudflare Access for SIFTQ Worker access control](0031-adopt-cloudflare-access-for-worker.md) | Accepted. | `siftq` Worker の公開アクセス制御に Cloudflare Access を採用し、Cloudflare アカウントメンバーに限定する。 |
