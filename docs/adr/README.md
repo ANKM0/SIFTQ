@@ -36,3 +36,4 @@
 | [ADR 0030: Adopt static component catalog](0030-adopt-static-component-catalog.md) | Accepted. | Hono JSX component を static HTML catalog 化し、Review 済み component を再利用する。 |
 | [ADR 0031: Adopt Cloudflare Access for SIFTQ Worker access control](0031-adopt-cloudflare-access-for-worker.md) | Superseded by ADR 0032. | `siftq` Worker の公開アクセス制御に Cloudflare Access を採用していた。 |
 | [ADR 0032: Adopt Worker-managed shared-password authentication](0032-adopt-worker-managed-shared-password-authentication.md) | Accepted. | Worker 内の共有パスワード認証と署名付き Cookie でアクセスを制御する。 |
+| [ADR 0033: md2idx は Bun の devDependency として導入する](0033-introduce-md2idx-as-bun-devdependency.md) | Accepted. | `md2idx` を `package.json` の devDependency で導入し、`bun x md2idx` で実行する。 |
