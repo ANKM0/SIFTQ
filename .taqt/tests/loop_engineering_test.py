@@ -267,6 +267,8 @@ def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: P
     assert 'base_url = "https://api.deepseek.com/"' in config
     assert 'wire_api = "responses"' in config
     assert 'env_key = "DEEPSEEK_API_KEY"' in config
+    assert 'model_reasoning_effort = "low"' in config
+    assert 'model_auto_compact_token_limit = 120000' in config
     assert "experimental_bearer_token" not in config
     assert "DEEPSEEK_API_KEY" not in json.dumps(catalog)
     assert {model["slug"] for model in catalog["models"]} == {
@@ -275,6 +277,8 @@ def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: P
     }
     assert all("base_instructions" in model for model in catalog["models"])
     assert all("instructions_template" in model["model_messages"] for model in catalog["models"])
+    assert all(model["auto_compact_token_limit"] == 120000 for model in catalog["models"])
+    assert all(model["default_reasoning_level"] == "low" for model in catalog["models"])
 
 
 def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
@@ -284,7 +288,7 @@ def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
     validate_loop_definition(loop)
     assert loop["agents"]["design"]["model"] == "deepseek-v4-pro"
     assert loop["agents"]["implement"]["model"] == "deepseek-v4-flash"
-    assert loop["agents"]["checker"]["model"] == "deepseek-v4-pro"
+    assert loop["agents"]["checker"]["model"] == "deepseek-v4-flash"
     assert "judge" not in loop["agents"]
 
 
@@ -636,15 +640,15 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
 
     assert agents["design"]["model"] == "deepseek-v4-pro"
-    assert agents["design"]["reasoning_effort"] == "medium"
+    assert agents["design"]["reasoning_effort"] == "high"
     assert agents["test"]["model"] == "deepseek-v4-flash"
     assert agents["test"]["reasoning_effort"] == "low"
     assert agents["implement"]["model"] == "deepseek-v4-flash"
     assert agents["implement"]["reasoning_effort"] == "low"
     assert agents["fix"]["model"] == "deepseek-v4-flash"
     assert agents["fix"]["reasoning_effort"] == "low"
-    assert agents["checker"]["model"] == "deepseek-v4-pro"
-    assert agents["checker"]["reasoning_effort"] == "medium"
+    assert agents["checker"]["model"] == "deepseek-v4-flash"
+    assert agents["checker"]["reasoning_effort"] == "low"
 
     step_ids = [step["id"] for step in steps]
     assert step_ids.index("design") < step_ids.index("test")
