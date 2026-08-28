@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import subprocess
 from pathlib import Path
 
 
@@ -10,16 +11,28 @@ def repository_root() -> Path:
 
 
 ROOT = repository_root()
-EXCLUDED_DIRS = {".git", ".venv", "node_modules", "dist"}
 
 
 def markdown_files() -> list[Path]:
-    files: list[Path] = []
-    for path in ROOT.rglob("*.md"):
-        if any(part in EXCLUDED_DIRS for part in path.parts):
-            continue
-        files.append(path)
-    return sorted(files)
+    """Repository-owned markdown files (tracked or untracked, not gitignored)."""
+    tracked = subprocess.check_output(
+        ["git", "-C", str(ROOT), "ls-files", "-z", "*.md"],
+        text=True,
+    ).split("\0")
+    untracked = subprocess.check_output(
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "ls-files",
+            "-z",
+            "--others",
+            "--exclude-standard",
+            "*.md",
+        ],
+        text=True,
+    ).split("\0")
+    return sorted({ROOT / name for name in tracked + untracked if name})
 
 
 def main() -> int:
