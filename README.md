@@ -61,6 +61,11 @@ task ci:test
 task ci:build
 ```
 
+## Deployment
+
+Cloudflare Workers とリモート D1 へのデプロイ手順は
+[`docs/contributing/deployment.md`](docs/contributing/deployment.md) を参照する。
+
 ## Loop Engineering
 
 The loop engineering direction is recorded in
