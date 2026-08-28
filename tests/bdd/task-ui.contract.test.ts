@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import app from "../../src/index";
+import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
 import { MemoryTaskRepository } from "../helpers/memory-task-repository";
 
@@ -10,7 +10,7 @@ beforeEach(() => {
 });
 
 function request(path: string, init?: RequestInit) {
-  return app.request(path, init, { TASK_REPOSITORY: repo });
+  return authenticatedRequest(path, repo, init);
 }
 
 describe("Matrix page", () => {

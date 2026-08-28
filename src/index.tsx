@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { JSX } from "hono/jsx/jsx-runtime";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -20,6 +21,14 @@ import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
 import { OptionMenu } from "./components/OptionMenu";
+import { LoginPage, safeNextPath } from "./components/LoginPage";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_DURATION_MS,
+  createSession,
+  isPasswordValid,
+  isValidSession,
+} from "./auth";
 import { D1TaskRepository } from "./task-repository";
 import type { TaskRepository } from "./task-repository";
 import { STYLES_CSS } from "./styles";
@@ -27,6 +36,8 @@ import { STYLES_CSS } from "./styles";
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
   DB?: D1Database;
+  AUTH_PASSWORD?: string;
+  SESSION_SECRET?: string;
 };
 
 type AppEnv = {
@@ -34,6 +45,53 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+
+const PUBLIC_PATHS = new Set(["/login", "/styles.css", "/matrix-dnd.js"]);
+
+function isPublicPath(path: string): boolean {
+  return PUBLIC_PATHS.has(path);
+}
+
+function authConfig(c: Context<AppEnv>): { password: string; secret: string } | null {
+  const password = c.env.AUTH_PASSWORD;
+  const secret = c.env.SESSION_SECRET;
+  if (password === undefined || secret === undefined) return null;
+  return { password, secret };
+}
+
+function unauthorizedResponse(c: Context<AppEnv>): Response {
+  if (c.req.path.startsWith("/api/")) {
+    return c.json(
+      {
+        type: "about:blank",
+        title: "Unauthorized",
+        status: 401,
+        code: "UNAUTHORIZED",
+      },
+      401,
+    );
+  }
+  if (c.req.header("HX-Request") === "true") {
+    c.header("HX-Redirect", "/login");
+    return c.body(null, 401);
+  }
+  return c.redirect("/login");
+}
+
+app.use("*", async (c, next) => {
+  if (isPublicPath(c.req.path)) return next();
+  const auth = authConfig(c);
+  if (auth === null) {
+    return c.text("Authentication is not configured", 503);
+  }
+
+  const session = getCookie(c, SESSION_COOKIE_NAME);
+  if (session !== undefined && (await isValidSession(auth.secret, session))) {
+    return next();
+  }
+
+  return unauthorizedResponse(c);
+});
 
 function repository(c: Context<AppEnv>): TaskRepository {
   if (c.env.TASK_REPOSITORY) return c.env.TASK_REPOSITORY;
@@ -349,6 +407,43 @@ function StatusMenu({ task }: { task: Task }) {
 function AreaMenu({ task }: { task: Task }) {
   return <OptionMenu task={task} open="area" />;
 }
+
+app.get("/login", (c) => {
+  const next = c.req.query("next");
+  if (next === undefined) {
+    return c.html(<LoginPage error={c.req.query("error") === "1"} />);
+  }
+  return c.html(<LoginPage error={c.req.query("error") === "1"} next={next} />);
+});
+
+app.post("/login", async (c) => {
+  const auth = authConfig(c);
+  if (auth === null) return c.text("Authentication is not configured", 503);
+
+  const body = await c.req.parseBody();
+  const password = typeof body["password"] === "string" ? body["password"] : "";
+  const next = typeof body["next"] === "string" ? body["next"] : "/";
+
+  if (!(await isPasswordValid(password, auth.password))) {
+    return c.html(<LoginPage error next={next} />, 401);
+  }
+
+  const expires = Date.now() + SESSION_DURATION_MS;
+  const session = await createSession(auth.secret, expires);
+  setCookie(c, SESSION_COOKIE_NAME, session, {
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: true,
+    path: "/",
+    expires: new Date(expires),
+  });
+  return c.redirect(safeNextPath(next));
+});
+
+app.post("/logout", (c) => {
+  deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
+  return c.redirect("/login");
+});
 
 app.get("/", async (c) => {
   const result = await repository(c).list();
