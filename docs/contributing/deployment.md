@@ -42,18 +42,24 @@ Token には次の権限が必要。
 共有パスワード認証に必要な secrets を設定する。
 
 ```bash
-bun x wrangler secret put AUTH_PASSWORD
-bun x wrangler secret put SESSION_SECRET
+task deploy:secrets
+```
+
+対話入力を避ける場合は環境変数で渡す。
+
+```bash
+AUTH_PASSWORD="<password>" SESSION_SECRET="<long-random-secret>" task deploy:secrets
 ```
 
 `SESSION_SECRET` は長いランダム文字列を設定する。
+`openssl rand -hex 32` で生成できる。
 ローカル開発では `.dev.vars` に `AUTH_PASSWORD` / `SESSION_SECRET` を記載し、
 `.gitignore` 済みであることを確認する。
 
 ## Worker をデプロイする
 
 ```bash
-bun x wrangler deploy
+task deploy
 ```
 
 コマンド末尾に表示される production URL で UI を確認する。
