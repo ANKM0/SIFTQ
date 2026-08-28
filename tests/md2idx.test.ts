@@ -39,7 +39,7 @@ function runMd2Idx(markdown: string): Md2IdxOutput {
   try {
     writeFileSync(fixturePath, markdown, "utf8");
     const bun = process.env["BUN"] ?? "bun";
-    const stdout = execFileSync(bun, ["x", "md2idx", fixturePath], {
+    const stdout = execFileSync(bun, ["x", "--no-install", "md2idx", fixturePath], {
       cwd: process.cwd(),
       encoding: "utf8",
     });
