@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import app from "../../src/index";
 import type { Task } from "../../src/task";
+import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
 import { MemoryTaskRepository } from "../helpers/memory-task-repository";
 
@@ -19,7 +19,7 @@ function request(method: string, path: string, body?: unknown) {
     init.body = JSON.stringify(body);
   }
 
-  return app.request(path, init, { TASK_REPOSITORY: repo });
+  return authenticatedRequest(path, repo, init);
 }
 
 describe("BDD-TM-001: task creation", () => {

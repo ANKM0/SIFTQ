@@ -37,6 +37,19 @@ Token には次の権限が必要。
 
 `bun x wrangler d1 migrations apply siftq --remote`
 
+## Worker 認証の secrets を設定する
+
+共有パスワード認証に必要な secrets を設定する。
+
+```bash
+bun x wrangler secret put AUTH_PASSWORD
+bun x wrangler secret put SESSION_SECRET
+```
+
+`SESSION_SECRET` は長いランダム文字列を設定する。
+ローカル開発では `.dev.vars` に `AUTH_PASSWORD` / `SESSION_SECRET` を記載し、
+`.gitignore` 済みであることを確認する。
+
 ## Worker をデプロイする
 
 ```bash
@@ -47,6 +60,6 @@ bun x wrangler deploy
 
 ## 動作確認
 
-- production URL で Matrix UI が表示される。
+- 未認証では `/login` が表示され、ログイン後に Matrix UI が表示される。
 - task の作成・更新・DnD 並べ替えが保存される。
 - `bun x wrangler d1 migrations list siftq --remote` で適用済み migration を確認できる。

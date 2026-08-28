@@ -8,6 +8,7 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+.dev.vars
 tmp/
 playwright-report/
 test-results/
