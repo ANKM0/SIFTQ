@@ -2,10 +2,8 @@
 
 ## 決定
 
-- `siftq` Worker の公開アクセス制御に Cloudflare Access（Cloudflare Zero Trust）を採用する。
-- Access は Worker 単位で全トラフィック（production / preview / workers.dev / custom domain）を保護する。
-- 認証ポリシーは Cloudflare アカウントのメンバーに限定する。
-- 現時点では Worker 内に認証・ユーザー識別を実装しない。
+- `siftq` Worker へのアクセスを Cloudflare Access で保護し、Cloudflare アカウントのメンバーに限定する。
+- 将来、ユーザーごとの配布・データ分割が必要になった場合は、Worker 内認証（セッション / API キー）の採用を再検討する。
 
 ### 決定の理由
 
