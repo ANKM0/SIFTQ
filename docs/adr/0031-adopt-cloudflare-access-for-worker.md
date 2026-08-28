@@ -1,5 +1,7 @@
 # ADR 0031: Adopt Cloudflare Access for SIFTQ Worker access control
 
+> Status: Superseded by [ADR 0032](0032-adopt-worker-managed-shared-password-authentication.md)
+
 ## 決定
 
 - `siftq` Worker へのアクセスを Cloudflare Access で保護し、Cloudflare アカウントのメンバーに限定する。
