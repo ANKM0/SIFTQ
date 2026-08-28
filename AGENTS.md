@@ -11,6 +11,12 @@
 - 探索は `rg` / `rg --files` を優先し、必要な範囲だけ読む。`rg` が無い環境では `find` / `grep` へ即フォールバックする。
 - 既存の設計、文書、Taskfile、`.codex/rules/` を優先する。
 
+## 長い Markdown の読み取り
+
+- 全文が不要な大きい Markdown は、まず index を取得して必要な section だけ読む。開発環境の依存関係を導入済みなら `bun x --no-install md2idx path/to/file.md | bun -e 'const d = JSON.parse(await Bun.stdin.text()); console.log(d.index)'` を実行し、番号を確認した後に同じコマンドの `console.log(d.index)` を `console.log(d.sections[番号])` または `console.log(d.sections.slice(開始, 終了).join("\n\n"))` へ置き換えて取得する。
+- `md2idx` が使えない場合は、`rg -n '^(#{1,6}[[:space:]]+|[=-]{3,}[[:space:]]*$)' path/to/file.md` で ATX 見出しと setext の下線位置を確認し、選択した見出しから次の見出し直前までを offset/limit（または `sed -n '開始,終了p'`）で読む。
+- `md2idx` は長い Markdown の section 抽出用であり、コードベースの関係調査や横断的な知識グラフには既存の `graphify` を使う。
+
 ## 検証
 
 - 検証コマンドの正は Taskfile、CI、hook に置く。
