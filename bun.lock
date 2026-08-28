@@ -16,6 +16,7 @@
         "eslint-plugin-sonarjs": "^4.2.0",
         "jscpd": "^5.0.16",
         "knip": "^6.32.2",
+        "md2idx": "^0.3.0",
         "typescript": "^5.9.3",
         "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
         "vite-plus": "0.3.0",
@@ -997,6 +998,8 @@
     "lz-string": ["lz-string@1.5.0", "", { "bin": { "lz-string": "bin/bin.js" } }, "sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
+
+    "md2idx": ["md2idx@0.3.0", "", { "bin": { "md2idx": "dist/cli.mjs" } }, "sha512-kn2hlF40blhCn2SvalA0Z+YTbRV6QIqm3jXspcBvpBuEgpd7shJz+9MzixuIbomUtfGLx9VeTGB+iGGwxbiglw=="],
 
     "marked": ["marked@16.4.2", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA=="],
 
