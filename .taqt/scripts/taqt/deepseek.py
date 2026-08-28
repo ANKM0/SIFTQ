@@ -41,7 +41,8 @@ def _config_text(models_path: Path) -> str:
             'model_provider = "deepseek"',
             'preferred_auth_method = "apikey"',
             'forced_login_method = "api"',
-            'model_reasoning_effort = "high"',
+            'model_reasoning_effort = "low"',
+            'model_auto_compact_token_limit = 120000',
             f'model_catalog_json = "{models_path.resolve()}"',
             "",
             "[model_providers.deepseek]",
@@ -100,6 +101,10 @@ def _ensure_models_catalog(models_path: Path) -> None:
         if isinstance(model_messages, dict) and "instructions_template" not in model_messages:
             model_messages["instructions_template"] = defaults["model_messages"]["instructions_template"]
             changed = True
+        for key in ("auto_compact_token_limit", "default_reasoning_level"):
+            if entry.get(key) != defaults[key]:
+                entry[key] = defaults[key]
+                changed = True
     if changed:
         models_path.write_text(
             json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
@@ -127,14 +132,14 @@ def _model_catalog(model: str) -> dict[str, object]:
         "context_window": 1048576,
         "max_context_window": 1048576,
         "effective_context_window_percent": 95,
-        "auto_compact_token_limit": None,
+        "auto_compact_token_limit": 120000,
         "reasoning_summary_format": "experimental",
         "default_reasoning_summary": "none",
         "display_name": "DeepSeek-V4-Pro" if is_pro else "DeepSeek-V4-Flash",
         "description": "DeepSeek V4 Pro for planning and review."
         if is_pro
         else "DeepSeek V4 Flash for taqt coding tasks.",
-        "default_reasoning_level": "high",
+        "default_reasoning_level": "low",
         "supported_reasoning_levels": [
             {"effort": "low", "description": "Fast responses with lighter reasoning"},
             {"effort": "high", "description": "Extra high reasoning depth for complex problems"},

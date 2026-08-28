@@ -3,14 +3,14 @@ id: development_feedback_loop_deepseek
 
 limits:
   max_iterations: 12
-  max_fix_attempts: 3
+  max_fix_attempts: 2
 
 agents:
   design:
     role: design
     adapter: codex
     model: deepseek-v4-pro
-    reasoning_effort: medium
+    reasoning_effort: high
     writes:
       - .taqt/loops/
       - .taqt/tests/
@@ -39,8 +39,8 @@ agents:
   checker:
     role: checker
     adapter: codex
-    model: deepseek-v4-pro
-    reasoning_effort: medium
+    model: deepseek-v4-flash
+    reasoning_effort: low
     readonly: true
 
 steps:

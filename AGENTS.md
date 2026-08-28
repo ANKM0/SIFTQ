@@ -23,6 +23,12 @@
 - ロジックを追加・変更したら、同時にテストを追加・更新する。入出力規則は副作用から分離し、pure 関数としてテスト可能にする。
 - 新しい共通 helper を作る前に既存実装を検索し、知識の重複を作らない。
 
+## DeepSeek 利用コスト
+
+- 長大タスクはサブタスク単位でセッションを分割し、1 セッションへ履歴を蓄積しない。
+- コマンド・ツール出力は必要最小限に絞り、`rg` / `head` / `sed -n` で必要な範囲だけ読む。
+- 定型・軽量な実装は flash を使い、pro は設計・重要レビューに限定する。
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
