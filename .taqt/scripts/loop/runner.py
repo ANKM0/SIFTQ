@@ -10,7 +10,14 @@ from .llm import run_agent
 from .observe import run_commands
 from .policy import route_next_step
 from .schema import load_document, validate_loop_definition, validate_task
-from .state import append_event, create_run_dir, load_events, load_state, save_state
+from .state import (
+    append_event,
+    compact_successful_agent_response,
+    create_run_dir,
+    load_events,
+    load_state,
+    save_state,
+)
 
 
 TERMINAL_STEPS = {"done", "human", "failed"}
@@ -215,12 +222,17 @@ def _run_step(
                         "status": "created",
                     },
                 )
-        append_event(run_dir, {"type": "agent_response", "step": step["id"], "response": response})
+        next_step = str(step.get("next", step.get("on_pass", "done")))
+        event_response = compact_successful_agent_response(response, next_step=next_step)
+        append_event(
+            run_dir,
+            {"type": "agent_response", "step": step["id"], "response": event_response},
+        )
         if response["status"] != "success":
             state["last_feedback"] = response.get("feedback") or "unknown"
             state["last_failed_step"] = step["id"]
             return str(step.get("on_failure", "human"))
-        return str(step.get("next", step.get("on_pass", "done")))
+        return next_step
 
     if kind == "terminal":
         return step["id"]

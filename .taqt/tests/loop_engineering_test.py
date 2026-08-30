@@ -14,6 +14,7 @@ from loop.llm import run_agent
 from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
+from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
 from taqt.task_store import (
@@ -552,6 +553,11 @@ input: {}
     assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
     assert artifact_event["summary"] == "Use the run artifact"
     assert artifact_event["status"] == "created"
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    response = response_event["response"]
+    assert "stdout" not in response
+    assert response["log"]["next_step"] == "done"
+    assert response["log"]["stdout"]["characters"] > 0
 
 
 def test_loop_runner_does_not_record_created_event_when_artifact_write_fails(
@@ -843,6 +849,34 @@ def test_context_truncates_large_agent_events(tmp_path: Path) -> None:
     assert len(event["response"]["stderr"]) == 2_001
 
 
+def test_successful_agent_response_is_compacted_deterministically() -> None:
+    response = {
+        "status": "success",
+        "stdout": "a" * (SUCCESS_LOG_TAIL_CHARS + 1),
+        "stderr": "stderr output",
+        "changed_paths": ["src/example.py"],
+    }
+
+    compacted = compact_successful_agent_response(response, next_step="observe")
+
+    assert "stdout" not in compacted
+    assert "stderr" not in compacted
+    assert compacted["changed_paths"] == ["src/example.py"]
+    assert compacted["log"]["next_step"] == "observe"
+    assert compacted["log"]["validation"] == "pending"
+    assert compacted["log"]["stdout"]["characters"] == SUCCESS_LOG_TAIL_CHARS + 1
+    assert compacted["log"]["stdout"]["tail"] == "a" * SUCCESS_LOG_TAIL_CHARS
+    assert len(compacted["log"]["stdout"]["sha256"]) == 64
+
+
+def test_failed_agent_response_keeps_full_transcripts() -> None:
+    response = {"status": "failure", "stdout": "output", "stderr": "failure details"}
+
+    preserved = compact_successful_agent_response(response, next_step="human")
+
+    assert preserved == response
+
+
 def test_loop_guard_blocks_readonly_agent_workspace_changes(tmp_path: Path) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
@@ -860,7 +894,7 @@ steps:
     kind: llm
     agent: checker
     command: >-
-      python -c 'from pathlib import Path; Path("changed.txt").write_text("x")'
+      python -c 'from pathlib import Path; Path("changed.txt").write_text("x"); print("agent output")'
     on_failure: human
     next: done
   - id: done
@@ -910,8 +944,14 @@ blocked_reason: null
     )
 
     assert result["status"] == "human"
-    events = (Path(result["run_dir"]) / "events.jsonl").read_text(encoding="utf-8")
-    assert "readonly agent cannot write" in events
+    events = [
+        json.loads(line)
+        for line in (Path(result["run_dir"]) / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    response = response_event["response"]
+    assert response["guard_error"] == "readonly agent cannot write: changed.txt"
+    assert response["stdout"] == "agent output\n"
 
 
 def test_loop_guard_allows_directory_itself_for_prefix_scope() -> None:
@@ -2026,6 +2066,43 @@ def test_run_report_renders_design_artifact_reference() -> None:
 
     assert "[artifacts/design-decision.md](artifacts/design-decision.md)" in report
     assert "(created) / Use the run artifact" in report
+
+
+def test_run_report_renders_success_log_summary() -> None:
+    report = render_report(
+        {
+            "task_id": "ISSUE-260",
+            "status": "done",
+            "current_step": "done",
+            "iteration": 1,
+            "last_feedback": None,
+        },
+        [
+            {
+                "type": "agent_response",
+                "step": "implement",
+                "response": {
+                    "status": "success",
+                    "mode": "codex",
+                    "changed_paths": ["src/example.py"],
+                    "artifact_path": "artifacts/result.md",
+                    "log": {
+                        "format": "success-summary-v1",
+                        "validation": "pending",
+                        "next_step": "observe",
+                        "stdout": {"characters": 120},
+                        "stderr": {"characters": 340},
+                    },
+                },
+            }
+        ],
+    )
+
+    assert "changed: 1 — `src/example.py`" in report
+    assert "artifact: `artifacts/result.md`" in report
+    assert "validation: pending" in report
+    assert "next: `observe`" in report
+    assert "omitted: stdout 120 chars; stderr 340 chars" in report
 
 
 def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
