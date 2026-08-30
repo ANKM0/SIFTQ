@@ -57,31 +57,18 @@ steps:
   - id: implement
     kind: llm
     agent: implement
-    next: observe
+    next: verification
 
-  - id: observe
-    kind: commands
-    run:
-      - task ci:markdown
-      - task ci:typecheck
-      - task ci:lint
-      - task ci:lint:python
-      - task ci:lint:ts-fast
-      - task ci:security
-      - task ci:performance
-      - task ci:requirements
-      - task ci:architecture
-      - task ci:glossary
-      - task ci:docs
-      - task ci:test
-      - task ci:build
-    on_success: checker
-    on_failure: decide
+  - id: verification
+    kind: verification
+    on_pass: checker
+    on_fix: decide
+    on_human: human
 
   - id: fix
     kind: llm
     agent: fix
-    next: observe
+    next: verification
     on_failure: human
 
   - id: decide
@@ -103,8 +90,13 @@ steps:
   - id: checker
     kind: llm
     agent: checker
-    next: done
-    on_failure: fix
+    next: post_review
+
+  - id: post_review
+    kind: post_review
+    on_pass: done
+    on_fix: fix
+    on_human: human
 
   - id: done
     kind: terminal

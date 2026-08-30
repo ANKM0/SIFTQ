@@ -14,6 +14,7 @@ from loop.llm import run_agent
 from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
+from loop.verification import run_verification, validate_review
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
 from taqt.task_store import (
@@ -653,7 +654,7 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     step_ids = [step["id"] for step in steps]
     assert step_ids.index("design") < step_ids.index("test")
     assert step_ids.index("test") < step_ids.index("implement")
-    assert step_ids.index("implement") < step_ids.index("observe")
+    assert step_ids.index("implement") < step_ids.index("verification")
     assert step_ids.index("checker") < step_ids.index("done")
 
     design = next(step for step in steps if step["id"] == "design")
@@ -662,11 +663,10 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
 
     checker = next(step for step in steps if step["id"] == "checker")
     assert checker["kind"] == "llm"
-    assert checker["next"] == "done"
-    assert checker["on_failure"] == "fix"
+    assert checker["next"] == "post_review"
 
 
-def test_deepseek_loop_observe_and_decide_are_model_free() -> None:
+def test_deepseek_loop_verification_and_decide_are_model_free() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop_deepseek.yaml"
 
     loop = load_document(loop_path)
@@ -675,15 +675,163 @@ def test_deepseek_loop_observe_and_decide_are_model_free() -> None:
     steps = {step["id"]: step for step in loop["steps"]}
     model_keys = {"agent", "model", "reasoning_effort"}
 
-    observe = steps["observe"]
-    assert observe["kind"] == "commands"
-    assert "run" in observe and observe["run"]
-    assert model_keys.isdisjoint(observe)
+    verification = steps["verification"]
+    assert verification["kind"] == "verification"
+    assert model_keys.isdisjoint(verification)
 
     decide = steps["decide"]
     assert decide["kind"] == "policy"
     assert "routes" in decide and decide["routes"]
     assert model_keys.isdisjoint(decide)
+
+
+def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
+        calls.append(command)
+        return {
+            "command": command,
+            "exit_code": 1 if command == "task ci:lint" else 0,
+            "elapsed_seconds": 0.1,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+
+    monkeypatch.setattr("loop.verification._run_command", fake_run)
+    result = run_verification(cwd=tmp_path, relevant_test_commands=("task pytest",))
+
+    assert result["status"] == "fix"
+    assert result["feedback"] == "verification_fix"
+    assert calls == ["git diff --check", "task ci:typecheck", "task ci:lint"]
+
+
+@pytest.mark.parametrize(
+    ("response", "changed_paths", "status"),
+    [
+        ({"parsed_json": True, "status": "success", "verdict": "approve"}, [], "pass"),
+        ({"parsed_json": True, "status": "success", "verdict": "changes_requested"}, [], "fix"),
+        ({"parsed_json": True, "status": "success", "verdict": "human_required"}, [], "human"),
+        ({"parsed_json": False, "status": "success"}, [], "human"),
+        ({"parsed_json": True, "status": "success", "verdict": "approve"}, ["changed.py"], "human"),
+    ],
+)
+def test_post_review_requires_json_contract_and_readonly(
+    tmp_path: Path, response: dict[str, object], changed_paths: list[str], status: str
+) -> None:
+    assert validate_review(response, changed_paths=changed_paths, cwd=tmp_path)["status"] == status
+
+
+def test_loop_runs_reviewer_only_after_verification_pass(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: review-gate
+agents:
+  checker:
+    readonly: true
+steps:
+  - id: verification
+    kind: verification
+    on_pass: checker
+    on_fix: human
+    on_human: human
+  - id: checker
+    kind: llm
+    agent: checker
+    next: post_review
+  - id: post_review
+    kind: post_review
+    on_pass: done
+    on_fix: human
+    on_human: human
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(_task_yaml("review-gate"), encoding="utf-8")
+    monkeypatch.setattr(
+        "loop.runner.run_verification",
+        lambda **_kwargs: {"status": "pass", "feedback": None, "commands": []},
+    )
+    calls: list[str] = []
+
+    def fake_agent(**_kwargs: object) -> dict[str, object]:
+        calls.append("checker")
+        return {"status": "success", "parsed_json": True, "verdict": "approve"}
+
+    monkeypatch.setattr("loop.runner.run_agent", fake_agent)
+    result = run_loop(loop_path=loop_path, task_path=task_path, workspace=tmp_path, runs_root=tmp_path / "runs")
+
+    assert result["status"] == "done"
+    assert calls == ["checker"]
+
+
+def test_loop_skips_reviewer_after_verification_failure(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: failed-gate
+agents:
+  checker:
+    readonly: true
+steps:
+  - id: verification
+    kind: verification
+    on_pass: checker
+    on_fix: human
+    on_human: human
+  - id: checker
+    kind: llm
+    agent: checker
+    next: done
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(_task_yaml("failed-gate"), encoding="utf-8")
+    monkeypatch.setattr(
+        "loop.runner.run_verification",
+        lambda **_kwargs: {"status": "fix", "feedback": "verification_fix", "commands": []},
+    )
+    monkeypatch.setattr("loop.runner.run_agent", lambda **_kwargs: pytest.fail("reviewer must not run"))
+
+    result = run_loop(loop_path=loop_path, task_path=task_path, workspace=tmp_path, runs_root=tmp_path / "runs")
+
+    assert result["status"] == "human"
+
+
+def _task_yaml(loop: str) -> str:
+    return f"""
+id: ISSUE-255
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 255
+status: pending
+phase: spec
+priority: normal
+loop: {loop}
+input: {{}}
+run:
+  id: null
+  state_path: null
+  events_path: null
+worker:
+  id: null
+  heartbeat_at: null
+blocked_reason: null
+"""
 
 
 def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps() -> None:
