@@ -6,11 +6,61 @@ Corrections, insights, and knowledge gaps captured during development.
 **Areas**: docs | taqt | frontend | ci | repo
 **Statuses**: pending | in_progress | resolved | wont_fix | promoted | promoted_to_skill
 
+## [LRN-20260830-003] correction
+
+**Logged**: 2026-08-30T16:05:00+09:00
+**Priority**: high
+**Status**: pending
+**Area**: repo
+
+### Summary
+複数Issueで進める作業は、子IssueのPRをmainへ直接マージせず、親Issueブランチへ統合する。
+
+### Details
+#245のPRをmain向けに作成したが、利用者は修正中の後続Issueをmainへ流入させないため、親Issueブランチをmainから作成し、子IssueのPRをそこへ順に統合する方針を指定した。
+
+### Suggested Action
+複数Issueを段階的に統合する作業では、PR作成前に親Issue番号・統合ブランチ・最終的なmainへのマージ条件を確認する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: docs/contributing/branch-strategy.md, .github/pull_request_template.md
+- Tags: branching, parent-issue, integration, pull-request
+
+---
+
+## [LRN-20260830-002] correction
+
+**Logged**: 2026-08-30T01:18:00+09:00
+**Priority**: medium
+**Status**: resolved
+**Area**: repo
+
+### Summary
+移行手順の依頼では、進捗記録ではなく指定された作業を実施する。
+
+### Details
+利用者がモックBE付きFEプレビューへの移行を開始し「まず1から」と指示した際、差分の分類を文書へ追記するだけで、次に求められる差分復元を実施しなかった。進捗は必要最小限のチェック更新に留め、明示された作業を完了させる。
+
+### Suggested Action
+段階的な移行指示では、対象ステップの実作業と検証を先に行い、文書はチェック状態だけ更新する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: 不満点.md, src/, tests/
+- Tags: migration, execution, progress
+
+### Resolution
+- **Resolved**: 2026-08-30T01:18:00+09:00
+- **Notes**: `src/`・`tests/` の対象差分を復元し、進捗記録をチェック状態へ整理する。
+
+---
+
 ## [LRN-20260822-002] correction
 
 **Logged**: 2026-08-22T15:48:00+09:00
 **Priority**: medium
-**Status**: resolved
+**Status**: in_progress
 **Area**: repo
 
 ### Summary
@@ -28,6 +78,204 @@ Corrections, insights, and knowledge gaps captured during development.
 - Tags: codex-session, encryption, git, backup
 
 ---
+
+## [LRN-20260830-001] correction
+
+**Logged**: 2026-08-30T00:18:00+09:00
+**Priority**: medium
+**Status**: resolved
+**Area**: docs
+
+### Summary
+wireframe の設計変更では、実アプリの `src/` を変更せず、生成スクリプトと `docs/wireframes` に限定する。
+
+### Details
+wireframe の状態・共通レイアウトを表現する依頼に対して、実アプリの `src/` とアプリテストを変更してしまった。今回の目的は実装変更ではなく、wireframe 専用の設計案を作ることだった。
+
+### Suggested Action
+wireframe の依頼では、先に `scripts/generate-wireframes.ts` が実装追従用か設計案用かを確認する。設計案の場合は wireframe 専用テンプレート、状態定義、CSS 上書き、README に変更を限定する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: scripts/generate-wireframes.ts, docs/wireframes/README.md, src/index.tsx
+- Tags: wireframe, scope, source-of-truth
+
+### Resolution
+- **Resolved**: 2026-08-30T00:18:00+09:00
+- **Notes**: `src/` の変更を戻し、wireframe 専用の生成処理へ切り替えた。
+
+---
+
+## [LRN-20260829-001] correction
+
+**Logged**: 2026-08-29T20:15:00+09:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Matrix の「area を押下」は area 番号ではなく、各象限の section 全体を指していた。
+
+### Details
+area 見出しへのリンクだけを実装したため、利用者が指定した Matrix の section 要素を
+押下しても新規タスク作成へ遷移しなかった。画面上の対象範囲が曖昧な場合、DOM 指定や
+操作対象の範囲を確認してから実装する。
+
+### Suggested Action
+Matrix の各 area section の余白クリックを新規作成へ遷移させ、task card と DnD 操作を
+除外する。操作対象を示すE2EまたはUIテストを追加する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/index.tsx, src/components/Layout.tsx, tests/bdd/task-ui.contract.test.ts
+- Tags: frontend, matrix, area, click-target, wireframe
+
+### Resolution
+- **Resolved**: 2026-08-29T20:45:00+09:00
+- **Notes**: quadrant section の空白クリックを area 付き新規作成へ遷移させ、カードと DnD を前面へ分離した。
+
+---
+
+## [LRN-20260829-002] correction
+
+**Logged**: 2026-08-29T20:50:00+09:00
+**Priority**: low
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+クリック領域を実装するための視覚的な案内文・点線は、要件に含まれなかった。
+
+### Details
+area section 全体のクリックを実現する際に、案内文と点線枠を追加したが、利用者は
+画面へ追加の表示を求めていなかった。操作可能領域の実装と視覚的な補助表示を分けて判断する。
+
+### Suggested Action
+要件にない説明文・装飾を追加する前に、既存の画面密度や明示的な要望を確認する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/index.tsx, src/styles.ts
+- Tags: frontend, wireframe, scope, visual-design
+- See Also: LRN-20260829-001
+
+### Resolution
+- **Resolved**: 2026-08-29T20:50:00+09:00
+- **Notes**: 透明なクリック領域だけを残し、案内文と点線を削除した。
+
+---
+
+## [LRN-20260829-003] correction
+
+**Logged**: 2026-08-29T21:00:00+09:00
+**Priority**: low
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Description欄の寸法指定は固定ピクセルではなく、同じフォームの幅と残り画面高さに合わせる必要があった。
+
+### Details
+「582×436px」という例示を固定サイズとして実装したが、利用者の意図はTitle欄との幅の整合と
+新規作成ページ下端までの可変高さだった。
+
+### Suggested Action
+画面内の寸法指定は、固定値か親要素との整合・残余領域の配分かを、実装前に確認する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/index.tsx, src/styles.ts
+- Tags: frontend, layout, responsive, form
+
+### Resolution
+- **Resolved**: 2026-08-29T21:00:00+09:00
+- **Notes**: New task専用にviewport充填とflex残余配分を適用し、Detailは不変とした。
+
+---
+
+## [LRN-20260829-004] correction
+
+**Logged**: 2026-08-29T21:05:00+09:00
+**Priority**: low
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+画面全体を伸ばすレイアウトでは、同じgrid内のside panelまで伸長させず、本文のtextareaだけを残余高さに配分する。
+
+### Details
+New taskのdetail gridを伸長した結果、右側のStatus/Area panelも縦に伸びた。利用者は同パネルを
+元の内容量（約300px）に保ち、Descriptionだけを10px短縮したかった。
+
+### Suggested Action
+flex/gridで残余領域を使う画面では、各columnの`align-self`と固定・可変の高さ責務を明示する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/styles.ts
+- Tags: frontend, layout, grid, flex, sidebar
+- See Also: LRN-20260829-003
+
+### Resolution
+- **Resolved**: 2026-08-29T21:05:00+09:00
+- **Notes**: New taskのside panelを`align-self: start; min-height: 300px`にし、Descriptionの残余高を10px減らした。
+
+---
+
+## [LRN-20260829-005] correction
+
+**Logged**: 2026-08-29T21:10:00+09:00
+**Priority**: low
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+New taskのページ高とside panel高は推測値でなく、利用者指定の固定値を使う。
+
+### Details
+ヘッダー高との整合からページ高を推測し、side panelを最小高にしたが、利用者は
+`calc(100vh - 121px)` と `height: 250px` を明示した。
+
+### Suggested Action
+利用者がレイアウトの具体的なCSS値を指定した場合は、別の整合性推測で置き換えない。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/styles.ts
+- Tags: frontend, layout, css, explicit-requirement
+- See Also: LRN-20260829-004
+
+### Resolution
+- **Resolved**: 2026-08-29T21:10:00+09:00
+- **Notes**: New taskに指定値を適用し、テストで固定した。
+
+---
+
+## [LRN-20260829-006] correction
+
+**Logged**: 2026-08-29T21:20:00+09:00
+**Priority**: medium
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+同じStatus/Areaポップオーバーを持つ画面は、見た目とchoice定義を共通コンポーネントにする。
+
+### Details
+New task用にnative detailsの別UIを追加したため、Detailのpopoverと表示が乖離した。
+
+### Suggested Action
+画面間で同じ操作・見た目が必要な場合は、状態更新方法だけを注入し、描画構造とchoice定義を共通化する。
+
+### Metadata
+- Source: user_feedback
+- Related Files: src/components/TaskMetaPopover.tsx, src/components/OptionMenu.tsx, src/index.tsx
+- Tags: frontend, component, popover, reuse
+
+### Resolution
+- **Resolved**: 2026-08-29T21:20:00+09:00
+- **Notes**: TaskMetaPopoverに共有し、DetailはHTMX、新規作成はform radioで利用した。
+
 
 ## Status Definitions
 

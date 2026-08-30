@@ -33,7 +33,6 @@ tasks:
       - uv run python scripts/switch_codex_profile.py set deepseek
       - |
         export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)"
-        codex logout
 
   auto:
     desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.

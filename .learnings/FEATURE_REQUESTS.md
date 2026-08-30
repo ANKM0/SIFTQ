@@ -44,3 +44,27 @@ medium
 
 ---
 
+## [FEAT-20260829-001] task-editor-draft-and-stateful-wireframes
+
+**Logged**: 2026-08-29T21:44:00+09:00
+**Priority**: medium
+**Status**: in_progress
+**Area**: frontend
+
+### Requested Capability
+新規タスクを Create するまで DB へ保存しない画面内下書きと、押下対象ごとの状態・遷移先を表す wireframe を提供する。
+
+### User Context
+新規作成と詳細編集を共通の編集画面として確認しつつ、リロード時には新規作成中の変更を初期値へ戻したい。
+
+### Complexity Estimate
+medium
+
+### Suggested Implementation
+new 側の Status／Area は form に紐付く画面内状態として保持し、Create 時だけ POST する。共通編集画面を導入し、new は Create、detail は Save を設定で切り替える。wireframe generator は各リンク・ポップアップ・選択状態を個別ページとして出力する。
+
+### Metadata
+- Frequency: first_time
+- Related Features: wireframe-preview, task-editor
+
+---
