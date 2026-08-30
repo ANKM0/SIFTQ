@@ -215,6 +215,7 @@ tasks:
       - task: ci:architecture
       - task: ci:glossary
       - task: ci:docs
+      - task: ci:wireframes
       - task: ci:typecheck
       - task: ci:test
       - task: ci:build
@@ -267,6 +268,25 @@ tasks:
     desc: Require mapped documentation updates for changed paths.
     cmds:
       - uv run python scripts/ci/check_docs.py
+  ci:wireframes:
+    desc: Regenerate static wireframes and reject output differences.
+    cmds:
+      - bun run docs:wireframes
+      - |
+        set -eu
+        tracked_diff="$(git diff -- docs/wireframes)"
+        untracked="$(git ls-files --others --exclude-standard -- docs/wireframes)"
+        if [ -n "${tracked_diff}" ] || [ -n "${untracked}" ]; then
+          echo "Static wireframes are out of date. Run 'bun run docs:wireframes' and commit the output." >&2
+          if [ -n "${tracked_diff}" ]; then
+            printf '%s\n' "${tracked_diff}" >&2
+          fi
+          if [ -n "${untracked}" ]; then
+            printf '%s\n' "${untracked}" >&2
+          fi
+          exit 1
+        fi
+
 
   ci:llm-eval:
     desc: Run the LLM evaluation smoke suite.

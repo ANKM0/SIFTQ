@@ -1,56 +1,36 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIFTQ Wireframe Index</title>
-    <link rel="stylesheet" href="./task-redesign.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SIFTQ UI Preview</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="topbar">
-        <div class="brand">SIFTQ Wireframes</div>
-        <nav class="nav" aria-label="Wireframe states">
-          <a class="active" href="./index.html">Index</a>
-          <a href="./matrix-page.html">Matrix</a>
-          <a href="./task-list.html">Tasks</a>
-        </nav>
-      </header>
-      <section class="page">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Zero-base task redesign</h1>
-            <p class="muted">Low-fidelity state map for the new task workflow.</p>
-          </div>
-          <a class="button primary" href="./task-new.html">New task</a>
+    <main class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">SIFTQ UI Preview</h1>
+          <p class="muted">実コンポーネントを固定モックデータで描画した静的プレビュー。</p>
         </div>
-        <div class="state-map">
-          <a class="state-card" href="./matrix-page.html">
-            <strong>Matrix page</strong>
-            <p class="muted">Four matrix areas with drag and drop.</p>
-          </a>
-          <a class="state-card" href="./task-list.html">
-            <strong>Task list</strong>
-            <p class="muted">GitHub Issues-like compact task list.</p>
-          </a>
-          <a class="state-card" href="./task-detail.html">
-            <strong>Task detail</strong>
-            <p class="muted">Edit title, description, and status.</p>
-          </a>
-          <a class="state-card" href="./task-new.html">
-            <strong>New task</strong>
-            <p class="muted">Create a task from title and description.</p>
-          </a>
-          <a class="state-card" href="./task-status-menu.html">
-            <strong>Status popover</strong>
-            <p class="muted">do / done / skip choices open in-place.</p>
-          </a>
-          <a class="state-card" href="./task-area-menu.html">
-            <strong>Area popover</strong>
-            <p class="muted">1 / 2 / 3 / 4 choices use the same popover shape.</p>
-          </a>
-        </div>
-      </section>
+      </div>
+      <div class="list" aria-label="Preview states">
+        <a class="task-row" href="./matrix-page.html"><span class="issue-number">P01</span><strong>Matrix</strong></a>
+        <a class="task-row" href="./task-list.html"><span class="issue-number">P02</span><strong>Task list</strong></a>
+        <a class="task-row" href="./task-detail.html"><span class="issue-number">P03</span><strong>Task detail</strong></a>
+        <a class="task-row" href="./task-new.html"><span class="issue-number">P04</span><strong>New task (default area 2)</strong></a>
+        <a class="task-row" href="./task-new-area-1.html"><span class="issue-number">P04a</span><strong>New task (Matrix area 1)</strong></a>
+        <a class="task-row" href="./task-new-area-2.html"><span class="issue-number">P04b</span><strong>New task (Matrix area 2)</strong></a>
+        <a class="task-row" href="./task-new-area-3.html"><span class="issue-number">P04c</span><strong>New task (Matrix area 3)</strong></a>
+        <a class="task-row" href="./task-new-area-4.html"><span class="issue-number">P04d</span><strong>New task (Matrix area 4)</strong></a>
+        <a class="task-row" href="./task-create-result.html"><span class="issue-number">P04e</span><strong>Create result (task detail)</strong></a>
+        <a class="task-row" href="./task-status-menu.html"><span class="issue-number">P05</span><strong>Status menu</strong></a>
+        <a class="task-row" href="./task-area-menu.html"><span class="issue-number">P06</span><strong>Area menu</strong></a>
+        <a class="task-row" href="./task-new-status-menu.html"><span class="issue-number">P07</span><strong>New task status menu</strong></a>
+        <a class="task-row" href="./task-new-area-menu.html"><span class="issue-number">P08</span><strong>New task area menu</strong></a>
+        <a class="task-row" href="./task-new-status-selected.html"><span class="issue-number">P09</span><strong>New task selected status</strong></a>
+        <a class="task-row" href="./task-new-area-selected.html"><span class="issue-number">P10</span><strong>New task selected area</strong></a>
+      </div>
     </main>
   </body>
 </html>

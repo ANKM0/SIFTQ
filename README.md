@@ -40,6 +40,14 @@ Start the Worker development server with Wrangler:
 task dev
 ```
 
+Start the UI preview with fixed mock data:
+
+```bash
+bun run preview:mock
+```
+
+Open `http://127.0.0.1:8787` and sign in with password `preview`.
+
 Apply the local D1 migrations:
 
 ```bash
@@ -59,6 +67,7 @@ task ci:typecheck
 task ci:lint
 task ci:test
 task ci:build
+task ci:wireframes
 ```
 
 ## Deployment
@@ -89,6 +98,6 @@ task ci
 - `migrations/`: D1 schema migrations.
 - `tests/`: unit tests.
 - `docs/requirements/`: product and system requirements.
-- `docs/wireframes/`: UI wireframes and wireframe templates.
+- `docs/wireframes/`: 実コンポーネントを固定モックデータで描画する静的 UI プレビュー。
 - `.taqt/runs/`: run state, events, and design decision artifacts.
 - `docs/adr/`: architecture and repository-wide decisions.

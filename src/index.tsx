@@ -32,12 +32,15 @@ import {
 import { D1TaskRepository } from "./task-repository";
 import type { TaskRepository } from "./task-repository";
 import { STYLES_CSS } from "./styles";
+import { MemoryTaskRepository } from "./preview/MemoryTaskRepository";
+import { PREVIEW_TASKS } from "./preview/tasks";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
   DB?: D1Database;
   AUTH_PASSWORD?: string;
   SESSION_SECRET?: string;
+  PREVIEW_MODE?: string;
 };
 
 type AppEnv = {
@@ -45,6 +48,7 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+const previewRepository = new MemoryTaskRepository(PREVIEW_TASKS);
 
 const PUBLIC_PATHS = new Set(["/login", "/styles.css", "/matrix-dnd.js"]);
 
@@ -94,6 +98,7 @@ app.use("*", async (c, next) => {
 });
 
 function repository(c: Context<AppEnv>): TaskRepository {
+  if (c.env.PREVIEW_MODE === "true") return previewRepository;
   if (c.env.TASK_REPOSITORY) return c.env.TASK_REPOSITORY;
   if (c.env.DB) return new D1TaskRepository(c.env.DB);
   throw new Error("task repository is not configured");
