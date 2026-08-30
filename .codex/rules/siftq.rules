@@ -68,6 +68,8 @@ prefix_rule(pattern=["python3", "/home/develop/.codex/skills/.system/skill-creat
 prefix_rule(pattern=["task", "--list"], decision="allow")
 prefix_rule(pattern=["task", "default"], decision="allow")
 prefix_rule(pattern=["task", "pytest"], decision="allow")
+prefix_rule(pattern=["task", "codex:codex"], decision="allow")
+prefix_rule(pattern=["task", "codex:deepseek"], decision="allow")
 prefix_rule(pattern=["task", "setup"], decision="allow")
 prefix_rule(pattern=["task", "setup:aqua"], decision="allow")
 prefix_rule(pattern=["task", "setup:bun"], decision="allow")

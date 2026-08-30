@@ -436,3 +436,17 @@ tasks:
     desc: Scan Codex sessions for recurring improvement candidates; add --execute to create Issues.
     cmds:
       - uv run python -m taqt.session_improvement {{.CLI_ARGS}}
+
+  codex:codex:
+    desc: Run Codex using the main/OpenAI profile.
+    cmds:
+      - |
+        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path main)" \
+          codex {{.CLI_ARGS}}
+
+  codex:deepseek:
+    desc: Run Codex using the DeepSeek profile.
+    cmds:
+      - |
+        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)" \
+          codex {{.CLI_ARGS}}
