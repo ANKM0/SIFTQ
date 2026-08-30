@@ -29,7 +29,7 @@ a {
   border-bottom: 1px solid #d0d7de;
   display: flex;
   gap: 16px;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 14px 20px;
 }
 
@@ -214,6 +214,25 @@ a {
 .area--quadrant {
   background: transparent;
   border: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.area--quadrant .matrix-cards {
+  flex: 1;
+  min-height: 0;
+}
+
+.area-create-link {
+  inset: 0;
+  position: absolute;
+  z-index: 0;
+}
+
+.area--quadrant h2,
+.area--quadrant .matrix-cards {
   position: relative;
   z-index: 1;
 }
@@ -257,10 +276,24 @@ a {
 }
 
 .task-card {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgb(31 35 40 / 12%);
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  min-height: 72px;
   padding: 12px;
+}
+
+.task-card:hover {
+  border-color: #0969da;
+  box-shadow: 0 0 0 2px #ddf4ff;
+}
+
+.task-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
 }
 
 .task-card[draggable="true"] {
@@ -428,6 +461,40 @@ select {
 }
 
 textarea {
+  min-height: 180px;
+}
+
+.page--new,
+.page--detail {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 63px);
+  min-height: 480px;
+}
+
+.page--new .detail-grid,
+.page--detail .detail-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.page--new .form-panel,
+.page--detail .form-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page--new .form-panel > label:has(textarea),
+.page--detail .form-panel > label:has(textarea) {
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 180px;
+}
+
+.page--new textarea,
+.page--detail textarea {
+  height: 100%;
   min-height: 180px;
 }
 

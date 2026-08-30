@@ -108,11 +108,33 @@ describe("BDD-TM-008: bulk reorder", () => {
       order: 0,
       version: 1,
     });
-    const task: Task = await response.json();
+    const tasks: Task[] = await response.json();
+    const task = tasks.find((candidate) => candidate.id === "task-1");
 
     expect(response.status).toBe(200);
-    expect(task.area).toBe(2);
-    expect(task.order).toBe(0);
+    expect(task?.area).toBe(2);
+    expect(task?.order).toBe(0);
+  });
+
+  it("returns every task whose version changed during reordering", async () => {
+    await repo.insert(taskFixture({ id: "task-1", area: 1, order: 0, version: 1 }));
+    await repo.insert(taskFixture({ id: "task-2", area: 1, order: 1, version: 1 }));
+
+    const response = await request("POST", "/api/tasks/reorder", {
+      id: "task-2",
+      area: 1,
+      order: 0,
+      version: 1,
+    });
+    const tasks: Task[] = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-1", order: 1, version: 2 }),
+        expect.objectContaining({ id: "task-2", order: 0, version: 2 }),
+      ]),
+    );
   });
 });
 

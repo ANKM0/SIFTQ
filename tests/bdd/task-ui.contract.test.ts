@@ -33,7 +33,7 @@ describe("Matrix page", () => {
     expect(fragmentBody).toContain("Matrix");
   });
 
-  it("renders four quadrants with axes and title-only cards", async () => {
+  it("renders four quadrants with area creation links and compact status cards", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
     const body = await (await request("/")).text();
@@ -43,7 +43,9 @@ describe("Matrix page", () => {
     expect(body).toContain("axis-line--horizontal");
     expect(body).toContain("axis-line--vertical");
     expect(body).toContain('data-task-id="task-1"');
-    expect(body).not.toContain("status--do");
+    expect(body).toContain('href="/tasks/new?area=1"');
+    expect(body).toContain('href="/tasks/task-1?from=matrix"');
+    expect(body).toContain("status--do");
   });
 });
 
@@ -88,14 +90,34 @@ describe("Task creation", () => {
     expect(body).toContain('id="task-meta"');
   });
 
+  it("creates a task with the selected status and area", async () => {
+    const response = await request("/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        title: "Plan",
+        description: "",
+        status: "done",
+        area: "4",
+      }).toString(),
+    });
+    const body = await response.text();
+
+    expect(response.status).toBe(201);
+    expect(body).toContain("status--done");
+    expect(body).toContain(">4</a>");
+  });
+
   it("renders the new task wireframe with cancel and side metadata", async () => {
-    const body = await (await request("/tasks/new")).text();
+    const body = await (await request("/tasks/new?area=3&status=done&menu=area")).text();
 
     expect(body).toContain("New task");
     expect(body).toContain("Cancel");
     expect(body).toContain("Create");
-    expect(body).toContain("status status--do");
+    expect(body).toContain("status status--done");
     expect(body).toContain("status area-badge");
+    expect(body).toContain('name="area" value="3"');
+    expect(body).toContain("Apply area to this task");
   });
 });
 
@@ -106,6 +128,9 @@ describe("Task detail and metadata menus", () => {
     const detail = await request("/tasks/task-1");
     expect(detail.status).toBe(200);
     expect(await detail.text()).toContain("seed task");
+
+    const matrixDetail = await request("/tasks/task-1?from=matrix");
+    expect(await matrixDetail.text()).toContain('href="/"');
 
     const statusMenu = await request("/tasks/task-1/status/menu");
     const statusBody = await statusMenu.text();

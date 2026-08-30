@@ -4,7 +4,7 @@ import { taskFixture } from "../helpers/task-fixture";
 import { MemoryTaskRepository } from "../helpers/memory-task-repository";
 
 describe("Matrix drag and drop", () => {
-  it("loads SortableJS and posts to the JSON reorder API", async () => {
+  it("enables native drag and drop and posts to the JSON reorder API", async () => {
     const repo = new MemoryTaskRepository();
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
@@ -12,9 +12,9 @@ describe("Matrix drag and drop", () => {
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(body).toContain("sortablejs@1.15.6");
+    expect(body).not.toContain("sortablejs");
     expect(body).toContain("/matrix-dnd.js");
-    expect(body).toContain('data-sortable-group="matrix"');
+    expect(body).toContain('data-dnd-group="matrix"');
     expect(body).toContain('data-area="1"');
   });
 
@@ -28,5 +28,15 @@ describe("Matrix drag and drop", () => {
     expect(body).toContain("showDndConflict");
     expect(body).toContain("restoreMatrix");
     expect(body).toContain("/api/tasks/reorder");
+    expect(body).toContain("dragstart");
+    expect(body).toContain("dragover");
+    expect(body).toContain("drop");
+    expect(body).toContain("matrixDropIndex");
+    expect(body).not.toContain("setDragImage");
+    expect(body).toContain("setMatrixDndPending(true)");
+    expect(body).toContain("finally(function () { setMatrixDndPending(false); })");
+    expect(body).toContain('card.setAttribute("draggable", pending ? "false" : "true")');
+    expect(body).toContain("Array.isArray(tasks)");
+    expect(body).toContain('updatedCard.setAttribute("data-version", String(task.version))');
   });
 });

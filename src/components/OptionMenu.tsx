@@ -53,15 +53,21 @@ function buildChoices(task: Task, open: "status" | "area"): Choice[] {
     : TASK_AREAS.map((value) => areaChoice(task, value));
 }
 
-const ChoiceLink: FC<{ task: Task; open: "status" | "area"; choice: Choice }> = ({
+const ChoiceLink: FC<{
+  task: Task;
+  open: "status" | "area";
+  choice: Choice;
+  returnTo: "matrix" | "tasks";
+}> = ({
   task,
   open,
   choice,
+  returnTo,
 }) => (
   <a
     class={`status-choice${choice.selected ? " selected" : ""}`}
-    href={`/tasks/${task.id}`}
-    hx-post={`/tasks/${task.id}/${open}`}
+    href={`/tasks/${task.id}?from=${returnTo}`}
+    hx-post={`/tasks/${task.id}/${open}?from=${returnTo}`}
     hx-vals={JSON.stringify({ [open]: choice.value, version: task.version })}
     hx-target="#task-meta"
     hx-swap="innerHTML"
@@ -76,7 +82,11 @@ const ChoiceLink: FC<{ task: Task; open: "status" | "area"; choice: Choice }> = 
   </a>
 );
 
-export const OptionMenu: FC<{ task: Task; open: "status" | "area" }> = ({ task, open }) => {
+export const OptionMenu: FC<{
+  task: Task;
+  open: "status" | "area";
+  returnTo?: "matrix" | "tasks";
+}> = ({ task, open, returnTo = "tasks" }) => {
   const choices = buildChoices(task, open);
   const title = open === "status" ? "Apply status to this task" : "Apply area to this task";
   const selectedTitle = open === "status" ? "Selected status" : "Selected area";
@@ -84,18 +94,34 @@ export const OptionMenu: FC<{ task: Task; open: "status" | "area" }> = ({ task, 
   const suggestions = choices.filter((choice) => !choice.selected);
 
   return (
-    <TaskSidePanel task={task} className="side-panel side-panel--popover-open">
+    <TaskSidePanel
+      task={task}
+      className="side-panel side-panel--popover-open"
+      returnTo={returnTo}
+    >
       <section class="popover" aria-label={title}>
         <h3>{title}</h3>
         <div class="status-group-title">{selectedTitle}</div>
         {selected.map((choice) => (
-          <ChoiceLink key={String(choice.value)} task={task} open={open} choice={choice} />
+          <ChoiceLink
+            key={String(choice.value)}
+            task={task}
+            open={open}
+            choice={choice}
+            returnTo={returnTo}
+          />
         ))}
         <div class="status-group-title">Suggestions</div>
         {suggestions.map((choice) => (
-          <ChoiceLink key={String(choice.value)} task={task} open={open} choice={choice} />
+          <ChoiceLink
+            key={String(choice.value)}
+            task={task}
+            open={open}
+            choice={choice}
+            returnTo={returnTo}
+          />
         ))}
-        <a class="status-choice" href={`/tasks/${task.id}`}>
+        <a class="status-choice" href={`/tasks/${task.id}?from=${returnTo}`}>
           Cancel
         </a>
       </section>
