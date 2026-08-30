@@ -1,6 +1,7 @@
 import type { FC } from "hono/jsx";
 import { isTaskArea, isTaskStatus, TASK_AREAS, TASK_STATUSES } from "../task";
 import type { TaskArea, TaskStatus } from "../task";
+import { AREA_DOT_CLASSES, STATUS_DESCRIPTIONS, STATUS_DOT_CLASSES } from "./OptionMenu";
 
 type OpenMenu = "status" | "area";
 
@@ -16,65 +17,56 @@ function newTaskPath(state: NewTaskState): string {
   return `/tasks/new?${query.toString()}`;
 }
 
-const STATUS_DESCRIPTIONS: Record<TaskStatus, string> = {
-  do: "Visible on the matrix.",
-  done: "Completed. Area is preserved.",
-  skip: "Skipped. Area is preserved.",
+type NewTaskChoiceState = {
+  selected: boolean;
+  next: NewTaskState;
+  dotClass: string;
+  description: string;
 };
 
-const STATUS_DOT_CLASSES: Record<TaskStatus, string> = {
-  do: "status-dot status-dot--do",
-  done: "status-dot status-dot--done",
-  skip: "status-dot status-dot--skip",
-};
-
-const AREA_DOT_CLASSES: Record<TaskArea, string> = {
-  1: "status-dot status-dot--one",
-  2: "status-dot status-dot--two",
-  3: "status-dot status-dot--three",
-  4: "status-dot status-dot--four",
-};
+function newTaskChoiceState(
+  state: NewTaskState,
+  menu: OpenMenu,
+  value: string | number,
+): NewTaskChoiceState | null {
+  if (menu === "status" && isTaskStatus(value)) {
+    return {
+      selected: state.status === value,
+      next: { ...state, status: value },
+      dotClass: STATUS_DOT_CLASSES[value],
+      description: STATUS_DESCRIPTIONS[value],
+    };
+  }
+  if (menu === "area" && isTaskArea(value)) {
+    return {
+      selected: state.area === value,
+      next: { ...state, area: value },
+      dotClass: AREA_DOT_CLASSES[value],
+      description: "Matrix quadrant.",
+    };
+  }
+  return null;
+}
 
 const NewTaskChoice: FC<{
   state: NewTaskState;
   menu: OpenMenu;
   value: string | number;
 }> = ({ state, menu, value }) => {
-  if (menu === "status" && isTaskStatus(value)) {
-    const selected = state.status === value;
-    const next = { ...state, status: value };
+  const choice = newTaskChoiceState(state, menu, value);
+  if (choice === null) return null;
 
-    return (
-      <a class={`status-choice${selected ? " selected" : ""}`} href={newTaskPath(next)}>
-        {selected ? <span class="check">✓</span> : <span class="box"></span>}
-        <span class={STATUS_DOT_CLASSES[value]}></span>
-        <span>
-          <strong>{value}</strong>
-          <br />
-          <span class="muted">{STATUS_DESCRIPTIONS[value]}</span>
-        </span>
-      </a>
-    );
-  }
-
-  if (menu === "area" && isTaskArea(value)) {
-    const selected = state.area === value;
-    const next = { ...state, area: value };
-
-    return (
-      <a class={`status-choice${selected ? " selected" : ""}`} href={newTaskPath(next)}>
-        {selected ? <span class="check">✓</span> : <span class="box"></span>}
-        <span class={AREA_DOT_CLASSES[value]}></span>
-        <span>
-          <strong>{value}</strong>
-          <br />
-          <span class="muted">Matrix quadrant.</span>
-        </span>
-      </a>
-    );
-  }
-
-  return null;
+  return (
+    <a class={`status-choice${choice.selected ? " selected" : ""}`} href={newTaskPath(choice.next)}>
+      {choice.selected ? <span class="check">✓</span> : <span class="box"></span>}
+      <span class={choice.dotClass}></span>
+      <span>
+        <strong>{value}</strong>
+        <br />
+        <span class="muted">{choice.description}</span>
+      </span>
+    </a>
+  );
 };
 
 export const NewTaskMeta: FC<{ state: NewTaskState }> = ({ state }) => {
