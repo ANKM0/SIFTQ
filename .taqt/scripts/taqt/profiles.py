@@ -4,6 +4,7 @@ from typing import Any
 import yaml
 
 from .deepseek import default_codex_home
+from .qwen import default_codex_home as qwen_default_codex_home
 
 
 DEFAULT_PROFILE = "main"
@@ -80,4 +81,6 @@ def resolve_codex_home(
         return workspace / expanded
     if profile == "deepseek":
         return default_codex_home()
+    if profile == "qwen":
+        return qwen_default_codex_home()
     return Path.home() / ".codex"

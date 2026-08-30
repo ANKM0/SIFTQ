@@ -450,3 +450,10 @@ tasks:
       - |
         CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)" \
           codex {{.CLI_ARGS}}
+
+  codex:qwen:
+    desc: Run Codex using the Qwen/OpenRouter profile.
+    cmds:
+      - |
+        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path qwen)" \
+          codex {{.CLI_ARGS}}

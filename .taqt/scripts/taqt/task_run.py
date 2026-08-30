@@ -19,7 +19,7 @@ from .task_store import (
     triage_task,
 )
 from .self_improvement import request_self_improvement
-from .deepseek import ensure_codex_home
+from .deepseek import ensure_codex_home as ensure_deepseek_codex_home
 from .profiles import load_profiles, resolve_codex_home, resolve_profile
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
@@ -109,12 +109,27 @@ def main(argv: list[str] | None = None) -> int:
     child_environment: dict[str, str] = {"CODEX_HOME": str(codex_home)}
     if profile == "deepseek":
         env_key = str(profile_spec.get("env_key") or "DEEPSEEK_API_KEY")
+        deepseek_api_key = os.environ.get(env_key) or _prompt_api_key()
+        if not deepseek_api_key:
+            print(f"{env_key} is required.")
+            return 2
+        openrouter_api_key = os.environ.get("OPENROUTER_API_KEY") or _prompt_api_key()
+        if not openrouter_api_key:
+            print("OPENROUTER_API_KEY is required.")
+            return 2
+        ensure_deepseek_codex_home(codex_home)
+        child_environment["DEEPSEEK_API_KEY"] = deepseek_api_key
+        child_environment["OPENROUTER_API_KEY"] = openrouter_api_key
+    elif profile == "qwen":
+        env_key = str(profile_spec.get("env_key") or "OPENROUTER_API_KEY")
         api_key = os.environ.get(env_key) or _prompt_api_key()
         if not api_key:
             print(f"{env_key} is required.")
             return 2
-        ensure_codex_home(codex_home)
-        child_environment["DEEPSEEK_API_KEY"] = api_key
+        from .qwen import ensure_codex_home as ensure_qwen_codex_home
+
+        ensure_qwen_codex_home(codex_home)
+        child_environment["OPENROUTER_API_KEY"] = api_key
 
     task["status"] = "running"
     task["worker"] = {"id": args.worker_id, "started_at": utc_now(), "heartbeat_at": utc_now()}

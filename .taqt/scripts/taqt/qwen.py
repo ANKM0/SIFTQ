@@ -3,17 +3,15 @@ import os
 from pathlib import Path
 
 
-FLASH_MODEL = "qwen/qwen3.8-flash"
-PRO_MODEL = "deepseek-v4-pro"
-MODELS = (FLASH_MODEL, PRO_MODEL)
-LEGACY_FLASH_MODEL = "deepseek-v4-flash"
+MODEL = "qwen/qwen3.8-flash"
+MODELS = (MODEL,)
 
 
 def default_codex_home() -> Path:
-    configured = os.environ.get("TAQT_DEEPSEEK_CODEX_HOME")
+    configured = os.environ.get("TAQT_QWEN_CODEX_HOME")
     if configured:
         return Path(configured).expanduser()
-    return Path.home() / ".codex-deepseek"
+    return Path.home() / ".codex-qwen"
 
 
 def ensure_codex_home(codex_home: Path) -> Path:
@@ -29,7 +27,7 @@ def ensure_codex_home(codex_home: Path) -> Path:
         _restrict_file(models_path)
 
     config_path = codex_home / "config.toml"
-    if not config_path.exists() or LEGACY_FLASH_MODEL in config_path.read_text(encoding="utf-8"):
+    if not config_path.exists():
         config_path.write_text(_config_text(models_path), encoding="utf-8")
         _restrict_file(config_path)
     return config_path
@@ -38,7 +36,7 @@ def ensure_codex_home(codex_home: Path) -> Path:
 def _config_text(models_path: Path) -> str:
     return "\n".join(
         [
-            f'model = "{FLASH_MODEL}"',
+            f'model = "{MODEL}"',
             'model_provider = "openrouter"',
             'preferred_auth_method = "apikey"',
             'forced_login_method = "api"',
@@ -51,12 +49,6 @@ def _config_text(models_path: Path) -> str:
             'base_url = "https://openrouter.ai/api/v1"',
             'wire_api = "responses"',
             'env_key = "OPENROUTER_API_KEY"',
-            "",
-            "[model_providers.deepseek]",
-            'name = "DeepSeek"',
-            'base_url = "https://api.deepseek.com/"',
-            'wire_api = "responses"',
-            'env_key = "DEEPSEEK_API_KEY"',
             "",
         ]
     )
@@ -76,27 +68,19 @@ def _ensure_models_catalog(models_path: Path) -> None:
         try:
             catalog = json.loads(models_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            raise ValueError(f"invalid DeepSeek model catalog: {models_path}") from error
+            raise ValueError(f"invalid Qwen model catalog: {models_path}") from error
         if not isinstance(catalog, dict) or not isinstance(catalog.get("models"), list):
-            raise ValueError(f"invalid DeepSeek model catalog: {models_path}")
+            raise ValueError(f"invalid Qwen model catalog: {models_path}")
     else:
         catalog = {"models": []}
 
     entries = catalog["models"]
-    retained_entries = [
-        entry
-        for entry in entries
-        if not isinstance(entry, dict) or entry.get("slug") != LEGACY_FLASH_MODEL
-    ]
-    changed = len(retained_entries) != len(entries)
-    if changed:
-        catalog["models"] = retained_entries
-        entries = retained_entries
     slugs = {
         entry.get("slug")
         for entry in entries
         if isinstance(entry, dict) and isinstance(entry.get("slug"), str)
     }
+    changed = False
     missing = [model for model in MODELS if model not in slugs]
     if missing:
         entries.extend(_model_catalog(model) for model in missing)
@@ -128,7 +112,6 @@ def _ensure_models_catalog(models_path: Path) -> None:
 
 
 def _model_catalog(model: str) -> dict[str, object]:
-    is_pro = model == PRO_MODEL
     return {
         "slug": model,
         "prefer_websockets": False,
@@ -144,21 +127,19 @@ def _model_catalog(model: str) -> dict[str, object]:
         "multi_agent_version": "v2",
         "use_responses_lite": False,
         "include_skills_usage_instructions": False,
-        "context_window": 1048576,
-        "max_context_window": 1048576,
+        "context_window": 1000000,
+        "max_context_window": 1000000,
         "effective_context_window_percent": 95,
         "auto_compact_token_limit": 120000,
         "reasoning_summary_format": "experimental",
         "default_reasoning_summary": "none",
-        "display_name": "DeepSeek-V4-Pro" if is_pro else "Qwen3.8-Flash",
-        "description": "DeepSeek V4 Pro for planning and review."
-        if is_pro
-        else "Qwen3.8 Flash for taqt coding tasks.",
+        "display_name": "Qwen3.8 Flash",
+        "description": "Qwen3.8 Flash for taqt coding tasks.",
         "default_reasoning_level": "low",
         "supported_reasoning_levels": [
             {"effort": "low", "description": "Fast responses with lighter reasoning"},
+            {"effort": "medium", "description": "Balanced reasoning depth for routine tasks"},
             {"effort": "high", "description": "Extra high reasoning depth for complex problems"},
-            {"effort": "max", "description": "Maximum reasoning depth for the hardest problems"},
         ],
         "shell_type": "shell_command",
         "visibility": "list",
