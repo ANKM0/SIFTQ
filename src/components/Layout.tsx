@@ -2,6 +2,13 @@ import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
 
 const HTMX_SCRIPT = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
+export const HTMX_CONFLICT_SWAP_SCRIPT = [
+  "document.body.addEventListener('htmx:beforeSwap', function (event) {",
+  "  if (event.detail.xhr.status !== 409) return;",
+  "  event.detail.shouldSwap = true;",
+  "  event.detail.isError = false;",
+  "});",
+].join("\n");
 const POPOVER_DISMISS_SCRIPT = [
   "document.addEventListener('click', function (event) {",
   "  var panel = document.querySelector('[data-popover-close-href]');",
@@ -140,6 +147,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
       <title>SIFTQ</title>
       <link rel="stylesheet" href="/styles.css" />
       <script src={HTMX_SCRIPT} defer></script>
+      <script src="/htmx-conflict.js" defer></script>
       <script src="/matrix-dnd.js" defer></script>
     </head>
     <body>
