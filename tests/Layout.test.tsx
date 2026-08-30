@@ -6,5 +6,7 @@ describe("Layout", () => {
     const html = String(<Layout active="matrix"><span>content</span></Layout>);
     expect(html).toContain("<html");
     expect(html).toContain('id="page"');
+    expect(html).toContain("htmx:beforeSwap");
+    expect(html).toContain("xhr.status !== 409");
   });
 });
