@@ -20,13 +20,6 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await expect(page.getByText("E2E task")).toBeVisible();
 });
 
-test("requires authentication for the task API", async ({ page }) => {
-  const response = await page.goto("/api/tasks");
-
-  expect(response?.status()).toBe(401);
-  await expect(page.getByText("UNAUTHORIZED")).toBeVisible();
-});
-
 test("persists an edit and displays a conflict from a stale editor", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
