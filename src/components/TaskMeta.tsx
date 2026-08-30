@@ -2,20 +2,35 @@ import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
 import type { Task } from "../task";
 
-export const TaskMeta: FC<{ task: Task }> = ({ task }) => (
-  <TaskSidePanel task={task} />
-);
+export const TaskMeta: FC<{ task: Task; returnTo?: "matrix" | "tasks" }> = ({
+  task,
+  returnTo,
+}) => {
+  if (returnTo === undefined) return <TaskSidePanel task={task} />;
+  return <TaskSidePanel task={task} returnTo={returnTo} />;
+};
 
-export const TaskSidePanel: FC<{ task: Task; className?: string; children?: JSX.Element }> = ({
+export const TaskSidePanel: FC<{
+  task: Task;
+  className?: string;
+  children?: JSX.Element;
+  returnTo?: "matrix" | "tasks";
+}> = ({
   task,
   className = "side-panel",
   children,
+  returnTo = "tasks",
 }) => {
-  const statusPath = `/tasks/${task.id}/status/menu`;
-  const areaPath = `/tasks/${task.id}/area/menu`;
+  const detailPath = `/tasks/${task.id}?from=${returnTo}`;
+  const statusPath = `/tasks/${task.id}/status/menu?from=${returnTo}`;
+  const areaPath = `/tasks/${task.id}/area/menu?from=${returnTo}`;
 
   return (
-    <aside id="task-meta" class={className}>
+    <aside
+      id="task-meta"
+      class={className}
+      data-popover-close-href={children === undefined ? undefined : detailPath}
+    >
       <MetaRow label="Status" path={statusPath} />
       <a
         class={`status status--${task.status}`}

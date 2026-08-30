@@ -26,6 +26,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | REQ-TM-002 | ユーザーは、完了したタスクと見送ったタスクを Matrix から外しつつ、一覧では確認したい。 | domain.md, screens.md |
 | REQ-TM-003 | ユーザーは、タスクの内容、状態、分類先を作成後に確認・編集したい。 | domain.md, screens.md |
 | REQ-TM-004 | ユーザーは、Matrix 上でタスクの分類先と表示順を直接調整したい。 | domain.md, screens.md |
+| REQ-TM-005 | 開発者は、固定データを使って本番 UI の操作をローカルで確認したい。 | screens.md |
 
 ## 仕様
 
@@ -40,6 +41,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-007 | REQ-TM-002, REQ-TM-003 | status を完了または見送りに変更しても、Task の area は保持される。 | BDD-TM-007 |
 | SPEC-TM-008 | REQ-TM-004 | Matrix 上の drag and drop は Task の area または area 内の order を変更する。 | BDD-TM-008 |
 | SPEC-TM-009 | REQ-TM-004 | Matrix 上の drag and drop の永続化が競合した場合、表示をサーバー状態へ戻し、競合を通知する。 | BDD-TM-009 |
+| SPEC-TM-010 | REQ-TM-005 | モック BE プレビューはログイン後に固定初期データを表示し、変更はプレビューの実行中だけ保持する。 | BDD-TM-010 |
 
 ## BDD 候補
 
@@ -54,6 +56,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-007 | SPEC-TM-007 | status を完了または見送りにしても、再び実行対象に戻すと元の area に表示される。 |
 | BDD-TM-008 | SPEC-TM-008 | Task を別 area へ drag and drop すると、移動先 area に表示される。 |
 | BDD-TM-009 | SPEC-TM-009 | Task を古い version で drag and drop すると、Matrix は最新状態へ戻り、競合が通知される。 |
+| BDD-TM-010 | SPEC-TM-010 | モック BE プレビューにログインすると、固定初期データを Matrix と Task list で確認できる。 |
 
 ## 未決事項
 

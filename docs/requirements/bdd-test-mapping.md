@@ -1,7 +1,6 @@
 # BDD テスト対応表
 
-Issue #196 で追加する契約テストと `docs/requirements/requirements-analysis.md`
-の BDD シナリオとの対応を示す。
+`docs/requirements/requirements-analysis.md` の BDD シナリオと検証の対応を示す。
 
 | BDD | テストファイル | 対象 |
 | --- | --- | --- |
@@ -14,6 +13,7 @@ Issue #196 で追加する契約テストと `docs/requirements/requirements-ana
 | BDD-TM-007 | `tests/bdd/task-domain.contract.test.ts` | status 変更時の area 保持 |
 | BDD-TM-008 | `tests/bdd/task-api.contract.test.ts` / `tests/bdd/task-domain.contract.test.ts` | reorder |
 | BDD-TM-009 | `tests/bdd/task-api.contract.test.ts` | 競合時の 409 + code |
+| BDD-TM-010 | `tests/preview.test.ts` | モック BE プレビューの固定初期データ |
 
 repository 契約は `tests/bdd/task-repository.contract.test.ts` で
 `TaskRepository` の in-memory double を使い、insert / list / find / update /

@@ -60,6 +60,8 @@ export type CreateTaskInput = {
   owner_id: string;
   title: string;
   description: string;
+  status?: TaskStatus;
+  area?: TaskArea;
 };
 
 export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
@@ -73,8 +75,8 @@ export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
     owner_id: input.owner_id,
     title: input.title,
     description: input.description,
-    status: "do",
-    area: 1,
+    status: input.status ?? "do",
+    area: input.area ?? 1,
     order: 1,
     version: 1,
     created_at: now,

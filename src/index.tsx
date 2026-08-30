@@ -16,11 +16,13 @@ import {
   sortForMatrix,
 } from "./task";
 import type { Task } from "./task";
-import { Layout, MATRIX_DND_SCRIPT } from "./components/Layout";
+import { HTMX_CONFLICT_SWAP_SCRIPT, Layout, MATRIX_DND_SCRIPT } from "./components/Layout";
 import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
 import { OptionMenu } from "./components/OptionMenu";
+import { NewTaskMeta } from "./components/NewTaskMeta";
+import type { NewTaskState } from "./components/NewTaskMeta";
 import { LoginPage, safeNextPath } from "./components/LoginPage";
 import {
   SESSION_COOKIE_NAME,
@@ -32,12 +34,15 @@ import {
 import { D1TaskRepository } from "./task-repository";
 import type { TaskRepository } from "./task-repository";
 import { STYLES_CSS } from "./styles";
+import { MemoryTaskRepository } from "./preview/MemoryTaskRepository";
+import { PREVIEW_TASKS } from "./preview/tasks";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
   DB?: D1Database;
   AUTH_PASSWORD?: string;
   SESSION_SECRET?: string;
+  PREVIEW_MODE?: string;
 };
 
 type AppEnv = {
@@ -45,8 +50,9 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+const previewRepository = new MemoryTaskRepository(PREVIEW_TASKS);
 
-const PUBLIC_PATHS = new Set(["/login", "/styles.css", "/matrix-dnd.js"]);
+const PUBLIC_PATHS = new Set(["/login", "/styles.css", "/htmx-conflict.js", "/matrix-dnd.js"]);
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.has(path);
@@ -94,6 +100,7 @@ app.use("*", async (c, next) => {
 });
 
 function repository(c: Context<AppEnv>): TaskRepository {
+  if (c.env.PREVIEW_MODE === "true") return previewRepository;
   if (c.env.TASK_REPOSITORY) return c.env.TASK_REPOSITORY;
   if (c.env.DB) return new D1TaskRepository(c.env.DB);
   throw new Error("task repository is not configured");
@@ -162,10 +169,15 @@ async function persistTask(c: Context<AppEnv>, updated: Task): Promise<Task | nu
   return result.ok ? result.value : null;
 }
 
-async function persistTaskMeta(c: Context<AppEnv>, task: Task, updated: Task): Promise<Response> {
+async function persistTaskMeta(
+  c: Context<AppEnv>,
+  task: Task,
+  updated: Task,
+  returnTo: "matrix" | "tasks",
+): Promise<Response> {
   const saved = await persistTask(c, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-  return c.html(<TaskMeta task={saved} />);
+  return c.html(<TaskMeta task={saved} returnTo={returnTo} />);
 }
 
 function renderPage(c: Context<AppEnv>, content: JSX.Element) {
@@ -212,10 +224,10 @@ function DescriptionField({ children }: { children?: string }) {
   );
 }
 
-function TaskFormActions({ submitLabel }: { submitLabel: string }) {
+function TaskFormActions({ submitLabel, cancelHref }: { submitLabel: string; cancelHref: string }) {
   return (
     <div class="form-actions">
-      <a class="button" href="/tasks">
+      <a class="button" href={cancelHref}>
         Cancel
       </a>
       <button class="button primary" type="submit">
@@ -234,11 +246,6 @@ function readTaskFields(body: ParsedBody): {
   const title = typeof body["title"] === "string" ? body["title"].trim() : "";
   const description = typeof body["description"] === "string" ? body["description"] : "";
   return { title, description };
-}
-
-async function readTaskInput(c: Context<AppEnv>) {
-  const body = await c.req.parseBody();
-  return readTaskFields(body);
 }
 
 async function readTaskUpdateInput(c: Context<AppEnv>) {
@@ -272,6 +279,23 @@ function parseTaskArea(value: unknown): Task["area"] | null {
   return area !== null && isTaskArea(area) ? area : null;
 }
 
+function parseNewTaskState(c: Context<AppEnv>): NewTaskState {
+  const status = c.req.query("status");
+  const area = c.req.query("area");
+  const menu = c.req.query("menu");
+  const parsedArea = parseTaskArea(area);
+
+  return {
+    status: isTaskStatus(status) ? status : "do",
+    area: parsedArea ?? 1,
+    openMenu: menu === "status" || menu === "area" ? menu : undefined,
+  };
+}
+
+function detailReturnTo(c: Context<AppEnv>): "matrix" | "tasks" {
+  return c.req.query("from") === "matrix" ? "matrix" : "tasks";
+}
+
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
@@ -300,8 +324,11 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
             aria-labelledby={`area-${area}`}
             data-drop-area={area}
           >
+            <a class="area-create-link" href={`/tasks/new?area=${area}`} aria-label={`Create task in area ${area}`}>
+              <span aria-hidden="true"></span>
+            </a>
             <h2 id={`area-${area}`}>{area}</h2>
-            <div class="matrix-cards" data-area={area} data-sortable-group="matrix">
+            <div class="matrix-cards" data-area={area} data-dnd-group="matrix">
               {matrixTasks
                 .filter((task) => task.area === area)
                 .map((task) => (
@@ -334,7 +361,7 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
   );
 }
 
-function NewTaskForm({ error }: { error?: string }) {
+function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) {
   return (
     <div class="page page--new" data-state="normal">
       <div class="page-header">
@@ -343,49 +370,51 @@ function NewTaskForm({ error }: { error?: string }) {
       <div class="detail-grid">
         <form class="form-panel" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
           <TitleField />
+          <input type="hidden" name="status" value={state.status} />
+          <input type="hidden" name="area" value={state.area} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
-          <TaskFormActions submitLabel="Create" />
+          <TaskFormActions submitLabel="Create" cancelHref="/tasks" />
         </form>
-        <aside class="side-panel">
-          <div class="meta-row">
-            <h2>Status</h2>
-            <span class="meta-caret" aria-hidden="true">
-              ▾
-            </span>
-          </div>
-          <span class="status status--do">do</span>
-          <div class="meta-row meta-row--spaced">
-            <h2>Area</h2>
-            <span class="meta-caret" aria-hidden="true">
-              ▾
-            </span>
-          </div>
-          <span class="status area-badge">1</span>
-        </aside>
+        <NewTaskMeta state={state} />
       </div>
     </div>
   );
 }
 
-function DetailPage({ task, error }: { task: Task; error?: string }) {
+function DetailPage({
+  task,
+  error,
+  returnTo = "tasks",
+}: {
+  task: Task;
+  error?: string;
+  returnTo?: "matrix" | "tasks";
+}) {
+  const cancelHref = returnTo === "matrix" ? "/" : "/tasks";
+
   return (
     <div class="page page--detail" data-state="normal">
       <div class="page-header">
         <h1 class="page-title">Task detail</h1>
-        <a class="button" href="/tasks">
+        <a class="button" href={cancelHref}>
           Tasks
         </a>
       </div>
       <div class="detail-grid">
-        <form class="form-panel" hx-post={`/tasks/${task.id}`} hx-target="#page" hx-swap="innerHTML">
+        <form
+          class="form-panel"
+          hx-post={`/tasks/${task.id}?from=${returnTo}`}
+          hx-target="#page"
+          hx-swap="innerHTML"
+        >
           <TitleField value={task.title} />
           <input type="hidden" name="version" value={task.version} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField>{task.description}</DescriptionField>
-          <TaskFormActions submitLabel="Save" />
+          <TaskFormActions submitLabel="Save" cancelHref={cancelHref} />
         </form>
-        <TaskMeta task={task} />
+        <TaskMeta task={task} returnTo={returnTo} />
       </div>
     </div>
   );
@@ -400,12 +429,12 @@ function ConflictPage({ taskId }: { taskId: string }) {
   );
 }
 
-function StatusMenu({ task }: { task: Task }) {
-  return <OptionMenu task={task} open="status" />;
+function StatusMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks" }) {
+  return <OptionMenu task={task} open="status" returnTo={returnTo} />;
 }
 
-function AreaMenu({ task }: { task: Task }) {
-  return <OptionMenu task={task} open="area" />;
+function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks" }) {
+  return <OptionMenu task={task} open="area" returnTo={returnTo} />;
 }
 
 app.get("/login", (c) => {
@@ -453,6 +482,12 @@ app.get("/", async (c) => {
 
 app.get("/matrix-dnd.js", (c) => {
   return c.body(MATRIX_DND_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
+app.get("/htmx-conflict.js", (c) => {
+  return c.body(HTMX_CONFLICT_SWAP_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
 });
@@ -544,8 +579,7 @@ app.post("/api/tasks/reorder", async (c) => {
   const result = await repository(c).move(changedWithVersion);
   if (!result.ok) return problem(c, 409, result.error.code);
 
-  const saved = result.value.find((task) => task.id === id);
-  return c.json(saved);
+  return c.json(result.value);
 });
 
 app.get("/tasks", async (c) => {
@@ -554,33 +588,43 @@ app.get("/tasks", async (c) => {
   return renderPage(c, <ListPage tasks={result.value} />);
 });
 
-app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm />));
+app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm state={parseNewTaskState(c)} />));
 
 app.get("/tasks/:id", async (c) => {
   const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
-  return renderPage(c, <DetailPage task={task} />);
+  return renderPage(c, <DetailPage task={task} returnTo={detailReturnTo(c)} />);
 });
 
 app.get("/tasks/:id/status/menu", async (c) => {
   const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
-  return c.html(<StatusMenu task={task} />);
+  return c.html(<StatusMenu task={task} returnTo={detailReturnTo(c)} />);
 });
 
 app.get("/tasks/:id/area/menu", async (c) => {
   const task = await findTask(c, c.req.param("id"));
   if (!task) return c.notFound();
-  return c.html(<AreaMenu task={task} />);
+  return c.html(<AreaMenu task={task} returnTo={detailReturnTo(c)} />);
 });
 
 app.post("/tasks", async (c) => {
-  const { title, description } = await readTaskInput(c);
+  const body = await c.req.parseBody();
+  const { title, description } = readTaskFields(body);
+  const status = body["status"];
+  const area = parseTaskArea(body["area"]);
+  const state: NewTaskState = {
+    status: isTaskStatus(status) ? status : "do",
+    area: area ?? 1,
+    openMenu: undefined,
+  };
   if (isInvalidTaskTitle(title)) {
-    return c.html(<NewTaskForm error="Title is required and must be 256 characters or fewer." />);
+    return c.html(
+      <NewTaskForm state={state} error="Title is required and must be 256 characters or fewer." />,
+    );
   }
 
-  const created = createTask({ owner_id: "local", title, description });
+  const created = createTask({ owner_id: "local", title, description, status: state.status, area: state.area });
   if (!created.ok) return c.text("Invalid title", 400);
 
   const inserted = await repository(c).insert(created.value);
@@ -598,14 +642,18 @@ app.post("/tasks/:id", async (c) => {
   if (version === null) return c.text("Invalid version", 400);
   if (isInvalidTaskTitle(title)) {
     return c.html(
-      <DetailPage task={task} error="Title is required and must be 256 characters or fewer." />,
+      <DetailPage
+        task={task}
+        error="Title is required and must be 256 characters or fewer."
+        returnTo={detailReturnTo(c)}
+      />,
     );
   }
 
   const updated = { ...task, title, description, version };
   const saved = await persistTask(c, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-  return c.html(<DetailPage task={saved} />);
+  return c.html(<DetailPage task={saved} returnTo={detailReturnTo(c)} />);
 });
 
 app.post("/tasks/:id/status", async (c) => {
@@ -621,7 +669,7 @@ app.post("/tasks/:id/status", async (c) => {
 
   const changed = changeTaskStatus(task, status);
   if (!changed.ok) return c.text("Invalid status", 400);
-  return persistTaskMeta(c, task, { ...changed.value, version });
+  return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
 });
 
 app.post("/tasks/:id/area", async (c) => {
@@ -635,7 +683,7 @@ app.post("/tasks/:id/area", async (c) => {
 
   const changed = changeTaskArea(task, area);
   if (!changed.ok) return c.text("Invalid area", 400);
-  return persistTaskMeta(c, task, { ...changed.value, version });
+  return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
 });
 
 export default app;

@@ -1,6 +1,8 @@
-%% Screen transition diagram generated from docs/wireframes/*.html.
-%% Regenerate SVG with: pnpm run docs:screen-flow:svg
+%% Screen transition diagram for the mock-backend FE preview.
+%% Regenerate SVG with: bun run docs:screen-flow:svg
 flowchart TB
+  P00["P00 Login<br/>preview 認証"]
+
   subgraph NAV["task 一覧"]
     direction TB
     P01["P01 Matrix<br/>do task を area 別に整理"]
@@ -18,11 +20,16 @@ flowchart TB
   end
 
   P01 -->|"Tasks 押下"| P02
+  P00 -->|"ログイン成功"| P01
   P02 -->|"Matrix 押下"| P01
   P01 -->|"New task 押下"| P04
   P02 -->|"New task 押下"| P04
   P04 -->|"Cancel 押下"| P02
   P04 -->|"Create 押下"| P03
+  P04 -->|"Status 押下"| P05
+  P05 -->|"new task: status 選択"| P04
+  P04 -->|"Area 押下"| P06
+  P06 -->|"new task: area 選択"| P04
   P01 -->|"task card 押下"| P03
   P02 -->|"task row 押下"| P03
   P03 -->|"Tasks 押下"| P02
@@ -30,9 +37,9 @@ flowchart TB
   P03 -->|"Save 押下"| SAVE
   SAVE --> P03
   P03 -->|"Status 押下"| P05
-  P05 -->|"status 選択"| P03
+  P05 -->|"detail: status 選択"| P03
   P03 -->|"Area 押下"| P06
-  P06 -->|"area 選択"| P03
+  P06 -->|"detail: area 選択"| P03
   P05 -->|"Area 押下"| P06
   P06 -->|"Status 押下"| P05
   P01 -.->|"ドラッグ"| DND
@@ -40,5 +47,5 @@ flowchart TB
 
   classDef transient fill:#b7eb63,stroke:#d0d7de,stroke-width:1px,color:#24292f;
   classDef note fill:#ddf4ff,stroke:#54aeff,stroke-width:1px,color:#24292f;
-  class P01,P02,P03,P04,P05,P06,SAVE transient;
+  class P00,P01,P02,P03,P04,P05,P06,SAVE transient;
   class DND note;

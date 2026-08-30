@@ -267,7 +267,6 @@ tasks:
     desc: Require mapped documentation updates for changed paths.
     cmds:
       - uv run python scripts/ci/check_docs.py
-
   ci:llm-eval:
     desc: Run the LLM evaluation smoke suite.
     env:

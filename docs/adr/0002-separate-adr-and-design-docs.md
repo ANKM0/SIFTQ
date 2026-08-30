@@ -23,7 +23,7 @@ ADR と Design Doc の使い分けを定義し、設計検討と意思決定の�
 <!-- ライブラリや設計の変更におけるトレードオフやできない事とその理由。 -->
 
 - 既存の ADR 運用、repository script、skill の責務分離を維持する。
-- requirements と wireframes の正は既存の `docs/requirements/` と `docs/wireframes/` に置く。
+- requirements と UI プレビューの正は `docs/requirements/` とモックBE付きFEプレビューに置く。
 - Issue の AC / DoD は Issue 側に置き、Design Doc には重複させない。
 
 ## 内容

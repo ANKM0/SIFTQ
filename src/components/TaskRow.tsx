@@ -2,7 +2,7 @@ import type { FC } from "hono/jsx";
 import type { Task } from "../task";
 
 export const TaskRow: FC<{ task: Task; issueNumber: number }> = ({ task, issueNumber }) => (
-  <a class="task-row" href={`/tasks/${task.id}`}>
+  <a class="task-row" href={`/tasks/${task.id}?from=tasks`}>
     <span class="issue-number">#{issueNumber}</span>
     <span class="task-row-main">
       <span class="task-row-title">

@@ -6,8 +6,12 @@ export const TaskCard: FC<{ task: Task }> = ({ task }) => (
     class="task-card"
     data-task-id={task.id}
     data-version={task.version}
-    href={`/tasks/${task.id}`}
+    draggable="true"
+    href={`/tasks/${task.id}?from=matrix`}
   >
-    <span class="task-title">{task.title}</span>
+    <span class="task-card-header">
+      <span class="task-title">{task.title}</span>
+      <span class={`status status--${task.status}`}>{task.status}</span>
+    </span>
   </a>
 );
