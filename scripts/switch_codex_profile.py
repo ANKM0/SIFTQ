@@ -9,7 +9,8 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / ".taqt" / "scripts"))
 
-from taqt.deepseek import write_codex_profile_config
+from taqt.deepseek import write_codex_profile_config as write_deepseek_codex_profile_config
+from taqt.qwen import write_codex_profile_config as write_qwen_codex_profile_config
 from taqt.profiles import (
     ACTIVE_FILE_NAME,
     load_profiles,
@@ -46,7 +47,9 @@ def main(argv: list[str] | None = None) -> int:
 
     codex_home = resolve_codex_home(profiles[profile], REPO_ROOT, profile=profile)
     if profile == "deepseek":
-        write_codex_profile_config(codex_home / "config.toml", codex_home=codex_home)
+        write_deepseek_codex_profile_config(codex_home / "config.toml", codex_home=codex_home)
+    elif profile == "qwen":
+        write_qwen_codex_profile_config(codex_home / "config.toml", codex_home=codex_home)
     else:
         if not _install_main_codex_config(codex_home):
             return 2

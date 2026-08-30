@@ -6,3 +6,7 @@ profiles:
     loop: development_feedback_loop_deepseek
     codex_home: .taqt/codex-home/deepseek
     env_key: DEEPSEEK_API_KEY
+  qwen:
+    loop: development_feedback_loop_qwen
+    codex_home: .taqt/codex-home/qwen
+    env_key: OPENROUTER_API_KEY

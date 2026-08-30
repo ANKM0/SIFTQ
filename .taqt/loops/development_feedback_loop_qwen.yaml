@@ -1,5 +1,5 @@
 version: 1
-id: development_feedback_loop_deepseek
+id: development_feedback_loop_qwen
 
 limits:
   max_iterations: 12
@@ -9,7 +9,7 @@ agents:
   design:
     role: design
     adapter: codex
-    model: deepseek-v4-pro
+    model: qwen/qwen3.8-flash
     reasoning_effort: high
     writes:
       - .taqt/loops/

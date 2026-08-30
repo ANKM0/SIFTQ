@@ -5,8 +5,8 @@
 - `CODEX_HOME` は profile ごとの相対パス `.taqt/codex-home/<profile>` を worktree root 基準で解決する。
   - main worktree では `<repository>/.taqt/codex-home/<profile>`。
   - 各 taqt worktree では `<repository>/.taqt/worktrees/<task>/.taqt/codex-home/<profile>`。
-- `taqt:run`、`taqt:auto`、`taqt:worker` が Codex を起動する loop 実行時は、解決済みの `CODEX_HOME` を main / deepseek の両 profile で子プロセスへ渡す。
-- `taqt:switch:main` / `taqt:switch:deepseek` は同じ解決済み `CODEX_HOME` へ profile 設定を書き込み、`codex login` / `codex logout` も同じ `CODEX_HOME` で実行する。
+- `taqt:run`、`taqt:auto`、`taqt:worker` が Codex を起動する loop 実行時は、解決済みの `CODEX_HOME` を main / deepseek / qwen の各 profile で子プロセスへ渡す。
+- `taqt:switch:main` / `taqt:switch:deepseek` / `taqt:switch:qwen` は同じ解決済み `CODEX_HOME` へ profile 設定を書き込み、`codex login` / `codex logout` も同じ `CODEX_HOME` で実行する。
 - `--codex-home` による CLI override を最優先し、次に profile の `codex_home`、最後に profile ごとの既定値を使う。
 - `.taqt/codex-home/` は worktree ごとのローカル成果物として Git の追跡対象外とする。
 
@@ -36,8 +36,9 @@
 
 - main profile の設定は利用者が `~/.codex/config.main.toml` に保持する main 用テンプレート、または `~/.codex/backup-deepseek/config.toml` から worktree の `CODEX_HOME` へ複製する。
 - main profile の認証は worktree ごとの `CODEX_HOME` に対して `codex login` を実行して確立する。
-- deepseek profile は API key を `DEEPSEEK_API_KEY` から受け取り、認証情報を config へ書き込まない（ADR 0011 の reasoning effort 解決は変更しない）。
-- `taqt:switch:main` / `taqt:switch:deepseek` の許可 rule は既存 Taskfile 名のままのため、`.codex/rules/siftq.rules` の追加変更は不要。
+- deepseek profile は design に DeepSeek の `deepseek-v4-pro`、実装系 agent に OpenRouter の `qwen/qwen3.8-flash` を使う。API key は `DEEPSEEK_API_KEY` と `OPENROUTER_API_KEY` から受け取り、認証情報を config へ書き込まない（ADR 0011 の reasoning effort 解決は変更しない）。
+- qwen profile は API key を `OPENROUTER_API_KEY` から受け取り、OpenRouter の `qwen/qwen3.8-flash` を使う。認証情報は config へ書き込まない。
+- `taqt:switch:qwen` と `codex:qwen` は新規 Taskfile 名のため、`.codex/rules/siftq.rules` へ対応する allow rule を追加する。
 
 ## 参考リンク
 
