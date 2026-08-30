@@ -6,11 +6,13 @@
   "packageManager": "bun@1.4.0",
   "scripts": {
     "dev": "wrangler dev",
+    "preview:mock": "wrangler dev --var PREVIEW_MODE:true --var AUTH_PASSWORD:preview --var SESSION_SECRET:preview-session-secret",
     "build": "tsc -p tsconfig.json && wrangler deploy --dry-run",
     "lint": "vp lint .",
     "test": "vp test run --passWithNoTests",
     "test:e2e": "playwright test --pass-with-no-tests",
     "typecheck": "tsc -p tsconfig.json",
+    "docs:wireframes": "bun scripts/generate-wireframes.ts",
     "docs:flow:svg": "mmdc -i docs/contributing/assets/development-flow.mmd -o docs/contributing/assets/development-flow.svg",
     "docs:screen-flow:svg": "mmdc -c docs/requirements/assets/screen-flow-mermaid.json -i docs/requirements/assets/screen-flow.mmd -o docs/requirements/assets/screen-flow.svg",
     "docs:app-architecture:svg": "mmdc -p docs/contributing/assets/app-architecture-puppeteer.json -c docs/contributing/assets/app-architecture-mermaid.json -i docs/contributing/assets/app-architecture.mmd -o docs/contributing/assets/app-architecture.svg"
