@@ -108,7 +108,7 @@ describe("Task creation", () => {
     expect(body).toContain(">4</a>");
   });
 
-  it("renders the new task wireframe with cancel and side metadata", async () => {
+  it("renders the new task page with cancel and side metadata", async () => {
     const body = await (await request("/tasks/new?area=3&status=done&menu=area")).text();
 
     expect(body).toContain("New task");

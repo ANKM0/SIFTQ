@@ -67,7 +67,6 @@ task ci:typecheck
 task ci:lint
 task ci:test
 task ci:build
-task ci:wireframes
 ```
 
 ## Deployment
@@ -98,6 +97,5 @@ task ci
 - `migrations/`: D1 schema migrations.
 - `tests/`: unit tests.
 - `docs/requirements/`: product and system requirements.
-- `docs/wireframes/`: 実コンポーネントを固定モックデータで描画する静的 UI プレビュー。
 - `.taqt/runs/`: run state, events, and design decision artifacts.
 - `docs/adr/`: architecture and repository-wide decisions.
