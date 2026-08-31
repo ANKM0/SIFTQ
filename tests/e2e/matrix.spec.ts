@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
+test.describe.configure({ mode: "serial" });
+
 test("creates a task and sees it in the list", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
