@@ -9,7 +9,7 @@ export const HTMX_CONFLICT_SWAP_SCRIPT = [
   "  event.detail.isError = false;",
   "});",
 ].join("\n");
-const POPOVER_DISMISS_SCRIPT = [
+export const POPOVER_DISMISS_SCRIPT = [
   "document.addEventListener('click', function (event) {",
   "  var panel = document.querySelector('[data-popover-close-href]');",
   "  if (!panel || panel.contains(event.target)) return;",
@@ -148,6 +148,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
       <link rel="stylesheet" href="/styles.css" />
       <script src={HTMX_SCRIPT} defer></script>
       <script src="/htmx-conflict.js" defer></script>
+      <script src="/popover-dismiss.js" defer></script>
       <script src="/matrix-dnd.js" defer></script>
     </head>
     <body>
@@ -163,7 +164,6 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
         </nav>
       </header>
       <main id="page">{children}</main>
-      <script>{POPOVER_DISMISS_SCRIPT}</script>
     </body>
   </html>
 );

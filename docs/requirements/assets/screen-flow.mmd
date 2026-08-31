@@ -28,8 +28,10 @@ flowchart TB
   P04 -->|"Create 押下"| P03
   P04 -->|"Status 押下"| P05
   P05 -->|"new task: status 選択"| P04
+  P05 -->|"外側押下: 現在の選択を保持"| P04
   P04 -->|"Area 押下"| P06
   P06 -->|"new task: area 選択"| P04
+  P06 -->|"外側押下: 現在の選択を保持"| P04
   P01 -->|"task card 押下"| P03
   P02 -->|"task row 押下"| P03
   P03 -->|"Tasks 押下"| P02
@@ -38,8 +40,10 @@ flowchart TB
   SAVE --> P03
   P03 -->|"Status 押下"| P05
   P05 -->|"detail: status 選択"| P03
+  P05 -->|"外側押下: 現在の選択を保持"| P03
   P03 -->|"Area 押下"| P06
   P06 -->|"detail: area 選択"| P03
+  P06 -->|"外側押下: 現在の選択を保持"| P03
   P05 -->|"Area 押下"| P06
   P06 -->|"Status 押下"| P05
   P01 -.->|"ドラッグ"| DND
