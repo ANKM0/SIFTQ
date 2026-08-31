@@ -18,4 +18,12 @@ describe("smoke", () => {
     expect(response.headers.get("content-type")).toContain("application/javascript");
     expect(await response.text()).toContain("xhr.status !== 409");
   });
+
+  it("serves the popover dismissal handler without authentication", async () => {
+    const response = await app.request("/popover-dismiss.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/javascript");
+    expect(await response.text()).toContain("window.location.assign");
+  });
 });

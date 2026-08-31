@@ -51,11 +51,13 @@
   - new task または detail 画面上で status 選択 popover を開いた状態を表す。
   - 選択肢は `do / done / skip` とする。
   - 完成 UI では同じ detail surface 上で開く。
+  - popover と Status / Area サイドパネルの外側を押下すると、現在の選択を保持して通常表示へ戻る。
 
 - `Area popover`
   - new task または detail 画面上で area 選択 popover を開いた状態を表す。
   - 選択肢は `1 / 2 / 3 / 4` とする。
   - 完成 UI では同じ detail surface 上で開く。
+  - popover と Status / Area サイドパネルの外側を押下すると、現在の選択を保持して通常表示へ戻る。
 
 ## 画面遷移
 

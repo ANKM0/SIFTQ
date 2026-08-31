@@ -16,7 +16,12 @@ import {
   sortForMatrix,
 } from "./task";
 import type { Task } from "./task";
-import { HTMX_CONFLICT_SWAP_SCRIPT, Layout, MATRIX_DND_SCRIPT } from "./components/Layout";
+import {
+  HTMX_CONFLICT_SWAP_SCRIPT,
+  Layout,
+  MATRIX_DND_SCRIPT,
+  POPOVER_DISMISS_SCRIPT,
+} from "./components/Layout";
 import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
@@ -52,7 +57,13 @@ type AppEnv = {
 const app = new Hono<AppEnv>();
 const previewRepository = new MemoryTaskRepository(PREVIEW_TASKS);
 
-const PUBLIC_PATHS = new Set(["/login", "/styles.css", "/htmx-conflict.js", "/matrix-dnd.js"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/styles.css",
+  "/htmx-conflict.js",
+  "/popover-dismiss.js",
+  "/matrix-dnd.js",
+]);
 
 function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.has(path);
@@ -490,6 +501,12 @@ app.get("/matrix-dnd.js", (c) => {
 
 app.get("/htmx-conflict.js", (c) => {
   return c.body(HTMX_CONFLICT_SWAP_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
+app.get("/popover-dismiss.js", (c) => {
+  return c.body(POPOVER_DISMISS_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
 });
