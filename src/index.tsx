@@ -404,6 +404,8 @@ function DetailPage({
       <div class="detail-grid">
         <form
           class="form-panel"
+          method="post"
+          action={`/tasks/${task.id}?from=${returnTo}`}
           hx-post={`/tasks/${task.id}?from=${returnTo}`}
           hx-target="#page"
           hx-swap="innerHTML"
