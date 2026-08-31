@@ -10,6 +10,7 @@ tasks:
     desc: Install all local development tools and dependencies.
     cmds:
       - task: setup:aqua
+      - task: setup:codex
       - task: setup:ouch
       - task: setup:bun
       - task: setup:vite-plus
@@ -27,6 +28,65 @@ tasks:
           exit 1
         fi
         aqua install
+
+  setup:codex:
+    desc: Ensure the Codex code-mode host is installed.
+    cmds:
+      - |
+        set -eu
+
+        CODEX="$(aqua which codex)"
+        CODEX_DIR="$(dirname "$CODEX")"
+        HOST="$CODEX_DIR/codex-code-mode-host"
+
+        if [ -x "$HOST" ]; then
+          echo "codex-code-mode-host is already installed."
+          exit 0
+        fi
+
+        VERSION="$("$CODEX" --version | awk '{print $2}')"
+        TAG="rust-v${VERSION}"
+
+        case "$(uname -m)" in
+          x86_64|amd64)
+            TARGET="x86_64-unknown-linux-musl"
+            ;;
+          aarch64|arm64)
+            TARGET="aarch64-unknown-linux-musl"
+            ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)" >&2
+            exit 1
+            ;;
+        esac
+
+        ASSET="codex-code-mode-host-${TARGET}.tar.gz"
+        URL="https://github.com/openai/codex/releases/download/${TAG}/${ASSET}"
+
+        TMPDIR="$(mktemp -d)"
+        trap 'rm -rf "$TMPDIR"' EXIT
+
+        echo "Codex version: $VERSION"
+        echo "Installing codex-code-mode-host..."
+
+        curl -fsSL "$URL" -o "$TMPDIR/$ASSET"
+        tar -xzf "$TMPDIR/$ASSET" -C "$TMPDIR"
+
+        HOST_SRC="$TMPDIR/codex-code-mode-host-${TARGET}"
+
+        if [ ! -f "$HOST_SRC" ]; then
+          echo "codex-code-mode-host was not found in the release archive." >&2
+          find "$TMPDIR" -maxdepth 2 -type f -print >&2
+          exit 1
+        fi
+
+        install -m 0755 "$HOST_SRC" "$HOST"
+
+        echo "Installed codex-code-mode-host:"
+        echo "  $HOST"
+
+
+
 
   setup:bun:
     desc: Install Bun if missing.
