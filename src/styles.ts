@@ -390,7 +390,7 @@ a {
 .detail-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 250px;
 }
 
 .form-panel,
