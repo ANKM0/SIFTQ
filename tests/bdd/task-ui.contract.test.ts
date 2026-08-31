@@ -121,7 +121,7 @@ describe("Task creation", () => {
   });
 });
 
-describe("Task detail and metadata menus", () => {
+describe("Task detail Save form", () => {
   it("renders a Save form when opened from the task list", async () => {
     await repo.insert(taskFixture({ id: "task-1", version: 3 }));
 
@@ -167,7 +167,9 @@ describe("Task detail and metadata menus", () => {
       }),
     );
   });
+});
 
+describe("Task detail and metadata menus", () => {
   it("renders detail and status/area menu fragments", async () => {
     await repo.insert(taskFixture({ id: "task-1", area: 1, status: "do" }));
 
