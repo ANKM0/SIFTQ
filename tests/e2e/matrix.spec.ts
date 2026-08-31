@@ -3,6 +3,8 @@ import type { Page } from "@playwright/test";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
+test.describe.configure({ mode: "serial" });
+
 async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
@@ -29,19 +31,21 @@ async function dismissPopover(page: Page, label: "status" | "area") {
 }
 
 test("creates a task and sees it in the list", async ({ page }) => {
+  const taskTitle = `E2E task ${Date.now()}`;
+
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.getByRole("link", { name: "New task" }).click();
-  await page.getByLabel("Title").fill("E2E task");
+  await page.getByLabel("Title").fill(taskTitle);
   await page.getByLabel("Description").fill("created by Playwright");
   await page.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
-  await expect(page.getByLabel("Title")).toHaveValue("E2E task");
+  await expect(page.getByLabel("Title")).toHaveValue(taskTitle);
 
   await page.goto("/tasks");
-  await expect(page.getByText("E2E task")).toBeVisible();
+  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 });
 
 test("dismisses new task Status and Area popovers when clicking outside", async ({ page }) => {

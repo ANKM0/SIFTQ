@@ -121,6 +121,54 @@ describe("Task creation", () => {
   });
 });
 
+describe("Task detail Save form", () => {
+  it("renders a Save form when opened from the task list", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1?from=tasks");
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain('method="post"');
+    expect(body).toContain('action="/tasks/task-1?from=tasks"');
+    expect(body).toContain('hx-post="/tasks/task-1?from=tasks"');
+    expect(body).toContain('name="version" value="3"');
+    expect(body).toContain('<button class="button primary" type="submit">Save</button>');
+    expect(body).toContain('href="/tasks"');
+  });
+
+  it("saves edits submitted from the task-list detail form", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1?from=tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        title: "updated task",
+        description: "updated description",
+        version: "3",
+      }).toString(),
+    });
+    const body = await response.text();
+    const saved = await repo.find("task-1", "local");
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("updated task");
+    expect(body).toContain("updated description");
+    expect(body).toContain('href="/tasks"');
+    expect(saved).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({
+          title: "updated task",
+          description: "updated description",
+          version: 4,
+        }),
+      }),
+    );
+  });
+});
+
 describe("Task detail and metadata menus", () => {
   it("renders detail and status/area menu fragments", async () => {
     await repo.insert(taskFixture({ id: "task-1", area: 1, status: "do" }));
