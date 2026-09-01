@@ -95,3 +95,26 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await expect(staleEditor.getByText("Task was updated elsewhere.")).toBeVisible();
   await expect(staleEditor.getByRole("link", { name: "Load latest" })).toBeVisible();
 });
+
+test("cancels a new task from the matrix and returns to the matrix", async ({ page }) => {
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+});
+
+test("cancels a new task from the task list and returns to the task list", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+});

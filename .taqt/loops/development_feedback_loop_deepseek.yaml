@@ -9,6 +9,7 @@ agents:
   design:
     role: design
     adapter: codex
+    profile: deepseek
     model: deepseek-v4-pro
     reasoning_effort: high
     writes:
@@ -21,7 +22,8 @@ agents:
   test:
     role: test_author
     adapter: codex
-    model: qwen/qwen3.8-flash
+    profile: deepseek0731
+    model: deepseek/deepseek-v4-flash-0731
     reasoning_effort: low
     writes:
       - tests/
@@ -29,17 +31,20 @@ agents:
   implement:
     role: implementation
     adapter: codex
-    model: qwen/qwen3.8-flash
+    profile: deepseek0731
+    model: deepseek/deepseek-v4-flash-0731
     reasoning_effort: low
   fix:
     role: implementation_fixer
     adapter: codex
-    model: qwen/qwen3.8-flash
+    profile: deepseek0731
+    model: deepseek/deepseek-v4-flash-0731
     reasoning_effort: low
   checker:
     role: checker
     adapter: codex
-    model: qwen/qwen3.8-flash
+    profile: deepseek0731
+    model: deepseek/deepseek-v4-flash-0731
     reasoning_effort: low
     readonly: true
 
