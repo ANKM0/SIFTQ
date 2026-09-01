@@ -500,20 +500,24 @@ tasks:
   codex:codex:
     desc: Run Codex using the main/OpenAI profile.
     cmds:
-      - |
-        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path main)" \
-          codex {{.CLI_ARGS}}
+      - codex {{.CLI_ARGS}}
 
   codex:deepseek:
-    desc: Run Codex using the DeepSeek profile.
+    desc: Run Codex using the DeepSeek V4 Flash 0731 profile.
     cmds:
-      - |
-        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)" \
-          codex {{.CLI_ARGS}}
+      - codex --profile deepseek0731 {{.CLI_ARGS}}
 
-  codex:qwen:
-    desc: Run Codex using the Qwen/OpenRouter profile.
+  codex:deepseek:pro:
+    desc: Run Codex using the DeepSeek V4 Pro profile.
     cmds:
-      - |
-        CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path qwen)" \
-          codex {{.CLI_ARGS}}
+      - codex --profile deepseek {{.CLI_ARGS}}
+
+  codex:profiles:init:
+    desc: Create missing shared DeepSeek Codex profiles without overwriting existing files.
+    cmds:
+      - uv run python scripts/codex_profiles.py init
+
+  codex:profiles:check:
+    desc: Validate shared DeepSeek Codex profiles and required API key environment variables.
+    cmds:
+      - uv run python scripts/codex_profiles.py check --require-env

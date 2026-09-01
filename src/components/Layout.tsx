@@ -139,7 +139,7 @@ export const MATRIX_DND_SCRIPT = [
   "  if (!quadrant) return;",
   '  var area = quadrant.getAttribute("data-drop-area");',
   "  if (area === null) return;",
-  '  window.location.assign("/tasks/new?area=" + encodeURIComponent(area));',
+  '  window.location.assign("/tasks/new?area=" + encodeURIComponent(area) + "&from=matrix");',
   "});",
   'document.addEventListener("DOMContentLoaded", initMatrixDnd);',
   'document.addEventListener("htmx:load", initMatrixDnd);',

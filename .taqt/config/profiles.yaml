@@ -1,12 +1,8 @@
 profiles:
   main:
     loop: development_feedback_loop
-    codex_home: .taqt/codex-home/main
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: .taqt/codex-home/deepseek
-    env_key: DEEPSEEK_API_KEY
-  qwen:
-    loop: development_feedback_loop_qwen
-    codex_home: .taqt/codex-home/qwen
-    env_key: OPENROUTER_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY

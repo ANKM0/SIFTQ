@@ -34,19 +34,25 @@ test("navigates to a new task from a matrix quadrant blank area", async ({ page 
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
-  const quadrant = page.locator('.area--quadrant[data-drop-area="4"] .matrix-cards');
-  await expect(quadrant.locator(".task-card")).toHaveCount(0);
-  await quadrant.click();
+  for (const area of [1, 2, 3, 4]) {
+    const quadrant = page.locator(`.area--quadrant[data-drop-area="${area}"] .matrix-cards`);
+    await quadrant.locator(".task-card").evaluateAll((cards) => {
+      cards.forEach((card) => card.remove());
+    });
+    await quadrant.click();
 
-  await expect(page).toHaveURL(/\/tasks\/new\?area=4/);
-  await expect(page.locator("#new-task-meta .area-badge")).toHaveText("4");
+    await expect(page).toHaveURL(new RegExp(`/tasks/new\\?area=${area}&from=matrix`));
+    await expect(page.locator("#new-task-meta .area-badge")).toHaveText(String(area));
+
+    if (area < 4) await page.goto("/");
+  }
 });
 
 test("keeps the matrix quadrant creation link working", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Create task in area 3" }).click();
+  await page.getByRole("link", { name: "Create task in area 3" }).click({ position: { x: 5, y: 5 } });
 
   await expect(page).toHaveURL(/\/tasks\/new\?area=3/);
   await expect(page.locator("#new-task-meta .area-badge")).toHaveText("3");
@@ -135,4 +141,27 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await staleEditor.getByRole("button", { name: "Save" }).click();
   await expect(staleEditor.getByText("Task was updated elsewhere.")).toBeVisible();
   await expect(staleEditor.getByRole("link", { name: "Load latest" })).toBeVisible();
+});
+
+test("cancels a new task from the matrix and returns to the matrix", async ({ page }) => {
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+});
+
+test("cancels a new task from the task list and returns to the task list", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
 });

@@ -34,6 +34,6 @@ describe("smoke", () => {
     expect(response.headers.get("content-type")).toContain("application/javascript");
     const body = await response.text();
     expect(body).toContain('closest(".area--quadrant[data-drop-area]")');
-    expect(body).toContain('window.location.assign("/tasks/new?area=" + encodeURIComponent(area))');
+    expect(body).toContain('window.location.assign("/tasks/new?area=" + encodeURIComponent(area) + "&from=matrix")');
   });
 });
