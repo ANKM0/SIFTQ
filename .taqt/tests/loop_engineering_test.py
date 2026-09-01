@@ -617,6 +617,7 @@ def test_development_feedback_loop_uses_luna_workers_and_sol_checker() -> None:
 
     agents = load_document(loop_path)["agents"]
 
+    assert agents["checker"]["readonly"] is True
     assert agents["design"]["model"] == "gpt-5.6-luna"
     assert agents["design"]["reasoning_effort"] == "xhigh"
     assert agents["test"]["model"] == "gpt-5.6-luna"
@@ -640,6 +641,7 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert {"decompose", "orchestrate", "judge"}.isdisjoint(agents)
     assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
 
+    assert agents["checker"]["readonly"] is True
     assert agents["design"]["model"] == "deepseek-v4-pro"
     assert agents["design"]["reasoning_effort"] == "high"
     assert agents["test"]["model"] == "deepseek-v4-flash"
@@ -713,6 +715,9 @@ def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch)
         ({"parsed_json": True, "status": "success", "verdict": "changes_requested"}, [], "fix"),
         ({"parsed_json": True, "status": "success", "verdict": "human_required"}, [], "human"),
         ({"parsed_json": False, "status": "success"}, [], "human"),
+        ({"parsed_json": True, "status": "success"}, [], "human"),
+        ({"parsed_json": True, "status": "success", "verdict": "maybe"}, [], "human"),
+        ({"parsed_json": True, "status": "failure", "verdict": "approve"}, [], "human"),
         ({"parsed_json": True, "status": "success", "verdict": "approve"}, ["changed.py"], "human"),
     ],
 )
@@ -950,8 +955,12 @@ steps:
     agent: checker
     command: >-
       python -c 'from pathlib import Path; Path("changed.txt").write_text("x")'
-    on_failure: human
-    next: done
+    next: post_review
+  - id: post_review
+    kind: post_review
+    on_pass: done
+    on_fix: human
+    on_human: human
   - id: done
     kind: terminal
   - id: human
