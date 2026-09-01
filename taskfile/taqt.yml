@@ -14,33 +14,6 @@ tasks:
     cmds:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
-  switch:show:
-    desc: Show the active Codex/taqt profile.
-    cmds:
-      - uv run python scripts/switch_codex_profile.py show
-
-  switch:main:
-    desc: Switch Codex and taqt to the main/OpenAI profile.
-    cmds:
-      - uv run python scripts/switch_codex_profile.py set main
-      - |
-        export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path main)"
-        codex login
-
-  switch:deepseek:
-    desc: Switch Codex and taqt to the DeepSeek profile.
-    cmds:
-      - uv run python scripts/switch_codex_profile.py set deepseek
-      - |
-        export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path deepseek)"
-
-  switch:qwen:
-    desc: Switch Codex and taqt to the Qwen/OpenRouter profile.
-    cmds:
-      - uv run python scripts/switch_codex_profile.py set qwen
-      - |
-        export CODEX_HOME="$(uv run python scripts/switch_codex_profile.py path qwen)"
-
   auto:
     desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.
     cmds:

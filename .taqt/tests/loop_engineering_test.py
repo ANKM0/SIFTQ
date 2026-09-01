@@ -39,8 +39,6 @@ from taqt.github_merge import main as github_merge_main
 from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
 from taqt.task_create import main as task_create_main
-from taqt.deepseek import ensure_codex_home
-from taqt.qwen import ensure_codex_home as ensure_qwen_codex_home
 from taqt.profiles import load_profiles, resolve_profile
 
 
@@ -260,95 +258,16 @@ blocked_reason: null
     assert state["status"] == "done"
 
 
-def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: Path) -> None:
-    config_path = ensure_codex_home(tmp_path / "deepseek-home")
-    config = config_path.read_text(encoding="utf-8")
-    catalog = json.loads((config_path.parent / "models.json").read_text(encoding="utf-8"))
-
-    assert 'model = "qwen/qwen3.8-flash"' in config
-    assert 'model_provider = "openrouter"' in config
-    assert 'base_url = "https://openrouter.ai/api/v1"' in config
-    assert 'env_key = "OPENROUTER_API_KEY"' in config
-    assert 'base_url = "https://api.deepseek.com/"' in config
-    assert 'wire_api = "responses"' in config
-    assert 'env_key = "DEEPSEEK_API_KEY"' in config
-    assert 'model_reasoning_effort = "low"' in config
-    assert 'model_auto_compact_token_limit = 120000' in config
-    assert "experimental_bearer_token" not in config
-    assert "DEEPSEEK_API_KEY" not in json.dumps(catalog)
-    assert {model["slug"] for model in catalog["models"]} == {
-        "qwen/qwen3.8-flash",
-        "deepseek-v4-pro",
-    }
-    assert all("base_instructions" in model for model in catalog["models"])
-    assert all("instructions_template" in model["model_messages"] for model in catalog["models"])
-    assert all(model["auto_compact_token_limit"] == 120000 for model in catalog["models"])
-    assert all(model["default_reasoning_level"] == "low" for model in catalog["models"])
-
-
-def test_deepseek_codex_home_migrates_legacy_flash_config_and_catalog(tmp_path: Path) -> None:
-    codex_home = tmp_path / "deepseek-home"
-    codex_home.mkdir()
-    (codex_home / "config.toml").write_text(
-        'model = "deepseek-v4-flash"\nmodel_provider = "deepseek"\n',
-        encoding="utf-8",
-    )
-    (codex_home / "models.json").write_text(
-        json.dumps({"models": [{"slug": "deepseek-v4-flash"}]}),
-        encoding="utf-8",
-    )
-
-    config_path = ensure_codex_home(codex_home)
-    config = config_path.read_text(encoding="utf-8")
-    catalog = json.loads((codex_home / "models.json").read_text(encoding="utf-8"))
-
-    assert 'model = "qwen/qwen3.8-flash"' in config
-    assert 'model_provider = "openrouter"' in config
-    assert {model["slug"] for model in catalog["models"]} == {
-        "qwen/qwen3.8-flash",
-        "deepseek-v4-pro",
-    }
-
-
-def test_qwen_codex_home_writes_provider_and_catalog_without_key(tmp_path: Path) -> None:
-    config_path = ensure_qwen_codex_home(tmp_path / "qwen-home")
-    config = config_path.read_text(encoding="utf-8")
-    catalog = json.loads((config_path.parent / "models.json").read_text(encoding="utf-8"))
-
-    assert 'model = "qwen/qwen3.8-flash"' in config
-    assert 'base_url = "https://openrouter.ai/api/v1"' in config
-    assert 'wire_api = "responses"' in config
-    assert 'env_key = "OPENROUTER_API_KEY"' in config
-    assert 'model_reasoning_effort = "low"' in config
-    assert 'model_auto_compact_token_limit = 120000' in config
-    assert "experimental_bearer_token" not in config
-    assert "OPENROUTER_API_KEY" not in json.dumps(catalog)
-    assert {model["slug"] for model in catalog["models"]} == {"qwen/qwen3.8-flash"}
-    assert all("base_instructions" in model for model in catalog["models"])
-    assert all("instructions_template" in model["model_messages"] for model in catalog["models"])
-    assert all(model["auto_compact_token_limit"] == 120000 for model in catalog["models"])
-    assert all(model["default_reasoning_level"] == "low" for model in catalog["models"])
-
-
-def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
+def test_deepseek_loop_definition_uses_pro_for_design_and_flash_for_implementation() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     loop = load_document(repository_root / ".taqt/loops/development_feedback_loop_deepseek.yaml")
 
     validate_loop_definition(loop)
     assert loop["agents"]["design"]["model"] == "deepseek-v4-pro"
-    assert loop["agents"]["implement"]["model"] == "qwen/qwen3.8-flash"
-    assert loop["agents"]["checker"]["model"] == "qwen/qwen3.8-flash"
-    assert "judge" not in loop["agents"]
-
-
-def test_qwen_loop_definition_uses_qwen_for_all_agents() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-    loop = load_document(repository_root / ".taqt/loops/development_feedback_loop_qwen.yaml")
-
-    validate_loop_definition(loop)
-    assert loop["agents"]["design"]["model"] == "qwen/qwen3.8-flash"
-    assert loop["agents"]["implement"]["model"] == "qwen/qwen3.8-flash"
-    assert loop["agents"]["checker"]["model"] == "qwen/qwen3.8-flash"
+    assert loop["agents"]["design"]["profile"] == "deepseek"
+    assert loop["agents"]["implement"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert loop["agents"]["checker"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert loop["agents"]["implement"]["profile"] == "deepseek0731"
     assert "judge" not in loop["agents"]
 
 
@@ -362,8 +281,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
@@ -372,7 +292,7 @@ profiles:
 
     assert profiles["main"]["loop"] == "development_feedback_loop"
     assert profiles["deepseek"]["loop"] == "development_feedback_loop_deepseek"
-    assert profiles["deepseek"]["codex_home"] == "~/.codex-deepseek"
+    assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"]
 
 
 def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
@@ -705,14 +625,19 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
 
     assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["profile"] == "deepseek"
     assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "qwen/qwen3.8-flash"
+    assert agents["test"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["test"]["profile"] == "deepseek0731"
     assert agents["test"]["reasoning_effort"] == "low"
-    assert agents["implement"]["model"] == "qwen/qwen3.8-flash"
+    assert agents["implement"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["implement"]["profile"] == "deepseek0731"
     assert agents["implement"]["reasoning_effort"] == "low"
-    assert agents["fix"]["model"] == "qwen/qwen3.8-flash"
+    assert agents["fix"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["fix"]["profile"] == "deepseek0731"
     assert agents["fix"]["reasoning_effort"] == "low"
-    assert agents["checker"]["model"] == "qwen/qwen3.8-flash"
+    assert agents["checker"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["checker"]["profile"] == "deepseek0731"
     assert agents["checker"]["reasoning_effort"] == "low"
 
     step_ids = [step["id"] for step in steps]
@@ -1180,8 +1105,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
@@ -1243,8 +1169,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
