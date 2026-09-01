@@ -23,6 +23,7 @@ flowchart TB
   P00 -->|"ログイン成功"| P01
   P02 -->|"Matrix 押下"| P01
   P01 -->|"New task 押下"| P04
+  P01 -->|"area 1〜4 空白押下: area を引き継ぐ"| P04
   P02 -->|"New task 押下"| P04
   P04 -->|"Cancel 押下"| P02
   P04 -->|"Create 押下"| P03

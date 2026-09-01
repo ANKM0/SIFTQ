@@ -25,6 +25,7 @@
   - 縦軸は `重要度`、横軸は `緊急度` とする。
   - task card は title のみを表示する。
   - task card は matrix 上で drag and drop できる。
+  - task card 以外の空白部分を押下すると、その area を選択済みとして `/tasks/new?area=<area>` へ遷移する。
 
 - `Task list` (`/tasks`)
   - 全 task を一覧表示する。
@@ -43,7 +44,7 @@
   - title と description を入力する。
   - status と area は右側 metadata として表示する。
   - status と area はそれぞれの popover から選択する。選択内容は `Create` まで保存しない。
-  - 初期値は `status = do`、`area = 1` とする。
+  - 初期値は `status = do`、`area = 1` とする。`/tasks/new?area=<area>` から開いた場合は、指定 area を初期選択する。
   - `Cancel` は一覧へ戻る。
   - `Create` は task を作成して detail へ進む。
 
