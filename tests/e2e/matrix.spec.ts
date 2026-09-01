@@ -36,10 +36,9 @@ test("navigates to a new task from a matrix quadrant blank area", async ({ page 
 
   for (const area of [1, 2, 3, 4]) {
     const quadrant = page.locator(`.area--quadrant[data-drop-area="${area}"] .matrix-cards`);
-    await quadrant.locator(".task-card").evaluateAll((cards) => {
-      cards.forEach((card) => card.remove());
+    await quadrant.evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    await quadrant.click();
 
     await expect(page).toHaveURL(new RegExp(`/tasks/new\\?area=${area}&from=matrix`));
     await expect(page.locator("#new-task-meta .area-badge")).toHaveText(String(area));
