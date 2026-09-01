@@ -27,7 +27,7 @@ import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
 import { OptionMenu } from "./components/OptionMenu";
 import { NewTaskMeta } from "./components/NewTaskMeta";
-import type { NewTaskState } from "./components/NewTaskMeta";
+import type { NewTaskFrom, NewTaskState } from "./components/NewTaskMeta";
 import { LoginPage, safeNextPath } from "./components/LoginPage";
 import {
   SESSION_COOKIE_NAME,
@@ -209,9 +209,9 @@ function pageNav(path: string) {
   };
 }
 
-function NewTaskLink() {
+function NewTaskLink({ from }: { from: NewTaskFrom }) {
   return (
-    <a class="button primary" {...pageNav("/tasks/new")}>
+    <a class="button primary" {...pageNav(`/tasks/new?from=${from}`)}>
       New task
     </a>
   );
@@ -300,6 +300,7 @@ function parseNewTaskState(c: Context<AppEnv>): NewTaskState {
     status: isTaskStatus(status) ? status : "do",
     area: parsedArea ?? 1,
     openMenu: menu === "status" || menu === "area" ? menu : undefined,
+    from: c.req.query("from") === "matrix" ? "matrix" : "tasks",
   };
 }
 
@@ -316,7 +317,7 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
           <h1 class="page-title">Matrix</h1>
           <p class="muted">Organize tasks by urgency and importance.</p>
         </div>
-        <NewTaskLink />
+        <NewTaskLink from="matrix" />
       </div>
       <p id="dnd-conflict" class="error" hidden>
         Task was updated elsewhere. The Matrix was restored to the latest state.
@@ -335,7 +336,7 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
             aria-labelledby={`area-${area}`}
             data-drop-area={area}
           >
-            <a class="area-create-link" href={`/tasks/new?area=${area}`} aria-label={`Create task in area ${area}`}>
+            <a class="area-create-link" href={`/tasks/new?area=${area}&from=matrix`} aria-label={`Create task in area ${area}`}>
               <span aria-hidden="true"></span>
             </a>
             <h2 id={`area-${area}`}>{area}</h2>
@@ -361,7 +362,7 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
           <h1 class="page-title">Tasks</h1>
           <p class="muted">GitHub Issues-like list without search in this scope.</p>
         </div>
-        <NewTaskLink />
+        <NewTaskLink from="tasks" />
       </div>
       <div class="list" aria-label="Task list">
         {tasks.map((task, index) => (
@@ -385,7 +386,7 @@ function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) 
           <input type="hidden" name="area" value={state.area} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
-          <TaskFormActions submitLabel="Create" cancelHref="/tasks" />
+          <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/" : "/tasks"} />
         </form>
         <NewTaskMeta state={state} />
       </div>
@@ -636,6 +637,7 @@ app.post("/tasks", async (c) => {
     status: isTaskStatus(status) ? status : "do",
     area: area ?? 1,
     openMenu: undefined,
+    from: detailReturnTo(c),
   };
   if (isInvalidTaskTitle(title)) {
     return c.html(
