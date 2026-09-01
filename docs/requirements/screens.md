@@ -44,7 +44,11 @@
   - status と area は右側 metadata として表示する。
   - status と area はそれぞれの popover から選択する。選択内容は `Create` まで保存しない。
   - 初期値は `status = do`、`area = 1` とする。
-  - `Cancel` は一覧へ戻る。
+  - `from` query で遷移元を受け取る。`from=matrix` は Matrix、`from=tasks` または省略時は Task list とする。
+  - Matrix の New task と area 新規作成リンクは `from=matrix` を付与し、Task list の New task は `from=tasks` を付与する。
+  - `status` / `area` の query 指定は従来どおり初期値へ反映し、`from` と同時に指定できる。
+  - `Status` / `Area` の選択中も `from` を保持する。
+  - `Cancel` は `from` に従い遷移元へ戻る。
   - `Create` は task を作成して detail へ進む。
 
 - `Status popover`
