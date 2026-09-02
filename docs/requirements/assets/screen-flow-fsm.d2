@@ -1,0 +1,35 @@
+# Screen transition FSM. States are screens; edge labels are events.
+# Regenerate SVG with: task docs:screen-flow:fsm:d2:svg
+direction: right
+
+p00: { label: "P00\nLogin"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p01: { label: "P01\nMatrix"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p02: { label: "P02\nTask list"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p03: { label: "P03\nTask detail"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p04: { label: "P04\nNew task"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p05: { label: "P05\nStatus popover"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+p06: { label: "P06\nArea popover"; shape: circle; style: { fill: "#242424"; stroke: "#242424"; font-color: "#ffffff" } }
+
+p00 -> p01: "ログイン成功"
+p01 -> p02: "Tasks 押下"
+p02 -> p01: "Matrix 押下"
+p01 -> p04: "New task / area 空白押下\nfrom=matrix"
+p02 -> p04: "New task 押下\nfrom=tasks"
+p04 -> p03: "Create 押下"
+p04 -> p01: "Cancel 押下\nfrom=matrix"
+p04 -> p02: "Cancel 押下\nfrom=tasks / 省略"
+p01 -> p03: "task card 押下"
+p02 -> p03: "task row 押下"
+p03 -> p02: "Tasks / Cancel 押下"
+p03 -> p03: "Save 押下"
+p04 -> p05: "Status 押下"
+p05 -> p04: "status 選択 / 外側押下\nnew task"
+p04 -> p06: "Area 押下"
+p06 -> p04: "area 選択 / 外側押下\nnew task"
+p03 -> p05: "Status 押下"
+p05 -> p03: "status 選択 / 外側押下\ndetail"
+p03 -> p06: "Area 押下"
+p06 -> p03: "area 選択 / 外側押下\ndetail"
+p05 -> p06: "Area 押下"
+p06 -> p05: "Status 押下"
+p01 -> p01: "ドラッグ&ドロップ\narea / order 更新"

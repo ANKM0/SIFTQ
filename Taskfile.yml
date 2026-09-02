@@ -16,3 +16,6 @@ includes:
   taqt:
     taskfile: ./taskfile/taqt.yml
     dir: .
+  docs:
+    taskfile: ./taskfile/docs.yml
+    dir: .

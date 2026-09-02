@@ -18,3 +18,4 @@ packages:
 - name: go-task/task@v3.51.1
 - name: BurntSushi/ripgrep@14.1.1
 - name: ouch-org/ouch@0.8.1
+- name: terrastruct/d2@v0.8.2
