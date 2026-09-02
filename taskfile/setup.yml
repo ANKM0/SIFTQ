@@ -1,0 +1,208 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: Install all local development tools and dependencies.
+    cmds:
+      - task: setup:aqua
+      - task: setup:codex
+      - task: setup:ouch
+      - task: setup:bun
+      - task: setup:vite-plus
+      - task: setup:python
+      - task: setup:frontend
+
+  setup:aqua:
+    desc: Install repository CLI tools with aqua.
+    cmds:
+      - |
+        set -eu
+        if ! command -v aqua >/dev/null 2>&1; then
+          echo "aqua is not installed." >&2
+          echo "Install aqua first, then rerun 'task setup'." >&2
+          exit 1
+        fi
+        aqua install
+
+  setup:codex:
+    desc: Ensure the Codex code-mode host is installed.
+    cmds:
+      - |
+        set -eu
+
+        CODEX="$(aqua which codex)"
+        CODEX_DIR="$(dirname "$CODEX")"
+        HOST="$CODEX_DIR/codex-code-mode-host"
+
+        if [ -x "$HOST" ]; then
+          echo "codex-code-mode-host is already installed."
+          exit 0
+        fi
+
+        VERSION="$("$CODEX" --version | awk '{print $2}')"
+        TAG="rust-v${VERSION}"
+
+        case "$(uname -m)" in
+          x86_64|amd64)
+            TARGET="x86_64-unknown-linux-musl"
+            ;;
+          aarch64|arm64)
+            TARGET="aarch64-unknown-linux-musl"
+            ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)" >&2
+            exit 1
+            ;;
+        esac
+
+        ASSET="codex-code-mode-host-${TARGET}.tar.gz"
+        URL="https://github.com/openai/codex/releases/download/${TAG}/${ASSET}"
+
+        TMPDIR="$(mktemp -d)"
+        trap 'rm -rf "$TMPDIR"' EXIT
+
+        echo "Codex version: $VERSION"
+        echo "Installing codex-code-mode-host..."
+
+        curl -fsSL "$URL" -o "$TMPDIR/$ASSET"
+        tar -xzf "$TMPDIR/$ASSET" -C "$TMPDIR"
+
+        HOST_SRC="$TMPDIR/codex-code-mode-host-${TARGET}"
+
+        if [ ! -f "$HOST_SRC" ]; then
+          echo "codex-code-mode-host was not found in the release archive." >&2
+          find "$TMPDIR" -maxdepth 2 -type f -print >&2
+          exit 1
+        fi
+
+        install -m 0755 "$HOST_SRC" "$HOST"
+
+        echo "Installed codex-code-mode-host:"
+        echo "  $HOST"
+
+
+
+
+  setup:bun:
+    desc: Install Bun if missing.
+    deps:
+      - setup:ouch
+    cmds:
+      - |
+        set -eu
+        if command -v bun >/dev/null 2>&1 || [ -x "$HOME/.bun/bin/bun" ]; then
+          echo "Bun is already installed."
+          exit 0
+        fi
+        if ! command -v ouch >/dev/null 2>&1; then
+          echo "ouch is required to install Bun." >&2
+          echo "Run 'task setup:ouch' first, then rerun 'task setup'." >&2
+          exit 1
+        fi
+        tmpdir="$(mktemp -d)"
+        trap 'rm -rf "$tmpdir"' EXIT
+        cat > "$tmpdir/unzip" <<'EOF'
+        #!/bin/sh
+        set -eu
+        out=
+        file=
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --)
+              shift
+              break
+              ;;
+            -*)
+              opts=${1#-}
+              while [ -n "$opts" ]; do
+                opt=${opts%"${opts#?}"}
+                rest=${opts#?}
+                case "$opt" in
+                  o|q) ;;
+                  d)
+                    if [ -n "$rest" ]; then
+                      out="$rest"
+                      rest=
+                    else
+                      shift
+                      out="$1"
+                    fi
+                    ;;
+                  *)
+                    echo "unsupported unzip option: -$opt" >&2
+                    exit 2
+                    ;;
+                esac
+                opts="$rest"
+              done
+              ;;
+            *)
+              file="$1"
+              ;;
+          esac
+          shift
+        done
+        [ -n "$file" ] || {
+          echo "no archive specified" >&2
+          exit 2
+        }
+        if [ -n "$out" ]; then
+          exec ouch decompress "$file" --dir "$out" --yes --quiet
+        fi
+        exec ouch decompress "$file" --yes --quiet
+        EOF
+        chmod +x "$tmpdir/unzip"
+        curl -fsSL https://bun.sh/install -o "$tmpdir/install.sh"
+        PATH="$tmpdir:$PATH" bash "$tmpdir/install.sh"
+
+  setup:ouch:
+    desc: Ensure ouch is installed via aqua.
+    cmds:
+      - |
+        set -eu
+        if command -v ouch >/dev/null 2>&1; then
+          echo "ouch is already installed."
+          exit 0
+        fi
+        if ! command -v aqua >/dev/null 2>&1; then
+          echo "aqua is not installed." >&2
+          echo "Install aqua first, then rerun 'task setup'." >&2
+          exit 1
+        fi
+        aqua install
+
+  setup:vite-plus:
+    desc: Install Vite+ if missing.
+    cmds:
+      - |
+        set -eu
+        if command -v vp >/dev/null 2>&1 || [ -x "$HOME/.local/share/vite-plus/bin/vp" ]; then
+          echo "Vite+ is already installed."
+          exit 0
+        fi
+        curl -fsSL https://vite.plus | bash
+
+  setup:python:
+    desc: Install Python dependencies with uv.
+    cmds:
+      - uv sync --all-groups
+
+  setup:frontend:
+    desc: Install frontend dependencies with Bun.
+    cmds:
+      - |
+        set -eu
+        if command -v bun >/dev/null 2>&1; then
+          bun install
+        elif [ -x "$HOME/.bun/bin/bun" ]; then
+          "$HOME/.bun/bin/bun" install
+        else
+          echo "Bun is not installed. Run 'task setup:bun' first." >&2
+          exit 1
+        fi
+
+  setup:frontend:ci:
+    desc: Install frontend dependencies from the lockfile.
+    cmds:
+      - bun install --frozen-lockfile
+
