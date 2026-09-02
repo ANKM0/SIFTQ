@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Start the Worker development server.
+    cmds:
+      - |
+        set -eu
+        if command -v vp >/dev/null 2>&1; then
+          vp run dev
+        elif [ -x "$HOME/.local/share/vite-plus/bin/vp" ]; then
+          "$HOME/.local/share/vite-plus/bin/vp" run dev
+        else
+          echo "Vite+ is not installed. Run 'task setup:vite-plus' first." >&2
+          exit 1
+        fi
+

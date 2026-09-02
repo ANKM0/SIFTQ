@@ -5,8 +5,24 @@ env:
   PLAYWRIGHT_BROWSERS_PATH: "{{.TASKFILE_DIR}}/tmp/playwright-browsers"
 
 includes:
-  core:
-    taskfile: ./taskfile/core.yml
+  setup:
+    taskfile: ./taskfile/setup.yml
+    dir: .
+    flatten: true
+  ci:
+    taskfile: ./taskfile/ci.yml
+    dir: .
+    flatten: true
+  frontend:
+    taskfile: ./taskfile/frontend.yml
+    dir: .
+    flatten: true
+  repository:
+    taskfile: ./taskfile/repository.yml
+    dir: .
+    flatten: true
+  codex:
+    taskfile: ./taskfile/codex.yml
     dir: .
     flatten: true
   release:
@@ -19,3 +35,9 @@ includes:
   docs:
     taskfile: ./taskfile/docs.yml
     dir: .
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list
