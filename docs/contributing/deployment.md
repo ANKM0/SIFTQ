@@ -1,5 +1,13 @@
 # Cloudflare Workers / D1 のデプロイ
 
+Release と Worker デプロイの判断は [ADR 0034](../adr/0034-separate-release-and-worker-deployment.md) に従う。Release-only の手順は [Release](release.md) を参照する。
+
+## デプロイ対象の判断
+
+- Worker 実行成果物、D1 migration、または本番 secrets・設定を変更する場合は Worker をデプロイする。
+- taqt、開発環境、CI、文書のみの変更は GitHub Release の対象にできるが、Worker はデプロイしない。
+- デプロイする Release は、対象 SHA に固定したタグの clean な専用 worktree から実行する。
+
 ## 前提
 
 - Cloudflare アカウントがある。
@@ -69,3 +77,4 @@ task deploy
 - 未認証では `/login` が表示され、ログイン後に Matrix UI が表示される。
 - task の作成・更新・DnD 並べ替えが保存される。
 - `bun x wrangler d1 migrations list siftq --remote` で適用済み migration を確認できる。
+- Release Notes に対象 SHA、Worker デプロイ有無、migration 確認、本番確認結果を記録する。
