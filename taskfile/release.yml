@@ -1,0 +1,50 @@
+version: "3"
+
+tasks:
+  release:plan:
+    desc: Print a read-only release plan.
+    cmds:
+      - uv run python scripts/release_deploy.py plan {{.CLI_ARGS}}
+
+  release:version:
+    desc: Update package version before committing a release commit.
+    cmds:
+      - uv run python scripts/release_deploy.py version {{.CLI_ARGS}}
+
+  release:create:
+    desc: Create and push an annotated release tag at the checked-out SHA.
+    cmds:
+      - uv run python scripts/release_deploy.py release {{.CLI_ARGS}}
+
+  deploy:plan:
+    desc: Print deployment prerequisites without changing state.
+    cmds:
+      - uv run python scripts/release_deploy.py plan {{.CLI_ARGS}}
+
+  deploy:release:
+    desc: Verify a release tag and deploy the Worker.
+    cmds:
+      - uv run python scripts/release_deploy.py deploy {{.CLI_ARGS}}
+
+  deploy:
+    desc: Deploy the Worker to Cloudflare.
+    cmds:
+      - bun x wrangler deploy
+
+  deploy:secrets:
+    desc: Set Worker auth secrets on Cloudflare.
+    cmds:
+      - |
+        set -eu
+        password="${AUTH_PASSWORD:-}"
+        secret="${SESSION_SECRET:-}"
+        if [ -z "$password" ]; then
+          printf 'AUTH_PASSWORD: '
+          IFS= read -r password
+        fi
+        if [ -z "$secret" ]; then
+          printf 'SESSION_SECRET: '
+          IFS= read -r secret
+        fi
+        printf '%s' "$password" | bun x wrangler secret put AUTH_PASSWORD
+        printf '%s' "$secret" | bun x wrangler secret put SESSION_SECRET
