@@ -18,7 +18,7 @@
 | [ADR 0012: taqt 中心の loop engineering 実行方針](0012-adopt-taqt-centered-loop-engineering-policy.md) | Accepted. | Issue を要求の正本、taqt run を実行記録とし、外部連携を script adapter に分離する。 |
 | [ADR 0013: worktree ごとの graphify 更新 Task](0013-worktree-scoped-graphify-update-task.md) | Accepted. | `task graphify:update` は worktree root を更新し、runtime 不在時は導入方法を含むエラーで止める。 |
 | [ADR 0014: `repo:pull-main` の pull と graphify 更新](0014-repo-pull-main-guards.md) | Accepted. | main 以外または dirty worktree では pull せず、pull が成功して HEAD が更新された場合だけ graphify を更新する。 |
-| [ADR 0015: worktree ごとの Codex 設定保存先と起動 Task](0015-worktree-scoped-codex-home.md) | Accepted. | `CODEX_HOME` を worktree root 基準の profile 別パスへ解決し、Codex 起動 Task と profile 切替が同じ保存先を使う。 |
+| [ADR 0015: 共有 Codex home とモデル profile](0015-worktree-scoped-codex-home.md) | Accepted. | skills・認証・session は `~/.codex` を共有し、モデルは静的 CLI profile、作業対象は worktree で分離する。 |
 | [ADR 0016: worktree ごとの `git pull` 振り分け shell function](0016-worktree-scoped-git-pull-shell-function.md) | Accepted. | Yoriwake の interactive shell で、SIFTQ worktree 内の引数なし `git pull` だけを `task repo:pull-main` へ振り分ける。 |
 | [ADR 0017: `.learnings` を共有追跡成果物として維持する](0017-keep-learnings-tracked-as-shared-artifacts.md) | Accepted. | `.learnings/LEARNINGS.md` など 3 ファイルは追跡対象かつ PR レビュー・マージ対象のまま維持し、`.learnings/` は ignore しない。 |
 | [ADR 0018: Adopt HTML-driven UI with JSON only for DnD](0018-adopt-html-driven-ui-with-json-only-for-dnd.md) | Accepted. | 画面・フォームは HTML 駆動、JSON は DnD 確定のみに限定する。 |

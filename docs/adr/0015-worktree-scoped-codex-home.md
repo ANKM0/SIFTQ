@@ -1,46 +1,52 @@
-# ADR 0015: worktree ごとの Codex 設定保存先と起動 Task
+# ADR 0015: 共有 Codex home とモデル profile
 
 ## 決定
 
-- `CODEX_HOME` は profile ごとの相対パス `.taqt/codex-home/<profile>` を worktree root 基準で解決する。
-  - main worktree では `<repository>/.taqt/codex-home/<profile>`。
-  - 各 taqt worktree では `<repository>/.taqt/worktrees/<task>/.taqt/codex-home/<profile>`。
-- `taqt:run`、`taqt:auto`、`taqt:worker` が Codex を起動する loop 実行時は、解決済みの `CODEX_HOME` を main / deepseek の両 profile で子プロセスへ渡す。
-- `taqt:switch:main` / `taqt:switch:deepseek` は同じ解決済み `CODEX_HOME` へ profile 設定を書き込み、`codex login` / `codex logout` も同じ `CODEX_HOME` で実行する。
-- `--codex-home` による CLI override を最優先し、次に profile の `codex_home`、最後に profile ごとの既定値を使う。
-- `.taqt/codex-home/` は worktree ごとのローカル成果物として Git の追跡対象外とする。
+- `CODEX_HOME` は通常の taqt 実行で設定しない。Codex の既定 `/home/develop/.codex` を共有する。
+- モデルと provider は静的な Codex CLI profile で分離する。
+  - `deepseek`: DeepSeek 公式 API の `deepseek-v4-pro`。
+  - `deepseek0731`: OpenRouter の `deepseek/deepseek-v4-flash-0731`。
+- profile ごとの catalog JSON は `/home/develop/.codex/models/` に置き、実行中は生成・書換えない。
+- taqt は `codex exec --cd <worktree> --profile <profile>` を使う。
+  - design は `deepseek`。
+  - test / implement / fix / checker は `deepseek0731`。
+- `--codex-home` は診断用の明示 override として残す。
 
-### 決定の理由
+## 理由
 
-- worktree ごとに Codex の config / model / auth を分離し、`/model` や profile 切替の変更が他 worktree へ波及するのを防ぐため。
-- 相対パスを worktree root 基準で解決することで、main と各 taqt worktree で安定した別々の保存先を再現できるため。
-- Taskfile に path を直書きせず、repository script と profile 設定を正本にして知識の重複を避けるため（ADR 0001）。
+worktree ごとの `.taqt/codex-home/` は model 設定だけでなく skills、認証、plugins、session 履歴も
+分散させる。共有 home と静的 profile に分けることで、それらを一箇所に保ちつつモデルの変更範囲を
+profile 単位へ限定できる。
+
+編集対象の分離は Codex home ではなく `--cd <worktree>` と Git worktree が担う。
+
+## 運用
+
+- `task codex:profiles:init` は不足する DeepSeek profile / catalog だけを作成し、既存ファイルを上書きしない。
+  `config.toml` は利用者の OpenAI 設定であり、作成・更新・検証の対象外とする。
+- `task codex:profiles:check` は profile、catalog、必要な API key 環境変数を検証する。
+- `task codex:codex` は既定 OpenAI 設定、`task codex:deepseek` は Flash 0731、
+  `task codex:deepseek:pro` は Pro を使う。
+- API key は `DEEPSEEK_API_KEY` と `OPENROUTER_API_KEY` の環境変数から渡す。TOML、Git、taqt run
+  artifact へ保存しない。
+- 外部 provider profile は共有している ChatGPT login を変更しない。`forced_login_method` は設定しない。
 
 ## 不採用
 
-- 全 worktree で `~/.codex-deepseek` を共有する。
-  - worktree 間で設定変更が波及し、分離の目的を満たさないため。
-- カレントディレクトリ基準で `CODEX_HOME` を解決する。
-  - 呼び出し位置によって保存先が変わり、安定した割り当てにならないため。
-- ハッシュ値だけの保存先を使う。
-  - worktree との対応が読み取りにくく、利用者が設定を確認・削除しにくいため。
+- worktree ごとの `.taqt/codex-home/`
+  - skills・sessionまで不要に分離し、設定生成が実行時の競合要因になるため。
+- 共通のモデル catalog
+  - 一つのモデルの capability 変更が別 profile に波及するため。
+- Docker によるモデル分離
+  - profile 選択を解決せず、skills・sessionを共有するには結局 home の mount が必要なため。
 
-## 補足情報
+## 移行
 
-### 背景
+旧 `switch_codex_profile.py`、qwen profile、`.taqt/scripts/taqt/deepseek.py`、
+`.taqt/scripts/taqt/qwen.py`、`taqt:switch:*` は削除する。既存の `.taqt/codex-home/` は Git 管理外の
+旧成果物であり、動作確認後に利用者が削除する。
 
-- Codex の既定設定は `~/.codex` を共有するため、worktree ごとの設定変更を分離できない。
-- taqt の loop 実行は `task_run` が子プロセスへ `CODEX_HOME` を渡す唯一の入口であり、profile 切替も同じ保存先へ揃える必要がある。
+## 参考
 
-### 制約事項
-
-- main profile の設定は利用者が `~/.codex/config.main.toml` に保持する main 用テンプレート、または `~/.codex/backup-deepseek/config.toml` から worktree の `CODEX_HOME` へ複製する。
-- main profile の認証は worktree ごとの `CODEX_HOME` に対して `codex login` を実行して確立する。
-- deepseek profile は API key を `DEEPSEEK_API_KEY` から受け取り、認証情報を config へ書き込まない（ADR 0011 の reasoning effort 解決は変更しない）。
-- `taqt:switch:main` / `taqt:switch:deepseek` の許可 rule は既存 Taskfile 名のままのため、`.codex/rules/siftq.rules` の追加変更は不要。
-
-## 参考リンク
-
-- [Issue #174](https://github.com/ANKM0/SIFTQ/issues/174)
-- [ADR 0001](0001-skill-orchestrated-repository-scripts.md)
+- [Issue #273](https://github.com/ANKM0/SIFTQ/issues/273)
 - [ADR 0011](0011-resolve-loop-reasoning-effort-in-codex-adapter.md)

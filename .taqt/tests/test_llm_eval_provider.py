@@ -29,7 +29,7 @@ def test_chat_base_url_preserves_v1() -> None:
 
 def test_build_provider_for_deepseek() -> None:
     config = {
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-v4-pro",
         "model_provider": "deepseek",
         "model_providers": {
             "deepseek": {
@@ -39,7 +39,7 @@ def test_build_provider_for_deepseek() -> None:
     }
     result = provider.build_provider(config)
     assert result == {
-        "id": "deepseek:chat:deepseek-v4-flash",
+        "id": "deepseek:chat:deepseek-v4-pro",
         "config": {"apiBaseUrl": "https://api.deepseek.com/v1"},
     }
 
@@ -53,6 +53,22 @@ def test_build_provider_for_openai() -> None:
     assert provider.build_provider(config) == {
         "id": "openai:chat:gpt-5-mini",
         "config": {},
+    }
+
+
+def test_build_provider_for_openrouter() -> None:
+    config = {
+        "model": "qwen/qwen3.8-flash",
+        "model_provider": "openrouter",
+        "model_providers": {
+            "openrouter": {
+                "base_url": "https://openrouter.ai/api/v1",
+            }
+        },
+    }
+    assert provider.build_provider(config) == {
+        "id": "openrouter:chat:qwen/qwen3.8-flash",
+        "config": {"apiBaseUrl": "https://openrouter.ai/api/v1"},
     }
 
 

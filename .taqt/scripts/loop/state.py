@@ -1,7 +1,11 @@
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+SUCCESS_LOG_TAIL_CHARS = 2_000
 
 
 def utc_now() -> str:
@@ -45,6 +49,35 @@ def append_event(run_dir: Path, event: dict[str, Any]) -> dict[str, Any]:
     with (run_dir / "events.jsonl").open("a", encoding="utf-8") as file:
         file.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
     return payload
+
+
+def compact_successful_agent_response(
+    response: dict[str, Any], *, next_step: str
+) -> dict[str, Any]:
+    """Replace successful agent transcripts with bounded diagnostic metadata."""
+    if response.get("status") != "success":
+        return dict(response)
+
+    compacted = {
+        key: value for key, value in response.items() if key not in {"stdout", "stderr"}
+    }
+    compacted["log"] = {
+        "format": "success-summary-v1",
+        "next_step": next_step,
+        "validation": "pending",
+        "stdout": _summarize_log_text(response.get("stdout")),
+        "stderr": _summarize_log_text(response.get("stderr")),
+    }
+    return compacted
+
+
+def _summarize_log_text(value: object) -> dict[str, str | int]:
+    text = value if isinstance(value, str) else ""
+    return {
+        "characters": len(text),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "tail": text[-SUCCESS_LOG_TAIL_CHARS:],
+    }
 
 
 def load_events(run_dir: Path) -> list[dict[str, Any]]:

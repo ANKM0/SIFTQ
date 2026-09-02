@@ -43,7 +43,7 @@ describe("Matrix page", () => {
     expect(body).toContain("axis-line--horizontal");
     expect(body).toContain("axis-line--vertical");
     expect(body).toContain('data-task-id="task-1"');
-    expect(body).toContain('href="/tasks/new?area=1"');
+    expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
     expect(body).toContain('href="/tasks/task-1?from=matrix"');
     expect(body).toContain("status--do");
   });
@@ -118,6 +118,100 @@ describe("Task creation", () => {
     expect(body).toContain("status area-badge");
     expect(body).toContain('name="area" value="3"');
     expect(body).toContain("Apply area to this task");
+  });
+});
+
+describe("Task creation origin tracking", () => {
+  it("renders cancel returning to origin from the task list", async () => {
+    const body = await (await request("/tasks/new?from=tasks&area=3&status=done")).text();
+
+    expect(body).toContain('href="/tasks"');
+    expect(body).toContain("New task");
+    expect(body).toContain("Cancel");
+  });
+
+  it("renders cancel returning to the matrix from a matrix origin", async () => {
+    const body = await (await request("/tasks/new?from=matrix&area=2&status=do")).text();
+
+    expect(body).toContain('href="/"');
+    expect(body).toContain("New task");
+    expect(body).toContain("Cancel");
+  });
+
+  it("renders cancel returning to the task list when origin is omitted", async () => {
+    const body = await (await request("/tasks/new?area=1")).text();
+
+    expect(body).toContain('href="/tasks"');
+  });
+
+  it("renders area creation links from the matrix with the matrix origin", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
+
+    const body = await (await request("/")).text();
+
+    expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
+    expect(body).toContain('href="/tasks/new?area=2&amp;from=matrix"');
+  });
+
+  it("preserves the origin while selecting status and area", async () => {
+    const body = await (await request("/tasks/new?from=tasks&area=3&status=do&menu=status")).text();
+
+    expect(body).toContain('href="/tasks/new?status=done&amp;area=3&amp;menu=status&amp;from=tasks"');
+    expect(body).toContain('status=do&amp;area=3&amp;menu=status&amp;from=tasks');
+  });
+
+  it("renders the task list New task link with the tasks origin", async () => {
+    const body = await (await request("/tasks")).text();
+
+    expect(body).toContain('href="/tasks/new?from=tasks"');
+  });
+});
+
+describe("Task detail Save form", () => {
+  it("renders a Save form when opened from the task list", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1?from=tasks");
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain('method="post"');
+    expect(body).toContain('action="/tasks/task-1?from=tasks"');
+    expect(body).toContain('hx-post="/tasks/task-1?from=tasks"');
+    expect(body).toContain('name="version" value="3"');
+    expect(body).toContain('<button class="button primary" type="submit">Save</button>');
+    expect(body).toContain('href="/tasks"');
+  });
+
+  it("saves edits submitted from the task-list detail form", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1?from=tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        title: "updated task",
+        description: "updated description",
+        version: "3",
+      }).toString(),
+    });
+    const body = await response.text();
+    const saved = await repo.find("task-1", "local");
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("updated task");
+    expect(body).toContain("updated description");
+    expect(body).toContain('href="/tasks"');
+    expect(saved).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({
+          title: "updated task",
+          description: "updated description",
+          version: 4,
+        }),
+      }),
+    );
   });
 });
 

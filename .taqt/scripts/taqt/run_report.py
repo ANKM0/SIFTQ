@@ -51,10 +51,14 @@ def _event_line(event: dict[str, Any]) -> str:
         )
     if event_type == "agent_response":
         response = event.get("response", {})
-        return (
+        lines = [
             f"- agent `{event.get('step')}`: "
             f"{response.get('status')} ({response.get('mode')})"
-        )
+        ]
+        log = response.get("log")
+        if isinstance(log, dict) and log.get("format") == "success-summary-v1":
+            lines.extend(_success_log_lines(response, log))
+        return "\n".join(lines)
     if event_type == "design_artifact":
         artifact_path = event.get("artifact_path")
         return (
@@ -65,6 +69,30 @@ def _event_line(event: dict[str, Any]) -> str:
     if event_type == "terminal":
         return f"- terminal `{event.get('step')}`"
     return f"- {event_type}: `{event.get('step') or event.get('reason')}`"
+
+
+def _success_log_lines(response: dict[str, Any], log: dict[str, Any]) -> list[str]:
+    changed_paths = response.get("changed_paths")
+    changed = changed_paths if isinstance(changed_paths, list) else []
+    paths = ", ".join(f"`{path}`" for path in changed if isinstance(path, str))
+    changed_line = f"  - changed: {len(changed)}"
+    if paths:
+        changed_line += f" — {paths}"
+
+    lines = [changed_line]
+    artifact_path = response.get("artifact_path")
+    if isinstance(artifact_path, str):
+        lines.append(f"  - artifact: `{artifact_path}`")
+    lines.append(f"  - validation: {log.get('validation', 'pending')}")
+    lines.append(f"  - next: `{log.get('next_step', 'done')}`")
+    lines.append(f"  - omitted: {_log_size(log, 'stdout')}; {_log_size(log, 'stderr')}")
+    return lines
+
+
+def _log_size(log: dict[str, Any], stream: str) -> str:
+    stream_log = log.get(stream)
+    characters = stream_log.get("characters", 0) if isinstance(stream_log, dict) else 0
+    return f"{stream} {characters} chars"
 
 
 if __name__ == "__main__":

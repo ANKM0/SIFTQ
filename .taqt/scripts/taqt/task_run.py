@@ -7,10 +7,12 @@ from loop.runner import run_loop
 from loop.state import utc_now
 
 from .github_labels import enabled_error
+from .profiles import load_profiles, resolve_codex_home, resolve_profile
+from .self_improvement import request_self_improvement
 from .task_store import (
     DEFAULT_TASK_ROOT,
-    decomposition_errors,
     block_task,
+    decomposition_errors,
     load_task,
     next_pending_task,
     readiness_errors,
@@ -18,9 +20,6 @@ from .task_store import (
     save_task,
     triage_task,
 )
-from .self_improvement import request_self_improvement
-from .deepseek import ensure_codex_home
-from .profiles import load_profiles, resolve_codex_home, resolve_profile
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
 
@@ -100,21 +99,25 @@ def main(argv: list[str] | None = None) -> int:
 
     loop_name = str(profile_spec["loop"])
     loop_path = args.loop_root / f"{loop_name}.yaml"
-    codex_home = resolve_codex_home(
-        profile_spec,
-        args.workspace,
-        profile=profile,
-        override=args.codex_home,
-    )
-    child_environment: dict[str, str] = {"CODEX_HOME": str(codex_home)}
-    if profile == "deepseek":
-        env_key = str(profile_spec.get("env_key") or "DEEPSEEK_API_KEY")
-        api_key = os.environ.get(env_key) or _prompt_api_key()
+    child_environment: dict[str, str] = {}
+    if args.codex_home is not None:
+        codex_home = resolve_codex_home(
+            profile_spec,
+            args.workspace,
+            profile=profile,
+            override=args.codex_home,
+        )
+        child_environment["CODEX_HOME"] = str(codex_home)
+    env_keys = profile_spec.get("env_keys", [])
+    if not isinstance(env_keys, list) or not all(isinstance(key, str) and key for key in env_keys):
+        print(f"taqt profile {profile} has invalid env_keys.")
+        return 2
+    for env_key in env_keys:
+        api_key = os.environ.get(env_key) or _prompt_api_key(env_key)
         if not api_key:
             print(f"{env_key} is required.")
             return 2
-        ensure_codex_home(codex_home)
-        child_environment["DEEPSEEK_API_KEY"] = api_key
+        child_environment[env_key] = api_key
 
     task["status"] = "running"
     task["worker"] = {"id": args.worker_id, "started_at": utc_now(), "heartbeat_at": utc_now()}
@@ -189,9 +192,9 @@ def _resume_error(task: dict[str, object], resume_dir: Path) -> str | None:
     return None
 
 
-def _prompt_api_key() -> str:
+def _prompt_api_key(env_key: str) -> str:
     try:
-        return getpass.getpass("DeepSeek API key: ").strip()
+        return getpass.getpass(f"{env_key}: ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
 

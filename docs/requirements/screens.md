@@ -25,6 +25,7 @@
   - 縦軸は `重要度`、横軸は `緊急度` とする。
   - task card は title のみを表示する。
   - task card は matrix 上で drag and drop できる。
+  - task card 以外の空白部分を押下すると、その area を選択済みとして `/tasks/new?area=<area>` へ遷移する。
 
 - `Task list` (`/tasks`)
   - 全 task を一覧表示する。
@@ -44,18 +45,24 @@
   - status と area は右側 metadata として表示する。
   - status と area はそれぞれの popover から選択する。選択内容は `Create` まで保存しない。
   - 初期値は `status = do`、`area = 1` とする。
-  - `Cancel` は一覧へ戻る。
+  - `from` query で遷移元を受け取る。`from=matrix` は Matrix、`from=tasks` または省略時は Task list とする。
+  - Matrix の New task と area 新規作成リンクは `from=matrix` を付与し、Task list の New task は `from=tasks` を付与する。
+  - `status` / `area` の query 指定は従来どおり初期値へ反映し、`from` と同時に指定できる。`/tasks/new?area=<area>` は指定 area を初期選択する。
+  - `Status` / `Area` の選択中も `from` を保持する。
+  - `Cancel` は `from` に従い遷移元へ戻る。
   - `Create` は task を作成して detail へ進む。
 
 - `Status popover`
   - new task または detail 画面上で status 選択 popover を開いた状態を表す。
   - 選択肢は `do / done / skip` とする。
   - 完成 UI では同じ detail surface 上で開く。
+  - popover と Status / Area サイドパネルの外側を押下すると、現在の選択を保持して通常表示へ戻る。
 
 - `Area popover`
   - new task または detail 画面上で area 選択 popover を開いた状態を表す。
   - 選択肢は `1 / 2 / 3 / 4` とする。
   - 完成 UI では同じ detail surface 上で開く。
+  - popover と Status / Area サイドパネルの外側を押下すると、現在の選択を保持して通常表示へ戻る。
 
 ## 画面遷移
 

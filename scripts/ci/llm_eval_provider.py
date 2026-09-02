@@ -40,6 +40,12 @@ def build_provider(config: dict) -> dict:
             provider["config"]["apiBaseUrl"] = chat_base_url(base_url)
         return provider
 
+    if provider_name == "openrouter":
+        provider = {"id": f"openrouter:chat:{model}", "config": {}}
+        if isinstance(base_url, str) and base_url:
+            provider["config"]["apiBaseUrl"] = base_url
+        return provider
+
     if provider_name == "openai":
         provider = {"id": f"openai:chat:{model}", "config": {}}
         if isinstance(base_url, str) and base_url:

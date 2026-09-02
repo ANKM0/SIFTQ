@@ -14,6 +14,7 @@ from loop.llm import run_agent
 from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
+from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
 from loop.verification import run_verification, validate_review
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
@@ -39,7 +40,6 @@ from taqt.github_merge import main as github_merge_main
 from taqt.github_merge import find_pr
 from taqt.github_sync import main as github_sync_main
 from taqt.task_create import main as task_create_main
-from taqt.deepseek import ensure_codex_home
 from taqt.profiles import load_profiles, resolve_profile
 
 
@@ -259,37 +259,16 @@ blocked_reason: null
     assert state["status"] == "done"
 
 
-def test_deepseek_codex_home_writes_provider_and_catalog_without_key(tmp_path: Path) -> None:
-    config_path = ensure_codex_home(tmp_path / "deepseek-home")
-    config = config_path.read_text(encoding="utf-8")
-    catalog = json.loads((config_path.parent / "models.json").read_text(encoding="utf-8"))
-
-    assert 'model = "deepseek-v4-flash"' in config
-    assert 'base_url = "https://api.deepseek.com/"' in config
-    assert 'wire_api = "responses"' in config
-    assert 'env_key = "DEEPSEEK_API_KEY"' in config
-    assert 'model_reasoning_effort = "low"' in config
-    assert 'model_auto_compact_token_limit = 120000' in config
-    assert "experimental_bearer_token" not in config
-    assert "DEEPSEEK_API_KEY" not in json.dumps(catalog)
-    assert {model["slug"] for model in catalog["models"]} == {
-        "deepseek-v4-flash",
-        "deepseek-v4-pro",
-    }
-    assert all("base_instructions" in model for model in catalog["models"])
-    assert all("instructions_template" in model["model_messages"] for model in catalog["models"])
-    assert all(model["auto_compact_token_limit"] == 120000 for model in catalog["models"])
-    assert all(model["default_reasoning_level"] == "low" for model in catalog["models"])
-
-
-def test_deepseek_loop_definition_uses_deepseek_for_all_agents() -> None:
+def test_deepseek_loop_definition_uses_pro_for_design_and_flash_for_implementation() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     loop = load_document(repository_root / ".taqt/loops/development_feedback_loop_deepseek.yaml")
 
     validate_loop_definition(loop)
     assert loop["agents"]["design"]["model"] == "deepseek-v4-pro"
-    assert loop["agents"]["implement"]["model"] == "deepseek-v4-flash"
-    assert loop["agents"]["checker"]["model"] == "deepseek-v4-flash"
+    assert loop["agents"]["design"]["profile"] == "deepseek"
+    assert loop["agents"]["implement"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert loop["agents"]["checker"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert loop["agents"]["implement"]["profile"] == "deepseek0731"
     assert "judge" not in loop["agents"]
 
 
@@ -303,8 +282,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
@@ -313,7 +293,7 @@ profiles:
 
     assert profiles["main"]["loop"] == "development_feedback_loop"
     assert profiles["deepseek"]["loop"] == "development_feedback_loop_deepseek"
-    assert profiles["deepseek"]["codex_home"] == "~/.codex-deepseek"
+    assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"]
 
 
 def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
@@ -494,6 +474,11 @@ input: {}
     assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
     assert artifact_event["summary"] == "Use the run artifact"
     assert artifact_event["status"] == "created"
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    response = response_event["response"]
+    assert "stdout" not in response
+    assert response["log"]["next_step"] == "done"
+    assert response["log"]["stdout"]["characters"] > 0
 
 
 def test_loop_runner_does_not_record_created_event_when_artifact_write_fails(
@@ -643,14 +628,19 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
 
     assert agents["checker"]["readonly"] is True
     assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["profile"] == "deepseek"
     assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek-v4-flash"
+    assert agents["test"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["test"]["profile"] == "deepseek0731"
     assert agents["test"]["reasoning_effort"] == "low"
-    assert agents["implement"]["model"] == "deepseek-v4-flash"
+    assert agents["implement"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["implement"]["profile"] == "deepseek0731"
     assert agents["implement"]["reasoning_effort"] == "low"
-    assert agents["fix"]["model"] == "deepseek-v4-flash"
+    assert agents["fix"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["fix"]["profile"] == "deepseek0731"
     assert agents["fix"]["reasoning_effort"] == "low"
-    assert agents["checker"]["model"] == "deepseek-v4-flash"
+    assert agents["checker"]["model"] == "deepseek/deepseek-v4-flash-0731"
+    assert agents["checker"]["profile"] == "deepseek0731"
     assert agents["checker"]["reasoning_effort"] == "low"
 
     step_ids = [step["id"] for step in steps]
@@ -937,6 +927,34 @@ def test_context_truncates_large_agent_events(tmp_path: Path) -> None:
     assert len(event["response"]["stderr"]) == 2_001
 
 
+def test_successful_agent_response_is_compacted_deterministically() -> None:
+    response = {
+        "status": "success",
+        "stdout": "a" * (SUCCESS_LOG_TAIL_CHARS + 1),
+        "stderr": "stderr output",
+        "changed_paths": ["src/example.py"],
+    }
+
+    compacted = compact_successful_agent_response(response, next_step="observe")
+
+    assert "stdout" not in compacted
+    assert "stderr" not in compacted
+    assert compacted["changed_paths"] == ["src/example.py"]
+    assert compacted["log"]["next_step"] == "observe"
+    assert compacted["log"]["validation"] == "pending"
+    assert compacted["log"]["stdout"]["characters"] == SUCCESS_LOG_TAIL_CHARS + 1
+    assert compacted["log"]["stdout"]["tail"] == "a" * SUCCESS_LOG_TAIL_CHARS
+    assert len(compacted["log"]["stdout"]["sha256"]) == 64
+
+
+def test_failed_agent_response_keeps_full_transcripts() -> None:
+    response = {"status": "failure", "stdout": "output", "stderr": "failure details"}
+
+    preserved = compact_successful_agent_response(response, next_step="human")
+
+    assert preserved == response
+
+
 def test_loop_guard_blocks_readonly_agent_workspace_changes(tmp_path: Path) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
@@ -954,7 +972,7 @@ steps:
     kind: llm
     agent: checker
     command: >-
-      python -c 'from pathlib import Path; Path("changed.txt").write_text("x")'
+      python -c 'from pathlib import Path; Path("changed.txt").write_text("x"); print("agent output")'
     next: post_review
   - id: post_review
     kind: post_review
@@ -1008,8 +1026,14 @@ blocked_reason: null
     )
 
     assert result["status"] == "human"
-    events = (Path(result["run_dir"]) / "events.jsonl").read_text(encoding="utf-8")
-    assert "readonly agent cannot write" in events
+    events = [
+        json.loads(line)
+        for line in (Path(result["run_dir"]) / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    response_event = next(event for event in events if event["type"] == "agent_response")
+    response = response_event["response"]
+    assert response["guard_error"] == "readonly agent cannot write: changed.txt"
+    assert response["stdout"] == "agent output\n"
 
 
 def test_loop_guard_allows_directory_itself_for_prefix_scope() -> None:
@@ -1238,8 +1262,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
@@ -1301,8 +1326,9 @@ profiles:
     loop: development_feedback_loop
   deepseek:
     loop: development_feedback_loop_deepseek
-    codex_home: ~/.codex-deepseek
-    env_key: DEEPSEEK_API_KEY
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENROUTER_API_KEY
 """,
         encoding="utf-8",
     )
@@ -1323,6 +1349,7 @@ steps:
         task_root=task_root,
     )
     monkeypatch.setenv("DEEPSEEK_API_KEY", "secret")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "qwen-secret")
 
     calls: list[dict[str, object]] = []
 
@@ -1352,6 +1379,7 @@ steps:
     assert exit_code == 0
     assert calls[0]["loop_path"].name == "development_feedback_loop_deepseek.yaml"
     assert calls[0]["child_environment"]["DEEPSEEK_API_KEY"] == "secret"
+    assert calls[0]["child_environment"]["OPENROUTER_API_KEY"] == "qwen-secret"
     assert calls[0]["child_environment"]["CODEX_HOME"] == str(deepseek_home)
 
 
@@ -2122,6 +2150,43 @@ def test_run_report_renders_design_artifact_reference() -> None:
 
     assert "[artifacts/design-decision.md](artifacts/design-decision.md)" in report
     assert "(created) / Use the run artifact" in report
+
+
+def test_run_report_renders_success_log_summary() -> None:
+    report = render_report(
+        {
+            "task_id": "ISSUE-260",
+            "status": "done",
+            "current_step": "done",
+            "iteration": 1,
+            "last_feedback": None,
+        },
+        [
+            {
+                "type": "agent_response",
+                "step": "implement",
+                "response": {
+                    "status": "success",
+                    "mode": "codex",
+                    "changed_paths": ["src/example.py"],
+                    "artifact_path": "artifacts/result.md",
+                    "log": {
+                        "format": "success-summary-v1",
+                        "validation": "pending",
+                        "next_step": "observe",
+                        "stdout": {"characters": 120},
+                        "stderr": {"characters": 340},
+                    },
+                },
+            }
+        ],
+    )
+
+    assert "changed: 1 — `src/example.py`" in report
+    assert "artifact: `artifacts/result.md`" in report
+    assert "validation: pending" in report
+    assert "next: `observe`" in report
+    assert "omitted: stdout 120 chars; stderr 340 chars" in report
 
 
 def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:

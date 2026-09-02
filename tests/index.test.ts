@@ -18,4 +18,22 @@ describe("smoke", () => {
     expect(response.headers.get("content-type")).toContain("application/javascript");
     expect(await response.text()).toContain("xhr.status !== 409");
   });
+
+  it("serves the popover dismissal handler without authentication", async () => {
+    const response = await app.request("/popover-dismiss.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/javascript");
+    expect(await response.text()).toContain("window.location.assign");
+  });
+
+  it("serves the matrix area navigation handler without authentication", async () => {
+    const response = await app.request("/matrix-dnd.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/javascript");
+    const body = await response.text();
+    expect(body).toContain('closest(".area--quadrant[data-drop-area]")');
+    expect(body).toContain('window.location.assign("/tasks/new?area=" + encodeURIComponent(area) + "&from=matrix")');
+  });
 });

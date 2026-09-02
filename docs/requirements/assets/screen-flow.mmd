@@ -22,14 +22,18 @@ flowchart TB
   P01 -->|"Tasks 押下"| P02
   P00 -->|"ログイン成功"| P01
   P02 -->|"Matrix 押下"| P01
-  P01 -->|"New task 押下"| P04
-  P02 -->|"New task 押下"| P04
-  P04 -->|"Cancel 押下"| P02
+  P01 -->|"New task 押下<br/>from=matrix"| P04
+  P01 -->|"area 1〜4 空白押下: area を引き継ぐ<br/>from=matrix"| P04
+  P02 -->|"New task 押下<br/>from=tasks"| P04
+  P04 -->|"Cancel 押下<br/>from=matrix"| P01
+  P04 -->|"Cancel 押下<br/>from=tasks / 省略"| P02
   P04 -->|"Create 押下"| P03
   P04 -->|"Status 押下"| P05
   P05 -->|"new task: status 選択"| P04
+  P05 -->|"外側押下: 現在の選択を保持"| P04
   P04 -->|"Area 押下"| P06
   P06 -->|"new task: area 選択"| P04
+  P06 -->|"外側押下: 現在の選択を保持"| P04
   P01 -->|"task card 押下"| P03
   P02 -->|"task row 押下"| P03
   P03 -->|"Tasks 押下"| P02
@@ -38,8 +42,10 @@ flowchart TB
   SAVE --> P03
   P03 -->|"Status 押下"| P05
   P05 -->|"detail: status 選択"| P03
+  P05 -->|"外側押下: 現在の選択を保持"| P03
   P03 -->|"Area 押下"| P06
   P06 -->|"detail: area 選択"| P03
+  P06 -->|"外側押下: 現在の選択を保持"| P03
   P05 -->|"Area 押下"| P06
   P06 -->|"Status 押下"| P05
   P01 -.->|"ドラッグ"| DND

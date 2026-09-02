@@ -3,7 +3,7 @@ import { NewTaskMeta } from "../src/components/NewTaskMeta";
 
 describe("NewTaskMeta", () => {
   it("renders the selected status menu while preserving the area", () => {
-    const html = String(<NewTaskMeta state={{ status: "done", area: 3, openMenu: "status" }} />);
+    const html = String(<NewTaskMeta state={{ status: "done", area: 3, openMenu: "status", from: "matrix" }} />);
 
     expect(html).toContain("Apply status to this task");
     expect(html).toContain("status=done&amp;area=3");
@@ -12,7 +12,7 @@ describe("NewTaskMeta", () => {
   });
 
   it("renders the selected area menu while preserving the status", () => {
-    const html = String(<NewTaskMeta state={{ status: "do", area: 2, openMenu: "area" }} />);
+    const html = String(<NewTaskMeta state={{ status: "do", area: 2, openMenu: "area", from: "tasks" }} />);
 
     expect(html).toContain("Apply area to this task");
     expect(html).toContain("status=do&amp;area=2");

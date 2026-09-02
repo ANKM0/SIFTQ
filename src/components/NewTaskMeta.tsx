@@ -5,15 +5,19 @@ import { AREA_DOT_CLASSES, STATUS_DESCRIPTIONS, STATUS_DOT_CLASSES } from "./Opt
 
 type OpenMenu = "status" | "area";
 
+export type NewTaskFrom = "matrix" | "tasks";
+
 export type NewTaskState = {
   status: TaskStatus;
   area: TaskArea;
   openMenu: OpenMenu | undefined;
+  from: NewTaskFrom;
 };
 
 function newTaskPath(state: NewTaskState): string {
   const query = new URLSearchParams({ status: state.status, area: String(state.area) });
   if (state.openMenu !== undefined) query.set("menu", state.openMenu);
+  query.set("from", state.from);
   return `/tasks/new?${query.toString()}`;
 }
 
