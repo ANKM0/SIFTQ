@@ -230,29 +230,6 @@ tasks:
     cmds:
       - uv run python scripts/repo_pull_main.py
 
-  deploy:
-    desc: Deploy the Worker to Cloudflare.
-    cmds:
-      - bun x wrangler deploy
-
-  deploy:secrets:
-    desc: Set Worker auth secrets on Cloudflare.
-    cmds:
-      - |
-        set -eu
-        password="${AUTH_PASSWORD:-}"
-        secret="${SESSION_SECRET:-}"
-        if [ -z "$password" ]; then
-          printf 'AUTH_PASSWORD: '
-          IFS= read -r password
-        fi
-        if [ -z "$secret" ]; then
-          printf 'SESSION_SECRET: '
-          IFS= read -r secret
-        fi
-        printf '%s' "$password" | bun x wrangler secret put AUTH_PASSWORD
-        printf '%s' "$secret" | bun x wrangler secret put SESSION_SECRET
-
   pytest:
     desc: Run pytest with optional file targets and additional arguments.
     cmds:

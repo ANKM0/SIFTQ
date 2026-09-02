@@ -24,6 +24,15 @@ Release はリポジトリ変更の配布単位であり、Cloudflare Workers �
 5. デプロイ対象なら、同じタグの worktree から [デプロイ手順](deployment.md) を実行する。Release-only なら Worker をデプロイしない。
 6. Release Notes に対象 SHA、デプロイ有無、migration の実施・確認、本番スモーク結果を記録する。
 
+## Task コマンド
+
+- `task release:plan -- --version vX.Y.Z --ref <sha> --base <tag>` は候補を読み取り専用で分類する。
+- `task release:version -- --version vX.Y.Z --execute` は `package.json` の version を更新する。差分を確認して release commit に含める。
+- `task release:create -- --version vX.Y.Z --ref HEAD --execute` は version 一致済みの clean worktree を注釈付きタグとして push する。
+- Worker デプロイは、タグを checkout した worktree で `task deploy:release -- --tag vX.Y.Z --execute` を実行する。
+
+`--execute` を付けない操作は外部状態を変更しない。タグ push、remote migration、Worker デプロイの直前には明示承認を得る。
+
 ## 本番確認
 
 デプロイ対象では、未認証時のログイン画面、ログイン後の主要な作成・更新操作、DnD を確認する。認証情報が必要な確認は、認証可能な担当者が実施結果を Release Notes に記録する。

@@ -9,6 +9,10 @@ includes:
     taskfile: ./taskfile/core.yml
     dir: .
     flatten: true
+  release:
+    taskfile: ./taskfile/release.yml
+    dir: .
+    flatten: true
   taqt:
     taskfile: ./taskfile/taqt.yml
     dir: .
