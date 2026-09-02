@@ -9,6 +9,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForLoadState("networkidle");
 }
 
 async function dismissPopover(page: Page, label: "status" | "area") {
