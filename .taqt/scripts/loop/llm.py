@@ -71,6 +71,7 @@ def run_agent(
         "exit_code": completed.returncode,
         "stdout": completed.stdout,
         "stderr": completed.stderr,
+        "parsed_json": bool(parsed),
     }
     if parsed:
         response.update(parsed)
@@ -146,6 +147,7 @@ def _run_codex(
         "exit_code": completed.returncode,
         "stdout": completed.stdout,
         "stderr": completed.stderr,
+        "parsed_json": bool(parsed),
     }
     if parsed:
         response.update(parsed)
@@ -164,6 +166,12 @@ def _build_prompt(
     context: dict[str, Any],
 ) -> str:
     role = agent.get("role") or step.get("agent") or "agent"
+    review_contract = (
+        "Return exactly one JSON object with status=success and verdict set to exactly one of "
+        "approve, changes_requested, or human_required. Do not modify files."
+        if agent.get("readonly")
+        else "Return JSON with at least a status field. Use status=success when the step is complete."
+    )
     return "\n".join(
         [
             f"Role: {role}",
@@ -172,7 +180,7 @@ def _build_prompt(
             "",
             "Use the repository files and task context to complete this step.",
             "Make the minimal scoped code or test changes required for this step.",
-            "Return JSON with at least a status field. Use status=success when the step is complete.",
+            review_contract,
             "Use status=failure and feedback when the loop should route to another step.",
             "",
             json.dumps(context, ensure_ascii=False, indent=2, sort_keys=True),

@@ -49,7 +49,7 @@ def validate_loop_definition(loop: dict[str, Any]) -> None:
             raise ValueError(f"duplicate step id: {step_id}")
         seen.add(step_id)
         kind = step.get("kind")
-        if kind not in {"commands", "policy", "llm", "terminal"}:
+        if kind not in {"commands", "policy", "llm", "verification", "post_review", "terminal"}:
             raise ValueError(f"step {step_id} has unsupported kind: {kind}")
 
     step_ids = set(seen)
@@ -156,6 +156,11 @@ def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: se
                 _validate_step_ref(step, key, step_ids)
         return
 
+    if kind in {"verification", "post_review"}:
+        for key in ("on_pass", "on_fix", "on_human"):
+            _validate_step_ref(step, key, step_ids)
+        return
+
 
 def _validate_reasoning_effort(payload: dict[str, Any], subject: str) -> None:
     if "reasoning_effort" not in payload:
@@ -205,4 +210,6 @@ def _next_steps(step: dict[str, Any]) -> list[str]:
             for key in ("next", "on_pass", "on_failure")
             if key in step
         ] or ["done"]
+    if kind in {"verification", "post_review"}:
+        return [step["on_pass"], step["on_fix"], step["on_human"]]
     return []
