@@ -66,11 +66,7 @@
 
 ## 画面遷移
 
-図の正本は Mermaid source の [`docs/requirements/assets/screen-flow.mmd`](assets/screen-flow.mmd) とする。
-生成物は [`docs/requirements/assets/screen-flow.svg`](assets/screen-flow.svg) とする。
-SVG は `bun run docs:screen-flow:svg` で再生成する。
-
-[画面遷移図 SVG を開く](assets/screen-flow.svg)
+![alt text](assets/screen-flow-fsm.svg)
 
 ## モック BE プレビュー
 
