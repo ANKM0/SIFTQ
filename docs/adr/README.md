@@ -38,3 +38,4 @@
 | [ADR 0032: Adopt Worker-managed shared-password authentication](0032-adopt-worker-managed-shared-password-authentication.md) | Accepted. | Worker 内の共有パスワード認証と署名付き Cookie でアクセスを制御する。 |
 | [ADR 0033: md2idx は Bun の devDependency として導入する](0033-introduce-md2idx-as-bun-devdependency.md) | Accepted. | `md2idx` を `package.json` の devDependency で導入し、`bun x md2idx` で実行する。 |
 | [ADR 0034: リリースと Worker デプロイを分離する](0034-separate-release-and-worker-deployment.md) | Accepted. | GitHub Release はリポジトリ変更、Worker デプロイは本番更新として分離し、変更種別で実施有無を判断する。 |
+| [ADR 0035: 画面遷移図の生成ツールとして、D2を採用する](0035-adopt-d2-for-screen-flow-diagram.md) | Accepted. | 画面遷移図の生成ツールとして、D2を採用する |
