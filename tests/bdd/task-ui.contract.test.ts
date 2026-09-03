@@ -76,18 +76,32 @@ describe("Task list page", () => {
 });
 
 describe("Task creation", () => {
-  it("creates a task and returns the detail page", async () => {
+  it("redirects to the task list after creating a task by default", async () => {
     const response = await request("/tasks", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ title: "Buy milk", description: "low-fat" }).toString(),
     });
-    const body = await response.text();
+    expect(response.status).toBe(201);
+    expect(response.headers.get("hx-redirect")).toBe("/tasks");
+    expect(await response.text()).toBe("");
+  });
 
-    expect([200, 201]).toContain(response.status);
-    expect(response.headers.get("hx-push-url")).toMatch(/^\/tasks\//);
-    expect(body).toContain("Buy milk");
-    expect(body).toContain('id="task-meta"');
+  it("redirects to the matrix after creating a task from the matrix", async () => {
+    const response = await request("/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ title: "Buy milk", from: "matrix" }).toString(),
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.headers.get("hx-redirect")).toBe("/");
+
+    const listed = await repo.list();
+    if (!listed.ok) throw new Error("expected task list");
+    expect(listed.value).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "Buy milk" })]),
+    );
   });
 
   it("creates a task with the selected status and area", async () => {
@@ -101,11 +115,8 @@ describe("Task creation", () => {
         area: "4",
       }).toString(),
     });
-    const body = await response.text();
-
     expect(response.status).toBe(201);
-    expect(body).toContain("status--done");
-    expect(body).toContain(">4</a>");
+    expect(response.headers.get("hx-redirect")).toBe("/tasks");
   });
 
   it("renders the new task page with cancel and side metadata", async () => {
@@ -136,6 +147,12 @@ describe("Task creation origin tracking", () => {
     expect(body).toContain('href="/"');
     expect(body).toContain("New task");
     expect(body).toContain("Cancel");
+  });
+
+  it("renders the matrix origin as a hidden form field", async () => {
+    const body = await (await request("/tasks/new?from=matrix")).text();
+
+    expect(body).toContain('name="from" value="matrix"');
   });
 
   it("renders cancel returning to the task list when origin is omitted", async () => {
