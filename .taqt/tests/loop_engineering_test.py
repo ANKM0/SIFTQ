@@ -2230,6 +2230,4 @@ def test_loop_policy_is_migrated_from_design_doc_to_adr() -> None:
     assert "docs/requirements/" in future_text
     assert "docs/adr/" in future_text
     assert "taqt run artifact" in future_text
-    wireframe_text = wireframe.read_text(encoding="utf-8")
-    assert "external design document" not in wireframe_text
-    assert "requirements" in wireframe_text
+    assert not wireframe.exists()
