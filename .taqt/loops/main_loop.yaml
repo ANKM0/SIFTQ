@@ -1,5 +1,10 @@
 version: 1
-id: development_feedback_loop_luna
+id: main_loop
+
+fallback:
+  profile: deepseek
+  model: deepseek-v4-pro
+  reasoning_effort: high
 
 limits:
   max_iterations: 12
@@ -31,14 +36,14 @@ agents:
   implement:
     role: implementation
     adapter: codex
-    profile: muse-spark-openrouter
-    model: meta/muse-spark-1.3
+    profile: muse-spark-opencode-free
+    model: muse-spark-1.3-contributor-free
     reasoning_effort: high
   fix:
     role: implementation_fixer
     adapter: codex
-    profile: muse-spark-openrouter
-    model: meta/muse-spark-1.3
+    profile: muse-spark-opencode-free
+    model: muse-spark-1.3-contributor-free
     reasoning_effort: high
   checker:
     role: checker
@@ -53,29 +58,24 @@ steps:
     kind: llm
     agent: design
     next: test
-
   - id: test
     kind: llm
     agent: test
     next: implement
-
   - id: implement
     kind: llm
     agent: implement
     next: verification
-
   - id: verification
     kind: verification
     on_pass: checker
     on_fix: decide
     on_human: human
-
   - id: fix
     kind: llm
     agent: fix
     next: verification
     on_failure: human
-
   - id: decide
     kind: policy
     routes:
@@ -91,20 +91,16 @@ steps:
         next: human
       - when: unknown
         next: human
-
   - id: checker
     kind: llm
     agent: checker
     next: post_review
-
   - id: post_review
     kind: post_review
     on_pass: done
     on_fix: fix
     on_human: human
-
   - id: done
     kind: terminal
-
   - id: human
     kind: terminal
