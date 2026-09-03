@@ -301,13 +301,11 @@ function parseTaskArea(value: unknown): Task["area"] | null {
 function parseNewTaskState(c: Context<AppEnv>): NewTaskState {
   const status = c.req.query("status");
   const area = c.req.query("area");
-  const menu = c.req.query("menu");
   const parsedArea = parseTaskArea(area);
 
   return {
     status: isTaskStatus(status) ? status : "do",
     area: parsedArea ?? 1,
-    openMenu: menu === "status" || menu === "area" ? menu : undefined,
     from: c.req.query("from") === "matrix" ? "matrix" : "tasks",
   };
 }
@@ -392,18 +390,16 @@ function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) 
       <div class="page-header">
         <h1 class="page-title">New task</h1>
       </div>
-      <div class="detail-grid">
-        <form class="form-panel" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
+      <form class="detail-grid" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
+        <div class="form-panel">
           <TitleField />
-          <input type="hidden" name="status" value={state.status} />
-          <input type="hidden" name="area" value={state.area} />
           <input type="hidden" name="from" value={state.from} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
           <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/" : "/tasks"} />
-        </form>
+        </div>
         <NewTaskMeta state={state} />
-      </div>
+      </form>
     </div>
   );
 }
@@ -650,7 +646,6 @@ app.post("/tasks", async (c) => {
   const state: NewTaskState = {
     status: isTaskStatus(status) ? status : "do",
     area: area ?? 1,
-    openMenu: undefined,
     from: newTaskOrigin(c, body),
   };
   if (isInvalidTaskTitle(title)) {

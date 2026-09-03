@@ -119,15 +119,15 @@ describe("Task creation", () => {
     expect(response.headers.get("hx-redirect")).toBe("/tasks");
   });
 
-  it("renders the new task page with cancel and side metadata", async () => {
-    const body = await (await request("/tasks/new?area=3&status=done&menu=area")).text();
+  it("renders the new task page with cancel and form-owned side metadata", async () => {
+    const body = await (await request("/tasks/new?area=3&status=done")).text();
 
     expect(body).toContain("New task");
     expect(body).toContain("Cancel");
     expect(body).toContain("Create");
     expect(body).toContain("status status--done");
     expect(body).toContain("status area-badge");
-    expect(body).toContain('name="area" value="3"');
+    expect(body).toContain('name="area" value="3" checked');
     expect(body).toContain("Apply area to this task");
   });
 });
@@ -170,11 +170,12 @@ describe("Task creation origin tracking", () => {
     expect(body).toContain('href="/tasks/new?area=2&amp;from=matrix"');
   });
 
-  it("preserves the origin while selecting status and area", async () => {
+  it("includes status and area choices in the create form", async () => {
     const body = await (await request("/tasks/new?from=tasks&area=3&status=do&menu=status")).text();
 
-    expect(body).toContain('href="/tasks/new?status=done&amp;area=3&amp;menu=status&amp;from=tasks"');
-    expect(body).toContain('status=do&amp;area=3&amp;menu=status&amp;from=tasks');
+    expect(body).toContain('<form class="detail-grid"');
+    expect(body).toContain('name="status" value="do" checked');
+    expect(body).toContain('name="area" value="3" checked');
   });
 
   it("renders the task list New task link with the tasks origin", async () => {
