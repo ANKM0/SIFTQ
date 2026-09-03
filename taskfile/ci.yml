@@ -117,6 +117,7 @@ tasks:
   ci:lint:codex-task-perms:
     desc: Check that Taskfile tasks are allowed in Codex rules.
     cmds:
+      - uv run python scripts/codex_rule_coverage.py --check
       - |
         set -eu
         tasks="$(mktemp)"
@@ -225,4 +226,3 @@ tasks:
           exit 0
         fi
         vp exec knip --config knip.json
-
