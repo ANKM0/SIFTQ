@@ -658,6 +658,54 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert checker["next"] == "post_review"
 
 
+def test_luna_loop_assigns_roles_to_luna_and_muse_spark() -> None:
+    loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop_luna.yaml"
+
+    loop = load_document(loop_path)
+    validate_loop_definition(loop)
+
+    assert loop["id"] == "development_feedback_loop_luna"
+    agents = loop["agents"]
+    steps = loop["steps"]
+    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
+
+    assert agents["design"]["profile"] == "luna-openrouter"
+    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["design"]["reasoning_effort"] == "xhigh"
+    assert agents["test"]["profile"] == "luna-openrouter"
+    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["test"]["reasoning_effort"] == "xhigh"
+    assert agents["implement"]["profile"] == "muse-spark-openrouter"
+    assert agents["implement"]["model"] == "meta/muse-spark-1.3"
+    assert agents["implement"]["reasoning_effort"] == "high"
+    assert agents["fix"]["profile"] == "muse-spark-openrouter"
+    assert agents["fix"]["model"] == "meta/muse-spark-1.3"
+    assert agents["fix"]["reasoning_effort"] == "high"
+    assert agents["checker"]["profile"] == "luna-openrouter"
+    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["checker"]["reasoning_effort"] == "xhigh"
+
+    assert agents["checker"]["readonly"] is True
+    assert ".taqt/loops/" in agents["design"]["writes"]
+    assert "docs/adr/" in agents["design"]["writes"]
+    assert "tests/" in agents["test"]["writes"]
+    assert ".taqt/tests/" in agents["test"]["writes"]
+
+    steps_by_id = {step["id"]: step for step in steps}
+    assert steps_by_id["fix"]["kind"] == "llm"
+    assert steps_by_id["fix"]["agent"] == "fix"
+
+    decide = steps_by_id["decide"]
+    assert decide["kind"] == "policy"
+    routes = {route["when"]: route["next"] for route in decide["routes"]}
+    assert routes["implementation_feedback"] == "fix"
+    assert routes["test_feedback"] == "fix"
+    assert routes["local_design_feedback"] == "design"
+    assert routes["specification_feedback"] == "human"
+    assert routes["product_feedback"] == "human"
+    assert routes["unknown"] == "human"
+
+
 def test_deepseek_loop_verification_and_decide_are_model_free() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "development_feedback_loop_deepseek.yaml"
 
