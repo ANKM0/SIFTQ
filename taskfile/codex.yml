@@ -37,6 +37,7 @@ tasks:
       - uv run python scripts/codex_profiles.py init
 
   codex:profiles:check:
-    desc: Validate shared Codex provider profiles and required API key environment variables.
+    desc: Validate shared Codex provider profiles, shared home paths, and required API key environment variables.
     cmds:
       - uv run python scripts/codex_profiles.py check --require-env
+      - uv run python scripts/codex_rule_coverage.py --check
