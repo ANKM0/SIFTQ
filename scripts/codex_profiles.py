@@ -84,6 +84,8 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
     catalog_dir = codex_home / MODEL_CATALOG_DIR
     deepseek_catalog = catalog_dir / "deepseek.json"
     flash_catalog = catalog_dir / "deepseek0731.json"
+    luna_catalog = catalog_dir / "luna-openrouter.json"
+    muse_catalog = catalog_dir / "muse-spark-openrouter.json"
     return {
         codex_home / "deepseek.config.toml": _profile_config(
             model="deepseek-v4-pro",
@@ -111,6 +113,34 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 'env_key = "OPENROUTER_API_KEY"',
             ],
         ),
+        codex_home / "luna-openrouter.config.toml": _profile_config(
+            model="openai/gpt-5.6-luna",
+            provider="openrouter",
+            effort="high",
+            catalog=luna_catalog,
+            provider_block=[
+                "[model_providers.openrouter]",
+                'name = "OpenRouter"',
+                'base_url = "https://openrouter.ai/api/v1"',
+                'wire_api = "responses"',
+                'env_key = "OPENROUTER_API_KEY"',
+                'namespace_tools = false',
+            ],
+        ),
+        codex_home / "muse-spark-openrouter.config.toml": _profile_config(
+            model="meta/muse-spark-1.3",
+            provider="openrouter",
+            effort="high",
+            catalog=muse_catalog,
+            provider_block=[
+                "[model_providers.openrouter]",
+                'name = "OpenRouter"',
+                'base_url = "https://openrouter.ai/api/v1"',
+                'wire_api = "responses"',
+                'env_key = "OPENROUTER_API_KEY"',
+                'namespace_tools = false',
+            ],
+        ),
         deepseek_catalog: json.dumps(
             _model_catalog(
                 slug="deepseek-v4-pro",
@@ -128,6 +158,28 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 display_name="DeepSeek V4 Flash 0731",
                 description="DeepSeek V4 Flash 0731 for routine coding tasks.",
                 efforts=["low", "high"],
+            ),
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        luna_catalog: json.dumps(
+            _model_catalog(
+                slug="openai/gpt-5.6-luna",
+                display_name="GPT-5.6 Luna",
+                description="GPT-5.6 Luna via OpenRouter for planning and review.",
+                efforts=["high", "xhigh", "medium", "low"],
+            ),
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        muse_catalog: json.dumps(
+            _model_catalog(
+                slug="meta/muse-spark-1.3",
+                display_name="Muse Spark 1.3",
+                description="Muse Spark 1.3 via OpenRouter for implementation tasks.",
+                efforts=["high", "medium", "low"],
             ),
             ensure_ascii=False,
             indent=2,
@@ -168,6 +220,22 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             "OPENROUTER_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "deepseek0731.json",
         ),
+        codex_home / "luna-openrouter.config.toml": (
+            "openai/gpt-5.6-luna",
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            codex_home / MODEL_CATALOG_DIR / "luna-openrouter.json",
+        ),
+        codex_home / "muse-spark-openrouter.config.toml": (
+            "meta/muse-spark-1.3",
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            codex_home / MODEL_CATALOG_DIR / "muse-spark-openrouter.json",
+        ),
+    }
+    namespace_tools_profiles = {
+        codex_home / "luna-openrouter.config.toml",
+        codex_home / "muse-spark-openrouter.config.toml",
     }
     for path, (model, provider, env_key, catalog_path) in profile_expectations.items():
         if not path.is_file():
@@ -184,6 +252,8 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
         provider_config = config.get("model_providers", {}).get(provider, {})
         if provider_config.get("env_key") != env_key:
             errors.append(f"unexpected env_key in {path}: expected {env_key}")
+        if path in namespace_tools_profiles and provider_config.get("namespace_tools") is not False:
+            errors.append(f"namespace_tools must be false in {path}")
         if config.get("model_catalog_json") != str(catalog_path):
             errors.append(f"unexpected model_catalog_json in {path}: expected {catalog_path}")
         if require_env and not os.environ.get(env_key):

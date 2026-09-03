@@ -21,12 +21,22 @@ tasks:
     cmds:
       - codex --profile deepseek {{.CLI_ARGS}}
 
+  codex:luna:
+    desc: Run Codex using the OpenRouter GPT-5.6-Luna profile.
+    cmds:
+      - codex --profile luna-openrouter {{.CLI_ARGS}}
+
+  codex:muse-spark:
+    desc: Run Codex using the OpenRouter Muse Spark 1.3 profile.
+    cmds:
+      - codex --profile muse-spark-openrouter {{.CLI_ARGS}}
+
   codex:profiles:init:
-    desc: Create missing shared DeepSeek Codex profiles without overwriting existing files.
+    desc: Create missing shared Codex provider profiles without overwriting existing files.
     cmds:
       - uv run python scripts/codex_profiles.py init
 
   codex:profiles:check:
-    desc: Validate shared DeepSeek Codex profiles and required API key environment variables.
+    desc: Validate shared Codex provider profiles and required API key environment variables.
     cmds:
       - uv run python scripts/codex_profiles.py check --require-env
