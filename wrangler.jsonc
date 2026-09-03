@@ -7,6 +7,7 @@
     {
       "binding": "DB",
       "database_name": "siftq",
+      "database_id": "20ca1496-cadc-4b40-9265-1d59d55d5b82",
       "migrations_dir": "migrations"
     }
   ]
