@@ -1,6 +1,11 @@
 version: 1
 id: development_feedback_loop
 
+fallback:
+  profile: luna-openrouter
+  model: openai/gpt-5.6-luna-pro
+  reasoning_effort: high
+
 limits:
   max_iterations: 12
   max_fix_attempts: 3

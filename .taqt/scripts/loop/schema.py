@@ -37,6 +37,7 @@ def validate_loop_definition(loop: dict[str, Any]) -> None:
         raise ValueError("loop.steps must be a non-empty list")
 
     _validate_limits(loop.get("limits"))
+    _validate_fallback(loop.get("fallback"))
     agents = _validate_agents(loop.get("agents"))
     seen: set[str] = set()
     for index, step in enumerate(steps, start=1):
@@ -213,3 +214,11 @@ def _next_steps(step: dict[str, Any]) -> list[str]:
     if kind in {"verification", "post_review"}:
         return [step["on_pass"], step["on_fix"], step["on_human"]]
     return []
+
+
+def _validate_fallback(value: Any) -> None:
+    if value is None: return
+    if not isinstance(value, dict): raise ValueError("loop.fallback must be a mapping")
+    if not isinstance(value.get("profile"), str) or not value["profile"]: raise ValueError("loop.fallback.profile is required")
+    if "model" in value and not isinstance(value["model"], str): raise ValueError("loop.fallback.model must be a string")
+    _validate_reasoning_effort(value, "loop.fallback")
