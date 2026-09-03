@@ -40,6 +40,7 @@ def run_agent(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             child_environment=child_environment,
+            fallback=loop_definition.get("fallback"),
         )
 
     if not command:
@@ -89,6 +90,7 @@ def _run_codex(
     cwd: Path,
     timeout_seconds: int,
     child_environment: Mapping[str, str] | None,
+    fallback: Any = None,
 ) -> dict[str, Any]:
     workspace = cwd.resolve()
     command = [
@@ -155,7 +157,24 @@ def _run_codex(
             response["status"] = "failure"
     if response["status"] != "success":
         response.setdefault("feedback", "unknown")
+        if isinstance(fallback, dict) and is_usage_limit_error(completed.stdout, completed.stderr):
+            fb_profile = fallback.get("profile")
+            if isinstance(fb_profile, str) and fb_profile:
+                fb_agent = {**agent, "profile": fb_profile}
+                if isinstance(fallback.get("model"), str): fb_agent["model"] = fallback["model"]
+                if isinstance(fallback.get("reasoning_effort"), str): fb_agent["reasoning_effort"] = fallback["reasoning_effort"]
+                retry = _run_codex(payload=payload, agent_id=agent_id, agent=fb_agent, step=step, cwd=cwd, timeout_seconds=timeout_seconds, child_environment=child_environment, fallback=None)
+                retry["fallback_used"] = True
+                retry["fallback_profile"] = fb_profile
+                retry["fallback_from_profile"] = profile
+                retry["initial_failure"] = {"exit_code": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
+                return retry
     return response
+
+
+def is_usage_limit_error(stdout: str, stderr: str) -> bool:
+    text = f"{stdout}\n{stderr}".lower()
+    return any(token in text for token in ("you've hit your usage limit", "usage limit", "usage_limit_reached", "rate_limit_reached"))
 
 
 def _build_prompt(
