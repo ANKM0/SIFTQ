@@ -151,6 +151,35 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
   await expect(page.locator("#task-meta .area-badge")).toHaveText("2");
 });
 
+async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: string) {
+  const title = `E2E ${kind} save ${Date.now()}`;
+
+  await page.goto("/tasks/new");
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create" }).click();
+  await page.getByText(title, { exact: true }).click();
+
+  await page.getByRole("link", { name: new RegExp(`^${kind === "status" ? "Status" : "Area"}`) }).click();
+  await page.locator(`[aria-label="Apply ${kind} to this task"] .status-choice`, { hasText: value }).click();
+  await page.getByLabel("Title").fill(`${title} saved`);
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.getByText(`${title} saved`, { exact: true })).toBeVisible();
+}
+
+test("saves after changing task status", async ({ page }) => {
+  await signIn(page);
+
+  await saveAfterMetaChange(page, "status", "done");
+});
+
+test("saves after changing task area", async ({ page }) => {
+  await signIn(page);
+
+  await saveAfterMetaChange(page, "area", "4");
+});
+
 test("persists an edit and displays a conflict from a stale editor", async ({ page }) => {
   await signIn(page);
 
