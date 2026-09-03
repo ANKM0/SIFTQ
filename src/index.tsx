@@ -209,6 +209,14 @@ function pageNav(path: string) {
   };
 }
 
+function redirectAfterTaskSave(c: Context<AppEnv>, path: string): Response {
+  if (c.req.header("HX-Request")) {
+    c.header("HX-Redirect", path);
+    return c.body(null);
+  }
+  return c.redirect(path);
+}
+
 function NewTaskLink({ from }: { from: NewTaskFrom }) {
   return (
     <a class="button primary" {...pageNav(`/tasks/new?from=${from}`)}>
@@ -306,6 +314,11 @@ function detailReturnTo(c: Context<AppEnv>): "matrix" | "tasks" {
   return c.req.query("from") === "matrix" ? "matrix" : "tasks";
 }
 
+function newTaskOrigin(c: Context<AppEnv>, body: ParsedBody): NewTaskFrom {
+  if (body["from"] === "matrix" || c.req.query("from") === "matrix") return "matrix";
+  return "tasks";
+}
+
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
@@ -380,6 +393,7 @@ function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) 
       <form class="detail-grid" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
         <div class="form-panel">
           <TitleField />
+          <input type="hidden" name="from" value={state.from} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
           <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/" : "/tasks"} />
@@ -632,7 +646,7 @@ app.post("/tasks", async (c) => {
   const state: NewTaskState = {
     status: isTaskStatus(status) ? status : "do",
     area: area ?? 1,
-    from: detailReturnTo(c),
+    from: newTaskOrigin(c, body),
   };
   if (isInvalidTaskTitle(title)) {
     return c.html(
@@ -646,8 +660,8 @@ app.post("/tasks", async (c) => {
   const inserted = await repository(c).insert(created.value);
   if (!inserted.ok) return c.text("Internal Server Error", 500);
 
-  c.header("HX-Push-Url", `/tasks/${created.value.id}`);
-  return c.html(<DetailPage task={inserted.value} />, 201);
+  c.header("HX-Redirect", state.from === "matrix" ? "/" : "/tasks");
+  return c.body(null, 201);
 });
 
 app.post("/tasks/:id", async (c) => {
@@ -669,7 +683,7 @@ app.post("/tasks/:id", async (c) => {
   const updated = { ...task, title, description, version };
   const saved = await persistTask(c, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-  return c.html(<DetailPage task={saved} returnTo={detailReturnTo(c)} />);
+  return redirectAfterTaskSave(c, detailReturnTo(c) === "matrix" ? "/" : "/tasks");
 });
 
 app.post("/tasks/:id/status", async (c) => {

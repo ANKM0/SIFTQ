@@ -67,7 +67,7 @@ test("keeps matrix task card navigation working", async ({ page }) => {
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
@@ -89,32 +89,46 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await page.getByLabel("Description").fill("created by Playwright");
   await page.getByRole("button", { name: "Create" }).click();
 
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
-  await expect(page.getByLabel("Title")).toHaveValue(taskTitle);
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.goto("/tasks");
   await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 });
 
+test("creates a task from the task list and returns to the task list", async ({ page }) => {
+  const taskTitle = `E2E list task ${Date.now()}`;
+
+  await signIn(page);
+  await page.goto("/tasks");
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").fill(taskTitle);
+  await page.getByRole("button", { name: "Create" }).click();
+
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+});
+
 test("keeps new-task inputs while changing Status and Area", async ({ page }) => {
+  const title = `Retained title ${Date.now()}`;
   await signIn(page);
 
   await page.goto("/tasks/new");
-  await page.getByLabel("Title").fill("Retained title");
+  await page.getByLabel("Title").fill(title);
   await page.getByLabel("Description").fill("Retained description");
 
   await page.locator("#new-task-meta details").first().locator("summary").click();
   await page.locator('input[name="status"][value="done"]').check();
-  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.getByLabel("Title")).toHaveValue(title);
   await expect(page.getByLabel("Description")).toHaveValue("Retained description");
 
   await page.locator("#new-task-meta details").nth(1).locator("summary").click();
   await page.locator('input[name="area"][value="4"]').check();
-  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.getByLabel("Title")).toHaveValue(title);
   await expect(page.getByLabel("Description")).toHaveValue("Retained description");
 
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await page.getByText(title, { exact: true }).click();
   await expect(page.locator("#task-meta .status--done")).toHaveText("done");
   await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
 });
@@ -122,9 +136,12 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
 test("dismisses task detail Status and Area popovers when clicking outside", async ({ page }) => {
   await signIn(page);
 
+  const title = `E2E popover task ${Date.now()}`;
   await page.goto("/tasks/new?status=do&area=2");
-  await page.getByLabel("Title").fill("E2E popover task");
+  await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await page.getByText(title, { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 
   await dismissPopover(page, "status");
@@ -137,18 +154,22 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
 test("persists an edit and displays a conflict from a stale editor", async ({ page }) => {
   await signIn(page);
 
+  const title = `E2E concurrent task ${Date.now()}`;
   await page.goto("/tasks/new?status=do&area=2");
-  await page.getByLabel("Title").fill("E2E concurrent task");
+  await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await page.getByText(title, { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 
   const staleEditor = await page.context().newPage();
   await staleEditor.goto(page.url());
-  await expect(staleEditor.getByLabel("Title")).toHaveValue("E2E concurrent task");
+  await expect(staleEditor.getByLabel("Title")).toHaveValue(title);
 
   await page.getByLabel("Title").fill("E2E saved task");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByLabel("Title")).toHaveValue("E2E saved task");
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.locator(".task-row").filter({ hasText: "E2E saved task" }).first()).toBeVisible();
 
   await staleEditor.getByLabel("Title").fill("E2E stale task");
   await staleEditor.getByRole("button", { name: "Save" }).click();
