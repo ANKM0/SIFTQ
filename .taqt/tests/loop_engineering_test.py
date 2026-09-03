@@ -1743,6 +1743,79 @@ def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
     assert "gh pr merge dev/#44_merge_flow --repo owner/repo --squash --delete-branch" in output
 
 
+def test_github_pr_waits_for_checks_and_falls_back_when_required_checks_are_not_configured(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=57,
+        loop="main_loop",
+        task_root=tmp_path,
+    )
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[:3] == ["gh", "pr", "list"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout='[{"number": 157, "url": "https://example.test/pull/157"}]',
+                stderr="",
+            )
+        if command[:3] == ["gh", "pr", "checks"] and "--required" in command:
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="",
+                stderr="no required checks reported on the branch\n",
+            )
+        return subprocess.CompletedProcess(command, 0, stdout="ci\tpass\n", stderr="")
+
+    monkeypatch.setattr("taqt.github_pr.subprocess.run", fake_run)
+    monkeypatch.setattr("taqt.github_merge.subprocess.run", fake_run)
+
+    assert github_pr_main([str(task_path), "--workspace", str(tmp_path), "--execute"]) == 0
+
+    command_list = [call[0] for call in commands]
+    assert command_list[0][:3] == ["gh", "pr", "list"]
+    assert command_list[1][:3] == ["gh", "pr", "edit"]
+    assert command_list[2][:4] == ["gh", "pr", "checks", "157"]
+    assert "--required" in command_list[2]
+    assert command_list[3][:4] == ["gh", "pr", "checks", "157"]
+    assert "--required" not in command_list[3]
+    assert "falling back to all PR checks" in capsys.readouterr().out
+
+
+def test_task_auto_stops_before_merge_when_pr_checks_fail(tmp_path: Path, monkeypatch) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=58,
+        loop="main_loop",
+        task_root=tmp_path,
+    )
+    calls = []
+
+    monkeypatch.setattr("taqt.task_auto.pr_main", lambda _args: 1)
+    monkeypatch.setattr("taqt.task_auto.merge_main", lambda _args: calls.append(_args) or 0)
+
+    assert task_auto_main(
+        [
+            str(task_path),
+            "--skip-run",
+            "--skip-commit",
+            "--skip-push",
+            "--merge",
+            "--workspace",
+            str(tmp_path),
+            "--execute",
+        ]
+    ) == 1
+    assert calls == []
+
+
 def test_github_merge_finds_open_pr_by_head_branch(tmp_path: Path, monkeypatch) -> None:
     calls = []
 

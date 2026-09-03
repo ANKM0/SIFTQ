@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from .github_labels import enabled_error
+from .github_merge import _checks_command, run_checks
 from .task_store import block_task, issue_branch, issue_ref, load_task
 
 
@@ -13,6 +14,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workspace", type=Path, default=Path("."))
     parser.add_argument("--base", default="main")
     parser.add_argument("--draft", action="store_true")
+    parser.add_argument("--watch-checks", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--required-checks", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--check-interval", type=int, default=10)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -44,6 +48,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.draft:
         command.append("--draft")
     print(" ".join(_quote(part) for part in command))
+    print(
+        " ".join(
+            _checks_command(
+                repo=str(source["repo"]),
+                selector=branch,
+                watch=args.watch_checks,
+                required=args.required_checks,
+                interval=args.check_interval,
+            )
+        )
+    )
     if not args.execute:
         return 0
     label_error = enabled_error(task)
@@ -65,8 +80,24 @@ def main(argv: list[str] | None = None) -> int:
             "--body",
             body,
         ]
-        return subprocess.run(edit_command, cwd=args.workspace, check=False).returncode
-    return subprocess.run(command, cwd=args.workspace, check=False).returncode
+        result = subprocess.run(edit_command, cwd=args.workspace, check=False).returncode
+    else:
+        result = subprocess.run(command, cwd=args.workspace, check=False).returncode
+    if result != 0 or not args.watch_checks:
+        return result
+
+    pr = existing or _find_existing_pr(repo=str(source["repo"]), branch=branch, cwd=args.workspace)
+    if pr is None:
+        print(f"No pull request found for branch {branch!r}.")
+        return 1
+    return run_checks(
+        repo=str(source["repo"]),
+        selector=str(pr["number"]),
+        cwd=args.workspace,
+        watch=True,
+        required=args.required_checks,
+        interval=args.check_interval,
+    )
 
 
 def _quote(value: str) -> str:
@@ -77,7 +108,19 @@ def _quote(value: str) -> str:
 
 def _find_existing_pr(*, repo: str, branch: str, cwd: Path) -> dict[str, object] | None:
     completed = subprocess.run(
-        ["gh", "pr", "view", "--repo", repo, "--head", branch, "--json", "number,url"],
+        [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--head",
+            branch,
+            "--state",
+            "open",
+            "--json",
+            "number,url",
+        ],
         cwd=cwd,
         text=True,
         stdout=subprocess.PIPE,
@@ -87,7 +130,9 @@ def _find_existing_pr(*, repo: str, branch: str, cwd: Path) -> dict[str, object]
     if completed.returncode != 0:
         return None
     payload = json.loads(completed.stdout)
-    return payload if isinstance(payload, dict) else None
+    if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+        return payload[0]
+    return None
 
 
 if __name__ == "__main__":
