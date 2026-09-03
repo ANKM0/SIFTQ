@@ -55,7 +55,7 @@ def test_openrouter_profiles_use_expected_models_and_namespace_tools(tmp_path: P
     luna = (tmp_path / "luna-openrouter.config.toml").read_text(encoding="utf-8")
     muse = (tmp_path / "muse-spark-openrouter.config.toml").read_text(encoding="utf-8")
 
-    assert 'model = "openai/gpt-5.6-luna"' in luna
+    assert 'model = "openai/gpt-5.6-luna-pro"' in luna
     assert 'model_provider = "openrouter"' in luna
     assert 'env_key = "OPENROUTER_API_KEY"' in luna
     assert 'namespace_tools = false' in luna

@@ -22,7 +22,7 @@ tasks:
       - codex --profile deepseek {{.CLI_ARGS}}
 
   codex:luna:
-    desc: Run Codex using the OpenRouter GPT-5.6-Luna profile.
+    desc: Run Codex using the OpenRouter GPT-5.6-Luna Pro profile.
     cmds:
       - codex --profile luna-openrouter {{.CLI_ARGS}}
 

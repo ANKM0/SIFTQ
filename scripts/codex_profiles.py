@@ -114,7 +114,7 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
             ],
         ),
         codex_home / "luna-openrouter.config.toml": _profile_config(
-            model="openai/gpt-5.6-luna",
+            model="openai/gpt-5.6-luna-pro",
             provider="openrouter",
             effort="high",
             catalog=luna_catalog,
@@ -165,9 +165,9 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
         + "\n",
         luna_catalog: json.dumps(
             _model_catalog(
-                slug="openai/gpt-5.6-luna",
-                display_name="GPT-5.6 Luna",
-                description="GPT-5.6 Luna via OpenRouter for planning and review.",
+                slug="openai/gpt-5.6-luna-pro",
+                display_name="GPT-5.6 Luna Pro",
+                description="GPT-5.6 Luna Pro via OpenRouter for planning and review.",
                 efforts=["high", "xhigh", "medium", "low"],
             ),
             ensure_ascii=False,
@@ -221,7 +221,7 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             codex_home / MODEL_CATALOG_DIR / "deepseek0731.json",
         ),
         codex_home / "luna-openrouter.config.toml": (
-            "openai/gpt-5.6-luna",
+            "openai/gpt-5.6-luna-pro",
             "openrouter",
             "OPENROUTER_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "luna-openrouter.json",
