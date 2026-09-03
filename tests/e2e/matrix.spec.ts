@@ -136,7 +136,8 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
 
   await page.getByLabel("Title").fill("E2E saved task");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByLabel("Title")).toHaveValue("E2E saved task");
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.locator(".task-row").filter({ hasText: "E2E saved task" }).first()).toBeVisible();
 
   await staleEditor.getByLabel("Title").fill("E2E stale task");
   await staleEditor.getByRole("button", { name: "Save" }).click();
