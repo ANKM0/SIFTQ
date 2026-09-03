@@ -308,6 +308,11 @@ function detailReturnTo(c: Context<AppEnv>): "matrix" | "tasks" {
   return c.req.query("from") === "matrix" ? "matrix" : "tasks";
 }
 
+function newTaskOrigin(c: Context<AppEnv>, body: ParsedBody): NewTaskFrom {
+  if (body["from"] === "matrix" || c.req.query("from") === "matrix") return "matrix";
+  return "tasks";
+}
+
 function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
   const matrixTasks = sortForMatrix(tasks);
   return (
@@ -384,6 +389,7 @@ function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) 
           <TitleField />
           <input type="hidden" name="status" value={state.status} />
           <input type="hidden" name="area" value={state.area} />
+          <input type="hidden" name="from" value={state.from} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
           <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/" : "/tasks"} />
@@ -637,7 +643,7 @@ app.post("/tasks", async (c) => {
     status: isTaskStatus(status) ? status : "do",
     area: area ?? 1,
     openMenu: undefined,
-    from: detailReturnTo(c),
+    from: newTaskOrigin(c, body),
   };
   if (isInvalidTaskTitle(title)) {
     return c.html(
@@ -651,8 +657,8 @@ app.post("/tasks", async (c) => {
   const inserted = await repository(c).insert(created.value);
   if (!inserted.ok) return c.text("Internal Server Error", 500);
 
-  c.header("HX-Push-Url", `/tasks/${created.value.id}`);
-  return c.html(<DetailPage task={inserted.value} />, 201);
+  c.header("HX-Redirect", state.from === "matrix" ? "/" : "/tasks");
+  return c.body(null, 201);
 });
 
 app.post("/tasks/:id", async (c) => {
