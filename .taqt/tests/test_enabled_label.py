@@ -14,7 +14,7 @@ def _task() -> dict[str, object]:
         "source": {"repo": "ANKM0/SIFTQ", "issue_number": 167},
         "status": "pending",
         "phase": "spec",
-        "loop": "development_feedback_loop",
+        "loop": "main_loop",
         "run": {},
     }
 

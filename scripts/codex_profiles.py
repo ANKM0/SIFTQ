@@ -83,9 +83,8 @@ def _model_catalog(
 def expected_files(codex_home: Path) -> dict[Path, str]:
     catalog_dir = codex_home / MODEL_CATALOG_DIR
     deepseek_catalog = catalog_dir / "deepseek.json"
-    flash_catalog = catalog_dir / "deepseek0731.json"
     luna_catalog = catalog_dir / "luna-openrouter.json"
-    muse_catalog = catalog_dir / "muse-spark-openrouter.json"
+    muse_free_catalog = catalog_dir / "muse-spark-opencode-free.json"
     return {
         codex_home / "deepseek.config.toml": _profile_config(
             model="deepseek-v4-pro",
@@ -98,19 +97,6 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 'base_url = "https://api.deepseek.com/"',
                 'wire_api = "responses"',
                 'env_key = "DEEPSEEK_API_KEY"',
-            ],
-        ),
-        codex_home / "deepseek0731.config.toml": _profile_config(
-            model="deepseek/deepseek-v4-flash-0731",
-            provider="openrouter",
-            effort="low",
-            catalog=flash_catalog,
-            provider_block=[
-                "[model_providers.openrouter]",
-                'name = "OpenRouter"',
-                'base_url = "https://openrouter.ai/api/v1"',
-                'wire_api = "responses"',
-                'env_key = "OPENROUTER_API_KEY"',
             ],
         ),
         codex_home / "luna-openrouter.config.toml": _profile_config(
@@ -127,17 +113,17 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 'namespace_tools = false',
             ],
         ),
-        codex_home / "muse-spark-openrouter.config.toml": _profile_config(
-            model="meta/muse-spark-1.3",
-            provider="openrouter",
+        codex_home / "muse-spark-opencode-free.config.toml": _profile_config(
+            model="muse-spark-1.3-contributor-free",
+            provider="opencode",
             effort="high",
-            catalog=muse_catalog,
+            catalog=muse_free_catalog,
             provider_block=[
-                "[model_providers.openrouter]",
-                'name = "OpenRouter"',
-                'base_url = "https://openrouter.ai/api/v1"',
+                "[model_providers.opencode]",
+                'name = "OpenCode Zen"',
+                'base_url = "https://opencode.ai/zen/v1"',
                 'wire_api = "responses"',
-                'env_key = "OPENROUTER_API_KEY"',
+                'env_key = "OPENCODE_API_KEY"',
                 'namespace_tools = false',
             ],
         ),
@@ -147,17 +133,6 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 display_name="DeepSeek V4 Pro",
                 description="DeepSeek V4 Pro for planning and review.",
                 efforts=["low", "high", "max"],
-            ),
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        flash_catalog: json.dumps(
-            _model_catalog(
-                slug="deepseek/deepseek-v4-flash-0731",
-                display_name="DeepSeek V4 Flash 0731",
-                description="DeepSeek V4 Flash 0731 for routine coding tasks.",
-                efforts=["low", "high"],
             ),
             ensure_ascii=False,
             indent=2,
@@ -174,11 +149,11 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
             indent=2,
         )
         + "\n",
-        muse_catalog: json.dumps(
+        muse_free_catalog: json.dumps(
             _model_catalog(
-                slug="meta/muse-spark-1.3",
-                display_name="Muse Spark 1.3",
-                description="Muse Spark 1.3 via OpenRouter for implementation tasks.",
+                slug="muse-spark-1.3-contributor-free",
+                display_name="Muse Spark 1.3 Contributor Free",
+                description="Muse Spark 1.3 Contributor Free via OpenCode Zen.",
                 efforts=["high", "medium", "low"],
             ),
             ensure_ascii=False,
@@ -214,28 +189,22 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             "DEEPSEEK_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "deepseek.json",
         ),
-        codex_home / "deepseek0731.config.toml": (
-            "deepseek/deepseek-v4-flash-0731",
-            "openrouter",
-            "OPENROUTER_API_KEY",
-            codex_home / MODEL_CATALOG_DIR / "deepseek0731.json",
-        ),
         codex_home / "luna-openrouter.config.toml": (
             "openai/gpt-5.6-luna-pro",
             "openrouter",
             "OPENROUTER_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "luna-openrouter.json",
         ),
-        codex_home / "muse-spark-openrouter.config.toml": (
-            "meta/muse-spark-1.3",
-            "openrouter",
-            "OPENROUTER_API_KEY",
-            codex_home / MODEL_CATALOG_DIR / "muse-spark-openrouter.json",
+        codex_home / "muse-spark-opencode-free.config.toml": (
+            "muse-spark-1.3-contributor-free",
+            "opencode",
+            "OPENCODE_API_KEY",
+            codex_home / MODEL_CATALOG_DIR / "muse-spark-opencode-free.json",
         ),
     }
     namespace_tools_profiles = {
         codex_home / "luna-openrouter.config.toml",
-        codex_home / "muse-spark-openrouter.config.toml",
+        codex_home / "muse-spark-opencode-free.config.toml",
     }
     for path, (model, provider, env_key, catalog_path) in profile_expectations.items():
         if not path.is_file():
