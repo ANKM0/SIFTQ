@@ -159,8 +159,11 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.getByRole("button", { name: "Create" }).click();
   await page.getByText(title, { exact: true }).click();
 
+  const version = page.locator("#task-version");
+  const beforeMetaChange = await version.inputValue();
   await page.getByRole("link", { name: new RegExp(`^${kind === "status" ? "Status" : "Area"}`) }).click();
   await page.locator(`[aria-label="Apply ${kind} to this task"] .status-choice`, { hasText: value }).click();
+  await expect(version).not.toHaveValue(beforeMetaChange);
   await page.getByLabel("Title").fill(`${title} saved`);
   await page.getByRole("button", { name: "Save" }).click();
 
