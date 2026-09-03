@@ -2,21 +2,19 @@ import { describe, expect, it } from "vite-plus/test";
 import { NewTaskMeta } from "../src/components/NewTaskMeta";
 
 describe("NewTaskMeta", () => {
-  it("renders the selected status menu while preserving the area", () => {
-    const html = String(<NewTaskMeta state={{ status: "done", area: 3, openMenu: "status", from: "matrix" }} />);
+  it("renders status radio choices with the selected status", () => {
+    const html = String(<NewTaskMeta state={{ status: "done", area: 3, from: "matrix" }} />);
 
     expect(html).toContain("Apply status to this task");
-    expect(html).toContain("status=done&amp;area=3");
-    expect(html).toContain("done");
-    expect(html).toContain("skip");
+    expect(html).toContain('name="status" value="done" checked');
+    expect(html).toContain('name="area" value="3" checked');
   });
 
-  it("renders the selected area menu while preserving the status", () => {
-    const html = String(<NewTaskMeta state={{ status: "do", area: 2, openMenu: "area", from: "tasks" }} />);
+  it("renders area radio choices with the selected area", () => {
+    const html = String(<NewTaskMeta state={{ status: "do", area: 2, from: "tasks" }} />);
 
     expect(html).toContain("Apply area to this task");
-    expect(html).toContain("status=do&amp;area=2");
-    expect(html).toContain("1");
-    expect(html).toContain("4");
+    expect(html).toContain('name="status" value="do" checked');
+    expect(html).toContain('name="area" value="2" checked');
   });
 });

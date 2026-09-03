@@ -96,15 +96,27 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 });
 
-test("dismisses new task Status and Area popovers when clicking outside", async ({ page }) => {
+test("keeps new-task inputs while changing Status and Area", async ({ page }) => {
   await signIn(page);
 
   await page.goto("/tasks/new");
-  await dismissPopover(page, "status");
-  await expect(page.locator("#new-task-meta .status--do")).toHaveText("do");
+  await page.getByLabel("Title").fill("Retained title");
+  await page.getByLabel("Description").fill("Retained description");
 
-  await dismissPopover(page, "area");
-  await expect(page.locator("#new-task-meta .area-badge")).toHaveText("1");
+  await page.locator("#new-task-meta details").first().locator("summary").click();
+  await page.locator('input[name="status"][value="done"]').check();
+  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.getByLabel("Description")).toHaveValue("Retained description");
+
+  await page.locator("#new-task-meta details").nth(1).locator("summary").click();
+  await page.locator('input[name="area"][value="4"]').check();
+  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.getByLabel("Description")).toHaveValue("Retained description");
+
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByLabel("Title")).toHaveValue("Retained title");
+  await expect(page.locator("#task-meta .status--done")).toHaveText("done");
+  await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
 });
 
 test("dismisses task detail Status and Area popovers when clicking outside", async ({ page }) => {

@@ -420,6 +420,14 @@ a {
   cursor: pointer;
 }
 
+.meta-row-link::marker {
+  content: "";
+}
+
+.meta-row-link::-webkit-details-marker {
+  display: none;
+}
+
 .meta-row h2 {
   font-size: 16px;
   margin: 0;
@@ -530,6 +538,10 @@ textarea {
   right: 0;
   top: 78px;
   z-index: 2;
+}
+
+details:not([open]) .popover {
+  display: none;
 }
 
 .popover h3 {
