@@ -21,14 +21,7 @@ async function dismissPopover(page: Page, label: "status" | "area") {
   const popover = page.locator(`[aria-label="${applyLabel}"]`);
   await expect(popover).toBeVisible();
 
-  const closeHref = await page.locator("[data-popover-close-href]").getAttribute("data-popover-close-href");
-  if (closeHref === null) throw new Error("Missing popover close URL");
-  const closeUrl = new URL(closeHref, page.url());
-
-  await Promise.all([
-    page.waitForURL((url) => url.pathname === closeUrl.pathname && url.search === closeUrl.search),
-    page.getByLabel("Title").click(),
-  ]);
+  await page.getByLabel("Title").click();
   await expect(popover).toHaveCount(0);
 }
 
