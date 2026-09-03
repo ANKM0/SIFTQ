@@ -209,6 +209,14 @@ function pageNav(path: string) {
   };
 }
 
+function redirectAfterTaskSave(c: Context<AppEnv>, path: string): Response {
+  if (c.req.header("HX-Request")) {
+    c.header("HX-Redirect", path);
+    return c.body(null);
+  }
+  return c.redirect(path);
+}
+
 function NewTaskLink({ from }: { from: NewTaskFrom }) {
   return (
     <a class="button primary" {...pageNav(`/tasks/new?from=${from}`)}>
@@ -674,7 +682,7 @@ app.post("/tasks/:id", async (c) => {
   const updated = { ...task, title, description, version };
   const saved = await persistTask(c, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-  return c.html(<DetailPage task={saved} returnTo={detailReturnTo(c)} />);
+  return redirectAfterTaskSave(c, detailReturnTo(c) === "matrix" ? "/" : "/tasks");
 });
 
 app.post("/tasks/:id/status", async (c) => {

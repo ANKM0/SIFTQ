@@ -183,7 +183,7 @@ describe("Task detail Save form", () => {
     expect(body).toContain('href="/tasks"');
   });
 
-  it("saves edits submitted from the task-list detail form", async () => {
+  it("saves edits and redirects to the task list from the task-list detail form", async () => {
     await repo.insert(taskFixture({ id: "task-1", version: 3 }));
 
     const response = await request("/tasks/task-1?from=tasks", {
@@ -195,13 +195,10 @@ describe("Task detail Save form", () => {
         version: "3",
       }).toString(),
     });
-    const body = await response.text();
     const saved = await repo.find("task-1", "local");
 
-    expect(response.status).toBe(200);
-    expect(body).toContain("updated task");
-    expect(body).toContain("updated description");
-    expect(body).toContain('href="/tasks"');
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/tasks");
     expect(saved).toEqual(
       expect.objectContaining({
         ok: true,
@@ -212,6 +209,26 @@ describe("Task detail Save form", () => {
         }),
       }),
     );
+  });
+
+  it("returns an HTMX redirect to the matrix when saving matrix detail", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1?from=matrix", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "HX-Request": "true",
+      },
+      body: new URLSearchParams({
+        title: "updated task",
+        description: "updated description",
+        version: "3",
+      }).toString(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("hx-redirect")).toBe("/");
   });
 });
 
