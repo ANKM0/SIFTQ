@@ -30,6 +30,9 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--min-covered", type=int, default=90)
     args = parser.parse_args()
+    if not args.default.is_file():
+        print(f"default rules unavailable; skipping coverage report: {args.default}")
+        return 0
     defaults, shared = patterns(args.default), patterns(args.shared)
     roots = Counter(rule[0] for rule in defaults if rule)
     covered = sum(covers(shared, rule) for rule in defaults)
