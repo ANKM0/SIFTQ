@@ -28,6 +28,33 @@ tasks:
       - task: ci:duplicate
       - task: ci:dead-code
 
+  ci:fast:
+    desc: Run the fast PR gate (no build, no E2E).
+    cmds:
+      - task: setup:python
+      - task: setup:frontend:ci
+      - task: ci:markdown
+      - task: ci:lint:task-refs
+      - task: ci:lint:codex-task-perms
+      - task: ci:lint
+      - task: ci:lint:python
+      - task: ci:security
+      - task: ci:performance
+      - task: ci:requirements
+      - task: ci:architecture
+      - task: ci:glossary
+      - task: ci:docs
+      - task: ci:typecheck
+      - task: ci:test:unit
+
+  ci:extended:
+    desc: Run the slow static checks (build, duplication, dead code).
+    cmds:
+      - task: setup:frontend:ci
+      - task: ci:build
+      - task: ci:duplicate
+      - task: ci:dead-code
+
   ci:commit-messages:
     desc: Check commit message format for the current branch.
     cmds:
@@ -172,12 +199,41 @@ tasks:
   ci:test:
     desc: Run Vitest and Playwright E2E.
     cmds:
+      - task: ci:test:unit
+      - task: ci:test:e2e
+
+  ci:test:unit:
+    desc: Run Vitest unit and contract tests.
+    cmds:
       - |
         if [ ! -d src ]; then
           echo "Skipping Worker tests: src/ does not exist yet."
           exit 0
         fi
         vp test run --passWithNoTests
+
+  ci:test:e2e:
+    desc: Run Playwright E2E.
+    cmds:
+      - task: ci:test:e2e:setup
+      - |
+        if [ ! -f tmp/.e2e-ready ]; then
+          echo "Skipping Playwright E2E: setup did not complete."
+          exit 0
+        fi
+        vp run test:e2e
+
+  ci:test:e2e:setup:
+    desc: Install Playwright browsers and apply local D1 migrations.
+    cmds:
+      - task: setup:frontend:ci
+      - |
+        marker="tmp/.e2e-ready"
+        rm -f "$marker"
+        if [ ! -d src ]; then
+          echo "Skipping E2E setup: src/ does not exist yet."
+          exit 0
+        fi
         if ! find tests/e2e -type f -print -quit 2>/dev/null | grep -q .; then
           echo "Skipping Playwright E2E: no test files found."
           exit 0
@@ -202,7 +258,18 @@ tasks:
         fi
 
         bun x wrangler d1 migrations apply siftq --local
-        vp run test:e2e
+        touch "$marker"
+
+  ci:test:e2e:nightly:
+    desc: Run Playwright E2E with retries for flake measurement.
+    cmds:
+      - task: ci:test:e2e:setup
+      - |
+        if [ ! -f tmp/.e2e-ready ]; then
+          echo "Skipping Playwright E2E: setup did not complete."
+          exit 0
+        fi
+        vp exec playwright test --pass-with-no-tests --retries 2
 
   ci:build:
     desc: Build the Worker (typecheck runs in ci:typecheck).
