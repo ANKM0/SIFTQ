@@ -31,11 +31,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--worker-id", default="local-worker")
-    parser.add_argument("--merge", action="store_true")
-    parser.add_argument("--cleanup-worktree", action="store_true")
-    parser.add_argument("--delete-local-branch", action="store_true")
-    parser.add_argument("--delete-remote-branch", action="store_true")
-    parser.add_argument("--force-worktree", action="store_true")
+    parser.add_argument("--merge", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--cleanup-worktree", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument(
+        "--delete-local-branch", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument(
+        "--delete-remote-branch", action=argparse.BooleanOptionalAction, default=False
+    )
+    parser.add_argument(
+        "--force-worktree", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -187,16 +195,15 @@ def _auto_command(
         "--base",
         base,
     ]
-    if merge:
-        command.append("--merge")
-    if cleanup_worktree:
-        command.append("--cleanup-worktree")
-    if delete_local_branch:
-        command.append("--delete-local-branch")
-    if delete_remote_branch:
-        command.append("--delete-remote-branch")
-    if force_worktree:
-        command.append("--force-worktree")
+    command.append("--merge" if merge else "--no-merge")
+    command.append("--cleanup-worktree" if cleanup_worktree else "--no-cleanup-worktree")
+    command.append(
+        "--delete-local-branch" if delete_local_branch else "--no-delete-local-branch"
+    )
+    command.append(
+        "--delete-remote-branch" if delete_remote_branch else "--no-delete-remote-branch"
+    )
+    command.append("--force-worktree" if force_worktree else "--no-force-worktree")
     if execute:
         command.append("--execute")
     return command

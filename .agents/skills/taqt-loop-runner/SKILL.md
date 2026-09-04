@@ -97,11 +97,8 @@ Use `taqt:auto` only after the task is ready and the selected workspace is corre
 task taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
 ```
 
-For merge and cleanup routing:
-
-```bash
-task taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --merge --cleanup-worktree --delete-local-branch --force-worktree --execute
-```
+The default auto route includes squash merge and worktree/local branch cleanup. Use the
+`--no-merge` or `--no-cleanup-worktree` options when those post-PR steps must be skipped.
 
 ## Human Escalation And Self-Improvement
 
