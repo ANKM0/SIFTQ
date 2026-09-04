@@ -16,7 +16,6 @@ tasks:
       - task: ci:lint:codex-task-perms
       - task: ci:lint
       - task: ci:lint:python
-      - task: ci:lint:ts-fast
       - task: ci:security
       - task: ci:performance
       - task: ci:requirements
@@ -170,11 +169,6 @@ tasks:
     cmds:
       - uv run ruff check scripts/ci --select E4,E7,E9,F
 
-  ci:lint:ts-fast:
-    desc: Run fast lint on src and tests.
-    cmds:
-      - vp lint src tests
-
   ci:test:
     desc: Run Vitest and Playwright E2E.
     cmds:
@@ -188,7 +182,7 @@ tasks:
           echo "Skipping Playwright E2E: no test files found."
           exit 0
         fi
-        vp exec playwright install chromium
+        vp exec playwright install --only-shell chromium
         set -eu
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
@@ -211,14 +205,14 @@ tasks:
         vp run test:e2e
 
   ci:build:
-    desc: Build the Worker.
+    desc: Build the Worker (typecheck runs in ci:typecheck).
     cmds:
       - |
         if [ ! -f src/index.tsx ]; then
           echo "Skipping Worker build: src/index.tsx does not exist yet."
           exit 0
         fi
-        vp run build
+        vp exec wrangler deploy --dry-run
 
   ci:duplicate:
     desc: Reject duplicated production TypeScript code.

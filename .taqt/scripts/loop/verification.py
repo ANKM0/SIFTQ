@@ -9,7 +9,6 @@ FAST_COMMANDS = (
     "task ci:typecheck",
     "task ci:lint",
     "task ci:lint:python",
-    "task ci:lint:ts-fast",
 )
 FULL_CI_COMMAND = "task ci"
 FRONTEND_DEPENDENCY_COMMAND = "task setup:frontend:ci"
