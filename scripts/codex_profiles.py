@@ -29,7 +29,13 @@ def _profile_config(
 
 
 def _model_catalog(
-    *, slug: str, display_name: str, description: str, efforts: list[str]
+    *,
+    slug: str,
+    display_name: str,
+    description: str,
+    efforts: list[str],
+    web_search_tool_type: str = "text",
+    supports_search_tool: bool = True,
 ) -> dict[str, object]:
     return {
         "models": [
@@ -39,7 +45,7 @@ def _model_catalog(
                 "support_verbosity": True,
                 "default_verbosity": "low",
                 "apply_patch_tool_type": "freeform",
-                "web_search_tool_type": "text",
+                "web_search_tool_type": web_search_tool_type,
                 "input_modalities": ["text"],
                 "supports_image_detail_original": False,
                 "truncation_policy": {"mode": "tokens", "limit": 10000},
@@ -73,7 +79,7 @@ def _model_catalog(
                     "instructions_template": "You are a coding agent. Complete the assigned task."
                 },
                 "experimental_supported_tools": [],
-                "supports_search_tool": True,
+                "supports_search_tool": supports_search_tool,
                 "supports_reasoning_summaries": True,
             }
         ]
@@ -129,6 +135,7 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 display_name="Muse Spark 1.3 Contributor Free",
                 description="Muse Spark 1.3 Contributor Free via OpenCode Zen.",
                 efforts=["high", "medium", "low"],
+                supports_search_tool=False,
             ),
             ensure_ascii=False,
             indent=2,

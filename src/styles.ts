@@ -116,6 +116,7 @@ a {
   border: 1px solid #d0d7de;
   border-radius: 8px;
   gap: 54px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   min-height: 0;
   padding: 72px 20px;
   position: relative;
@@ -216,6 +217,7 @@ a {
   border: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   position: relative;
   z-index: 1;
 }
@@ -223,6 +225,7 @@ a {
 .area--quadrant .matrix-cards {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .area-create-link {
