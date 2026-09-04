@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
 
     selector = str(pr["number"])
     if args.watch_checks:
-        checks_result = _run_checks(
+        checks_result = run_checks(
             repo=repo,
             selector=selector,
             cwd=args.workspace,
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     return subprocess.run(merge, cwd=args.workspace, check=False).returncode
 
 
-def _run_checks(
+def run_checks(
     *,
     repo: str,
     selector: str,

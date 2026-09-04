@@ -196,7 +196,7 @@ describe("Task detail Save form", () => {
     expect(body).toContain('method="post"');
     expect(body).toContain('action="/tasks/task-1?from=tasks"');
     expect(body).toContain('hx-post="/tasks/task-1?from=tasks"');
-    expect(body).toContain('name="version" value="3"');
+    expect(body).toContain('id="task-version" type="hidden" name="version" value="3"');
     expect(body).toContain('<button class="button primary" type="submit">Save</button>');
     expect(body).toContain('href="/tasks"');
   });
@@ -287,5 +287,22 @@ describe("Task detail and metadata menus", () => {
     const areaBody = await (await request("/tasks/task-1/area/menu")).text();
     expect(areaBody).toContain("Apply area to this task");
     expect(areaBody).toContain("Selected area");
+  });
+
+  it.each([
+    ["status", "done", "/tasks/task-1/status"],
+    ["area", "4", "/tasks/task-1/area"],
+  ])("refreshes the form version after changing %s", async (_kind, value, path) => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request(path, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ [_kind]: value, version: "3" }).toString(),
+    });
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain('id="task-version" type="hidden" name="version" value="4" hx-swap-oob="true"');
   });
 });

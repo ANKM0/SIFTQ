@@ -30,13 +30,13 @@ def test_profiles_have_no_worktree_codex_home_or_qwen_profile() -> None:
     assert all("codex_home" not in profile for profile in profiles.values())
     assert profiles["deepseek"]["env_keys"] == [
         "DEEPSEEK_API_KEY",
-        "OPENROUTER_API_KEY",
+        "OPENCODE_API_KEY",
     ]
 
 
 def test_deepseek_loop_selects_pro_for_design_and_flash_for_other_agents() -> None:
     loop = yaml.safe_load(
-        (REPOSITORY_ROOT / ".taqt" / "loops" / "development_feedback_loop_deepseek.yaml").read_text(
+        (REPOSITORY_ROOT / ".taqt" / "loops" / "sub_loop.yaml").read_text(
             encoding="utf-8"
         )
     )
@@ -44,9 +44,12 @@ def test_deepseek_loop_selects_pro_for_design_and_flash_for_other_agents() -> No
 
     assert agents["design"]["profile"] == "deepseek"
     assert agents["design"]["model"] == "deepseek-v4-pro"
-    for agent_name in ("test", "implement", "fix", "checker"):
-        assert agents[agent_name]["profile"] == "deepseek0731"
-        assert agents[agent_name]["model"] == "deepseek/deepseek-v4-flash-0731"
+    for agent_name in ("test", "checker"):
+        assert agents[agent_name]["profile"] == "deepseek"
+        assert agents[agent_name]["model"] == "deepseek-v4-pro"
+    for agent_name in ("implement", "fix"):
+        assert agents[agent_name]["profile"] == "muse-spark-opencode-free"
+        assert agents[agent_name]["model"] == "muse-spark-1.3-contributor-free"
 
 
 def test_resolve_codex_home_uses_shared_default(tmp_path: Path, monkeypatch) -> None:
@@ -72,8 +75,8 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
             {
                 "profiles": {
                     "deepseek": {
-                        "loop": "development_feedback_loop_deepseek",
-                        "env_keys": ["DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"],
+                        "loop": "sub_loop",
+                        "env_keys": ["DEEPSEEK_API_KEY", "OPENCODE_API_KEY"],
                     }
                 }
             },
@@ -81,7 +84,7 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
         ),
         encoding="utf-8",
     )
-    (loop_root / "development_feedback_loop_deepseek.yaml").write_text(
+    (loop_root / "sub_loop.yaml").write_text(
         "version: 1\nid: test\nsteps:\n  - id: done\n    kind: terminal\n",
         encoding="utf-8",
     )
@@ -97,7 +100,7 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
         or {"status": "done", "run_dir": str(tmp_path / "run")},
     )
     monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OPENCODE_API_KEY", "opencode-key")
 
     exit_code = task_run_main(
         [
@@ -117,5 +120,5 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
     assert exit_code == 0
     assert calls[0]["child_environment"] == {
         "DEEPSEEK_API_KEY": "deepseek-key",
-        "OPENROUTER_API_KEY": "openrouter-key",
+        "OPENCODE_API_KEY": "opencode-key",
     }

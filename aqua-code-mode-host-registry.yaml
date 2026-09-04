@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/registry.json
+packages:
+- type: github_release
+  name: openai/codex
+  repo_owner: openai
+  repo_name: codex
+  description: Codex CLI with its local Code Mode host
+  version_prefix: rust-
+  version_constraint: "true"
+  asset: codex-package-{{.Arch}}-{{.OS}}.{{.Format}}
+  format: tar.gz
+  files:
+  - name: codex
+    src: bin/codex
+  - name: codex-code-mode-host
+    src: bin/codex-code-mode-host
+  replacements:
+    amd64: x86_64
+    arm64: aarch64
+    darwin: apple-darwin
+    linux: unknown-linux-musl
+    windows: pc-windows-msvc
+  supported_envs:
+  - linux
+  - darwin
+  - windows

@@ -188,7 +188,12 @@ async function persistTaskMeta(
 ): Promise<Response> {
   const saved = await persistTask(c, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-  return c.html(<TaskMeta task={saved} returnTo={returnTo} />);
+  return c.html(
+    <>
+      <TaskMeta task={saved} returnTo={returnTo} />
+      <TaskVersionInput version={saved.version} outOfBand />
+    </>,
+  );
 }
 
 function renderPage(c: Context<AppEnv>, content: JSX.Element) {
@@ -240,6 +245,18 @@ function DescriptionField({ children }: { children?: string }) {
       Description
       <textarea name="description">{children}</textarea>
     </label>
+  );
+}
+
+function TaskVersionInput({ version, outOfBand = false }: { version: number; outOfBand?: boolean }) {
+  return (
+    <input
+      id="task-version"
+      type="hidden"
+      name="version"
+      value={version}
+      hx-swap-oob={outOfBand ? "true" : undefined}
+    />
   );
 }
 
@@ -433,7 +450,7 @@ function DetailPage({
           hx-swap="innerHTML"
         >
           <TitleField value={task.title} />
-          <input type="hidden" name="version" value={task.version} />
+          <TaskVersionInput version={task.version} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField>{task.description}</DescriptionField>
           <TaskFormActions submitLabel="Save" cancelHref={cancelHref} />

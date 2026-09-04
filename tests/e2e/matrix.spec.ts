@@ -21,14 +21,7 @@ async function dismissPopover(page: Page, label: "status" | "area") {
   const popover = page.locator(`[aria-label="${applyLabel}"]`);
   await expect(popover).toBeVisible();
 
-  const closeHref = await page.locator("[data-popover-close-href]").getAttribute("data-popover-close-href");
-  if (closeHref === null) throw new Error("Missing popover close URL");
-  const closeUrl = new URL(closeHref, page.url());
-
-  await Promise.all([
-    page.waitForURL((url) => url.pathname === closeUrl.pathname && url.search === closeUrl.search),
-    page.getByLabel("Title").click(),
-  ]);
+  await page.getByLabel("Title").click();
   await expect(popover).toHaveCount(0);
 }
 
@@ -149,6 +142,38 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
 
   await dismissPopover(page, "area");
   await expect(page.locator("#task-meta .area-badge")).toHaveText("2");
+});
+
+async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: string) {
+  const title = `E2E ${kind} save ${Date.now()}`;
+
+  await page.goto("/tasks/new");
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create" }).click();
+  await page.getByText(title, { exact: true }).click();
+
+  const version = page.locator("#task-version");
+  const beforeMetaChange = await version.inputValue();
+  await page.getByRole("link", { name: new RegExp(`^${kind === "status" ? "Status" : "Area"}`) }).click();
+  await page.locator(`[aria-label="Apply ${kind} to this task"] .status-choice`, { hasText: value }).click();
+  await expect(version).not.toHaveValue(beforeMetaChange);
+  await page.getByLabel("Title").fill(`${title} saved`);
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.getByText(`${title} saved`, { exact: true })).toBeVisible();
+}
+
+test("saves after changing task status", async ({ page }) => {
+  await signIn(page);
+
+  await saveAfterMetaChange(page, "status", "done");
+});
+
+test("saves after changing task area", async ({ page }) => {
+  await signIn(page);
+
+  await saveAfterMetaChange(page, "area", "4");
 });
 
 test("persists an edit and displays a conflict from a stale editor", async ({ page }) => {

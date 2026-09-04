@@ -83,7 +83,7 @@ def _model_catalog(
 def expected_files(codex_home: Path) -> dict[Path, str]:
     catalog_dir = codex_home / MODEL_CATALOG_DIR
     deepseek_catalog = catalog_dir / "deepseek.json"
-    flash_catalog = catalog_dir / "deepseek0731.json"
+    muse_free_catalog = catalog_dir / "muse-spark-opencode-free.json"
     return {
         codex_home / "deepseek.config.toml": _profile_config(
             model="deepseek-v4-pro",
@@ -98,17 +98,18 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 'env_key = "DEEPSEEK_API_KEY"',
             ],
         ),
-        codex_home / "deepseek0731.config.toml": _profile_config(
-            model="deepseek/deepseek-v4-flash-0731",
-            provider="openrouter",
-            effort="low",
-            catalog=flash_catalog,
+        codex_home / "muse-spark-opencode-free.config.toml": _profile_config(
+            model="muse-spark-1.3-contributor-free",
+            provider="opencode",
+            effort="high",
+            catalog=muse_free_catalog,
             provider_block=[
-                "[model_providers.openrouter]",
-                'name = "OpenRouter"',
-                'base_url = "https://openrouter.ai/api/v1"',
+                "[model_providers.opencode]",
+                'name = "OpenCode Zen"',
+                'base_url = "https://opencode.ai/zen/v1"',
                 'wire_api = "responses"',
-                'env_key = "OPENROUTER_API_KEY"',
+                'env_key = "OPENCODE_API_KEY"',
+                'namespace_tools = false',
             ],
         ),
         deepseek_catalog: json.dumps(
@@ -122,12 +123,12 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
             indent=2,
         )
         + "\n",
-        flash_catalog: json.dumps(
+        muse_free_catalog: json.dumps(
             _model_catalog(
-                slug="deepseek/deepseek-v4-flash-0731",
-                display_name="DeepSeek V4 Flash 0731",
-                description="DeepSeek V4 Flash 0731 for routine coding tasks.",
-                efforts=["low", "high"],
+                slug="muse-spark-1.3-contributor-free",
+                display_name="Muse Spark 1.3 Contributor Free",
+                description="Muse Spark 1.3 Contributor Free via OpenCode Zen.",
+                efforts=["high", "medium", "low"],
             ),
             ensure_ascii=False,
             indent=2,
@@ -162,13 +163,14 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             "DEEPSEEK_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "deepseek.json",
         ),
-        codex_home / "deepseek0731.config.toml": (
-            "deepseek/deepseek-v4-flash-0731",
-            "openrouter",
-            "OPENROUTER_API_KEY",
-            codex_home / MODEL_CATALOG_DIR / "deepseek0731.json",
+        codex_home / "muse-spark-opencode-free.config.toml": (
+            "muse-spark-1.3-contributor-free",
+            "opencode",
+            "OPENCODE_API_KEY",
+            codex_home / MODEL_CATALOG_DIR / "muse-spark-opencode-free.json",
         ),
     }
+    namespace_tools_profiles = {codex_home / "muse-spark-opencode-free.config.toml"}
     for path, (model, provider, env_key, catalog_path) in profile_expectations.items():
         if not path.is_file():
             continue
@@ -184,6 +186,8 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
         provider_config = config.get("model_providers", {}).get(provider, {})
         if provider_config.get("env_key") != env_key:
             errors.append(f"unexpected env_key in {path}: expected {env_key}")
+        if path in namespace_tools_profiles and provider_config.get("namespace_tools") is not False:
+            errors.append(f"namespace_tools must be false in {path}")
         if config.get("model_catalog_json") != str(catalog_path):
             errors.append(f"unexpected model_catalog_json in {path}: expected {catalog_path}")
         if require_env and not os.environ.get(env_key):
