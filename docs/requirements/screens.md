@@ -26,6 +26,7 @@
   - task card は title のみを表示する。
   - task card は matrix 上で drag and drop できる。
   - task card 以外の空白部分を押下すると、その area を選択済みとして `/tasks/new?area=<area>` へ遷移する。
+  - area 内のカードは表示専用ソートで並べ替えられる。既定は `order` で、ソートしても `area` と永続 `order` は変わらない。
 
 - `Task list` (`/tasks`)
   - 全 task を一覧表示する。
