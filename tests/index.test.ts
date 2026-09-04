@@ -24,7 +24,10 @@ describe("smoke", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/javascript");
-    expect(await response.text()).toContain("window.location.assign");
+    const body = await response.text();
+    expect(body).toContain("window.location.assign");
+    expect(body).toContain("[data-popover-close]");
+    expect(body).toContain("[data-popover-cancel]");
   });
 
   it("serves the matrix area navigation handler without authentication", async () => {
