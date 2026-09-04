@@ -1,0 +1,11 @@
+---
+# Allow only the repository-local registry used to install the OpenAI Code Mode host.
+registries:
+- type: standard
+  ref: semver(">= 3.0.0")
+- name: codex-complete
+  type: local
+  path: aqua-code-mode-host-registry.yaml
+packages:
+- registry: standard
+- registry: codex-complete
