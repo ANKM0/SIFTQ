@@ -12,6 +12,7 @@ FAST_COMMANDS = (
     "task ci:lint:ts-fast",
 )
 FULL_CI_COMMAND = "task ci"
+FRONTEND_DEPENDENCY_COMMAND = "task setup:frontend:ci"
 
 
 def run_verification(
@@ -19,11 +20,15 @@ def run_verification(
     cwd: Path,
     relevant_test_commands: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    commands = (
-        ("diff_check", ("git diff --check",)),
-        ("fast_checks", FAST_COMMANDS),
-        ("relevant_tests", tuple(relevant_test_commands or _relevant_test_commands(cwd))),
-        ("full_ci", (FULL_CI_COMMAND,)),
+    commands: list[tuple[str, tuple[str, ...]]] = [("diff_check", ("git diff --check",))]
+    if _requires_frontend_dependencies(cwd):
+        commands.append(("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)))
+    commands.extend(
+        (
+            ("fast_checks", FAST_COMMANDS),
+            ("relevant_tests", tuple(relevant_test_commands or _relevant_test_commands(cwd))),
+            ("full_ci", (FULL_CI_COMMAND,)),
+        )
     )
     results: list[dict[str, Any]] = []
     for phase, phase_commands in commands:
@@ -83,6 +88,10 @@ def _relevant_test_commands(cwd: Path) -> tuple[str, ...]:
     if any(path.startswith(("src/", "tests/")) for path in changed_paths):
         return ("task ci:test",)
     return ("task pytest",)
+
+
+def _requires_frontend_dependencies(cwd: Path) -> bool:
+    return any(path.startswith(("src/", "tests/")) for path in _changed_paths(cwd))
 
 
 def _changed_paths(cwd: Path) -> list[str]:
