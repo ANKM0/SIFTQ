@@ -44,7 +44,7 @@ tasks:
     cmds:
       - |
           attempt=1
-          while ! bun audit --audit-level high; do
+          while ! timeout 30 bun audit --audit-level high; do
             if [ "$attempt" -ge 3 ]; then
               exit 1
             fi
