@@ -3,7 +3,6 @@ profiles:
     loop: main_loop
     env_keys:
       - DEEPSEEK_API_KEY
-      - OPENROUTER_API_KEY
       - OPENCODE_API_KEY
   deepseek:
     loop: sub_loop

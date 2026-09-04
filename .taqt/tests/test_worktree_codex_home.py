@@ -76,7 +76,7 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
                 "profiles": {
                     "deepseek": {
                         "loop": "sub_loop",
-                        "env_keys": ["DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"],
+                        "env_keys": ["DEEPSEEK_API_KEY", "OPENCODE_API_KEY"],
                     }
                 }
             },
@@ -100,7 +100,7 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
         or {"status": "done", "run_dir": str(tmp_path / "run")},
     )
     monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OPENCODE_API_KEY", "opencode-key")
 
     exit_code = task_run_main(
         [
@@ -120,5 +120,5 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
     assert exit_code == 0
     assert calls[0]["child_environment"] == {
         "DEEPSEEK_API_KEY": "deepseek-key",
-        "OPENROUTER_API_KEY": "openrouter-key",
+        "OPENCODE_API_KEY": "opencode-key",
     }

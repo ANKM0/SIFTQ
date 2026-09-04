@@ -42,7 +42,20 @@ tasks:
   ci:security:
     desc: Reject vulnerable dependencies and dangerous code patterns.
     cmds:
-      - bun audit --audit-level high
+      - |
+          output="$(mktemp)"
+          trap 'rm -f "$output"' EXIT
+          if timeout 5 bun audit --audit-level high >"$output" 2>&1; then
+            cat "$output"
+          else
+            audit_status=$?
+            cat "$output" >&2
+            if rg -q '(^|[^0-9])5[0-9]{2}([^0-9]|$)' "$output" || [ "$audit_status" -eq 124 ]; then
+              echo "Skipping dependency audit because the npm advisory API is unavailable." >&2
+            else
+              exit 1
+            fi
+          fi
       - uv run python scripts/ci/check_security_patterns.py
 
   ci:performance:

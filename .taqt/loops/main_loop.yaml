@@ -14,9 +14,9 @@ agents:
   design:
     role: design
     adapter: codex
-    profile: luna-openrouter
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
+    profile: deepseek
+    model: deepseek-v4-pro
+    reasoning_effort: high
     writes:
       - .taqt/loops/
       - .taqt/tests/
@@ -27,9 +27,9 @@ agents:
   test:
     role: test_author
     adapter: codex
-    profile: luna-openrouter
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
+    profile: deepseek
+    model: deepseek-v4-pro
+    reasoning_effort: high
     writes:
       - tests/
       - .taqt/tests/
@@ -48,9 +48,9 @@ agents:
   checker:
     role: checker
     adapter: codex
-    profile: luna-openrouter
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
+    profile: deepseek
+    model: deepseek-v4-pro
+    reasoning_effort: high
     readonly: true
 
 steps:
