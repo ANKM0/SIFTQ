@@ -55,6 +55,14 @@ describe("styles", () => {
     expect(vertical?.[0]).toContain("inset: 72px auto 72px 50%;");
     expect(vertical?.[0]).toContain("transform: translateX(-50%);");
   });
+
+  it("allocates an explicit grid row for the matrix sort controls", () => {
+    const page = STYLES_CSS.match(/(?:^|\n)\.page--matrix\s*\{[^}]*\}/);
+    expect(page?.[0]).toContain("grid-template-rows: auto auto auto minmax(0, 1fr);");
+    const sort = STYLES_CSS.match(/(?:^|\n)\.matrix-sort\s*\{[^}]*\}/);
+    expect(sort?.[0]).toContain("display: flex;");
+    expect(sort?.[0]).toContain("min-height: 34px;");
+  });
 });
 
 describe("styles regression guards", () => {

@@ -70,7 +70,7 @@ a {
 
 .page--matrix {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   height: calc(100vh - 63px);
   max-width: none;
   padding: 3vh 5vw;
@@ -81,6 +81,18 @@ a {
 .page--matrix > * {
   justify-self: center;
   width: min(100%, 80vw);
+}
+
+.page--matrix > #dnd-conflict {
+  margin: 0;
+}
+
+.matrix-sort {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
 }
 
 .page--matrix .matrix-axis {

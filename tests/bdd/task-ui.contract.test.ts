@@ -22,6 +22,15 @@ function cardIds(body: string): string[] {
   return ids;
 }
 
+function cardIdsInArea(body: string, area: number): string[] {
+  const section = body.match(new RegExp(`<section[^>]*data-drop-area="${area}"[\\s\\S]*?</section>`))?.[0] ?? "";
+  return cardIds(section);
+}
+
+function cardOpeningTag(body: string, id: string): string {
+  return body.match(new RegExp(`<a[^>]*data-task-id="${id}"[^>]*>`))?.[0] ?? "";
+}
+
 describe("Matrix page", () => {
   it("renders the full page and an HTMX fragment", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
@@ -87,7 +96,7 @@ describe("Matrix area display sort", () => {
     expect(cardIds(body)).toEqual(["z", "a"]);
   });
 
-  it("keeps sorted tasks in their original area", async () => {
+  it("keeps sorted cards in their original area and preserves card actions", async () => {
     await repo.insert(taskFixture({ id: "b", title: "Banana", area: 2, order: 0 }));
     await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
     await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
@@ -95,6 +104,35 @@ describe("Matrix area display sort", () => {
     const body = await (await request("/?sort=title")).text();
 
     expect(cardIds(body)).toEqual(["a", "z", "b"]);
+    expect(cardIdsInArea(body, 1)).toEqual(["a", "z"]);
+    expect(cardIdsInArea(body, 2)).toEqual(["b"]);
+    expect(body).toContain('src="/matrix-dnd.js"');
+    expect(body).toContain('data-dnd-group="matrix"');
+    for (const id of ["a", "z", "b"]) {
+      const card = cardOpeningTag(body, id);
+      expect(card).toContain(`draggable="true"`);
+      expect(card).toContain(`href="/tasks/${id}?from=matrix"`);
+    }
+  });
+
+  it("keeps sort controls on their own row with many cards so they do not overlap the Matrix", async () => {
+    for (let i = 0; i < 20; i += 1) {
+      await repo.insert(
+        taskFixture({ id: `t${i}`, title: `Task ${String(19 - i).padStart(2, "0")}`, area: 1, order: i }),
+      );
+    }
+
+    const body = await (await request("/?sort=title")).text();
+    const sortIndex = body.indexOf('class="matrix-sort"');
+    const matrixIndex = body.indexOf('class="matrix matrix-axis"');
+
+    expect(sortIndex).toBeGreaterThan(-1);
+    expect(matrixIndex).toBeGreaterThan(sortIndex);
+    expect(cardIdsInArea(body, 1)).toHaveLength(20);
+    expect(cardIdsInArea(body, 1)[0]).toBe("t19");
+    const firstCard = cardOpeningTag(body, "t19");
+    expect(firstCard).toContain('draggable="true"');
+    expect(firstCard).toContain('href="/tasks/t19?from=matrix"');
   });
 });
 
