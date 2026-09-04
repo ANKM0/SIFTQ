@@ -32,12 +32,6 @@ jobs:
           path: ~/.local/share/vite-plus
           key: vp-${{ runner.os }}-v1.18.0
 
-      - name: Restore Bun store cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
       - name: Restore Playwright browsers cache
         uses: actions/cache@v4
         with:

@@ -229,6 +229,7 @@ tasks:
       - task: setup:frontend:ci
       - |
         marker="tmp/.e2e-ready"
+        mkdir -p "$(dirname "$marker")"
         rm -f "$marker"
         if [ ! -d src ]; then
           echo "Skipping E2E setup: src/ does not exist yet."
