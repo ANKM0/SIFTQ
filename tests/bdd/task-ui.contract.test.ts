@@ -136,6 +136,23 @@ describe("Matrix area display sort", () => {
   });
 });
 
+describe("Matrix non-overflow display", () => {
+  it("keeps cards in their existing area display", async () => {
+    for (const area of [1, 2, 3, 4] as const) {
+      await repo.insert(taskFixture({ id: `area-${area}`, area, order: 0 }));
+    }
+
+    for (const path of ["/", "/?sort=title"]) {
+      const body = await (await request(path)).text();
+
+      expect(cardIds(body)).toEqual(["area-1", "area-2", "area-3", "area-4"]);
+      for (const area of [1, 2, 3, 4] as const) {
+        expect(cardIdsInArea(body, area)).toEqual([`area-${area}`]);
+      }
+    }
+  });
+});
+
 describe("Task list page", () => {
   it("renders all statuses", async () => {
     await repo.insert(taskFixture({ id: "done-1", status: "done" }));
