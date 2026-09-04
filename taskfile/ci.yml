@@ -42,7 +42,15 @@ tasks:
   ci:security:
     desc: Reject vulnerable dependencies and dangerous code patterns.
     cmds:
-      - bun audit --audit-level high
+      - |
+          attempt=1
+          while ! bun audit --audit-level high; do
+            if [ "$attempt" -ge 3 ]; then
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 5
+          done
       - uv run python scripts/ci/check_security_patterns.py
 
   ci:performance:
