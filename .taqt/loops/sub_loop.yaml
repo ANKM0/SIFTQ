@@ -8,9 +8,8 @@ limits:
 agents:
   design:
     role: design
-    adapter: codex
-    profile: deepseek
-    model: deepseek-v4-pro
+    adapter: opencode
+    model: deepseek/deepseek-v4-pro
     reasoning_effort: high
     writes:
       - .taqt/loops/
@@ -21,30 +20,26 @@ agents:
       - docs/contributing/
   test:
     role: test_author
-    adapter: codex
-    profile: deepseek
-    model: deepseek-v4-pro
+    adapter: opencode
+    model: deepseek/deepseek-v4-pro
     reasoning_effort: high
     writes:
       - tests/
       - .taqt/tests/
   implement:
     role: implementation
-    adapter: codex
-    profile: muse-spark-opencode-free
-    model: muse-spark-1.3-contributor-free
+    adapter: opencode
+    model: opencode/muse-spark-1.3-contributor-free
     reasoning_effort: high
   fix:
     role: implementation_fixer
-    adapter: codex
-    profile: muse-spark-opencode-free
-    model: muse-spark-1.3-contributor-free
+    adapter: opencode
+    model: opencode/muse-spark-1.3-contributor-free
     reasoning_effort: high
   checker:
     role: checker
-    adapter: codex
-    profile: deepseek
-    model: deepseek-v4-pro
+    adapter: opencode
+    model: deepseek/deepseek-v4-pro
     reasoning_effort: high
     readonly: true
 

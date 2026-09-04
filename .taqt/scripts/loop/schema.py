@@ -108,6 +108,7 @@ def _validate_agents(value: Any) -> set[str]:
             if key in agent and not isinstance(agent[key], str):
                 raise ValueError(f"agent {agent_id}.{key} must be a string")
         _validate_reasoning_effort(agent, f"agent {agent_id}")
+        _validate_opencode_model(agent, f"agent {agent_id}")
         writes = agent.get("writes")
         if writes is not None and (
             not isinstance(writes, list)
@@ -152,6 +153,7 @@ def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: se
             if key in step and not isinstance(step[key], str):
                 raise ValueError(f"llm step {step_id}.{key} must be a string")
         _validate_reasoning_effort(step, f"llm step {step_id}")
+        _validate_opencode_model(step, f"llm step {step_id}")
         for key in ("next", "on_pass", "on_failure"):
             if key in step:
                 _validate_step_ref(step, key, step_ids)
@@ -216,9 +218,20 @@ def _next_steps(step: dict[str, Any]) -> list[str]:
     return []
 
 
+def _validate_opencode_model(payload: dict[str, Any], subject: str) -> None:
+    if payload.get("adapter") != "opencode":
+        return
+    if "model" not in payload:
+        return
+    model = payload["model"]
+    if not isinstance(model, str) or "/" not in model:
+        raise ValueError(f"{subject}.model must be a full opencode model id (provider/model)")
+
+
 def _validate_fallback(value: Any) -> None:
     if value is None: return
     if not isinstance(value, dict): raise ValueError("loop.fallback must be a mapping")
-    if not isinstance(value.get("profile"), str) or not value["profile"]: raise ValueError("loop.fallback.profile is required")
-    if "model" in value and not isinstance(value["model"], str): raise ValueError("loop.fallback.model must be a string")
+    if not isinstance(value.get("model"), str) or not value["model"]: raise ValueError("loop.fallback.model is required")
+    if "/" not in value["model"]: raise ValueError("loop.fallback.model must be a full opencode model id (provider/model)")
+    if "profile" in value and not isinstance(value["profile"], str): raise ValueError("loop.fallback.profile must be a string")
     _validate_reasoning_effort(value, "loop.fallback")

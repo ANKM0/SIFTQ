@@ -42,14 +42,14 @@ def test_deepseek_loop_selects_pro_for_design_and_flash_for_other_agents() -> No
     )
     agents = loop["agents"]
 
-    assert agents["design"]["profile"] == "deepseek"
-    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["adapter"] == "opencode"
+    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
     for agent_name in ("test", "checker"):
-        assert agents[agent_name]["profile"] == "deepseek"
-        assert agents[agent_name]["model"] == "deepseek-v4-pro"
+        assert agents[agent_name]["adapter"] == "opencode"
+        assert agents[agent_name]["model"] == "deepseek/deepseek-v4-pro"
     for agent_name in ("implement", "fix"):
-        assert agents[agent_name]["profile"] == "muse-spark-opencode-free"
-        assert agents[agent_name]["model"] == "muse-spark-1.3-contributor-free"
+        assert agents[agent_name]["adapter"] == "opencode"
+        assert agents[agent_name]["model"] == "opencode/muse-spark-1.3-contributor-free"
 
 
 def test_resolve_codex_home_uses_shared_default(tmp_path: Path, monkeypatch) -> None:

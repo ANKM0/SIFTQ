@@ -10,7 +10,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
-from loop.llm import is_fallback_error, run_agent
+from loop.llm import (
+    _parse_opencode_stdout,
+    is_fallback_error,
+    is_opencode_fallback_error,
+    run_agent,
+)
 from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
@@ -264,11 +269,12 @@ def test_deepseek_loop_definition_uses_pro_for_design_and_flash_for_implementati
     loop = load_document(repository_root / ".taqt/loops/sub_loop.yaml")
 
     validate_loop_definition(loop)
-    assert loop["agents"]["design"]["model"] == "deepseek-v4-pro"
-    assert loop["agents"]["design"]["profile"] == "deepseek"
-    assert loop["agents"]["implement"]["model"] == "muse-spark-1.3-contributor-free"
-    assert loop["agents"]["checker"]["model"] == "deepseek-v4-pro"
-    assert loop["agents"]["implement"]["profile"] == "muse-spark-opencode-free"
+    assert loop["agents"]["design"]["adapter"] == "opencode"
+    assert loop["agents"]["design"]["model"] == "deepseek/deepseek-v4-pro"
+    assert "profile" not in loop["agents"]["design"]
+    assert loop["agents"]["implement"]["adapter"] == "opencode"
+    assert loop["agents"]["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
+    assert loop["agents"]["checker"]["model"] == "deepseek/deepseek-v4-pro"
     assert "judge" not in loop["agents"]
 
 
@@ -603,13 +609,14 @@ def test_main_loop_uses_deepseek_reviewers_and_muse_free_implementers() -> None:
     agents = load_document(loop_path)["agents"]
 
     assert agents["checker"]["readonly"] is True
-    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["adapter"] == "opencode"
+    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek-v4-pro"
+    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["test"]["reasoning_effort"] == "high"
-    assert agents["implement"]["model"] == "muse-spark-1.3-contributor-free"
+    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "deepseek-v4-pro"
+    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["checker"]["reasoning_effort"] == "high"
 
 
@@ -627,20 +634,17 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
 
     assert agents["checker"]["readonly"] is True
-    assert agents["design"]["model"] == "deepseek-v4-pro"
-    assert agents["design"]["profile"] == "deepseek"
+    assert agents["design"]["adapter"] == "opencode"
+    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
+    assert "profile" not in agents["design"]
     assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek-v4-pro"
-    assert agents["test"]["profile"] == "deepseek"
+    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["test"]["reasoning_effort"] == "high"
-    assert agents["implement"]["model"] == "muse-spark-1.3-contributor-free"
-    assert agents["implement"]["profile"] == "muse-spark-opencode-free"
+    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["fix"]["model"] == "muse-spark-1.3-contributor-free"
-    assert agents["fix"]["profile"] == "muse-spark-opencode-free"
+    assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "deepseek-v4-pro"
-    assert agents["checker"]["profile"] == "deepseek"
+    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["checker"]["reasoning_effort"] == "high"
 
     step_ids = [step["id"] for step in steps]
@@ -669,20 +673,16 @@ def test_main_loop_assigns_roles_to_deepseek_and_muse_spark() -> None:
     steps = loop["steps"]
     assert {"design", "test", "implement", "fix", "checker"} == set(agents)
 
-    assert agents["design"]["profile"] == "deepseek"
-    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["adapter"] == "opencode"
+    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["profile"] == "deepseek"
-    assert agents["test"]["model"] == "deepseek-v4-pro"
+    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["test"]["reasoning_effort"] == "high"
-    assert agents["implement"]["profile"] == "muse-spark-opencode-free"
-    assert agents["implement"]["model"] == "muse-spark-1.3-contributor-free"
+    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["fix"]["profile"] == "muse-spark-opencode-free"
-    assert agents["fix"]["model"] == "muse-spark-1.3-contributor-free"
+    assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["profile"] == "deepseek"
-    assert agents["checker"]["model"] == "deepseek-v4-pro"
+    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
     assert agents["checker"]["reasoning_effort"] == "high"
 
     assert agents["checker"]["readonly"] is True
@@ -1259,6 +1259,242 @@ def test_codex_agent_adapter_uses_codex_default_reasoning_effort_when_unspecifie
     command = calls[0]
     assert "-c" not in command
     assert not any(argument.startswith("model_reasoning_effort=") for argument in command)
+
+
+def test_opencode_agent_adapter_invokes_opencode_run(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "opencode",
+                    "model": "opencode/muse-spark-1.3-contributor-free",
+                    "reasoning_effort": "high",
+                }
+            }
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={"files": {}},
+        cwd=tmp_path,
+        child_environment={"OPENCODE_API_KEY": "secret"},
+    )
+
+    assert response["status"] == "success"
+    assert response["mode"] == "opencode"
+    command, kwargs = calls[0]
+    assert command[:2] == ["opencode", "run"]
+    assert command[command.index("-m") + 1] == "opencode/muse-spark-1.3-contributor-free"
+    assert command[command.index("--format") + 1] == "json"
+    assert command[command.index("--dir") + 1] == str(tmp_path.resolve())
+    assert "--auto" in command
+    assert command[command.index("--variant") + 1] == "high"
+    assert command[-2] == "--"
+    assert command[-1].startswith("Role: implementation")
+    assert kwargs["env"]["OPENCODE_API_KEY"] == "secret"
+
+
+def test_opencode_agent_adapter_rejects_bare_model_slug(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        raise AssertionError("subprocess must not run")
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "opencode",
+                    "model": "muse-spark-1.3-contributor-free",
+                }
+            }
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={},
+        cwd=tmp_path,
+    )
+
+    assert response["status"] == "failure"
+    assert response["mode"] == "opencode"
+    assert calls == []
+
+
+def test_opencode_agent_adapter_resolves_variant(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return Completed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+    monkeypatch.setenv("LOOP_OPENCODE_VARIANT", "low")
+
+    cases = [
+        ({"reasoning_effort": "high"}, {"reasoning_effort": "max"}, "high"),
+        ({}, {"reasoning_effort": "max"}, "max"),
+        ({}, {}, "low"),
+    ]
+    for step_overrides, agent_overrides, expected_variant in cases:
+        run_agent(
+            loop_definition={
+                "agents": {
+                    "implement": {
+                        "role": "implementation",
+                        "adapter": "opencode",
+                        "model": "deepseek/deepseek-v4-pro",
+                        **agent_overrides,
+                    }
+                }
+            },
+            task={"id": "ISSUE-1"},
+            step={"id": "implement", "agent": "implement", **step_overrides},
+            context={},
+            cwd=tmp_path,
+        )
+        command = calls[-1]
+        assert command[command.index("--variant") + 1] == expected_variant
+
+
+def test_parse_opencode_stdout_extracts_text_events() -> None:
+    stdout = "\n".join(
+        [
+            json.dumps({"type": "step_start", "part": {"type": "step-start"}}),
+            json.dumps(
+                {
+                    "type": "text",
+                    "part": {
+                        "type": "text",
+                        "text": json.dumps({"status": "success", "verdict": "approve"}),
+                    },
+                }
+            ),
+            json.dumps({"type": "step_finish", "part": {"type": "step-finish"}}),
+        ]
+    )
+
+    parsed = _parse_opencode_stdout(stdout)
+
+    assert parsed["status"] == "success"
+    assert parsed["verdict"] == "approve"
+
+
+def test_parse_opencode_stdout_ignores_non_text_events() -> None:
+    assert _parse_opencode_stdout("") == {}
+    assert _parse_opencode_stdout("not json\nnot json either") == {}
+
+
+def test_opencode_fallback_error_detects_rate_limits() -> None:
+    assert is_opencode_fallback_error("", "429 Too Many Requests")
+    assert is_opencode_fallback_error("quota exceeded", "")
+    assert not is_opencode_fallback_error("", "Recursive JSON schemas are not currently supported")
+    assert not is_opencode_fallback_error("all good", "")
+
+
+def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch) -> None:
+    calls = []
+
+    class Failed:
+        returncode = 1
+        stdout = ""
+        stderr = "429 Too Many Requests"
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return Completed() if len(calls) > 1 else Failed()
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "opencode",
+                    "model": "opencode/muse-spark-1.3-contributor-free",
+                }
+            },
+            "fallback": {"model": "deepseek/deepseek-v4-pro"},
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={},
+        cwd=tmp_path,
+    )
+
+    assert response["fallback_used"] is True
+    assert response["fallback_model"] == "deepseek/deepseek-v4-pro"
+    assert response["fallback_from_model"] == "opencode/muse-spark-1.3-contributor-free"
+    assert calls[1][calls[1].index("-m") + 1] == "deepseek/deepseek-v4-pro"
+
+
+def test_loop_schema_rejects_bare_model_for_opencode_adapter() -> None:
+    loop = {
+        "version": 1,
+        "id": "bare-model",
+        "agents": {
+            "implement": {
+                "adapter": "opencode",
+                "model": "deepseek-v4-pro",
+            }
+        },
+        "steps": [{"id": "done", "kind": "terminal"}],
+    }
+    try:
+        validate_loop_definition(loop)
+    except ValueError as error:
+        assert "provider/model" in str(error)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_loop_schema_rejects_fallback_without_full_model_id() -> None:
+    for fallback in (
+        {"profile": "deepseek"},
+        {"model": "deepseek-v4-pro"},
+        {"model": 1},
+    ):
+        loop = {
+            "version": 1,
+            "id": "bad-fallback",
+            "fallback": fallback,
+            "steps": [{"id": "done", "kind": "terminal"}],
+        }
+        try:
+            validate_loop_definition(loop)
+        except ValueError as error:
+            assert "fallback" in str(error)
+        else:
+            raise AssertionError(f"expected ValueError for {fallback}")
+
+
 def test_build_context_compacts_large_events(tmp_path: Path) -> None:
     event = {
         "type": "agent_response",
