@@ -1,9 +1,10 @@
+import { renderToString } from "hono/jsx/dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import { LoginPage, safeNextPath } from "../src/components/LoginPage";
 
 describe("LoginPage", () => {
   it("renders the password form", () => {
-    const html = String(<LoginPage />);
+    const html = renderToString(<LoginPage />);
 
     expect(html).toContain('method="post"');
     expect(html).toContain('type="password"');
@@ -11,7 +12,7 @@ describe("LoginPage", () => {
   });
 
   it("shows an error when authentication fails", () => {
-    const html = String(<LoginPage error />);
+    const html = renderToString(<LoginPage error />);
 
     expect(html).toContain("Incorrect password");
   });
