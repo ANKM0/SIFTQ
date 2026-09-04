@@ -26,15 +26,21 @@ def test_profiles_have_no_worktree_codex_home_or_qwen_profile() -> None:
         )
     )["profiles"]
 
-    assert set(profiles) == {"main", "deepseek"}
+    assert set(profiles) == {"main", "deepseek", "burn"}
     assert all("codex_home" not in profile for profile in profiles.values())
     assert profiles["deepseek"]["env_keys"] == [
         "DEEPSEEK_API_KEY",
         "OPENCODE_API_KEY",
     ]
+    assert profiles["burn"]["loop"] == "burn_loop"
+    assert profiles["burn"]["env_keys"] == [
+        "DEEPSEEK_API_KEY",
+        "OPENROUTER_API_KEY",
+        "OPENCODE_API_KEY",
+    ]
 
 
-def test_deepseek_loop_selects_pro_for_design_and_flash_for_other_agents() -> None:
+def test_sub_loop_selects_go_luna_for_reviewers_and_muse_for_implementers() -> None:
     loop = yaml.safe_load(
         (REPOSITORY_ROOT / ".taqt" / "loops" / "sub_loop.yaml").read_text(
             encoding="utf-8"
@@ -42,14 +48,14 @@ def test_deepseek_loop_selects_pro_for_design_and_flash_for_other_agents() -> No
     )
     agents = loop["agents"]
 
-    assert agents["design"]["profile"] == "deepseek"
-    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["adapter"] == "opencode"
+    assert agents["design"]["model"] == "opencode-go/gpt-5.6-luna"
     for agent_name in ("test", "checker"):
-        assert agents[agent_name]["profile"] == "deepseek"
-        assert agents[agent_name]["model"] == "deepseek-v4-pro"
+        assert agents[agent_name]["adapter"] == "opencode"
+        assert agents[agent_name]["model"] == "opencode-go/gpt-5.6-luna"
     for agent_name in ("implement", "fix"):
-        assert agents[agent_name]["profile"] == "muse-spark-opencode-free"
-        assert agents[agent_name]["model"] == "muse-spark-1.3-contributor-free"
+        assert agents[agent_name]["adapter"] == "opencode"
+        assert agents[agent_name]["model"] == "opencode/muse-spark-1.3-contributor-free"
 
 
 def test_resolve_codex_home_uses_shared_default(tmp_path: Path, monkeypatch) -> None:

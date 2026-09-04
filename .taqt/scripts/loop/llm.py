@@ -42,6 +42,17 @@ def run_agent(
             child_environment=child_environment,
             fallback=loop_definition.get("fallback"),
         )
+    if adapter == "opencode" and not command:
+        return _run_opencode(
+            payload=payload,
+            agent_id=agent_id,
+            agent=agent,
+            step=step,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            child_environment=child_environment,
+            fallback=loop_definition.get("fallback"),
+        )
 
     if not command:
         return {
@@ -172,6 +183,103 @@ def _run_codex(
     return response
 
 
+def _run_opencode(
+    *,
+    payload: dict[str, Any],
+    agent_id: object,
+    agent: dict[str, Any],
+    step: dict[str, Any],
+    cwd: Path,
+    timeout_seconds: int,
+    child_environment: Mapping[str, str] | None,
+    fallback: Any = None,
+) -> dict[str, Any]:
+    workspace = cwd.resolve()
+    model = step.get("model") or agent.get("model") or os.environ.get("LOOP_OPENCODE_MODEL")
+    if not model or "/" not in str(model):
+        return {
+            "status": "failure",
+            "mode": "opencode",
+            "agent": agent_id,
+            "feedback": "unknown",
+            "stderr": f"opencode adapter requires a full model id (provider/model); got: {model!r}",
+        }
+    command = [
+        "opencode",
+        "run",
+        "-m",
+        str(model),
+        "--format",
+        "json",
+        "--dir",
+        str(workspace),
+        "--auto",
+    ]
+    variant = (
+        step.get("reasoning_effort")
+        or agent.get("reasoning_effort")
+        or os.environ.get("LOOP_OPENCODE_VARIANT")
+    )
+    if variant:
+        command.extend(["--variant", str(variant)])
+    extra_args = os.environ.get("LOOP_OPENCODE_EXTRA_ARGS")
+    if extra_args:
+        command.extend(shlex.split(extra_args))
+    command.extend(["--", str(payload["prompt"])])
+
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workspace,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**os.environ, **(child_environment or {})},
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError:
+        return {
+            "status": "failure",
+            "mode": "opencode",
+            "agent": agent_id,
+            "command": shlex.join(command[:-1]),
+            "feedback": "unknown",
+            "stderr": "opencode executable was not found",
+        }
+
+    parsed = _parse_opencode_stdout(completed.stdout)
+    response = {
+        "status": "success" if completed.returncode == 0 else "failure",
+        "mode": "opencode",
+        "agent": agent_id,
+        "command": shlex.join(command[:-1]),
+        "exit_code": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+        "parsed_json": bool(parsed),
+    }
+    if parsed:
+        response.update(parsed)
+        if completed.returncode != 0:
+            response["status"] = "failure"
+    if response["status"] != "success":
+        response.setdefault("feedback", "unknown")
+        if isinstance(fallback, dict) and is_opencode_fallback_error(completed.stdout, completed.stderr):
+            fb_model = fallback.get("model")
+            if isinstance(fb_model, str) and fb_model:
+                fb_agent = {**agent, "model": fb_model}
+                if isinstance(fallback.get("reasoning_effort"), str):
+                    fb_agent["reasoning_effort"] = fallback["reasoning_effort"]
+                retry = _run_opencode(payload=payload, agent_id=agent_id, agent=fb_agent, step=step, cwd=cwd, timeout_seconds=timeout_seconds, child_environment=child_environment, fallback=None)
+                retry["fallback_used"] = True
+                retry["fallback_model"] = fb_model
+                retry["fallback_from_model"] = model
+                retry["initial_failure"] = {"exit_code": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
+                return retry
+    return response
+
+
 def is_usage_limit_error(stdout: str, stderr: str) -> bool:
     text = f"{stdout}\n{stderr}".lower()
     return any(token in text for token in ("you've hit your usage limit", "usage limit", "usage_limit_reached", "rate_limit_reached"))
@@ -180,6 +288,43 @@ def is_usage_limit_error(stdout: str, stderr: str) -> bool:
 def is_fallback_error(stdout: str, stderr: str) -> bool:
     text = f"{stdout}\n{stderr}".lower()
     return is_usage_limit_error(stdout, stderr) or "recursive json schemas are not currently supported" in text
+
+
+def is_opencode_fallback_error(stdout: str, stderr: str) -> bool:
+    text = f"{stdout}\n{stderr}".lower()
+    return any(
+        token in text
+        for token in (
+            "usage limit",
+            "usage_limit_reached",
+            "rate_limit_reached",
+            "rate limited",
+            "too many requests",
+            "429",
+            "quota",
+            "overloaded",
+        )
+    )
+
+
+def _parse_opencode_stdout(stdout: str) -> dict[str, Any]:
+    texts: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        part = event.get("part")
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == "text" and isinstance(part.get("text"), str):
+            texts.append(part["text"])
+    return _parse_stdout("\n".join(texts))
 
 
 def _build_prompt(
