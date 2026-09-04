@@ -83,7 +83,6 @@ def _model_catalog(
 def expected_files(codex_home: Path) -> dict[Path, str]:
     catalog_dir = codex_home / MODEL_CATALOG_DIR
     deepseek_catalog = catalog_dir / "deepseek.json"
-    luna_catalog = catalog_dir / "luna-openrouter.json"
     muse_free_catalog = catalog_dir / "muse-spark-opencode-free.json"
     return {
         codex_home / "deepseek.config.toml": _profile_config(
@@ -97,20 +96,6 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 'base_url = "https://api.deepseek.com/"',
                 'wire_api = "responses"',
                 'env_key = "DEEPSEEK_API_KEY"',
-            ],
-        ),
-        codex_home / "luna-openrouter.config.toml": _profile_config(
-            model="openai/gpt-5.6-luna-pro",
-            provider="openrouter",
-            effort="high",
-            catalog=luna_catalog,
-            provider_block=[
-                "[model_providers.openrouter]",
-                'name = "OpenRouter"',
-                'base_url = "https://openrouter.ai/api/v1"',
-                'wire_api = "responses"',
-                'env_key = "OPENROUTER_API_KEY"',
-                'namespace_tools = false',
             ],
         ),
         codex_home / "muse-spark-opencode-free.config.toml": _profile_config(
@@ -133,17 +118,6 @@ def expected_files(codex_home: Path) -> dict[Path, str]:
                 display_name="DeepSeek V4 Pro",
                 description="DeepSeek V4 Pro for planning and review.",
                 efforts=["low", "high", "max"],
-            ),
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        luna_catalog: json.dumps(
-            _model_catalog(
-                slug="openai/gpt-5.6-luna-pro",
-                display_name="GPT-5.6 Luna Pro",
-                description="GPT-5.6 Luna Pro via OpenRouter for planning and review.",
-                efforts=["high", "xhigh", "medium", "low"],
             ),
             ensure_ascii=False,
             indent=2,
@@ -189,12 +163,6 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             "DEEPSEEK_API_KEY",
             codex_home / MODEL_CATALOG_DIR / "deepseek.json",
         ),
-        codex_home / "luna-openrouter.config.toml": (
-            "openai/gpt-5.6-luna-pro",
-            "openrouter",
-            "OPENROUTER_API_KEY",
-            codex_home / MODEL_CATALOG_DIR / "luna-openrouter.json",
-        ),
         codex_home / "muse-spark-opencode-free.config.toml": (
             "muse-spark-1.3-contributor-free",
             "opencode",
@@ -202,10 +170,7 @@ def validate(codex_home: Path, *, require_env: bool) -> list[str]:
             codex_home / MODEL_CATALOG_DIR / "muse-spark-opencode-free.json",
         ),
     }
-    namespace_tools_profiles = {
-        codex_home / "luna-openrouter.config.toml",
-        codex_home / "muse-spark-opencode-free.config.toml",
-    }
+    namespace_tools_profiles = {codex_home / "muse-spark-opencode-free.config.toml"}
     for path, (model, provider, env_key, catalog_path) in profile_expectations.items():
         if not path.is_file():
             continue

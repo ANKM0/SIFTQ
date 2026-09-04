@@ -14,7 +14,6 @@ def test_initialize_creates_supported_profiles(tmp_path: Path) -> None:
     created = initialize(tmp_path)
 
     assert tmp_path / "deepseek.config.toml" in created
-    assert tmp_path / "luna-openrouter.config.toml" in created
     assert tmp_path / "muse-spark-opencode-free.config.toml" in created
     assert not (tmp_path / "deepseek0731.config.toml").exists()
     assert not (tmp_path / "muse-spark-openrouter.config.toml").exists()
@@ -23,7 +22,6 @@ def test_initialize_creates_supported_profiles(tmp_path: Path) -> None:
 def test_validate_requires_supported_profiles_and_keys(tmp_path: Path, monkeypatch) -> None:
     initialize(tmp_path)
     monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setenv("OPENCODE_API_KEY", "opencode-key")
 
     assert validate(tmp_path, require_env=True) == []
@@ -32,11 +30,8 @@ def test_validate_requires_supported_profiles_and_keys(tmp_path: Path, monkeypat
 def test_profiles_use_expected_endpoints(tmp_path: Path) -> None:
     initialize(tmp_path)
 
-    luna = (tmp_path / "luna-openrouter.config.toml").read_text(encoding="utf-8")
     muse_free = (tmp_path / "muse-spark-opencode-free.config.toml").read_text(encoding="utf-8")
 
-    assert 'model = "openai/gpt-5.6-luna-pro"' in luna
-    assert 'env_key = "OPENROUTER_API_KEY"' in luna
     assert 'model = "muse-spark-1.3-contributor-free"' in muse_free
     assert 'base_url = "https://opencode.ai/zen/v1"' in muse_free
 
@@ -48,7 +43,7 @@ def test_catalogs_declare_required_reasoning_levels(tmp_path: Path) -> None:
         payload = json.loads(path.read_text(encoding="utf-8"))
         return {entry["effort"] for entry in payload["models"][0]["supported_reasoning_levels"]}
 
-    assert "xhigh" in efforts(tmp_path / "models" / "luna-openrouter.json")
+    assert "high" in efforts(tmp_path / "models" / "deepseek.json")
     assert "high" in efforts(tmp_path / "models" / "muse-spark-opencode-free.json")
 
 
@@ -58,7 +53,7 @@ def test_taskfile_exposes_supported_codex_tasks() -> None:
     )["tasks"]
 
     assert tasks["codex:deepseek"]["cmds"] == ["codex --profile deepseek {{.CLI_ARGS}}"]
-    assert tasks["codex:luna"]["cmds"] == ["codex --profile luna-openrouter {{.CLI_ARGS}}"]
+    assert "codex:luna" not in tasks
     assert tasks["codex:muse-spark:free"]["cmds"] == [
         "codex --profile muse-spark-opencode-free {{.CLI_ARGS}}"
     ]

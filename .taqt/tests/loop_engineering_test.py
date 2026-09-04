@@ -284,7 +284,7 @@ profiles:
     loop: sub_loop
     env_keys:
       - DEEPSEEK_API_KEY
-      - OPENROUTER_API_KEY
+      - OPENCODE_API_KEY
 """,
         encoding="utf-8",
     )
@@ -293,7 +293,7 @@ profiles:
 
     assert profiles["main"]["loop"] == "main_loop"
     assert profiles["deepseek"]["loop"] == "sub_loop"
-    assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENROUTER_API_KEY"]
+    assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENCODE_API_KEY"]
 
 
 def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
@@ -597,20 +597,20 @@ steps:
     assert loop["steps"][0]["reasoning_effort"] == "high"
 
 
-def test_main_loop_uses_luna_reviewers_and_muse_free_implementers() -> None:
+def test_main_loop_uses_deepseek_reviewers_and_muse_free_implementers() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
 
     agents = load_document(loop_path)["agents"]
 
     assert agents["checker"]["readonly"] is True
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
+    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["reasoning_effort"] == "high"
+    assert agents["test"]["model"] == "deepseek-v4-pro"
+    assert agents["test"]["reasoning_effort"] == "high"
     assert agents["implement"]["model"] == "muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
+    assert agents["checker"]["model"] == "deepseek-v4-pro"
+    assert agents["checker"]["reasoning_effort"] == "high"
 
 
 def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
@@ -658,7 +658,7 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert checker["next"] == "post_review"
 
 
-def test_luna_loop_assigns_roles_to_luna_and_muse_spark() -> None:
+def test_main_loop_assigns_roles_to_deepseek_and_muse_spark() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
 
     loop = load_document(loop_path)
@@ -669,21 +669,21 @@ def test_luna_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     steps = loop["steps"]
     assert {"design", "test", "implement", "fix", "checker"} == set(agents)
 
-    assert agents["design"]["profile"] == "luna-openrouter"
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["profile"] == "luna-openrouter"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
+    assert agents["design"]["profile"] == "deepseek"
+    assert agents["design"]["model"] == "deepseek-v4-pro"
+    assert agents["design"]["reasoning_effort"] == "high"
+    assert agents["test"]["profile"] == "deepseek"
+    assert agents["test"]["model"] == "deepseek-v4-pro"
+    assert agents["test"]["reasoning_effort"] == "high"
     assert agents["implement"]["profile"] == "muse-spark-opencode-free"
     assert agents["implement"]["model"] == "muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
     assert agents["fix"]["profile"] == "muse-spark-opencode-free"
     assert agents["fix"]["model"] == "muse-spark-1.3-contributor-free"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["profile"] == "luna-openrouter"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
+    assert agents["checker"]["profile"] == "deepseek"
+    assert agents["checker"]["model"] == "deepseek-v4-pro"
+    assert agents["checker"]["reasoning_effort"] == "high"
 
     assert agents["checker"]["readonly"] is True
     assert ".taqt/loops/" in agents["design"]["writes"]
