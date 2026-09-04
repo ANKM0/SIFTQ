@@ -126,6 +126,65 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
   await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
 });
 
+test("dismisses new task Status popover when clicking outside", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/tasks/new");
+
+  const statusDetails = page.locator("#new-task-meta details").first();
+  await statusDetails.locator("summary").click();
+  const popover = page.locator('[aria-label="Apply status to this task"]');
+  await expect(popover).toBeVisible();
+
+  await page.getByLabel("Title").click();
+  await expect(statusDetails).not.toHaveAttribute("open");
+  await expect(popover).toBeHidden();
+});
+
+test("dismisses new task Area popover when clicking outside", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/tasks/new");
+
+  const areaDetails = page.locator("#new-task-meta details").nth(1);
+  await areaDetails.locator("summary").click();
+  const popover = page.locator('[aria-label="Apply area to this task"]');
+  await expect(popover).toBeVisible();
+
+  await page.getByLabel("Title").click();
+  await expect(areaDetails).not.toHaveAttribute("open");
+  await expect(popover).toBeHidden();
+});
+
+test("closes new task Status and Area popovers with Cancel without changing selection", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/tasks/new");
+
+  const statusDetails = page.locator("#new-task-meta details").first();
+  await statusDetails.locator("summary").click();
+  await page
+    .locator('[aria-label="Apply status to this task"] [data-popover-cancel]')
+    .click();
+  await expect(statusDetails).not.toHaveAttribute("open");
+  await expect(page.locator('input[name="status"][value="do"]')).toBeChecked();
+
+  const areaDetails = page.locator("#new-task-meta details").nth(1);
+  await areaDetails.locator("summary").click();
+  await page.locator('[aria-label="Apply area to this task"] [data-popover-cancel]').click();
+  await expect(areaDetails).not.toHaveAttribute("open");
+  await expect(page.locator('input[name="area"][value="1"]')).toBeChecked();
+});
+
+test("closes new task popover when selecting a choice", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/tasks/new");
+
+  const statusDetails = page.locator("#new-task-meta details").first();
+  await statusDetails.locator("summary").click();
+  await page.locator('input[name="status"][value="done"]').check();
+  await expect(statusDetails).not.toHaveAttribute("open");
+});
+
 test("dismisses task detail Status and Area popovers when clicking outside", async ({ page }) => {
   await signIn(page);
 

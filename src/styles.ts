@@ -576,6 +576,16 @@ details:not([open]) .popover {
   box-shadow: inset 4px 0 0 #0969da;
 }
 
+button.status-choice {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
 .check {
   align-items: center;
   background: #0969da;
