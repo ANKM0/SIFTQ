@@ -13,6 +13,15 @@ function request(path: string, init?: RequestInit) {
   return authenticatedRequest(path, repo, init);
 }
 
+function cardIds(body: string): string[] {
+  const ids: string[] = [];
+  for (const match of body.matchAll(/data-task-id="([^"]+)"/g)) {
+    const id = match[1];
+    if (id !== undefined) ids.push(id);
+  }
+  return ids;
+}
+
 describe("Matrix page", () => {
   it("renders the full page and an HTMX fragment", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
@@ -46,6 +55,46 @@ describe("Matrix page", () => {
     expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
     expect(body).toContain('href="/tasks/task-1?from=matrix"');
     expect(body).toContain("status--do");
+  });
+});
+
+describe("Matrix area display sort", () => {
+  it("sorts area cards by title when ?sort=title", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+    await repo.insert(taskFixture({ id: "m", title: "Mango", area: 1, order: 2 }));
+
+    const body = await (await request("/?sort=title")).text();
+
+    expect(cardIds(body)).toEqual(["a", "m", "z"]);
+  });
+
+  it("keeps order as the default sort", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/")).text();
+
+    expect(cardIds(body)).toEqual(["z", "a"]);
+  });
+
+  it("falls back to order sort for an unknown sort key", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/?sort=status")).text();
+
+    expect(cardIds(body)).toEqual(["z", "a"]);
+  });
+
+  it("keeps sorted tasks in their original area", async () => {
+    await repo.insert(taskFixture({ id: "b", title: "Banana", area: 2, order: 0 }));
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/?sort=title")).text();
+
+    expect(cardIds(body)).toEqual(["a", "z", "b"]);
   });
 });
 
