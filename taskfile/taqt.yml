@@ -15,7 +15,7 @@ tasks:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
   auto:
-    desc: Run a taqt:enabled task through run, commit, push, PR, and optional merge routing.
+    desc: Run a taqt:enabled task through run, commit, push, PR, squash merge, and cleanup.
     cmds:
       - uv run python -m taqt.task_auto {{.CLI_ARGS}}
 

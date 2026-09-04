@@ -1937,6 +1937,45 @@ def test_task_auto_dry_run_includes_merge_route(tmp_path: Path, capsys) -> None:
     assert "taqt.merge" in output
 
 
+def test_task_auto_dry_run_defaults_to_merge_and_cleanup(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=56,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    assert task_auto_main([str(task_path), "--workspace", str(tmp_path / "worktree")]) == 0
+
+    output = capsys.readouterr().out
+    for step in ("taqt.run", "taqt.commit", "taqt.push", "taqt.pr", "taqt.merge", "taqt.cleanup"):
+        assert step in output
+    assert output.index("taqt.pr") < output.index("taqt.merge") < output.index("taqt.cleanup")
+    assert "--strategy squash" in output
+    assert "--delete-branch" in output
+    assert "--delete-local-branch" in output
+    assert "--force-worktree" in output
+
+
+def test_task_auto_post_pr_steps_have_explicit_opt_outs(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=57,
+        loop="development_feedback_loop",
+        task_root=tmp_path,
+    )
+
+    assert task_auto_main([str(task_path), "--no-merge", "--workspace", str(tmp_path)]) == 0
+    no_merge_output = capsys.readouterr().out
+    assert "taqt.merge" not in no_merge_output
+    assert "taqt.cleanup" not in no_merge_output
+
+    assert task_auto_main([str(task_path), "--no-cleanup-worktree", "--workspace", str(tmp_path)]) == 0
+    no_cleanup_output = capsys.readouterr().out
+    assert "taqt.merge" in no_cleanup_output
+    assert "taqt.cleanup" not in no_cleanup_output
+
+
 def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
@@ -1989,6 +2028,53 @@ def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, c
     assert ".taqt/worktrees/ISSUE-50" in output
     assert ".taqt/worktrees/ISSUE-51" in output
     assert output.count("taqt.task_auto") == 2
+
+
+def test_task_worker_defaults_to_merge_and_cleanup(tmp_path: Path, capsys) -> None:
+    upsert_issue_task(
+        repo="owner/repo",
+        issue_number=58,
+        loop="development_feedback_loop",
+        issue_title="Task 58",
+        issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
+        task_root=tmp_path,
+    )
+
+    assert task_worker_main(["--task-root", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "--merge" in output
+    assert "--cleanup-worktree" in output
+    assert "--delete-local-branch" in output
+    assert "--force-worktree" in output
+
+
+def test_task_worker_supports_post_pr_opt_outs(tmp_path: Path, capsys) -> None:
+    upsert_issue_task(
+        repo="owner/repo",
+        issue_number=59,
+        loop="development_feedback_loop",
+        issue_title="Task 59",
+        issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
+        task_root=tmp_path,
+    )
+
+    assert task_worker_main(
+        [
+            "--task-root",
+            str(tmp_path),
+            "--no-merge",
+            "--no-cleanup-worktree",
+            "--no-delete-local-branch",
+            "--no-force-worktree",
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert "--no-merge" in output
+    assert "--no-cleanup-worktree" in output
+    assert "--no-delete-local-branch" in output
+    assert "--no-force-worktree" in output
 
 
 def test_task_worker_plans_decomposed_child_tasks(tmp_path: Path, capsys) -> None:
