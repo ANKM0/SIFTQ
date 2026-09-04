@@ -11,10 +11,20 @@ export const HTMX_CONFLICT_SWAP_SCRIPT = [
 ].join("\n");
 export const POPOVER_DISMISS_SCRIPT = [
   "document.addEventListener('click', function (event) {",
+  "  var target = event.target;",
+  "  var cancel = target && target.closest ? target.closest('[data-popover-cancel]') : null;",
+  "  Array.prototype.forEach.call(document.querySelectorAll('[data-popover-close][open]'), function (details) {",
+  "    if (cancel ? details.contains(cancel) : !details.contains(target)) details.removeAttribute('open');",
+  "  });",
   "  var panel = document.querySelector('[data-popover-close-href]');",
   "  if (!panel || panel.contains(event.target)) return;",
   "  var href = panel.getAttribute('data-popover-close-href');",
   "  if (href) window.location.assign(href);",
+  "});",
+  "document.addEventListener('change', function (event) {",
+  "  var target = event.target;",
+  "  var details = target && target.closest ? target.closest('[data-popover-close]') : null;",
+  "  if (details) details.removeAttribute('open');",
   "});",
 ].join("\n");
 export const MATRIX_DND_SCRIPT = [

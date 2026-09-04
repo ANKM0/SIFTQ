@@ -1,4 +1,4 @@
-# ADR 0037: Matrix area display sort
+# ADR 0038: Matrix area display sort
 
 ## 決定
 
