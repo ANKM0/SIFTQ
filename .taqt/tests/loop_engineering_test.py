@@ -264,17 +264,17 @@ blocked_reason: null
     assert state["status"] == "done"
 
 
-def test_deepseek_loop_definition_uses_pro_for_design_and_flash_for_implementation() -> None:
+def test_sub_loop_definition_uses_go_luna_for_reviewers_and_muse_for_implementation() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     loop = load_document(repository_root / ".taqt/loops/sub_loop.yaml")
 
     validate_loop_definition(loop)
     assert loop["agents"]["design"]["adapter"] == "opencode"
-    assert loop["agents"]["design"]["model"] == "deepseek/deepseek-v4-pro"
+    assert loop["agents"]["design"]["model"] == "opencode-go/gpt-5.6-luna"
     assert "profile" not in loop["agents"]["design"]
     assert loop["agents"]["implement"]["adapter"] == "opencode"
     assert loop["agents"]["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert loop["agents"]["checker"]["model"] == "deepseek/deepseek-v4-pro"
+    assert loop["agents"]["checker"]["model"] == "opencode-go/gpt-5.6-luna"
     assert "judge" not in loop["agents"]
 
 
@@ -603,24 +603,24 @@ steps:
     assert loop["steps"][0]["reasoning_effort"] == "high"
 
 
-def test_main_loop_uses_deepseek_reviewers_and_muse_free_implementers() -> None:
+def test_main_loop_uses_luna_reviewers_and_muse_free_implementers() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
 
     agents = load_document(loop_path)["agents"]
 
     assert agents["checker"]["readonly"] is True
     assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["test"]["reasoning_effort"] == "high"
+    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["design"]["reasoning_effort"] == "xhigh"
+    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["test"]["reasoning_effort"] == "xhigh"
     assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["checker"]["reasoning_effort"] == "high"
+    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["checker"]["reasoning_effort"] == "xhigh"
 
 
-def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
+def test_sub_loop_uses_go_luna_reviewers_and_muse_implementers() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
 
     loop = load_document(loop_path)
@@ -635,17 +635,17 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
 
     assert agents["checker"]["readonly"] is True
     assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
+    assert agents["design"]["model"] == "opencode-go/gpt-5.6-luna"
     assert "profile" not in agents["design"]
-    assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["test"]["reasoning_effort"] == "high"
+    assert agents["design"]["reasoning_effort"] == "xhigh"
+    assert agents["test"]["model"] == "opencode-go/gpt-5.6-luna"
+    assert agents["test"]["reasoning_effort"] == "xhigh"
     assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
     assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["checker"]["reasoning_effort"] == "high"
+    assert agents["checker"]["model"] == "opencode-go/gpt-5.6-luna"
+    assert agents["checker"]["reasoning_effort"] == "xhigh"
 
     step_ids = [step["id"] for step in steps]
     assert step_ids.index("design") < step_ids.index("test")
@@ -662,7 +662,7 @@ def test_deepseek_loop_skips_decompose_orchestrate_and_judge() -> None:
     assert checker["next"] == "post_review"
 
 
-def test_main_loop_assigns_roles_to_deepseek_and_muse_spark() -> None:
+def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
 
     loop = load_document(loop_path)
@@ -674,16 +674,16 @@ def test_main_loop_assigns_roles_to_deepseek_and_muse_spark() -> None:
     assert {"design", "test", "implement", "fix", "checker"} == set(agents)
 
     assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["design"]["reasoning_effort"] == "high"
-    assert agents["test"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["test"]["reasoning_effort"] == "high"
+    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["design"]["reasoning_effort"] == "xhigh"
+    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["test"]["reasoning_effort"] == "xhigh"
     assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
     assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "deepseek/deepseek-v4-pro"
-    assert agents["checker"]["reasoning_effort"] == "high"
+    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
+    assert agents["checker"]["reasoning_effort"] == "xhigh"
 
     assert agents["checker"]["readonly"] is True
     assert ".taqt/loops/" in agents["design"]["writes"]
@@ -706,7 +706,7 @@ def test_main_loop_assigns_roles_to_deepseek_and_muse_spark() -> None:
     assert routes["unknown"] == "human"
 
 
-def test_deepseek_loop_verification_and_decide_are_model_free() -> None:
+def test_sub_loop_verification_and_decide_are_model_free() -> None:
     loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
 
     loop = load_document(loop_path)
