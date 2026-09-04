@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
-from loop.llm import run_agent
+from loop.llm import is_fallback_error, run_agent
 from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
@@ -1176,6 +1176,10 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert kwargs["input"].startswith("Role: implementation")
     assert kwargs["env"]["DEEPSEEK_API_KEY"] == "secret"
     assert kwargs["env"]["CODEX_HOME"] == "/tmp/deepseek"
+
+
+def test_recursive_schema_error_uses_provider_fallback() -> None:
+    assert is_fallback_error("", "Recursive JSON schemas are not currently supported")
 
 
 def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:

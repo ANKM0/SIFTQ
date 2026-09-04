@@ -35,6 +35,12 @@ def test_profiles_use_expected_endpoints(tmp_path: Path) -> None:
     assert 'model = "muse-spark-1.3-contributor-free"' in muse_free
     assert 'base_url = "https://opencode.ai/zen/v1"' in muse_free
 
+    catalog = json.loads(
+        (tmp_path / "models" / "muse-spark-opencode-free.json").read_text(encoding="utf-8")
+    )
+    assert catalog["models"][0]["web_search_tool_type"] == "text"
+    assert catalog["models"][0]["supports_search_tool"] is False
+
 
 def test_catalogs_declare_required_reasoning_levels(tmp_path: Path) -> None:
     initialize(tmp_path)

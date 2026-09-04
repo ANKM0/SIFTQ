@@ -157,7 +157,7 @@ def _run_codex(
             response["status"] = "failure"
     if response["status"] != "success":
         response.setdefault("feedback", "unknown")
-        if isinstance(fallback, dict) and is_usage_limit_error(completed.stdout, completed.stderr):
+        if isinstance(fallback, dict) and is_fallback_error(completed.stdout, completed.stderr):
             fb_profile = fallback.get("profile")
             if isinstance(fb_profile, str) and fb_profile:
                 fb_agent = {**agent, "profile": fb_profile}
@@ -175,6 +175,11 @@ def _run_codex(
 def is_usage_limit_error(stdout: str, stderr: str) -> bool:
     text = f"{stdout}\n{stderr}".lower()
     return any(token in text for token in ("you've hit your usage limit", "usage limit", "usage_limit_reached", "rate_limit_reached"))
+
+
+def is_fallback_error(stdout: str, stderr: str) -> bool:
+    text = f"{stdout}\n{stderr}".lower()
+    return is_usage_limit_error(stdout, stderr) or "recursive json schemas are not currently supported" in text
 
 
 def _build_prompt(
