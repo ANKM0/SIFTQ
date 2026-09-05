@@ -28,6 +28,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | REQ-TM-004 | ユーザーは、Matrix 上でタスクの分類先と表示順を直接調整したい。 | domain.md, screens.md |
 | REQ-TM-005 | 開発者は、固定データを使って本番 UI の操作をローカルで確認したい。 | screens.md |
 | REQ-TM-006 | ユーザーは、Matrix 上からタスクを完了、見送り、削除したい。 | domain.md, screens.md |
+| REQ-TM-007 | ユーザーは、Task list で確認したい status のタスクだけを表示したい。 | domain.md, screens.md |
 
 ## 仕様
 
@@ -35,7 +36,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | --- | --- | --- | --- |
 | SPEC-TM-001 | REQ-TM-001 | Task は title、description、status、area、order を持つ。 | BDD-TM-001 |
 | SPEC-TM-002 | REQ-TM-001, REQ-TM-002 | 実行対象の Task は Matrix と Task list に表示される。 | BDD-TM-002 |
-| SPEC-TM-003 | REQ-TM-002 | 完了した Task と見送った Task は Matrix に表示されず、Task list には表示される。 | BDD-TM-003 |
+| SPEC-TM-003 | REQ-TM-002 | 完了した Task と見送った Task は Matrix に表示されず、Task list で選択すると表示される。 | BDD-TM-003 |
 | SPEC-TM-004 | REQ-TM-001 | Matrix は Task を area ごとに 4 象限へ分けて表示する。 | BDD-TM-004 |
 | SPEC-TM-005 | REQ-TM-003 | ユーザーは Task の title と description を作成・編集できる。 | BDD-TM-005 |
 | SPEC-TM-006 | REQ-TM-003 | ユーザーは Task の status と area を detail から変更できる。 | BDD-TM-006 |
@@ -48,6 +49,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-013 | REQ-TM-006 | `delete` を選択すると確認ダイアログを表示し、確認後に task を完全削除する。 | BDD-TM-014, BDD-TM-015 |
 | SPEC-TM-014 | REQ-TM-006 | delete 確認中は overlay により背後の画面を操作できない。 | BDD-TM-014 |
 | SPEC-TM-015 | REQ-TM-006 | Matrix の task action menu は右クリックによるマウス操作だけを対象とし、操作ボタン、キーボード、タッチ端末の長押し、スクリーンリーダーは対象外とする。 | BDD-TM-011 |
+| SPEC-TM-016 | REQ-TM-007 | Task list は `do`、`done`、`skip` の status filter を持ち、選択した status の task だけを表示する。初期値は `do` とし、選択状態を再読み込み後も維持する。 | BDD-TM-016 |
 
 ## BDD 候補
 
@@ -68,6 +70,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-013 | SPEC-TM-012 | Matrix で `skip` を選択すると task が Matrix から外れ、Task list には残る。 |
 | BDD-TM-014 | SPEC-TM-013, SPEC-TM-014 | delete confirmation をキャンセルすると task は残り、確認中は背後を操作できない。 |
 | BDD-TM-015 | SPEC-TM-013 | delete confirmation で削除を確定すると task が Matrix と Task list から消える。 |
+| BDD-TM-016 | SPEC-TM-016 | Task list で status を切り替えると、選択した status の task だけが表示され、再読み込み後も選択状態が維持される。 |
 
 ## 未決事項
 

@@ -88,7 +88,7 @@ test("changes a Matrix task to done from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="done"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks");
+  await page.goto("/tasks?status=done");
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--done")).toBeVisible();
 });
@@ -103,7 +103,7 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="skip"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks");
+  await page.goto("/tasks?status=skip");
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
@@ -166,6 +166,39 @@ test("creates a task from the task list and returns to the task list", async ({ 
   await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 });
 
+test("filters the task list by status and retains it after reload", async ({ page }) => {
+  await signIn(page);
+
+  const suffix = Date.now();
+  for (const status of ["do", "done", "skip"] as const) {
+    const title = `E2E filter ${status} ${suffix}`;
+    await page.goto(`/tasks/new?status=${status}`);
+    await page.getByLabel("Title").fill(title);
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  }
+
+  await page.goto("/tasks");
+  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).not.toBeVisible();
+  await expect(page.getByText(`E2E filter skip ${suffix}`, { exact: true })).not.toBeVisible();
+
+  await page.locator('a[href="/tasks?status=done"]').click();
+  await expect(page).toHaveURL(/\/tasks\?status=done$/);
+  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).not.toBeVisible();
+
+  await page.reload();
+  await expect(page).toHaveURL(/\/tasks\?status=done$/);
+  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
+
+  await page.goto("/");
+  await page.locator('nav.nav a[href="/tasks"]').click();
+  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.locator('a[href="/tasks?status=do"][aria-current="true"]')).toBeVisible();
+  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
+});
+
 test("keeps new-task inputs while changing Status and Area", async ({ page }) => {
   const title = `Retained title ${Date.now()}`;
   await signIn(page);
@@ -186,6 +219,7 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await page.goto("/tasks?status=done");
   await page.getByText(title, { exact: true }).click();
   await expect(page.locator("#task-meta .status--done")).toHaveText("done");
   await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
@@ -285,6 +319,7 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page).toHaveURL(/\/tasks$/);
+  if (kind === "status") await page.goto(`/tasks?status=${value}`);
   await expect(page.getByText(`${title} saved`, { exact: true })).toBeVisible();
 }
 

@@ -41,4 +41,3 @@
 | [ADR 0035: 画面遷移図の生成ツールとして、D2を採用する](0035-adopt-d2-for-screen-flow-diagram.md) | Accepted. | 画面遷移図の生成ツールとして、D2を採用する |
 | [ADR 0036: Adopt Better Auth as future authentication migration target](0036-adopt-better-auth-as-future-auth-migration-target.md) | Accepted. | 将来のユーザー別認証・認可の移行先として Better Auth を採用し、当面は共有パスワード認証を維持する。 |
 | [ADR 0037: LLMクライアントをcodexからopencodeに変更する](0037-switch-llm-client-to-opencode.md) | Accepted. | LLMクライアントをcodexからopencodeに変更する。 |
-| [ADR 0038: Matrix area display sort](0038-matrix-area-display-sort.md) | Accepted. | Matrix の area 内ソートは表示専用とし、サーバー側で並べ替え、永続 `order` を変更しない。 |
