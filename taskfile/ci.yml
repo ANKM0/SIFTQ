@@ -33,27 +33,46 @@ tasks:
     cmds:
       - task: setup:python
       - task: setup:frontend:ci
+      - task: ci:fast:checks
+
+  ci:fast:checks:
+    desc: Run independent fast checks in parallel.
+    deps:
+      - ci:markdown
+      - ci:lint:task-refs
+      - ci:lint:codex-task-perms
+      - ci:lint
+      - ci:lint:python
+      - ci:security
+      - ci:performance
+      - ci:requirements
+      - ci:architecture
+      - ci:glossary
+      - ci:docs
+      - ci:typecheck
+      - ci:test:unit
+
+  ci:docs-fast:
+    desc: Run the lightweight gate for documentation-only changes.
+    cmds:
       - task: ci:markdown
       - task: ci:lint:task-refs
       - task: ci:lint:codex-task-perms
-      - task: ci:lint
-      - task: ci:lint:python
-      - task: ci:security
-      - task: ci:performance
-      - task: ci:requirements
-      - task: ci:architecture
       - task: ci:glossary
       - task: ci:docs
-      - task: ci:typecheck
-      - task: ci:test:unit
 
   ci:extended:
     desc: Run the slow static checks (build, duplication, dead code).
     cmds:
       - task: setup:frontend:ci
-      - task: ci:build
-      - task: ci:duplicate
-      - task: ci:dead-code
+      - task: ci:extended:checks
+
+  ci:extended:checks:
+    desc: Run independent extended checks in parallel.
+    deps:
+      - ci:build
+      - ci:duplicate
+      - ci:dead-code
 
   ci:commit-messages:
     desc: Check commit message format for the current branch.

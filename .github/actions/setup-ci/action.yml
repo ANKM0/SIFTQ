@@ -1,0 +1,55 @@
+name: Set up CI tools
+description: Install the small set of tools used by the repository CI tasks.
+inputs:
+  frontend:
+    description: Install Bun and cache frontend dependencies.
+    required: false
+    default: "true"
+  playwright:
+    description: Cache Playwright browsers.
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Set up Task
+      uses: go-task/setup-task@v1
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Restore frontend dependencies
+      if: inputs.frontend == 'true'
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-bun-1.4.0-${{ hashFiles('bun.lock') }}
+
+    - name: Restore Playwright browsers
+      if: inputs.playwright == 'true'
+      uses: actions/cache@v4
+      with:
+        path: taskfile/tmp/playwright-browsers
+        key: playwright-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lock') }}
+
+    - name: Set up Bun
+      if: inputs.frontend == 'true'
+      uses: oven-sh/setup-bun@v2.2.0
+      with:
+        bun-version: 1.4.0
+
+    - name: Add local frontend binaries to PATH
+      if: inputs.frontend == 'true'
+      shell: bash
+      run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+
+    - name: Verify CI tools
+      shell: bash
+      run: |
+        set -eu
+        command -v task
+        command -v uv
+        command -v rg
+        if [ "${{ inputs.frontend }}" = "true" ]; then
+          command -v bun
+        fi

@@ -18,61 +18,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Restore aqua tools cache
-        id: cache-aqua
-        uses: actions/cache@v4
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
         with:
-          path: ~/.local/share/aquaproj-aqua
-          key: aqua-${{ runner.os }}-${{ hashFiles('aqua.yaml', 'aqua-policy.yaml') }}
-
-      - name: Restore Vite+ cache
-        id: cache-vp
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/vite-plus
-          key: vp-${{ runner.os }}-v1.18.0
-
-      - name: Restore Playwright browsers cache
-        uses: actions/cache@v4
-        with:
-          path: taskfile/tmp/playwright-browsers
-          key: playwright-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lock') }}
-
-      - name: Install aqua
-        if: steps.cache-aqua.outputs.cache-hit != 'true'
-        uses: aquaproj/aqua-installer@v3.1.2
-        with:
-          aqua_version: v2.59.0
-
-      - name: Add cached aqua to PATH
-        if: steps.cache-aqua.outputs.cache-hit == 'true'
-        run: echo "$HOME/.local/share/aquaproj-aqua/bin" >> "$GITHUB_PATH"
-
-      - name: Install repository tools
-        if: steps.cache-aqua.outputs.cache-hit != 'true'
-        run: |
-          aqua policy allow aqua-policy.yaml
-          aqua install
-
-      - name: Allow aqua policy
-        if: steps.cache-aqua.outputs.cache-hit == 'true'
-        run: aqua policy allow aqua-policy.yaml
-
-      - name: Set up Vite+
-        if: steps.cache-vp.outputs.cache-hit != 'true'
-        uses: voidzero-dev/setup-vp@v1.18.0
-
-      - name: Add cached Vite+ to PATH
-        if: steps.cache-vp.outputs.cache-hit == 'true'
-        run: echo "$HOME/.local/share/vite-plus/bin" >> "$GITHUB_PATH"
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version: 1.4.0
-
-      - name: Verify tools
-        run: command -v task && command -v vp && command -v bun
+          playwright: "true"
 
       - name: Run E2E with retries
         run: task ci:test:e2e:nightly

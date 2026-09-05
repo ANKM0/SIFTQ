@@ -101,3 +101,17 @@ fast gate（required、10秒目標）とextended（非blocking）に分割する
 - `aqua.yaml`のjob毎分割：cache hit時の`aqua install`スキップで同等効果のため見送り。
 
 残課題（別issue化を推奨）：自作コンテナ化によるsetup約13秒の消去。
+
+## 追加高速化（#338 follow-up）
+
+Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネックと判明した。
+
+- `setup-vp`は、`bun install`で導入される`node_modules/.bin/vp`をPATHへ追加することで不要になる。
+- aquaはCIで必要な`task`・`uv`・`rg`のためだけに使われていたため、`go-task/setup-task`・`astral-sh/setup-uv`へ分離する。`rg`はrunner標準を利用する。
+- `node_modules`を`bun.lock`キーで直接キャッシュする。Bun storeの復元はinstallより遅かったため採用しない。
+- fastの独立チェックとextendedの静的チェックをTaskの並列`deps`へ移す。
+- commit message checkをchanges jobへ移し、fast jobの処理から外す。
+- docs-only変更では同じrequired job名のまま`ci:docs-fast`へ切り替え、frontend依存を導入しない。
+- feature branchのpushをCI対象から外し、`pull_request`と`main` pushだけを対象にする。同じcommitのpush/PR二重実行を防ぐ。
+
+これにより、通常のPRではfast gateの処理を約10秒未満、docs-only変更では約1秒のローカルtask処理まで短縮できる見込みである。ただしGitHub Actionsのrunner起動・checkout・action実行時間を含むjob全体の10秒達成は、hosted runnerでは別途検証が必要である。
