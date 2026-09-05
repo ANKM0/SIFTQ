@@ -88,7 +88,7 @@ test("changes a Matrix task to done from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="done"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks");
+  await page.goto("/tasks?status=done");
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--done")).toBeVisible();
 });
@@ -103,7 +103,7 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="skip"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks");
+  await page.goto("/tasks?status=skip");
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
