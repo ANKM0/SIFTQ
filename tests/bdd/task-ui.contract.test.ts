@@ -45,7 +45,7 @@ describe("Matrix page", () => {
     expect(body).toContain('data-task-id="task-1"');
     expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
     expect(body).toContain('href="/tasks/task-1?from=matrix"');
-    expect(body).toContain("status--do");
+    expect(body).not.toContain("status--do");
   });
 });
 

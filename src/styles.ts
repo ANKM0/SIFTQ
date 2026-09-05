@@ -297,6 +297,7 @@ a {
 }
 
 .task-card {
+  border-color: #24292f;
   box-shadow: 0 1px 2px rgb(31 35 40 / 12%);
   display: flex;
   flex-direction: column;

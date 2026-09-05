@@ -18,6 +18,13 @@ describe("styles", () => {
     expect(matrix?.[0]).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
   });
 
+  it("uses a dark border for Matrix cards against the light Matrix frame", () => {
+    const taskCard = STYLES_CSS.match(/(?:^|\n)\.task-card\s*\{[^}]*\}/);
+    const matrixAxis = STYLES_CSS.match(/(?:^|\n)\.matrix-axis\s*\{[^}]*\}/);
+    expect(taskCard?.[0]).toContain("border-color: #24292f;");
+    expect(matrixAxis?.[0]).toContain("border: 1px solid #d0d7de;");
+  });
+
   it("places the four quadrant areas in their Matrix grid cells", () => {
     const q1 = STYLES_CSS.match(/(?:^|\n)\.area--q1\s*\{[^}]*\}/);
     expect(q1?.[0]).toContain("grid-column: 1;");

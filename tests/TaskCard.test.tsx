@@ -10,4 +10,10 @@ describe("TaskCard", () => {
     expect(html).toContain('draggable="true"');
     expect(html).toContain("seed task");
   });
+
+  it("does not render the task status badge", () => {
+    const html = renderToString(<TaskCard task={taskFixture({ status: "do" })} />);
+    expect(html).not.toContain("status--do");
+    expect(html).not.toContain(">do</span>");
+  });
 });
