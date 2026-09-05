@@ -95,7 +95,7 @@ tasks:
           else
             audit_status=$?
             cat "$output" >&2
-            if rg -q '(^|[^0-9])5[0-9]{2}([^0-9]|$)' "$output" || [ "$audit_status" -eq 124 ]; then
+            if grep -qE '(^|[^0-9])5[0-9]{2}([^0-9]|$)' "$output" || [ "$audit_status" -eq 124 ]; then
               echo "Skipping dependency audit because the npm advisory API is unavailable." >&2
             else
               exit 1
@@ -159,7 +159,7 @@ tasks:
         tasks="$(mktemp)"
         trap 'rm -f "$refs" "$tasks"' EXIT
 
-        rg '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
+        grep -E '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
           | sed -E 's/^[[:space:]]*run:[[:space:]]*task[[:space:]]*//; s/[[:space:]].*$//; /^$/d' \
           | sort -u > "$refs"
         task --list --json \
@@ -185,7 +185,7 @@ tasks:
         task --list --json \
           | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
           | sort -u > "$tasks"
-        rg 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
+        grep -E 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
           | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
           | sort -u > "$allowed"
 

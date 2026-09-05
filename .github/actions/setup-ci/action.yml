@@ -49,7 +49,6 @@ runs:
         set -eu
         command -v task
         command -v uv
-        command -v rg
         if [ "${{ inputs.frontend }}" = "true" ]; then
           command -v bun
         fi
