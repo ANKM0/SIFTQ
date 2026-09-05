@@ -169,6 +169,7 @@ tasks:
     desc: Run ruff on scripts/ci with the safe pyflakes rule set.
     cmds:
       - uv run ruff check scripts/ci --select E4,E7,E9,F
+      - uv run python scripts/ci/check_package_version.py
 
   ci:lint:ts-fast:
     desc: Run fast lint on src and tests.
