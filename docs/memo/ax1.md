@@ -118,15 +118,15 @@ Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネッ�
 
 ### 追加施策の実測
 
-対象run：`33948721805`（追加施策反映後、全job成功、node_modules cache hit）。
+対象run：`33949022444`（追加施策反映後、全job成功、node_modules cache hit）。
 
 | job | 時間 | 備考 |
 |---|---:|---|
 | `changes` | 5秒 | commit message checkを移動済み |
-| `fast` | 22秒 | setup約11秒、fast gate約7秒 |
-| `extended` | 19秒 | setup込み。静的checkは並列実行 |
-| `e2e` | 41秒 | Playwright browser cache hit、setup込み |
-| 壁時計 | 約54秒 | feature branchのpush runは発生せずPR runのみ |
+| `fast` | 21秒 | setup約11秒、fast gate約6秒 |
+| `extended` | 26秒 | setup込み。静的checkは並列実行 |
+| `e2e` | 48秒 | Playwright browser cache hit、setup込み |
+| 壁時計 | 約56秒 | feature branchのpush runは発生せずPR runのみ |
 
 追加施策の効果：
 
