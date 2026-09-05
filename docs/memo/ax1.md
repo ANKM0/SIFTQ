@@ -115,3 +115,26 @@ Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネッ�
 - feature branchのpushをCI対象から外し、`pull_request`と`main` pushだけを対象にする。同じcommitのpush/PR二重実行を防ぐ。
 
 これにより、通常のPRではfast gateの処理を約10秒未満、docs-only変更では約1秒のローカルtask処理まで短縮できる見込みである。ただしGitHub Actionsのrunner起動・checkout・action実行時間を含むjob全体の10秒達成は、hosted runnerでは別途検証が必要である。
+
+### 追加施策の実測
+
+対象run：`33948721805`（追加施策反映後、全job成功、node_modules cache hit）。
+
+| job | 時間 | 備考 |
+|---|---:|---|
+| `changes` | 5秒 | commit message checkを移動済み |
+| `fast` | 22秒 | setup約11秒、fast gate約7秒 |
+| `extended` | 19秒 | setup込み。静的checkは並列実行 |
+| `e2e` | 41秒 | Playwright browser cache hit、setup込み |
+| 壁時計 | 約54秒 | feature branchのpush runは発生せずPR runのみ |
+
+追加施策の効果：
+
+- `setup-vp`とVite+ cacheを削除し、`node_modules/.bin/vp`を利用した。
+- aqua cacheを削除し、`go-task/setup-task`と`astral-sh/setup-uv`へ分離した。
+- `node_modules`（約254MB）を直接cacheし、frontend installを約10msまで短縮した。
+- fast gateの独立checkを並列化し、ローカルの`task ci:fast`は約0.8〜2.6秒で完了した。
+- docs-only変更は`ci:docs-fast`へ分岐し、frontend依存を導入しない。
+- feature branchのpush triggerを削除し、同一commitのpush/PR二重実行を解消した。
+
+残る制約：hosted runnerのjob setupが約11秒あるため、fast job全体の10秒は未達。10秒をjob全体のSLOとする場合は、Task・uv・Bun・依存を焼き込んだcontainer、または常駐self-hosted runnerが必要である。
