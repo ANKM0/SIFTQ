@@ -13,6 +13,24 @@ function request(path: string, init?: RequestInit) {
   return authenticatedRequest(path, repo, init);
 }
 
+function cardIds(body: string): string[] {
+  const ids: string[] = [];
+  for (const match of body.matchAll(/data-task-id="([^"]+)"/g)) {
+    const id = match[1];
+    if (id !== undefined) ids.push(id);
+  }
+  return ids;
+}
+
+function cardIdsInArea(body: string, area: number): string[] {
+  const section = body.match(new RegExp(`<section[^>]*data-drop-area="${area}"[\\s\\S]*?</section>`))?.[0] ?? "";
+  return cardIds(section);
+}
+
+function cardOpeningTag(body: string, id: string): string {
+  return body.match(new RegExp(`<a[^>]*data-task-id="${id}"[^>]*>`))?.[0] ?? "";
+}
+
 describe("Matrix page", () => {
   it("renders the full page and an HTMX fragment", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
@@ -46,6 +64,92 @@ describe("Matrix page", () => {
     expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
     expect(body).toContain('href="/tasks/task-1?from=matrix"');
     expect(body).toContain("status--do");
+  });
+});
+
+describe("Matrix area display sort", () => {
+  it("sorts area cards by title when ?sort=title", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+    await repo.insert(taskFixture({ id: "m", title: "Mango", area: 1, order: 2 }));
+
+    const body = await (await request("/?sort=title")).text();
+
+    expect(cardIds(body)).toEqual(["a", "m", "z"]);
+  });
+
+  it("keeps order as the default sort", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/")).text();
+
+    expect(cardIds(body)).toEqual(["z", "a"]);
+  });
+
+  it("falls back to order sort for an unknown sort key", async () => {
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/?sort=status")).text();
+
+    expect(cardIds(body)).toEqual(["z", "a"]);
+  });
+
+  it("keeps sorted cards in their original area and preserves card actions", async () => {
+    await repo.insert(taskFixture({ id: "b", title: "Banana", area: 2, order: 0 }));
+    await repo.insert(taskFixture({ id: "z", title: "Zebra", area: 1, order: 0 }));
+    await repo.insert(taskFixture({ id: "a", title: "Apple", area: 1, order: 1 }));
+
+    const body = await (await request("/?sort=title")).text();
+
+    expect(cardIds(body)).toEqual(["a", "z", "b"]);
+    expect(cardIdsInArea(body, 1)).toEqual(["a", "z"]);
+    expect(cardIdsInArea(body, 2)).toEqual(["b"]);
+    expect(body).toContain('src="/matrix-dnd.js"');
+    expect(body).toContain('data-dnd-group="matrix"');
+    for (const id of ["a", "z", "b"]) {
+      const card = cardOpeningTag(body, id);
+      expect(card).toContain(`draggable="true"`);
+      expect(card).toContain(`href="/tasks/${id}?from=matrix"`);
+    }
+  });
+
+  it("keeps sort controls on their own row with many cards so they do not overlap the Matrix", async () => {
+    for (let i = 0; i < 20; i += 1) {
+      await repo.insert(
+        taskFixture({ id: `t${i}`, title: `Task ${String(19 - i).padStart(2, "0")}`, area: 1, order: i }),
+      );
+    }
+
+    const body = await (await request("/?sort=title")).text();
+    const sortIndex = body.indexOf('class="matrix-sort"');
+    const matrixIndex = body.indexOf('class="matrix matrix-axis"');
+
+    expect(sortIndex).toBeGreaterThan(-1);
+    expect(matrixIndex).toBeGreaterThan(sortIndex);
+    expect(cardIdsInArea(body, 1)).toHaveLength(20);
+    expect(cardIdsInArea(body, 1)[0]).toBe("t19");
+    const firstCard = cardOpeningTag(body, "t19");
+    expect(firstCard).toContain('draggable="true"');
+    expect(firstCard).toContain('href="/tasks/t19?from=matrix"');
+  });
+});
+
+describe("Matrix non-overflow display", () => {
+  it("keeps cards in their existing area display", async () => {
+    for (const area of [1, 2, 3, 4] as const) {
+      await repo.insert(taskFixture({ id: `area-${area}`, area, order: 0 }));
+    }
+
+    for (const path of ["/", "/?sort=title"]) {
+      const body = await (await request(path)).text();
+
+      expect(cardIds(body)).toEqual(["area-1", "area-2", "area-3", "area-4"]);
+      for (const area of [1, 2, 3, 4] as const) {
+        expect(cardIdsInArea(body, area)).toEqual([`area-${area}`]);
+      }
+    }
   });
 });
 

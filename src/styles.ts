@@ -70,7 +70,7 @@ a {
 
 .page--matrix {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   height: calc(100vh - 63px);
   max-width: none;
   padding: 3vh 5vw;
@@ -81,6 +81,18 @@ a {
 .page--matrix > * {
   justify-self: center;
   width: min(100%, 80vw);
+}
+
+.page--matrix > #dnd-conflict {
+  margin: 0;
+}
+
+.matrix-sort {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
 }
 
 .page--matrix .matrix-axis {
@@ -576,6 +588,16 @@ details:not([open]) .popover {
   box-shadow: inset 4px 0 0 #0969da;
 }
 
+button.status-choice {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
 .check {
   align-items: center;
   background: #0969da;
@@ -647,6 +669,101 @@ details:not([open]) .popover {
   margin-bottom: 10px;
   padding: 10px;
   text-align: center;
+}
+
+.matrix-menu {
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  position: fixed;
+  z-index: 50;
+}
+
+.matrix-menu-item {
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.matrix-menu-item:hover {
+  background: #eaeef2;
+}
+
+.matrix-menu-item--delete {
+  color: #b00;
+}
+
+.matrix-modal-backdrop {
+  align-items: center;
+  background: rgb(31 35 40 / 45%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 100;
+}
+
+.matrix-modal {
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgb(31 35 40 / 30%);
+  display: flex;
+  flex-direction: column;
+  height: 160px;
+  justify-content: space-between;
+  max-width: 90vw;
+  padding: 16px 20px;
+  width: 320px;
+}
+
+.matrix-modal-text {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.matrix-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.matrix-modal-button {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 34px;
+  padding: 7px 16px;
+}
+
+.matrix-modal-button--cancel {
+  background: #ffffff;
+}
+
+.matrix-modal-button--cancel:hover {
+  background: #eaeef2;
+}
+
+.matrix-modal-button--danger {
+  background: #b00;
+  border-color: #900;
+  color: #ffffff;
+}
+
+.matrix-modal-button--danger:hover {
+  background: #900;
 }
 
 .error { color: #b00; }

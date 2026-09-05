@@ -16,6 +16,7 @@
 | P04 | New task | 新規タスク作成画面 |
 | P05 | Status popover | 新規作成・詳細画面内のステータス選択パネル |
 | P06 | Area popover | 新規作成・詳細画面内のエリア選択パネル |
+| P07 | Delete confirmation dialog | Matrix 上の task を完全削除する確認ダイアログ |
 
 ## 画面詳細
 
@@ -25,7 +26,14 @@
   - 縦軸は `重要度`、横軸は `緊急度` とする。
   - task card は title のみを表示する。
   - task card は matrix 上で drag and drop できる。
+  - task card を右クリックすると task action menu を表示する。
+  - task action menu の選択肢は `done`、`skip`、`delete` とする。
+  - `done` を選択すると task の status を `done` に変更し、Matrix から除外する。
+  - `skip` を選択すると task の status を `skip` に変更し、Matrix から除外する。
+  - `delete` を選択すると Delete confirmation dialog を表示する。
   - task card 以外の空白部分を押下すると、その area を選択済みとして `/tasks/new?area=<area>` へ遷移する。
+  - area 内のカードは表示専用ソートで並べ替えられる。既定は `order` で、ソートしても `area` と永続 `order` は変わらない。
+  - task action menu は右クリックによるマウス操作だけを対象とする。操作ボタン、キーボード操作、タッチ端末の長押し、スクリーンリーダーは対象外とする。
 
 - `Task list` (`/tasks`)
   - 全 task を一覧表示する。
@@ -63,6 +71,14 @@
   - 選択肢は `1 / 2 / 3 / 4` とする。
   - 完成 UI では同じ detail surface 上で開く。
   - popover と Status / Area サイドパネルの外側を押下すると、現在の選択を保持して通常表示へ戻る。
+
+- `Delete confirmation dialog`
+  - Matrix の中央に表示する。
+  - メッセージは「このタスクを削除しますか？」とする。
+  - ボタンは `キャンセル` と `削除` とする。
+  - 表示中は画面全体を overlay で覆い、背後の Matrix を操作できないようにする。
+  - `キャンセル` は task を変更せずにダイアログを閉じる。
+  - `削除` は task を完全削除し、Matrix と Task list から除外する。
 
 ## 画面遷移
 

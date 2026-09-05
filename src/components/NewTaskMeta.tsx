@@ -38,7 +38,7 @@ const NewTaskAreaChoice: FC<{ area: TaskArea; selected: TaskArea }> = ({ area, s
 export const NewTaskMeta: FC<{ state: NewTaskState }> = ({ state }) => {
   return (
     <aside id="new-task-meta" class="side-panel side-panel--popover-open">
-      <details>
+      <details data-popover-close="status">
         <summary class="meta-row meta-row-link">
           <h2>Status</h2>
           <span class={`status status--${state.status}`}>{state.status}</span>
@@ -46,9 +46,10 @@ export const NewTaskMeta: FC<{ state: NewTaskState }> = ({ state }) => {
         <section class="popover" aria-label="Apply status to this task">
           <h3>Apply status to this task</h3>
           {TASK_STATUSES.map((status) => <NewTaskStatusChoice key={status} status={status} selected={state.status} />)}
+          <PopoverCancelButton />
         </section>
       </details>
-      <details>
+      <details data-popover-close="area">
         <summary class="meta-row meta-row-link meta-row--spaced">
           <h2>Area</h2>
           <span class="status area-badge">{state.area}</span>
@@ -56,8 +57,15 @@ export const NewTaskMeta: FC<{ state: NewTaskState }> = ({ state }) => {
         <section class="popover" aria-label="Apply area to this task">
           <h3>Apply area to this task</h3>
           {TASK_AREAS.map((area) => <NewTaskAreaChoice key={area} area={area} selected={state.area} />)}
+          <PopoverCancelButton />
         </section>
       </details>
     </aside>
   );
 };
+
+const PopoverCancelButton: FC = () => (
+  <button type="button" class="status-choice" data-popover-cancel>
+    Cancel
+  </button>
+);

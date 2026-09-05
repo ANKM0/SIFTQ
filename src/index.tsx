@@ -9,13 +9,14 @@ import {
   changeTaskArea,
   changeTaskStatus,
   createTask,
+  isMatrixSortKey,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
   sortForMatrix,
 } from "./task";
-import type { Task } from "./task";
+import type { MatrixSortKey, Task } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
@@ -173,6 +174,17 @@ function applyArea(body: Record<string, unknown>, task: Task): Task | null {
 async function findTask(c: Context<AppEnv>, id: string): Promise<Task | undefined> {
   const result = await repository(c).find(id, "local");
   return result.ok ? result.value : undefined;
+}
+
+type ApiTaskLookup =
+  | { ok: true; task: Task }
+  | { ok: false; status: ContentfulStatusCode; code: string };
+
+async function findApiTask(c: Context<AppEnv>, id: string): Promise<ApiTaskLookup> {
+  const found = await repository(c).find(id, "local");
+  if (!found.ok) return { ok: false, status: 500, code: found.error.code };
+  if (!found.value) return { ok: false, status: 404, code: "NOT_FOUND" };
+  return { ok: true, task: found.value };
 }
 
 async function persistTask(c: Context<AppEnv>, updated: Task): Promise<Task | null> {
@@ -336,8 +348,32 @@ function newTaskOrigin(c: Context<AppEnv>, body: ParsedBody): NewTaskFrom {
   return "tasks";
 }
 
-function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
-  const matrixTasks = sortForMatrix(tasks);
+const MATRIX_SORT_OPTIONS: { key: MatrixSortKey; label: string }[] = [
+  { key: "order", label: "Order" },
+  { key: "title", label: "Title" },
+  { key: "created_at", label: "Created" },
+  { key: "updated_at", label: "Updated" },
+];
+
+function MatrixSortNav({ sortKey }: { sortKey: MatrixSortKey }) {
+  return (
+    <nav class="matrix-sort" aria-label="Sort matrix cards">
+      {MATRIX_SORT_OPTIONS.map((option) => (
+        <a
+          key={option.key}
+          class={option.key === sortKey ? "button small is-active" : "button small"}
+          aria-current={option.key === sortKey ? "true" : undefined}
+          {...pageNav(`/?sort=${option.key}`)}
+        >
+          {option.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function MatrixPage({ tasks, sortKey = "order" }: { tasks: readonly Task[]; sortKey?: MatrixSortKey }) {
+  const matrixTasks = sortForMatrix(tasks, sortKey);
   return (
     <div class="page page--matrix" data-state="normal">
       <div class="page-header">
@@ -347,6 +383,7 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
         </div>
         <NewTaskLink from="matrix" />
       </div>
+      <MatrixSortNav sortKey={sortKey} />
       <p id="dnd-conflict" class="error" hidden>
         Task was updated elsewhere. The Matrix was restored to the latest state.
       </p>
@@ -518,7 +555,9 @@ app.post("/logout", (c) => {
 app.get("/", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
-  return renderPage(c, <MatrixPage tasks={result.value} />);
+  const rawSort = c.req.query("sort");
+  const sortKey = isMatrixSortKey(rawSort) ? rawSort : "order";
+  return renderPage(c, <MatrixPage tasks={result.value} sortKey={sortKey} />);
 });
 
 app.get("/matrix-dnd.js", (c) => {
@@ -577,11 +616,10 @@ app.post("/api/tasks", async (c) => {
 
 app.patch("/api/tasks/:id", async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
-  const found = await repository(c).find(c.req.param("id"), "local");
-  if (!found.ok) return problem(c, 500, found.error.code);
-  if (!found.value) return problem(c, 404, "NOT_FOUND");
+  const found = await findApiTask(c, c.req.param("id"));
+  if (!found.ok) return problem(c, found.status, found.code);
 
-  const patched = applyPatch(body, found.value);
+  const patched = applyPatch(body, found.task);
   if (!patched.ok) return problem(c, 400, patched.code);
   const task = patched.task;
 
@@ -593,6 +631,24 @@ app.patch("/api/tasks/:id", async (c) => {
   const updated = await repository(c).update({ ...task, version });
   if (!updated.ok) return problem(c, 409, updated.error.code);
   return c.json(updated.value);
+});
+
+app.delete("/api/tasks/:id", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  const version = parseVersion(body["version"]);
+  if (version === null) return problem(c, 400, "INVALID_ORDER");
+
+  const found = await findApiTask(c, c.req.param("id"));
+  if (!found.ok) return problem(c, found.status, found.code);
+
+  const removed = await repository(c).remove(found.task.id, "local", version);
+  if (!removed.ok) {
+    return removed.error.code === "CONFLICT"
+      ? problem(c, 409, removed.error.code)
+      : problem(c, 404, removed.error.code);
+  }
+
+  return c.body(null, 204);
 });
 
 app.post("/api/tasks/reorder", async (c) => {

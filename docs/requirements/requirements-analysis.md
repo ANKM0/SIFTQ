@@ -27,6 +27,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | REQ-TM-003 | ユーザーは、タスクの内容、状態、分類先を作成後に確認・編集したい。 | domain.md, screens.md |
 | REQ-TM-004 | ユーザーは、Matrix 上でタスクの分類先と表示順を直接調整したい。 | domain.md, screens.md |
 | REQ-TM-005 | 開発者は、固定データを使って本番 UI の操作をローカルで確認したい。 | screens.md |
+| REQ-TM-006 | ユーザーは、Matrix 上からタスクを完了、見送り、削除したい。 | domain.md, screens.md |
 
 ## 仕様
 
@@ -42,6 +43,11 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-008 | REQ-TM-004 | Matrix 上の drag and drop は Task の area または area 内の order を変更する。 | BDD-TM-008 |
 | SPEC-TM-009 | REQ-TM-004 | Matrix 上の drag and drop の永続化が競合した場合、表示をサーバー状態へ戻し、競合を通知する。 | BDD-TM-009 |
 | SPEC-TM-010 | REQ-TM-005 | モック BE プレビューはログイン後に固定初期データを表示し、変更はプレビューの実行中だけ保持する。 | BDD-TM-010 |
+| SPEC-TM-011 | REQ-TM-002, REQ-TM-006 | Matrix の task card を右クリックすると、`done`、`skip`、`delete` を選択できる。 | BDD-TM-011 |
+| SPEC-TM-012 | REQ-TM-006 | `done` または `skip` を選択すると、task は Matrix から外れ、Task list には残る。 | BDD-TM-012, BDD-TM-013 |
+| SPEC-TM-013 | REQ-TM-006 | `delete` を選択すると確認ダイアログを表示し、確認後に task を完全削除する。 | BDD-TM-014, BDD-TM-015 |
+| SPEC-TM-014 | REQ-TM-006 | delete 確認中は overlay により背後の画面を操作できない。 | BDD-TM-014 |
+| SPEC-TM-015 | REQ-TM-006 | Matrix の task action menu は右クリックによるマウス操作だけを対象とし、操作ボタン、キーボード、タッチ端末の長押し、スクリーンリーダーは対象外とする。 | BDD-TM-011 |
 
 ## BDD 候補
 
@@ -57,6 +63,11 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-008 | SPEC-TM-008 | Task を別 area へ drag and drop すると、移動先 area に表示される。 |
 | BDD-TM-009 | SPEC-TM-009 | Task を古い version で drag and drop すると、Matrix は最新状態へ戻り、競合が通知される。 |
 | BDD-TM-010 | SPEC-TM-010 | モック BE プレビューにログインすると、固定初期データを Matrix と Task list で確認できる。 |
+| BDD-TM-011 | SPEC-TM-011 | Matrix の task card を右クリックすると、`done`、`skip`、`delete` menu が表示される。 |
+| BDD-TM-012 | SPEC-TM-012 | Matrix で `done` を選択すると task が Matrix から外れ、Task list には残る。 |
+| BDD-TM-013 | SPEC-TM-012 | Matrix で `skip` を選択すると task が Matrix から外れ、Task list には残る。 |
+| BDD-TM-014 | SPEC-TM-013, SPEC-TM-014 | delete confirmation をキャンセルすると task は残り、確認中は背後を操作できない。 |
+| BDD-TM-015 | SPEC-TM-013 | delete confirmation で削除を確定すると task が Matrix と Task list から消える。 |
 
 ## 未決事項
 

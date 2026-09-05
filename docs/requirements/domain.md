@@ -40,6 +40,12 @@
 - `status = do` の task だけが matrix に表示される。
 - task list は `do / done / skip` の全 task を表示する。
 
+## Delete
+
+- task の delete は status 変更ではなく、task 自体の完全削除である。
+- delete した task は Matrix、Task list、detail のいずれにも表示しない。
+- delete した task は復元しない。
+
 ## Order
 
 - `order` は area 内の表示順を表す。

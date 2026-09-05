@@ -96,6 +96,19 @@ describe("BDD-TM-005 / BDD-TM-006: task update", () => {
     expect(task.status).toBe("done");
     expect(task.area).toBe(4);
   });
+
+  it("returns a conflict for a stale status change", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 2 }));
+
+    const response = await request("PATCH", "/api/tasks/task-1", {
+      status: "done",
+      version: 1,
+    });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("CONFLICT");
+  });
 });
 
 describe("BDD-TM-008: bulk reorder", () => {
@@ -152,6 +165,27 @@ describe("BDD-TM-009: reorder conflict", () => {
 
     expect(response.status).toBe(409);
     expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+    expect(body.code).toBe("CONFLICT");
+  });
+});
+
+describe("BDD-TM-013 / BDD-TM-015: task deletion", () => {
+  it("deletes a task with the current version", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 1 }));
+
+    const response = await request("DELETE", "/api/tasks/task-1", { version: 1 });
+
+    expect(response.status).toBe(204);
+    expect(await repo.find("task-1", "owner-1")).toEqual({ ok: true, value: undefined });
+  });
+
+  it("returns a conflict for a stale delete", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 2 }));
+
+    const response = await request("DELETE", "/api/tasks/task-1", { version: 1 });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(409);
     expect(body.code).toBe("CONFLICT");
   });
 });
