@@ -32,6 +32,17 @@ export class MemoryTaskRepository implements TaskRepository {
     return ok<Task, RepositoryError>(updated);
   }
 
+  async remove(id: string, _owner_id: string, version: number): Promise<Result<null, RepositoryError>> {
+    const current = this.tasks.get(id);
+    if (!current) {
+      return err<null, RepositoryError>({ code: "NOT_FOUND" });
+    }
+    if (current.version !== version) return err<null, RepositoryError>({ code: "CONFLICT" });
+
+    this.tasks.delete(id);
+    return ok<null, RepositoryError>(null);
+  }
+
   async move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
     for (const task of tasks) {
       const current = this.tasks.get(task.id);

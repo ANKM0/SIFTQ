@@ -50,6 +50,7 @@ export interface TaskRepository {
   find(id: string, owner_id: string): Promise<Result<Task | undefined, RepositoryError>>;
   insert(task: Task): Promise<Result<Task, RepositoryError>>;
   update(task: Task): Promise<Result<Task, RepositoryError>>;
+  remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>>;
   move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>>;
 }
 
@@ -123,6 +124,21 @@ export class D1TaskRepository implements TaskRepository {
       return err({ code: "CONFLICT" });
     }
     return ok({ ...task, version: task.version + 1, updated_at: updatedAt });
+  }
+
+  async remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>> {
+    const found = await this.find(id, owner_id);
+    if (!found.ok) return err(found.error);
+    if (!found.value) return err({ code: "NOT_FOUND" });
+    if (found.value.version !== version) return err({ code: "CONFLICT" });
+
+    const result = await this.db
+      .prepare("DELETE FROM tasks WHERE id = ? AND owner_id = ? AND version = ?")
+      .bind(id, owner_id, version)
+      .run();
+
+    if (changes(result) === 0) return err({ code: "CONFLICT" });
+    return ok(null);
   }
 
   async move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
