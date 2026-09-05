@@ -4,6 +4,10 @@ import {
   changeTaskArea,
   changeTaskStatus,
   createTask,
+  filterTasks,
+  is_do,
+  is_done,
+  is_skip,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
@@ -40,6 +44,21 @@ describe("task enums", () => {
     expect(isTaskArea(4)).toBe(true);
     expect(isTaskArea(0)).toBe(false);
     expect(isTaskArea(5)).toBe(false);
+  });
+});
+
+describe("task filters", () => {
+  it("filters tasks by status and supports composing predicates", () => {
+    const tasks = [
+      taskFixture({ id: "do", status: "do" }),
+      taskFixture({ id: "done", status: "done" }),
+      taskFixture({ id: "skip", status: "skip" }),
+    ];
+
+    expect(filterTasks(tasks, [is_do]).map((task) => task.id)).toEqual(["do"]);
+    expect(filterTasks(tasks, [is_done]).map((task) => task.id)).toEqual(["done"]);
+    expect(filterTasks(tasks, [is_skip]).map((task) => task.id)).toEqual(["skip"]);
+    expect(filterTasks(tasks, [is_do, is_done])).toEqual([]);
   });
 });
 

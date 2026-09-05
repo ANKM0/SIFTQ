@@ -19,6 +19,8 @@ export type Task = {
   updated_at: string;
 };
 
+export type TaskFilter = (task: Task) => boolean;
+
 export type DomainErrorCode =
   | "INVALID_TITLE"
   | "INVALID_STATUS"
@@ -41,6 +43,28 @@ export function err<T, E>(error: E): Result<T, E> {
 
 export function isTaskStatus(value: unknown): value is TaskStatus {
   return typeof value === "string" && TASK_STATUSES.some((status) => status === value);
+}
+
+export function is_do(task: Task): boolean {
+  return task.status === "do";
+}
+
+export function is_done(task: Task): boolean {
+  return task.status === "done";
+}
+
+export function is_skip(task: Task): boolean {
+  return task.status === "skip";
+}
+
+export const TASK_STATUS_FILTERS: Record<TaskStatus, TaskFilter> = {
+  do: is_do,
+  done: is_done,
+  skip: is_skip,
+};
+
+export function filterTasks(tasks: readonly Task[], filters: readonly TaskFilter[]): Task[] {
+  return tasks.filter((task) => filters.every((filter) => filter(task)));
 }
 
 export function isTaskArea(value: unknown): value is TaskArea {

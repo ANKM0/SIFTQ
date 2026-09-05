@@ -6,10 +6,12 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
+  TASK_STATUS_FILTERS,
   TASK_STATUSES,
   changeTaskArea,
   changeTaskStatus,
   createTask,
+  filterTasks,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
@@ -406,7 +408,7 @@ function TaskStatusFilter({ status }: { status: TaskStatus }) {
 }
 
 function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatus }) {
-  const filteredTasks = tasks.filter((task) => task.status === status);
+  const filteredTasks = filterTasks(tasks, [TASK_STATUS_FILTERS[status]]);
 
   return (
     <div class="page page--list" data-state="normal">
