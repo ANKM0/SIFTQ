@@ -19,6 +19,7 @@
 | BDD-TM-013 | `tests/e2e/matrix.spec.ts` | Matrixからskipへのstatus変更 |
 | BDD-TM-014 | `tests/e2e/matrix.spec.ts` | delete確認のキャンセルとoverlay |
 | BDD-TM-015 | `tests/e2e/matrix.spec.ts` / `tests/bdd/task-api.contract.test.ts` | delete確定後のtask除外 |
+| BDD-TM-016 | `tests/bdd/task-ui.contract.test.ts` / `tests/e2e/matrix.spec.ts` | Task listのstatus filter、初期値、空状態、再読み込み後の選択状態 |
 
 repository 契約は `tests/bdd/task-repository.contract.test.ts` で
 `TaskRepository` の in-memory double を使い、insert / list / find / update /

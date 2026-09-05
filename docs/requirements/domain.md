@@ -38,7 +38,8 @@
 - `area` 変更は detail の area popover から行う。
 - `status` 変更は detail の status popover から行う。
 - `status = do` の task だけが matrix に表示される。
-- task list は `do / done / skip` の全 task を表示する。
+- task list は選択した status の task だけを表示する。選択肢は `do / done / skip` とし、初期値は `do` とする。
+- task list の status 選択は再表示可能な状態として扱い、`/tasks?status=<status>` で保持する。
 
 ## Delete
 

@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | P00 | Login | プレビューへログインする画面 |
 | P01 | Matrix | タスクを4象限のマトリックスでDnDする画面 (do statusのタスクのみを表示) |
-| P02 | Task list | タスク一覧画面 全statusのタスクを表示する |
+| P02 | Task list | タスク一覧画面。選択したstatusのタスクを表示する |
 | P03 | Task detail | タスク詳細画面 title、description、status、area を確認・編集する |
 | P04 | New task | 新規タスク作成画面 |
 | P05 | Status popover | 新規作成・詳細画面内のステータス選択パネル |
@@ -35,7 +35,11 @@
   - task action menu は右クリックによるマウス操作だけを対象とする。操作ボタン、キーボード操作、タッチ端末の長押し、スクリーンリーダーは対象外とする。
 
 - `Task list` (`/tasks`)
-  - 全 task を一覧表示する。
+  - `do`、`done`、`skip` の status 切り替えボタンを表示する。
+  - status 指定なし、または不正な status で開いた場合は `do` を選択する。
+  - 選択した status は `/tasks?status=<status>` で保持し、再読み込み後も維持する。
+  - Task list 以外の画面から `/tasks` へ遷移した場合は `do` を選択する。
+  - 選択した status と一致する task だけを表示する。該当 task がない場合は空状態メッセージを表示する。
   - 各行は `#番号`、title、area badge、status badge を表示する。
   - area badge は `1 / 2 / 3 / 4` を表示する。
   - status badge は `do / done / skip` を表示する。
