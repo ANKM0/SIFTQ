@@ -739,11 +739,11 @@ def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch)
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    result = run_verification(cwd=tmp_path, relevant_test_commands=("task pytest",))
+    result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "fix"
     assert result["feedback"] == "verification_fix"
-    assert calls == ["git diff --check", "task ci:typecheck", "task ci:lint"]
+    assert calls == ["git diff --check", "task setup:frontend:ci", "task ci:lint"]
 
 
 def test_verification_installs_frontend_dependencies_before_checks_for_frontend_changes(
@@ -766,10 +766,16 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
 
     run_verification(cwd=tmp_path)
 
-    assert calls == ["git diff --check", "task setup:frontend:ci", "task ci:typecheck"]
+    assert calls == [
+        "git diff --check",
+        "task setup:frontend:ci",
+        "task ci:lint",
+        "task ci:lint:python",
+        "task ci:typecheck",
+    ]
 
 
-def test_verification_skips_frontend_dependencies_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
+def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
@@ -787,7 +793,40 @@ def test_verification_skips_frontend_dependencies_for_taqt_changes(tmp_path: Pat
 
     run_verification(cwd=tmp_path)
 
-    assert calls == ["git diff --check", "task ci:typecheck"]
+    assert calls == [
+        "git diff --check",
+        "task setup:frontend:ci",
+        "task ci:lint",
+        "task ci:lint:python",
+        "task ci:typecheck",
+    ]
+
+
+def test_verification_runs_only_fast_checks(tmp_path: Path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
+        calls.append(command)
+        return {
+            "command": command,
+            "exit_code": 0,
+            "elapsed_seconds": 0.1,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+
+    monkeypatch.setattr("loop.verification._run_command", fake_run)
+    result = run_verification(cwd=tmp_path)
+
+    assert result["status"] == "pass"
+    assert calls == [
+        "git diff --check",
+        "task setup:frontend:ci",
+        "task ci:lint",
+        "task ci:lint:python",
+        "task ci:typecheck",
+        "task ci:test:unit",
+    ]
 
 
 @pytest.mark.parametrize(

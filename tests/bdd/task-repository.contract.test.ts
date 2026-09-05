@@ -51,6 +51,24 @@ describe("repository contract", () => {
     }
   });
 
+  it("removes with optimistic version locking", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 1 }));
+
+    const removed = await repo.remove("task-1", "owner-1", 1);
+    const found = await repo.find("task-1", "owner-1");
+
+    expect(removed).toEqual({ ok: true, value: null });
+    expect(found).toEqual({ ok: true, value: undefined });
+  });
+
+  it("rejects removing with a stale version", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 2 }));
+
+    const removed = await repo.remove("task-1", "owner-1", 1);
+
+    expect(removed).toEqual({ ok: false, error: { code: "CONFLICT" } });
+  });
+
   it("moves tasks atomically with version increments", async () => {
     await repo.insert(taskFixture({ id: "task-1", version: 1 }));
     await repo.insert(taskFixture({ id: "task-2", version: 1 }));

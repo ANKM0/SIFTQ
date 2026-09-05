@@ -1,17 +1,17 @@
 name: CI
 
 on:
-  push:
   pull_request:
 
 permissions:
   contents: read
+  actions: write
 
 env:
   UV_CACHE_DIR: /tmp/uv-cache
 
 jobs:
-  ci:
+  changes:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,26 +19,77 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install aqua
-        uses: aquaproj/aqua-installer@v3.1.2
-        with:
-          aqua_version: v2.59.0
-
-      - name: Install repository tools
-        run: |
-          aqua policy allow aqua-policy.yaml
-          aqua install
-
-      - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@v1.18.0
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version: 1.4.0
-
       - name: Check commit messages
-        run: task ci:commit-messages -- "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.event.pull_request.head.sha || github.sha }}"
+        shell: bash
+        run: |
+          set -eu
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          python scripts/ci/check_commit_messages.py "$base" "$head"
 
-      - name: Run CI gate
-        run: task ci
+  fast:
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
+        with:
+          frontend: "true"
+
+      - name: Run fast gate
+        run: task ci:fast
+
+  extended:
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
+
+      - name: Run extended gate
+        run: task ci:extended
+
+  e2e:
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
+        with:
+          playwright: "true"
+
+      - name: Run E2E gate
+        run: task ci:test:e2e
+
+  merge-gate:
+    needs: [changes, fast, extended, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the appropriate checks
+        shell: bash
+        run: |
+          set -eu
+          echo "changes=${{ needs.changes.result }}"
+          echo "fast=${{ needs.fast.result }}"
+          echo "extended=${{ needs.extended.result }}"
+          echo "e2e=${{ needs.e2e.result }}"
+          test "${{ needs.changes.result }}" = success
+          test "${{ needs.fast.result }}" = success
+          test "${{ needs.extended.result }}" = success
+          test "${{ needs.e2e.result }}" = success
