@@ -11,7 +11,6 @@ export const TaskCard: FC<{ task: Task }> = ({ task }) => (
   >
     <span class="task-card-header">
       <span class="task-title">{task.title}</span>
-      <span class={`status status--${task.status}`}>{task.status}</span>
     </span>
   </a>
 );
