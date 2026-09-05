@@ -32,7 +32,6 @@
   - `skip` を選択すると task の status を `skip` に変更し、Matrix から除外する。
   - `delete` を選択すると Delete confirmation dialog を表示する。
   - task card 以外の空白部分を押下すると、その area を選択済みとして `/tasks/new?area=<area>` へ遷移する。
-  - area 内のカードは表示専用ソートで並べ替えられる。既定は `order` で、ソートしても `area` と永続 `order` は変わらない。
   - task action menu は右クリックによるマウス操作だけを対象とする。操作ボタン、キーボード操作、タッチ端末の長押し、スクリーンリーダーは対象外とする。
 
 - `Task list` (`/tasks`)

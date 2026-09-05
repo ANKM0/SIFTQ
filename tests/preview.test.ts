@@ -20,7 +20,7 @@ async function previewRequest(path: string): Promise<Response> {
 describe("mock backend preview", () => {
   it("renders the production Matrix and Task list with fixed scenario data", async () => {
     const matrix = await previewRequest("/");
-    const list = await previewRequest("/tasks");
+    const list = await previewRequest("/tasks?status=done");
 
     expect(matrix.status).toBe(200);
     expect(await matrix.text()).toContain("Matrix のタスクカードを見直す");

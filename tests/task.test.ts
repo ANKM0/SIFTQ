@@ -4,7 +4,6 @@ import {
   changeTaskArea,
   changeTaskStatus,
   createTask,
-  isMatrixSortKey,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
@@ -99,44 +98,6 @@ describe("task domain", () => {
     ];
 
     expect(sortForMatrix(tasks).map((task) => task.id)).toEqual(["c", "a", "b"]);
-  });
-});
-
-describe("matrix display sort", () => {
-  it("recognizes valid sort keys", () => {
-    expect(isMatrixSortKey("order")).toBe(true);
-    expect(isMatrixSortKey("title")).toBe(true);
-    expect(isMatrixSortKey("created_at")).toBe(true);
-    expect(isMatrixSortKey("updated_at")).toBe(true);
-    expect(isMatrixSortKey("status")).toBe(false);
-    expect(isMatrixSortKey(undefined)).toBe(false);
-  });
-
-  it("sorts by title within each area without changing area or order", () => {
-    const tasks = [
-      taskFixture({ id: "z", title: "Zebra", status: "do", area: 1, order: 0 }),
-      taskFixture({ id: "a", title: "Apple", status: "do", area: 1, order: 1 }),
-      taskFixture({ id: "b", title: "Banana", status: "do", area: 2, order: 0 }),
-    ];
-
-    const sorted = sortForMatrix(tasks, "title");
-
-    expect(sorted.map((task) => task.id)).toEqual(["a", "z", "b"]);
-    expect(sorted.map((task) => [task.area, task.order])).toEqual([
-      [1, 1],
-      [1, 0],
-      [2, 0],
-    ]);
-  });
-
-  it("sorts by created_at and updated_at within an area", () => {
-    const tasks = [
-      taskFixture({ id: "new", created_at: "2026-02-01T00:00:00.000Z", updated_at: "2026-02-01T00:00:00.000Z" }),
-      taskFixture({ id: "old", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }),
-    ];
-
-    expect(sortForMatrix(tasks, "created_at").map((task) => task.id)).toEqual(["old", "new"]);
-    expect(sortForMatrix(tasks, "updated_at").map((task) => task.id)).toEqual(["old", "new"]);
   });
 });
 

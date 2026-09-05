@@ -70,7 +70,7 @@ a {
 
 .page--matrix {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   height: calc(100vh - 63px);
   max-width: none;
   padding: 3vh 5vw;
@@ -83,16 +83,22 @@ a {
   width: min(100%, 80vw);
 }
 
-.page--matrix > #dnd-conflict {
-  margin: 0;
-}
-
-.matrix-sort {
-  align-items: center;
+.task-status-filter {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 34px;
+  margin-bottom: 18px;
+}
+
+.task-status-filter .button.small {
+  min-height: 32px;
+  padding: 5px 12px;
+}
+
+.task-status-filter .button.is-active {
+  background: #2da44e;
+  border-color: #2a9147;
+  color: #ffffff;
 }
 
 .page--matrix .matrix-axis {
@@ -367,6 +373,13 @@ a {
   border: 1px solid #d0d7de;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.task-list-empty {
+  color: #57606a;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
 }
 
 .task-row {

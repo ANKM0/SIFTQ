@@ -6,17 +6,17 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
+  TASK_STATUSES,
   changeTaskArea,
   changeTaskStatus,
   createTask,
-  isMatrixSortKey,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
   sortForMatrix,
 } from "./task";
-import type { MatrixSortKey, Task } from "./task";
+import type { Task, TaskStatus } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
@@ -337,32 +337,8 @@ function newTaskOrigin(c: Context<AppEnv>, body: ParsedBody): NewTaskFrom {
   return "tasks";
 }
 
-const MATRIX_SORT_OPTIONS: { key: MatrixSortKey; label: string }[] = [
-  { key: "order", label: "Order" },
-  { key: "title", label: "Title" },
-  { key: "created_at", label: "Created" },
-  { key: "updated_at", label: "Updated" },
-];
-
-function MatrixSortNav({ sortKey }: { sortKey: MatrixSortKey }) {
-  return (
-    <nav class="matrix-sort" aria-label="Sort matrix cards">
-      {MATRIX_SORT_OPTIONS.map((option) => (
-        <a
-          key={option.key}
-          class={option.key === sortKey ? "button small is-active" : "button small"}
-          aria-current={option.key === sortKey ? "true" : undefined}
-          {...pageNav(`/?sort=${option.key}`)}
-        >
-          {option.label}
-        </a>
-      ))}
-    </nav>
-  );
-}
-
-function MatrixPage({ tasks, sortKey = "order" }: { tasks: readonly Task[]; sortKey?: MatrixSortKey }) {
-  const matrixTasks = sortForMatrix(tasks, sortKey);
+function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
+  const matrixTasks = sortForMatrix(tasks);
   return (
     <div class="page page--matrix" data-state="normal">
       <div class="page-header">
@@ -372,7 +348,6 @@ function MatrixPage({ tasks, sortKey = "order" }: { tasks: readonly Task[]; sort
         </div>
         <NewTaskLink from="matrix" />
       </div>
-      <MatrixSortNav sortKey={sortKey} />
       <p id="dnd-conflict" class="error" hidden>
         Task was updated elsewhere. The Matrix was restored to the latest state.
       </p>
@@ -408,7 +383,31 @@ function MatrixPage({ tasks, sortKey = "order" }: { tasks: readonly Task[]; sort
   );
 }
 
-function ListPage({ tasks }: { tasks: readonly Task[] }) {
+const TASK_STATUS_OPTIONS: { status: TaskStatus; label: string }[] = TASK_STATUSES.map((status) => ({
+  status,
+  label: status,
+}));
+
+function TaskStatusFilter({ status }: { status: TaskStatus }) {
+  return (
+    <nav class="task-status-filter" aria-label="Filter tasks by status">
+      {TASK_STATUS_OPTIONS.map((option) => (
+        <a
+          key={option.status}
+          class={option.status === status ? "button small is-active" : "button small"}
+          aria-current={option.status === status ? "true" : undefined}
+          href={`/tasks?status=${option.status}`}
+        >
+          {option.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatus }) {
+  const filteredTasks = tasks.filter((task) => task.status === status);
+
   return (
     <div class="page page--list" data-state="normal">
       <div class="page-header">
@@ -418,10 +417,13 @@ function ListPage({ tasks }: { tasks: readonly Task[] }) {
         </div>
         <NewTaskLink from="tasks" />
       </div>
+      <TaskStatusFilter status={status} />
       <div class="list" aria-label="Task list">
-        {tasks.map((task, index) => (
-          <TaskRow key={task.id} task={task} issueNumber={index + 1} />
-        ))}
+        {filteredTasks.length === 0 ? (
+          <p class="task-list-empty">該当するtaskはありません。</p>
+        ) : (
+          filteredTasks.map((task, index) => <TaskRow key={task.id} task={task} issueNumber={index + 1} />)
+        )}
       </div>
     </div>
   );
@@ -544,9 +546,7 @@ app.post("/logout", (c) => {
 app.get("/", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
-  const rawSort = c.req.query("sort");
-  const sortKey = isMatrixSortKey(rawSort) ? rawSort : "order";
-  return renderPage(c, <MatrixPage tasks={result.value} sortKey={sortKey} />);
+  return renderPage(c, <MatrixPage tasks={result.value} />);
 });
 
 app.get("/matrix-dnd.js", (c) => {
@@ -660,7 +660,9 @@ app.post("/api/tasks/reorder", async (c) => {
 app.get("/tasks", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
-  return renderPage(c, <ListPage tasks={result.value} />);
+  const rawStatus = c.req.query("status");
+  const status = isTaskStatus(rawStatus) ? rawStatus : "do";
+  return renderPage(c, <ListPage tasks={result.value} status={status} />);
 });
 
 app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm state={parseNewTaskState(c)} />));

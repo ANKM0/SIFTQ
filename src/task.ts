@@ -92,43 +92,10 @@ export function changeTaskArea(task: Task, area: TaskArea): Result<Task, DomainE
   return ok({ ...task, area });
 }
 
-export function sortForMatrix(tasks: readonly Task[], sortKey?: unknown): Task[] {
-  const key = isMatrixSortKey(sortKey) ? sortKey : "order";
+export function sortForMatrix(tasks: readonly Task[]): Task[] {
   return tasks
     .filter((task) => task.status === "do")
-    .sort(
-      (left, right) =>
-        left.area - right.area ||
-        compareBySortKey(left, right, key) ||
-        left.order - right.order,
-    );
-}
-
-export const MATRIX_SORT_KEYS = ["order", "title", "created_at", "updated_at"] as const;
-export type MatrixSortKey = (typeof MATRIX_SORT_KEYS)[number];
-
-export function isMatrixSortKey(value: unknown): value is MatrixSortKey {
-  return typeof value === "string" && MATRIX_SORT_KEYS.some((key) => key === value);
-}
-
-function compareBySortKey(left: Task, right: Task, key: MatrixSortKey): number {
-  switch (key) {
-    case "title":
-      return left.title.localeCompare(right.title);
-    case "created_at":
-      return compareIsoTime(left.created_at, right.created_at);
-    case "updated_at":
-      return compareIsoTime(left.updated_at, right.updated_at);
-    case "order":
-    default:
-      return left.order - right.order;
-  }
-}
-
-function compareIsoTime(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
+    .sort((left, right) => left.area - right.area || left.order - right.order);
 }
 
 export function moveTask(
