@@ -14,7 +14,12 @@
 | BDD-TM-008 | `tests/bdd/task-api.contract.test.ts` / `tests/bdd/task-domain.contract.test.ts` | reorder |
 | BDD-TM-009 | `tests/bdd/task-api.contract.test.ts` | 競合時の 409 + code |
 | BDD-TM-010 | `tests/preview.test.ts` | モック BE プレビューの固定初期データ |
+| BDD-TM-011 | `tests/e2e/matrix.spec.ts` / `tests/bdd/task-dnd.contract.test.ts` | Matrix右クリックmenuの表示 |
+| BDD-TM-012 | `tests/e2e/matrix.spec.ts` | Matrixからdoneへのstatus変更 |
+| BDD-TM-013 | `tests/e2e/matrix.spec.ts` | Matrixからskipへのstatus変更 |
+| BDD-TM-014 | `tests/e2e/matrix.spec.ts` | delete確認のキャンセルとoverlay |
+| BDD-TM-015 | `tests/e2e/matrix.spec.ts` / `tests/bdd/task-api.contract.test.ts` | delete確定後のtask除外 |
 
 repository 契約は `tests/bdd/task-repository.contract.test.ts` で
 `TaskRepository` の in-memory double を使い、insert / list / find / update /
-move の契約を固定する。
+remove / move の契約を固定する。

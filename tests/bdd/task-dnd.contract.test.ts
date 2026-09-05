@@ -39,4 +39,20 @@ describe("Matrix drag and drop", () => {
     expect(body).toContain("Array.isArray(tasks)");
     expect(body).toContain('updatedCard.setAttribute("data-version", String(task.version))');
   });
+
+  it("includes Matrix status and delete actions", async () => {
+    const repo = new MemoryTaskRepository();
+    const response = await authenticatedRequest("/matrix-dnd.js", repo);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain('contextmenu');
+    expect(body).toContain('method: "PATCH"');
+    expect(body).toContain('method: "DELETE"');
+    expect(body).toContain('"/api/tasks/"');
+    expect(body).toContain('このタスクを削除しますか？');
+    expect(body).toContain('textContent = "キャンセル"');
+    expect(body).toContain('textContent = "削除"');
+    expect(body).toContain("matrix-modal-backdrop");
+  });
 });

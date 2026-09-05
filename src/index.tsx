@@ -623,6 +623,25 @@ app.patch("/api/tasks/:id", async (c) => {
   return c.json(updated.value);
 });
 
+app.delete("/api/tasks/:id", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  const version = parseVersion(body["version"]);
+  if (version === null) return problem(c, 400, "INVALID_ORDER");
+
+  const found = await repository(c).find(c.req.param("id"), "local");
+  if (!found.ok) return problem(c, 500, found.error.code);
+  if (!found.value) return problem(c, 404, "NOT_FOUND");
+
+  const removed = await repository(c).remove(found.value.id, "local", version);
+  if (!removed.ok) {
+    return removed.error.code === "CONFLICT"
+      ? problem(c, 409, removed.error.code)
+      : problem(c, 404, removed.error.code);
+  }
+
+  return c.body(null, 204);
+});
+
 app.post("/api/tasks/reorder", async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const id = typeof body["id"] === "string" ? body["id"] : "";

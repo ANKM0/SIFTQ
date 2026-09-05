@@ -13,6 +13,13 @@ async function signIn(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
+async function createMatrixTask(page: Page, title: string) {
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+}
+
 async function dismissPopover(page: Page, label: "status" | "area") {
   const title = label === "status" ? "Status" : "Area";
   const applyLabel = `Apply ${label} to this task`;
@@ -69,6 +76,64 @@ test("keeps matrix task card navigation working", async ({ page }) => {
   await expect(page).toHaveURL(/\/tasks\/[^/]+\?from=matrix/);
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
   await expect(page.getByLabel("Title")).toHaveValue(title);
+});
+
+test("changes a Matrix task to done from the context menu", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E context done ${Date.now()}`;
+  await createMatrixTask(page, title);
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="done"]').click();
+
+  await expect(card).toHaveCount(0);
+  await page.goto("/tasks");
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--done")).toBeVisible();
+});
+
+test("changes a Matrix task to skip from the context menu", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E context skip ${Date.now()}`;
+  await createMatrixTask(page, title);
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="skip"]').click();
+
+  await expect(card).toHaveCount(0);
+  await page.goto("/tasks");
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
+});
+
+test("confirms Matrix task deletion in the centered dialog", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E context delete ${Date.now()}`;
+  await createMatrixTask(page, title);
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="delete"]').click();
+
+  const dialog = page.locator(".matrix-modal");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("このタスクを削除しますか？");
+  await expect(page.locator(".matrix-modal-backdrop")).toBeVisible();
+  await expect(page.locator(".matrix-menu")).toHaveCount(0);
+
+  await dialog.locator('.matrix-modal-button[data-matrix-modal-action="cancel"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(card).toBeVisible();
+
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="delete"]').click();
+  await page.locator('.matrix-modal-button[data-matrix-modal-action="confirm"]').click();
+  await expect(card).toHaveCount(0);
+
+  await page.goto("/tasks");
+  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
 });
 
 test("creates a task and sees it in the list", async ({ page }) => {
