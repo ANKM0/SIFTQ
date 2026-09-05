@@ -23,3 +23,4 @@ packages:
 - name: BurntSushi/ripgrep@14.1.1
 - name: ouch-org/ouch@0.8.1
 - name: terrastruct/d2@v0.8.2
+- name: anomalyco/opencode@v1.18.27
