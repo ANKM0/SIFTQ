@@ -165,92 +165,6 @@ area section 全体のクリックを実現する際に、案内文と点線枠�
 
 ---
 
-## [LRN-20260829-003] correction
-
-**Logged**: 2026-08-29T21:00:00+09:00
-**Priority**: low
-**Status**: resolved
-**Area**: frontend
-
-### Summary
-Description欄の寸法指定は固定ピクセルではなく、同じフォームの幅と残り画面高さに合わせる必要があった。
-
-### Details
-「582×436px」という例示を固定サイズとして実装したが、利用者の意図はTitle欄との幅の整合と
-新規作成ページ下端までの可変高さだった。
-
-### Suggested Action
-画面内の寸法指定は、固定値か親要素との整合・残余領域の配分かを、実装前に確認する。
-
-### Metadata
-- Source: user_feedback
-- Related Files: src/index.tsx, src/styles.ts
-- Tags: frontend, layout, responsive, form
-
-### Resolution
-- **Resolved**: 2026-08-29T21:00:00+09:00
-- **Notes**: New task専用にviewport充填とflex残余配分を適用し、Detailは不変とした。
-
----
-
-## [LRN-20260829-004] correction
-
-**Logged**: 2026-08-29T21:05:00+09:00
-**Priority**: low
-**Status**: resolved
-**Area**: frontend
-
-### Summary
-画面全体を伸ばすレイアウトでは、同じgrid内のside panelまで伸長させず、本文のtextareaだけを残余高さに配分する。
-
-### Details
-New taskのdetail gridを伸長した結果、右側のStatus/Area panelも縦に伸びた。利用者は同パネルを
-元の内容量（約300px）に保ち、Descriptionだけを10px短縮したかった。
-
-### Suggested Action
-flex/gridで残余領域を使う画面では、各columnの`align-self`と固定・可変の高さ責務を明示する。
-
-### Metadata
-- Source: user_feedback
-- Related Files: src/styles.ts
-- Tags: frontend, layout, grid, flex, sidebar
-- See Also: LRN-20260829-003
-
-### Resolution
-- **Resolved**: 2026-08-29T21:05:00+09:00
-- **Notes**: New taskのside panelを`align-self: start; min-height: 300px`にし、Descriptionの残余高を10px減らした。
-
----
-
-## [LRN-20260829-005] correction
-
-**Logged**: 2026-08-29T21:10:00+09:00
-**Priority**: low
-**Status**: resolved
-**Area**: frontend
-
-### Summary
-New taskのページ高とside panel高は推測値でなく、利用者指定の固定値を使う。
-
-### Details
-ヘッダー高との整合からページ高を推測し、side panelを最小高にしたが、利用者は
-`calc(100vh - 121px)` と `height: 250px` を明示した。
-
-### Suggested Action
-利用者がレイアウトの具体的なCSS値を指定した場合は、別の整合性推測で置き換えない。
-
-### Metadata
-- Source: user_feedback
-- Related Files: src/styles.ts
-- Tags: frontend, layout, css, explicit-requirement
-- See Also: LRN-20260829-004
-
-### Resolution
-- **Resolved**: 2026-08-29T21:10:00+09:00
-- **Notes**: New taskに指定値を適用し、テストで固定した。
-
----
-
 ## [LRN-20260829-006] correction
 
 **Logged**: 2026-08-29T21:20:00+09:00
@@ -325,17 +239,19 @@ deepseek loop の design / test agent は自身の `writes` スコープ外の�
 ### Details
 ISSUE-174 の slice 03 / 04 / 06 で、design agent が `scripts/repo_pull_main.py`、`scripts/yoriwake_git_pull.sh`、test agent が worktree root の `artifacts/test-report.md` を書き、`path outside agent write scope` の guard error で loop が human 終端に到達した。実装自体は成功しており、`--resume <run-dir>` で同じ slice を再実行すると design / test は write scope 内のみに変更し、後続 step（implement / observe / checker）が通って done になる。
 
+同じ問題は ISSUE-336 slice 01（`ci:lint:ts-fast` 削除）でも発生した。新規 run では `taskfile/ci.yml` に加えて `.codex/rules/siftq.rules` と `.taqt/scripts/loop/verification.py` まで scope 外編集が拡大したため、単純なリランではなく resume を先に試す必要がある。infra 系では design 成果物と実装ファイルの境界が曖昧になりやすい。
+
 ### Suggested Action
-loop の human エスカレーションで guard error が記録されている場合は、ワークスペースの変更を確認した上で `task taqt:run -- <slice> --workspace <worktree> --resume <run-dir>` により再実行する。design / test agent に実装ファイルの作成をさせたい場合は、該当 agent の `writes` にパスを追加してから再実行する。
+loop の human エスカレーションで guard error が記録されている場合は、ワークスペースの変更を確認した上で `task taqt:run -- <slice> --workspace <worktree> --resume <run-dir>` を先に試す。再発する場合は agent の `writes` を拡張するか手動実装へ切り替える。design agent が `.taqt/scripts/` など loop 自身のファイルを変更した場合は、内容の正否に関わらず revert してから次の手段を選ぶ。
 
 ### Metadata
 - Source: error
-- Related Files: .taqt/loops/development_feedback_loop_deepseek.yaml, .taqt/scripts/loop/guard.py, .taqt/scripts/taqt/task_run.py
+- Related Files: .taqt/loops/development_feedback_loop_deepseek.yaml, .taqt/loops/main_loop.yaml, .taqt/scripts/loop/guard.py, .taqt/scripts/loop/verification.py, .taqt/scripts/taqt/task_run.py, .codex/rules/siftq.rules, taskfile/ci.yml
 - Tags: taqt, loop, guard, write-scope, resume
 - Pattern-Key: taqt.agent_write_scope_guard
-- Recurrence-Count: 2
+- Recurrence-Count: 3
 - First-Seen: 2026-08-22
-- Last-Seen: 2026-08-23
+- Last-Seen: 2026-09-04
 
 ---
 
