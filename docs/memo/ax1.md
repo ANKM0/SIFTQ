@@ -27,7 +27,7 @@
 3. Playwrightの分離・軽量化：効果約25〜30秒、コスト中
    - 最大のボトルネック。選択肢は3つ。
    - a. `install chromium`を`install --only-shell chromium`にし、`PLAYWRIGHT_BROWSERS_PATH`を`actions/cache`する（約10秒削減）。
-   - b. e2e自体をPRゲートから外し、`ci-extended` / nightlyへ移動（約30秒削減）。fast gateを10秒化するなら必須。
+   - b. e2e自体をtaqt loopから外し、マージ判定へ移動（約30秒削減）。fast gateを10秒化するなら必須。
 
 4. ジョブ並列化：効果は壁時計で約1/3〜1/5、コスト中
    - 単一`ci`ジョブの直列20タスクを、`fast` / `type-test` / `build` / `e2e`の4並列へ。壁時計は最長ジョブに収束。
@@ -44,10 +44,10 @@
 
 ## 10秒達成の構成案
 
-fast gate（required、10秒目標）とextended（非blocking）に分割する以外に道はない。
+fast gate（required、10秒目標）とマージ判定用の全件ゲートに分割する。
 
 - `ci-fast`：checkout＋cache hit＋python checks＋`vp lint .`＋`tsc --noEmit --incremental`＋vitestのみ。見積約8〜9秒。
-- `ci-extended`：depcruise/knip/jscpd/build/e2e/audit。PRマージ条件にしないか、`merge_group`のみ実行。
+- マージ判定：`ci:fast`、`ci:extended`、`ci:test:e2e`、commit message check。
 
 ## 推奨順序
 
@@ -55,18 +55,17 @@ fast gate（required、10秒目標）とextended（非blocking）に分割する
 2. Phase 2：4の並列化＋`paths-filter`。目標約15秒（e2e除く最長job）。
 3. Phase 3：3bのゲート分割。fastのみで約10秒。
 
-## e2e分離時のflaky対策
+## e2eをマージ判定へ分離
 
 外すのは実行タイミングであり、検出自体は維持する。検出の場を移す。
 
-現状のe2eは`matrix.spec.ts`12件・serial・`retries: 0`。`networkidle`待ちや`Date.now()`依存があり、PRゲートに置くとflakyが全PRを止める。これが分離の理由でもある。
+現状のe2eは`matrix.spec.ts`12件・serial・`retries: 0`。`networkidle`待ちや`Date.now()`依存があり、taqt loopに置くと実装フィードバックを遅延させる。これが分離の理由でもある。
 
-1. `merge_group`と`main` pushでは必須実行にする。PRでは非blocking、merge直前にblocking。マージ前の検出は維持できる。
-2. UI変更時のみPRでも任意実行する。`paths-filter`で`src/**`変更時に`ci-extended`を手動/自動トリガし、無関係PRの待ちを消す。
-3. nightlyでflake率を計測する。extended側は`retries: 2`＋`--shard`＋レポーター出力とし、リトライ成功＝flakyとして記録する。現状の`retries: 0`はflakeと真の失敗を区別できない。
-4. 縮小と移譲をする。API/UI契約は`tests/bdd`のcontract testがfast gateに残るため、大半の回帰はPRで検出できる。e2eはクリティカルパス（signIn→作成→表示）に絞り、件数を減らしてflake母数を下げる。
+1. PRのマージ判定では必須実行にする。taqt loopでは実行せず、マージ前の検出は維持する。
+2. 現状の`retries: 0`はflakeと真の失敗を区別できないため、失敗時は再実行と原因確認を行う。
+3. API/UI契約は`tests/bdd`のcontract testをfast gateに残す。e2eはクリティカルパス（signIn→作成→表示）に絞り、flake母数を下げる。
 
-要約すると、PR高速化と安全性は「PR任意＋merge必須＋nightly計測」の三層で両立する。
+要約すると、PR高速化と安全性は「loop最小化＋マージ前全件確認」で両立する。
 
 ## e2e記述ルール：時間依存のsleepを入れない
 
@@ -111,10 +110,10 @@ Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネッ�
 - `node_modules`を`bun.lock`キーで直接キャッシュする。Bun storeの復元はinstallより遅かったため採用しない。
 - fastの独立チェックとextendedの静的チェックをTaskの並列`deps`へ移す。
 - commit message checkをchanges jobへ移し、fast jobの処理から外す。
-- docs-only変更では同じrequired job名のまま`ci:docs-fast`へ切り替え、frontend依存を導入しない。
-- feature branchのpushをCI対象から外し、`pull_request`と`main` pushだけを対象にする。同じcommitのpush/PR二重実行を防ぐ。
+- PR更新ではfast、extended、e2eをマージ判定として実行する。
+- CIは`pull_request`だけを対象にし、同じcommitのpush/PR二重実行を防ぐ。
 
-これにより、通常のPRではfast gateの処理を約10秒未満、docs-only変更では約1秒のローカルtask処理まで短縮できる見込みである。ただしGitHub Actionsのrunner起動・checkout・action実行時間を含むjob全体の10秒達成は、hosted runnerでは別途検証が必要である。
+これにより、通常のPRではfast gateの処理を約10秒未満まで短縮できる見込みである。ただしGitHub Actionsのrunner起動・checkout・action実行時間を含むjob全体の10秒達成は、hosted runnerでは別途検証が必要である。
 
 ### 追加施策の実測
 
@@ -134,17 +133,13 @@ Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネッ�
 - aqua cacheを削除し、`go-task/setup-task`と`astral-sh/setup-uv`へ分離した。
 - `node_modules`（約254MB）を直接cacheし、frontend installを約10msまで短縮した。
 - fast gateの独立checkを並列化し、ローカルの`task ci:fast`は約0.8〜2.6秒で完了した。
-- docs-only変更は`ci:docs-fast`へ分岐し、frontend依存を導入しない。
 - feature branchのpush triggerを削除し、同一commitのpush/PR二重実行を解消した。
 
 残る制約：hosted runnerのjob setupが約11秒あるため、fast job全体の10秒は未達。10秒をjob全体のSLOとする場合は、Task・uv・Bun・依存を焼き込んだcontainer、または常駐self-hosted runnerが必要である。
 
 ## 実行ポリシー
 
-- taqt loop：lint、typecheck、unit/contract testのfast checksのみ実行する。`task ci`による全件確認は行わない。
-- PR更新：`fast`と`merge-gate`を実行し、`fast`をrequiredにする。source変更がないPRでは`ci:docs-fast`を実行する。
-- PRマージ前：merge queueの`merge_group`で`fast`、`extended`、`e2e`を実行し、`merge-gate`で全件成功を確認する。
-- main push：`fast`、`extended`、`e2e`を実行する。main pushではsource変更判定を行わず全件確認する。
-- nightly：`task ci:nightly`でretry付きe2eを含む全件確認を行う。
+- taqt loop：`git diff --check`、`task ci:lint`、`task ci:lint:python`、`task ci:typecheck`、`task ci:test:unit`のみ実行する。
+- マージ判定：`task ci:commit-messages`、`task ci:fast`、`task ci:extended`、`task ci:test:e2e`を実行し、`merge-gate`で全件成功を確認する。
 
-GitHub ruleset `main`には`fast`と`merge-gate`をrequired status checkとして設定した。merge queue自体の有効化はGitHub側の設定が必要である。
+GitHub ruleset `main`には`fast`と`merge-gate`をrequired status checkとして設定した。

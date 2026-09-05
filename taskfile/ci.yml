@@ -52,15 +52,6 @@ tasks:
       - ci:typecheck
       - ci:test:unit
 
-  ci:docs-fast:
-    desc: Run the lightweight gate for documentation-only changes.
-    cmds:
-      - task: ci:markdown
-      - task: ci:lint:task-refs
-      - task: ci:lint:codex-task-perms
-      - task: ci:glossary
-      - task: ci:docs
-
   ci:extended:
     desc: Run the slow static checks (build, duplication, dead code).
     cmds:
@@ -73,29 +64,6 @@ tasks:
       - ci:build
       - ci:duplicate
       - ci:dead-code
-
-  ci:nightly:
-    desc: Run the full CI gate with retry-enabled E2E.
-    cmds:
-      - task: setup:python
-      - task: setup:frontend:ci
-      - task: ci:markdown
-      - task: ci:lint:task-refs
-      - task: ci:lint:codex-task-perms
-      - task: ci:lint
-      - task: ci:lint:python
-      - task: ci:security
-      - task: ci:performance
-      - task: ci:requirements
-      - task: ci:architecture
-      - task: ci:glossary
-      - task: ci:docs
-      - task: ci:typecheck
-      - task: ci:test:unit
-      - task: ci:build
-      - task: ci:duplicate
-      - task: ci:dead-code
-      - task: ci:test:e2e:nightly
 
   ci:commit-messages:
     desc: Check commit message format for the current branch.
@@ -302,17 +270,6 @@ tasks:
 
         bun x wrangler d1 migrations apply siftq --local
         touch "$marker"
-
-  ci:test:e2e:nightly:
-    desc: Run Playwright E2E with retries for flake measurement.
-    cmds:
-      - task: ci:test:e2e:setup
-      - |
-        if [ ! -f tmp/.e2e-ready ]; then
-          echo "Skipping Playwright E2E: setup did not complete."
-          exit 0
-        fi
-        vp exec playwright test --pass-with-no-tests --retries 2
 
   ci:build:
     desc: Build the Worker (typecheck runs in ci:typecheck).

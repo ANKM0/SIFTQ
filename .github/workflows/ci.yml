@@ -1,11 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
-  merge_group:
 
 permissions:
   contents: read
@@ -17,36 +13,18 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-latest
-    outputs:
-      src: ${{ steps.filter.outputs.src }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changes and check commit messages
-        id: filter
+      - name: Check commit messages
         shell: bash
         run: |
           set -eu
-          if [ "${{ github.event_name }}" = "merge_group" ]; then
-            base="${{ github.event.merge_group.base_sha }}"
-            head="${{ github.event.merge_group.head_sha }}"
-            echo "src=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-            head="${{ github.event.pull_request.head.sha }}"
-            if git diff --name-only "$base" "$head" | grep -qvE '^(docs/|.*\.md$)'; then
-              echo "src=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "src=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            base="${{ github.event.before }}"
-            head="${{ github.sha }}"
-            echo "src=true" >> "$GITHUB_OUTPUT"
-          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
           python scripts/ci/check_commit_messages.py "$base" "$head"
 
   fast:
@@ -61,20 +39,13 @@ jobs:
       - name: Set up CI tools
         uses: ./.github/actions/setup-ci
         with:
-          frontend: ${{ needs.changes.outputs.src == 'true' }}
+          frontend: "true"
 
       - name: Run fast gate
-        shell: bash
-        run: |
-          if [ "${{ needs.changes.outputs.src }}" = "true" ]; then
-            task ci:fast
-          else
-            task ci:docs-fast
-          fi
+        run: task ci:fast
 
   extended:
     needs: [changes]
-    if: needs.changes.outputs.src == 'true' && (github.event_name == 'merge_group' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -90,7 +61,6 @@ jobs:
 
   e2e:
     needs: [changes]
-    if: needs.changes.outputs.src == 'true' && (github.event_name == 'merge_group' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -121,7 +91,5 @@ jobs:
           echo "e2e=${{ needs.e2e.result }}"
           test "${{ needs.changes.result }}" = success
           test "${{ needs.fast.result }}" = success
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            test "${{ needs.extended.result }}" = success
-            test "${{ needs.e2e.result }}" = success
-          fi
+          test "${{ needs.extended.result }}" = success
+          test "${{ needs.e2e.result }}" = success

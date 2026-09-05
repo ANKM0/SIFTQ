@@ -18,14 +18,11 @@ def run_verification(
     *,
     cwd: Path,
 ) -> dict[str, Any]:
-    commands: list[tuple[str, tuple[str, ...]]] = [("diff_check", ("git diff --check",))]
-    if _requires_frontend_dependencies(cwd):
-        commands.append(("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)))
-        commands.extend(
-            (
-                ("fast_checks", FAST_COMMANDS),
-            )
-        )
+    commands: list[tuple[str, tuple[str, ...]]] = [
+        ("diff_check", ("git diff --check",)),
+        ("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)),
+        ("fast_checks", FAST_COMMANDS),
+    ]
     results: list[dict[str, Any]] = []
     for phase, phase_commands in commands:
         for command in phase_commands:
@@ -75,10 +72,6 @@ def validate_review(
         cwd=cwd,
         findings=["review verdict is invalid"],
     )
-
-
-def _requires_frontend_dependencies(cwd: Path) -> bool:
-    return True
 
 
 def _changed_paths(cwd: Path) -> list[str]:
