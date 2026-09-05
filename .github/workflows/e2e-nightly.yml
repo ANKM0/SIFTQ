@@ -1,4 +1,4 @@
-name: E2E Nightly
+name: CI Nightly
 
 on:
   schedule:
@@ -23,8 +23,8 @@ jobs:
         with:
           playwright: "true"
 
-      - name: Run E2E with retries
-        run: task ci:test:e2e:nightly
+      - name: Run full CI with retries
+        run: task ci:nightly
 
       - name: Upload test results
         if: failure()

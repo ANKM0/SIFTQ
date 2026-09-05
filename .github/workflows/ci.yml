@@ -45,14 +45,7 @@ jobs:
           else
             base="${{ github.event.before }}"
             head="${{ github.sha }}"
-            if [ "$base" = "0000000000000000000000000000000000000000" ] \
-              || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-              echo "src=true" >> "$GITHUB_OUTPUT"
-            elif git diff --name-only "$base" "$head" | grep -qvE '^(docs/|.*\.md$)'; then
-              echo "src=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "src=false" >> "$GITHUB_OUTPUT"
-            fi
+            echo "src=true" >> "$GITHUB_OUTPUT"
           fi
           python scripts/ci/check_commit_messages.py "$base" "$head"
 
@@ -81,7 +74,7 @@ jobs:
 
   extended:
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' && (github.event_name == 'merge_group' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -97,7 +90,7 @@ jobs:
 
   e2e:
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' && (github.event_name == 'merge_group' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -112,3 +105,23 @@ jobs:
 
       - name: Run E2E gate
         run: task ci:test:e2e
+
+  merge-gate:
+    needs: [changes, fast, extended, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the appropriate checks
+        shell: bash
+        run: |
+          set -eu
+          echo "changes=${{ needs.changes.result }}"
+          echo "fast=${{ needs.fast.result }}"
+          echo "extended=${{ needs.extended.result }}"
+          echo "e2e=${{ needs.e2e.result }}"
+          test "${{ needs.changes.result }}" = success
+          test "${{ needs.fast.result }}" = success
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            test "${{ needs.extended.result }}" = success
+            test "${{ needs.e2e.result }}" = success
+          fi

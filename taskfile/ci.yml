@@ -74,6 +74,29 @@ tasks:
       - ci:duplicate
       - ci:dead-code
 
+  ci:nightly:
+    desc: Run the full CI gate with retry-enabled E2E.
+    cmds:
+      - task: setup:python
+      - task: setup:frontend:ci
+      - task: ci:markdown
+      - task: ci:lint:task-refs
+      - task: ci:lint:codex-task-perms
+      - task: ci:lint
+      - task: ci:lint:python
+      - task: ci:security
+      - task: ci:performance
+      - task: ci:requirements
+      - task: ci:architecture
+      - task: ci:glossary
+      - task: ci:docs
+      - task: ci:typecheck
+      - task: ci:test:unit
+      - task: ci:build
+      - task: ci:duplicate
+      - task: ci:dead-code
+      - task: ci:test:e2e:nightly
+
   ci:commit-messages:
     desc: Check commit message format for the current branch.
     cmds:
