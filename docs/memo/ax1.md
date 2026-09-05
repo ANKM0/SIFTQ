@@ -138,3 +138,13 @@ Phase 1〜3後の追加計測で、fast jobのsetupが主な残ボトルネッ�
 - feature branchのpush triggerを削除し、同一commitのpush/PR二重実行を解消した。
 
 残る制約：hosted runnerのjob setupが約11秒あるため、fast job全体の10秒は未達。10秒をjob全体のSLOとする場合は、Task・uv・Bun・依存を焼き込んだcontainer、または常駐self-hosted runnerが必要である。
+
+## 実行ポリシー
+
+- taqt loop：lint、typecheck、unit/contract testのfast checksのみ実行する。`task ci`による全件確認は行わない。
+- PR更新：`fast`と`merge-gate`を実行し、`fast`をrequiredにする。source変更がないPRでは`ci:docs-fast`を実行する。
+- PRマージ前：merge queueの`merge_group`で`fast`、`extended`、`e2e`を実行し、`merge-gate`で全件成功を確認する。
+- main push：`fast`、`extended`、`e2e`を実行する。main pushではsource変更判定を行わず全件確認する。
+- nightly：`task ci:nightly`でretry付きe2eを含む全件確認を行う。
+
+GitHub ruleset `main`には`fast`と`merge-gate`をrequired status checkとして設定した。merge queue自体の有効化はGitHub側の設定が必要である。
