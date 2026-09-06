@@ -13,6 +13,10 @@ async function signIn(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
+function descriptionEditor(page: Page) {
+  return page.getByRole("textbox", { name: "Description" });
+}
+
 async function createMatrixTask(page: Page, title: string) {
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").fill(title);
@@ -144,13 +148,70 @@ test("creates a task and sees it in the list", async ({ page }) => {
 
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").fill(taskTitle);
-  await page.getByLabel("Description").fill("created by Playwright");
+  await descriptionEditor(page).fill("created by Playwright");
   await page.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.goto("/tasks");
   await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+});
+
+test("opens description URLs with native link behavior", async ({ page }) => {
+  const taskTitle = `E2E description links ${Date.now()}`;
+  const taskUrl = "http://127.0.0.1:4173/tasks";
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").fill(taskTitle);
+  await descriptionEditor(page).fill(`Open ${taskUrl} or ${taskUrl}`);
+  await page.getByRole("button", { name: "Create" }).click();
+
+  await page.locator(".task-card", { hasText: taskTitle }).click();
+  const links = descriptionEditor(page).locator("a");
+  await expect(links).toHaveCount(2);
+  await expect(links.first()).toHaveAttribute("href", taskUrl);
+
+  const popupPromise = page.waitForEvent("popup");
+  await links.nth(1).click({ modifiers: ["Control"] });
+  const popup = await popupPromise;
+  await expect(popup).toHaveURL(/\/tasks$/);
+  await popup.close();
+
+  await links.first().click();
+  await expect(page).toHaveURL(/\/tasks$/);
+});
+
+test("linkifies pasted URLs and submits plain text", async ({ page }) => {
+  const taskTitle = `E2E pasted description URL ${Date.now()}`;
+  const taskUrl = "http://127.0.0.1:4173/tasks";
+  const description = `Pasted ${taskUrl}`;
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").fill(taskTitle);
+
+  const editor = descriptionEditor(page);
+  await editor.click();
+  await editor.evaluate((element, text) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    const selection = window.getSelection();
+    if (!selection) throw new Error("Selection is unavailable");
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    element.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, clipboardData: data }));
+  }, description);
+
+  await expect(editor.locator("a")).toHaveAttribute("href", taskUrl);
+  await page.getByRole("button", { name: "Create" }).click();
+  await page.locator(".task-card", { hasText: taskTitle }).click();
+
+  await expect(descriptionEditor(page).locator("a")).toHaveAttribute("href", taskUrl);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
 });
 
 test("creates exactly one task with Ctrl+Enter from the title or description", async ({ page }) => {
@@ -160,8 +221,8 @@ test("creates exactly one task with Ctrl+Enter from the title or description", a
     const taskTitle = `E2E shortcut ${field} ${Date.now()}`;
     await page.getByRole("link", { name: "New task" }).click();
     await page.getByLabel("Title").fill(taskTitle);
-    if (field === "Description") await page.getByLabel(field).fill("created by shortcut");
-    await page.getByLabel(field).press("Control+Enter");
+    if (field === "Description") await descriptionEditor(page).fill("created by shortcut");
+    await (field === "Description" ? descriptionEditor(page) : page.getByLabel(field)).press("Control+Enter");
 
     await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
     await expect(page.locator(".task-card", { hasText: taskTitle })).toHaveCount(1);
@@ -178,7 +239,7 @@ test("saves exactly one task with Ctrl+Enter from the detail form", async ({ pag
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 
   await page.getByLabel("Title").fill(updatedTitle);
-  await page.getByLabel("Description").press("Control+Enter");
+  await descriptionEditor(page).press("Control+Enter");
 
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
   await expect(page.locator(".task-card", { hasText: updatedTitle })).toHaveCount(1);
@@ -187,8 +248,8 @@ test("saves exactly one task with Ctrl+Enter from the detail form", async ({ pag
 test("keeps native task validation on Ctrl+Enter", async ({ page }) => {
   await signIn(page);
   await page.getByRole("link", { name: "New task" }).click();
-  await page.getByLabel("Description").fill("description without a title");
-  await page.getByLabel("Description").press("Control+Enter");
+  await descriptionEditor(page).fill("description without a title");
+  await descriptionEditor(page).press("Control+Enter");
 
   await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
   const titleIsInvalid = await page.getByLabel("Title").evaluate(
@@ -249,17 +310,17 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
 
   await page.goto("/tasks/new");
   await page.getByLabel("Title").fill(title);
-  await page.getByLabel("Description").fill("Retained description");
+  await descriptionEditor(page).fill("Retained description");
 
   await page.locator("#new-task-meta details").first().locator("summary").click();
   await page.locator('input[name="status"][value="done"]').check();
   await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(page.getByLabel("Description")).toHaveValue("Retained description");
+  await expect(descriptionEditor(page)).toHaveText("Retained description");
 
   await page.locator("#new-task-meta details").nth(1).locator("summary").click();
   await page.locator('input[name="area"][value="4"]').check();
   await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(page.getByLabel("Description")).toHaveValue("Retained description");
+  await expect(descriptionEditor(page)).toHaveText("Retained description");
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();

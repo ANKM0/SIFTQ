@@ -481,7 +481,8 @@ label {
 
 input,
 textarea,
-select {
+select,
+.description-editor {
   border: 1px solid #d0d7de;
   border-radius: 6px;
   font: inherit;
@@ -491,6 +492,22 @@ select {
 
 textarea {
   min-height: 180px;
+}
+
+.description-editor {
+  background: #ffffff;
+  min-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.description-editor a {
+  color: #0969da;
+  text-decoration: underline;
+}
+
+textarea[data-description-value] {
+  display: none;
 }
 
 .page--new,
@@ -514,15 +531,17 @@ textarea {
   min-height: 0;
 }
 
-.page--new .form-panel > label:has(textarea),
-.page--detail .form-panel > label:has(textarea) {
+.page--new .form-panel > label:has([data-description-editor]),
+.page--detail .form-panel > label:has([data-description-editor]) {
   flex: 1;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 180px;
 }
 
 .page--new textarea,
-.page--detail textarea {
+.page--detail textarea,
+.page--new .description-editor,
+.page--detail .description-editor {
   height: 100%;
   min-height: 180px;
 }

@@ -10,7 +10,7 @@
 | 属性 | 値 | 外部仕様 |
 | --- | --- | --- |
 | `title` | text | matrix、list、detail に表示する。 |
-| `description` | text | detail と new task で入力・編集する。 |
+| `description` | text | detail と new task で入力・編集する。http/https URL は編集領域内でリンクとして表示するが、保存値はプレーンテキストとする。 |
 | `status` | `do` / `done` / `skip` | 進行状態。matrix 表示可否を決める。 |
 | `area` | `1` / `2` / `3` / `4` | matrix の象限。常に保持する。 |
 | `order` | number | area 内の表示順。 |

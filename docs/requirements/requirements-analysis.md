@@ -50,6 +50,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-014 | REQ-TM-006 | delete 確認中は overlay により背後の画面を操作できない。 | BDD-TM-014 |
 | SPEC-TM-015 | REQ-TM-006 | Matrix の task action menu は右クリックによるマウス操作だけを対象とし、操作ボタン、キーボード、タッチ端末の長押し、スクリーンリーダーは対象外とする。 | BDD-TM-011 |
 | SPEC-TM-016 | REQ-TM-007 | Task list は `do`、`done`、`skip` の status filter を持ち、選択した status の task だけを表示する。初期値は `do` とし、選択状態を再読み込み後も維持する。 | BDD-TM-016 |
+| SPEC-TM-017 | REQ-TM-003 | New task と Task detail の description 編集領域では http/https URL をリンクとして表示し、通常クリックは同じタブ、Ctrl/Command クリックは別タブで開く。保存値はプレーンテキストとする。 | BDD-TM-017 |
+| SPEC-TM-018 | REQ-TM-003 | description に http/https URL を貼り付けると編集領域内でリンクとして表示する。Markdown、HTML、その他のリッチテキスト記法は解釈しない。 | BDD-TM-018 |
 
 ## BDD 候補
 
@@ -71,6 +73,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-014 | SPEC-TM-013, SPEC-TM-014 | delete confirmation をキャンセルすると task は残り、確認中は背後を操作できない。 |
 | BDD-TM-015 | SPEC-TM-013 | delete confirmation で削除を確定すると task が Matrix と Task list から消える。 |
 | BDD-TM-016 | SPEC-TM-016 | Task list で status を切り替えると、選択した status の task だけが表示され、再読み込み後も選択状態が維持される。 |
+| BDD-TM-017 | SPEC-TM-017 | description のURLを通常クリックすると同じタブで開き、Ctrl/Command クリックでは別タブで開く。保存後もリンク表示が維持される。 |
+| BDD-TM-018 | SPEC-TM-018 | description に貼り付けた http/https URL はリンクになり、保存時は `<a>` などのHTMLタグを含まないプレーンテキストになる。 |
 
 ## 未決事項
 
