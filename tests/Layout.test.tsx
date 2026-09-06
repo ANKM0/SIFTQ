@@ -9,5 +9,6 @@ describe("Layout", () => {
     expect(html).toContain('id="page"');
     expect(html).toContain('src="/htmx-conflict.js"');
     expect(html).toContain('src="/popover-dismiss.js"');
+    expect(html).toContain('src="/task-form-shortcut.js"');
   });
 });

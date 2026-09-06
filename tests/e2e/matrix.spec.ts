@@ -153,6 +153,50 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 });
 
+test("creates exactly one task with Ctrl+Enter from the title or description", async ({ page }) => {
+  await signIn(page);
+
+  for (const field of ["Title", "Description"] as const) {
+    const taskTitle = `E2E shortcut ${field} ${Date.now()}`;
+    await page.getByRole("link", { name: "New task" }).click();
+    await page.getByLabel("Title").fill(taskTitle);
+    if (field === "Description") await page.getByLabel(field).fill("created by shortcut");
+    await page.getByLabel(field).press("Control+Enter");
+
+    await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+    await expect(page.locator(".task-card", { hasText: taskTitle })).toHaveCount(1);
+  }
+});
+
+test("saves exactly one task with Ctrl+Enter from the detail form", async ({ page }) => {
+  const originalTitle = `E2E detail shortcut ${Date.now()}`;
+  const updatedTitle = `${originalTitle} updated`;
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+
+  await page.getByLabel("Title").fill(updatedTitle);
+  await page.getByLabel("Description").press("Control+Enter");
+
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect(page.locator(".task-card", { hasText: updatedTitle })).toHaveCount(1);
+});
+
+test("keeps native task validation on Ctrl+Enter", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Description").fill("description without a title");
+  await page.getByLabel("Description").press("Control+Enter");
+
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+  const titleIsInvalid = await page.getByLabel("Title").evaluate(
+    (element) => element instanceof HTMLInputElement && !element.validity.valid,
+  );
+  expect(titleIsInvalid).toBe(true);
+});
+
 test("creates a task from the task list and returns to the task list", async ({ page }) => {
   const taskTitle = `E2E list task ${Date.now()}`;
 
