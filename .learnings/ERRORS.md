@@ -75,3 +75,33 @@ worktree 作成時に `aqua policy allow` を実行するか、taqt 実行前チ
 - Related Files: .taqt/scripts/taqt/git_worktree.py, .taqt/scripts/taqt/task_run.py
 
 ---
+
+## [ERR-20260906-002] taqt_verification_package_version_baseline
+
+**Logged**: 2026-09-06T15:52:21+09:00
+**Priority**: medium
+**Status**: pending
+**Area**: taqt
+
+### Summary
+taqtの検証が、変更と無関係なpackage.jsonのバージョン不一致で停止した。
+
+### Error
+```
+package.json version is older than the latest release tag: 0.6.2 < 0.7.3
+```
+
+### Context
+- Issue #355 slice 01のverificationで`task ci:lint:python`を実行した。
+- `ruff check`は成功したが、既存のpackage version checkが失敗した。
+- UI変更の対象テスト、typecheck、build、lintは別途成功した。
+
+### Suggested Fix
+taqtのverificationで変更と無関係な既知のベースライン失敗を識別し、対象変更の検証結果と分けて扱えるようにする。
+
+### Metadata
+- Reproducible: yes
+- Related Files: scripts/ci/check_package_version.py, taskfile/ci.yml
+- See Also: ERR-20260904-001
+
+---

@@ -318,14 +318,6 @@ a {
   justify-content: space-between;
 }
 
-.task-card[draggable="true"] {
-  cursor: grab;
-}
-
-.task-card[draggable="true"]:active {
-  cursor: grabbing;
-}
-
 .task-card.dragging {
   border-color: #0969da;
   box-shadow: 0 0 0 3px #ddf4ff;
