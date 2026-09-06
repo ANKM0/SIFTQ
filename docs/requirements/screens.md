@@ -46,6 +46,9 @@
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。
+  - description 内の http/https URL は編集領域内でリンクとして表示する。
+  - URL の通常クリックは同じタブ、Ctrl クリック / Command クリックは別タブで開く。
+  - URL のリンク表示は編集用の表示であり、保存する description はプレーンテキストとする。
   - status と area は右側 metadata として表示する。
   - `Cancel` は遷移前の一覧へ戻る。
   - `Save` は編集内容を保存する。
@@ -53,6 +56,9 @@
 - `New task` (`/tasks/new`)
   - detail と同じ 2 column layout を使う。
   - title と description を入力する。
+  - description 内の http/https URL は編集領域内でリンクとして表示する。
+  - URL の通常クリックは同じタブ、Ctrl クリック / Command クリックは別タブで開く。
+  - URL を貼り付けた場合もリンクとして表示し、保存する description はプレーンテキストとする。
   - status と area は右側 metadata として表示する。
   - status と area はそれぞれの popover から選択する。選択内容は `Create` まで保存しない。
   - 初期値は `status = do`、`area = 1` とする。

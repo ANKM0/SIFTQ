@@ -24,8 +24,10 @@ import {
   Layout,
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
+  DESCRIPTION_EDITOR_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
 } from "./components/Layout";
+import { splitDescription } from "./description";
 import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
 import { TaskMeta } from "./components/TaskMeta";
@@ -256,11 +258,34 @@ function TitleField({ value }: { value?: string }) {
 }
 
 function DescriptionField({ children }: { children?: string }) {
+  const description = children ?? "";
   return (
-    <label>
-      Description
-      <textarea name="description">{children}</textarea>
-    </label>
+    <>
+      <label>
+        Description
+        <div
+          aria-label="Description"
+          class="description-editor"
+          contenteditable={true}
+          data-description-editor
+          role="textbox"
+          aria-multiline="true"
+        >
+          {splitDescription(description).map((segment, index) =>
+            segment.href ? (
+              <a key={index} href={segment.href} contenteditable={false}>
+                {segment.text}
+              </a>
+            ) : (
+              segment.text
+            ),
+          )}
+        </div>
+      </label>
+      <textarea name="description" data-description-value hidden>
+        {description}
+      </textarea>
+    </>
   );
 }
 
@@ -585,6 +610,12 @@ app.get("/popover-dismiss.js", (c) => {
 
 app.get("/task-form-shortcut.js", (c) => {
   return c.body(TASK_FORM_SHORTCUT_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
+app.get("/description-editor.js", (c) => {
+  return c.body(DESCRIPTION_EDITOR_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
 });
