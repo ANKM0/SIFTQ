@@ -273,7 +273,7 @@ function DescriptionField({ children }: { children?: string }) {
         >
           {splitDescription(description).map((segment, index) =>
             segment.href ? (
-              <a key={index} href={segment.href} contenteditable={false}>
+              <a key={index} href={segment.href}>
                 {segment.text}
               </a>
             ) : (

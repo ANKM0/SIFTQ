@@ -214,6 +214,42 @@ test("linkifies pasted URLs and submits plain text", async ({ page }) => {
   await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
 });
 
+test("deletes text before a description URL at the URL boundary", async ({ page }) => {
+  const taskTitle = `E2E description URL backspace ${Date.now()}`;
+  const taskUrl = "https://example.com/tasks";
+  const description = `Before ${taskUrl}`;
+  const expectedDescription = `Before${taskUrl}`;
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").fill(taskTitle);
+  await descriptionEditor(page).fill(description);
+  await page.getByRole("button", { name: "Create" }).click();
+
+  await page.locator(".task-card", { hasText: taskTitle }).click();
+  const editor = descriptionEditor(page);
+  const urlLink = editor.locator("a", { hasText: taskUrl });
+  await expect(urlLink).toHaveCount(1);
+  await urlLink.evaluate((element) => {
+    const editor = element.closest("[data-description-editor]");
+    if (!(editor instanceof HTMLElement)) throw new Error("Description editor is unavailable");
+    editor.focus();
+
+    const range = document.createRange();
+    range.setStartBefore(element);
+    range.collapse(true);
+    const selection = window.getSelection();
+    if (!selection) throw new Error("Selection is unavailable");
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+
+  await page.keyboard.press("Backspace");
+
+  await expect(editor).toHaveText(expectedDescription);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(expectedDescription);
+});
+
 test("creates exactly one task with Ctrl+Enter from the title or description", async ({ page }) => {
   await signIn(page);
 
