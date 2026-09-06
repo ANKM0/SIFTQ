@@ -25,6 +25,12 @@ describe("styles", () => {
     expect(matrixAxis?.[0]).toContain("border: 1px solid #d0d7de;");
   });
 
+  it("does not override the cursor on draggable Matrix cards", () => {
+    expect(STYLES_CSS).not.toContain('.task-card[draggable="true"]');
+    expect(STYLES_CSS).not.toContain("cursor: grab;");
+    expect(STYLES_CSS).not.toContain("cursor: grabbing;");
+  });
+
   it("places the four quadrant areas in their Matrix grid cells", () => {
     const q1 = STYLES_CSS.match(/(?:^|\n)\.area--q1\s*\{[^}]*\}/);
     expect(q1?.[0]).toContain("grid-column: 1;");
