@@ -160,6 +160,7 @@ describe("Task creation", () => {
     expect(body).toContain("New task");
     expect(body).toContain("Cancel");
     expect(body).toContain("Create");
+    expect(body).toContain('data-task-form="new"');
     expect(body).toContain("status status--done");
     expect(body).toContain("status area-badge");
     expect(body).toContain('name="area" value="3" checked');
@@ -232,6 +233,7 @@ describe("Task detail Save form", () => {
     expect(body).toContain('action="/tasks/task-1?from=tasks"');
     expect(body).toContain('hx-post="/tasks/task-1?from=tasks"');
     expect(body).toContain('id="task-version" type="hidden" name="version" value="3"');
+    expect(body).toContain('data-task-form="edit"');
     expect(body).toContain('<button class="button primary" type="submit">Save</button>');
     expect(body).toContain('href="/tasks"');
   });

@@ -27,6 +27,20 @@ export const POPOVER_DISMISS_SCRIPT = [
   "  if (details) details.removeAttribute('open');",
   "});",
 ].join("\n");
+export const TASK_FORM_SHORTCUT_SCRIPT = [
+  'document.addEventListener("keydown", function (event) {',
+  '  if (!event.ctrlKey || event.key !== "Enter") return;',
+  "  var target = event.target;",
+  '  if (!target || (target.name !== "title" && target.name !== "description")) return;',
+  '  var form = target.closest ? target.closest("form[data-task-form]") : null;',
+  "  if (!form) return;",
+  "  event.preventDefault();",
+  '  if (form.dataset.shortcutSubmitting === "true") return;',
+  "  if (!form.checkValidity()) { form.reportValidity(); return; }",
+  '  form.dataset.shortcutSubmitting = "true";',
+  "  form.requestSubmit();",
+  "});",
+].join("\n");
 export const MATRIX_DND_SCRIPT = [
   "var matrixDraggingCard = null;",
   "var matrixDropTarget = null;",
@@ -318,6 +332,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
       <script src={HTMX_SCRIPT} defer></script>
       <script src="/htmx-conflict.js" defer></script>
       <script src="/popover-dismiss.js" defer></script>
+      <script src="/task-form-shortcut.js" defer></script>
       <script src="/matrix-dnd.js" defer></script>
     </head>
     <body>

@@ -24,6 +24,7 @@ import {
   Layout,
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
+  TASK_FORM_SHORTCUT_SCRIPT,
 } from "./components/Layout";
 import { TaskCard } from "./components/TaskCard";
 import { TaskRow } from "./components/TaskRow";
@@ -65,6 +66,7 @@ const PUBLIC_PATHS = new Set([
   "/styles.css",
   "/htmx-conflict.js",
   "/popover-dismiss.js",
+  "/task-form-shortcut.js",
   "/matrix-dnd.js",
 ]);
 
@@ -448,7 +450,7 @@ function NewTaskForm({ state, error }: { state: NewTaskState; error?: string }) 
       <div class="page-header">
         <h1 class="page-title">New task</h1>
       </div>
-      <form class="detail-grid" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
+      <form class="detail-grid" data-task-form="new" hx-post="/tasks" hx-target="#page" hx-swap="innerHTML">
         <div class="form-panel">
           <TitleField />
           <input type="hidden" name="from" value={state.from} />
@@ -484,6 +486,7 @@ function DetailPage({
       <div class="detail-grid">
         <form
           class="form-panel"
+          data-task-form="edit"
           method="post"
           action={`/tasks/${task.id}?from=${returnTo}`}
           hx-post={`/tasks/${task.id}?from=${returnTo}`}
@@ -576,6 +579,12 @@ app.get("/htmx-conflict.js", (c) => {
 
 app.get("/popover-dismiss.js", (c) => {
   return c.body(POPOVER_DISMISS_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
+app.get("/task-form-shortcut.js", (c) => {
+  return c.body(TASK_FORM_SHORTCUT_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
 });

@@ -30,6 +30,17 @@ describe("smoke", () => {
     expect(body).toContain("[data-popover-cancel]");
   });
 
+  it("serves the new task keyboard shortcut handler without authentication", async () => {
+    const response = await app.request("/task-form-shortcut.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/javascript");
+    const body = await response.text();
+    expect(body).toContain('event.ctrlKey || event.key !== "Enter"');
+    expect(body).toContain('form[data-task-form]');
+    expect(body).toContain("form.requestSubmit()");
+  });
+
   it("serves the matrix area navigation handler without authentication", async () => {
     const response = await app.request("/matrix-dnd.js");
 
