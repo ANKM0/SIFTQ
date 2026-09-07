@@ -43,6 +43,11 @@
   - 各行は `#番号`、title、area badge、status badge を表示する。
   - area badge は `1 / 2 / 3 / 4` を表示する。
   - status badge は `do / done / skip` を表示する。
+  - status 絞り込み後の件数を25件単位でページ分割し、一覧下にページナビを表示する。
+  - ページナビはページ番号と前へ/次へを持ち、先頭・最終ページは常に表示して間の飛び区間は「…」にまとめる。
+  - 25件以下ではページナビを表示しない。
+  - ページ指定は `/tasks?status=<status>&page=<page>` で保持する。status 切替時は1ページ目に戻る。
+  - 数値以外のページ指定は1ページ目へ、範囲超過は最終ページへ寄せる。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。

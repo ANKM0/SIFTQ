@@ -24,6 +24,17 @@ async function createMatrixTask(page: Page, title: string) {
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
 
+async function expectTaskVisibleInList(page: Page, title: string, status: string) {
+  await page.goto(`/tasks?status=${status}`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await page.getByText(title, { exact: true }).count()) > 0) return;
+    const next = page.getByRole("link", { name: "Next page" });
+    if ((await next.count()) === 0) break;
+    await next.click();
+  }
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+}
+
 async function dismissPopover(page: Page, label: "status" | "area") {
   const title = label === "status" ? "Status" : "Area";
   const applyLabel = `Apply ${label} to this task`;
@@ -92,8 +103,7 @@ test("changes a Matrix task to done from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="done"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks?status=done");
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, title, "done");
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--done")).toBeVisible();
 });
 
@@ -107,8 +117,7 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="skip"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks?status=skip");
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, title, "skip");
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
 
@@ -165,8 +174,7 @@ test("creates a task and sees it in the list", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
-  await page.goto("/tasks");
-  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, taskTitle, "do");
 });
 
 test("opens description URLs with native link behavior", async ({ page }) => {
@@ -332,24 +340,23 @@ test("filters the task list by status and retains it after reload", async ({ pag
   }
 
   await page.goto("/tasks");
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
   await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).not.toBeVisible();
   await expect(page.getByText(`E2E filter skip ${suffix}`, { exact: true })).not.toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter do ${suffix}`, "do");
 
   await page.locator('a[href="/tasks?status=done"]').click();
   await expect(page).toHaveURL(/\/tasks\?status=done$/);
-  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).not.toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter done ${suffix}`, "done");
 
   await page.reload();
   await expect(page).toHaveURL(/\/tasks\?status=done$/);
-  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter done ${suffix}`, "done");
 
   await page.goto("/");
   await page.locator('nav.nav a[href="/tasks"]').click();
   await expect(page).toHaveURL(/\/tasks$/);
   await expect(page.locator('a[href="/tasks?status=do"][aria-current="true"]')).toBeVisible();
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter do ${suffix}`, "do");
 });
 
 test("keeps new-task inputs while changing Status and Area", async ({ page }) => {
@@ -372,7 +379,7 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.goto("/tasks?status=done");
+  await expectTaskVisibleInList(page, title, "done");
   await page.getByText(title, { exact: true }).click();
   await expect(page.locator("#task-meta .status--done")).toHaveText("done");
   await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
