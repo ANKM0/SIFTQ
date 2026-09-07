@@ -24,9 +24,18 @@ async function createMatrixTask(page: Page, title: string) {
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
 
+async function gotoListPage(page: Page, status: string) {
+  const target = `/tasks?status=${status}`;
+  try {
+    await page.goto(target);
+  } catch {
+    await page.waitForLoadState();
+    await page.goto(target);
+  }
+}
+
 async function expectTaskVisibleInList(page: Page, title: string, status: string) {
-  await page.waitForLoadState();
-  await page.goto(`/tasks?status=${status}`);
+  await gotoListPage(page, status);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if ((await page.getByText(title, { exact: true }).count()) > 0) return;
     const next = page.getByRole("link", { name: "Next page" });
@@ -43,8 +52,7 @@ async function openTaskFromList(page: Page, title: string, status: string) {
 }
 
 async function expectTaskAbsentFromList(page: Page, title: string, status: string) {
-  await page.waitForLoadState();
-  await page.goto(`/tasks?status=${status}`);
+  await gotoListPage(page, status);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await expect(page.getByText(title, { exact: true })).toHaveCount(0);
     const next = page.getByRole("link", { name: "Next page" });
