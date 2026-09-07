@@ -1,10 +1,10 @@
-# ADR 0031: Adopt Cloudflare Access for SIFTQ Worker access control
+# ADR 0031: Adopt Cloudflare Access for Worker access control
 
 > Status: Superseded by [ADR 0032](0032-adopt-worker-managed-shared-password-authentication.md)
 
 ## 決定
 
-- `siftq` Worker へのアクセスを Cloudflare Access で保護し、Cloudflare アカウントのメンバーに限定する。
+- Worker へのアクセスを Cloudflare Access で保護し、Cloudflare アカウントのメンバーに限定する。
 - 将来、ユーザーごとの配布・データ分割が必要になった場合は、Worker 内認証（セッション / API キー）の採用を再検討する。
 
 ### 決定の理由
@@ -24,7 +24,7 @@
 ### 背景
 
 - `*.workers.dev` はデフォルトでインターネット公開され、URL を知る第三者がアクセスできる。
-- 現在の `siftq` Worker には認証がなく、task の閲覧・作成・変更が第三者に可能な状態。
+- 現在の Worker には認証がなく、task の閲覧・作成・変更が第三者に可能な状態。
 - ADR 0019 では API を内部 IF と位置づけているが、アクセス制御は未実装だった。
 
 ### 制約事項

@@ -36,14 +36,14 @@ Token には次の権限が必要。
 
 ## リモート D1 を作成する
 
-`bun x wrangler d1 create siftq`
+`bun x wrangler d1 create app`
 
 `wrangler.jsonc` は `database_name` で D1 を参照するため、作成した database 名が
-`siftq` であれば設定変更は不要。
+`app` であれば設定変更は不要。
 
 ## マイグレーションを適用する
 
-`bun x wrangler d1 migrations apply siftq --remote`
+`bun x wrangler d1 migrations apply app --remote`
 
 ## Worker 認証の secrets を設定する
 
@@ -76,5 +76,5 @@ task deploy
 
 - 未認証では `/login` が表示され、ログイン後に Matrix UI が表示される。
 - task の作成・更新・DnD 並べ替えが保存される。
-- `bun x wrangler d1 migrations list siftq --remote` で適用済み migration を確認できる。
+- `bun x wrangler d1 migrations list app --remote` で適用済み migration を確認できる。
 - Release Notes に対象 SHA、Worker デプロイ有無、migration 確認、本番確認結果を記録する。

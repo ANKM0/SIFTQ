@@ -44,7 +44,7 @@
 
 - `graphify:update` の実行は既存 Task（ADR 0013）を再利用し、runtime 不在時の導入案内を引き継ぐ。
 - graphify 更新の失敗では pull を巻き戻さない。利用者は main が更新済みであることをエラーで知り、graphify を修正して再実行する。
-- `.codex/rules/siftq.rules` に `task repo:pull-main` の許可 rule を追加し、`ci:lint:codex-task-perms` を満たす。
+- `.codex/rules/shared.rules` に `task repo:pull-main` の許可 rule を追加し、`ci:lint:codex-task-perms` を満たす。
 - エラーメッセージは、利用者が main への switch または変更の commit / stash という次の行動を選べる文言にする。
 
 ## 参考リンク

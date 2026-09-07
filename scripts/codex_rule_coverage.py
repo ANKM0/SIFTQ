@@ -26,7 +26,7 @@ def covers(prefixes: list[tuple[str, ...]], rule: tuple[str, ...]) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--default", type=Path, default=Path.home() / ".codex/rules/default.rules")
-    parser.add_argument("--shared", type=Path, default=Path(".codex/rules/siftq.rules"))
+    parser.add_argument("--shared", type=Path, default=Path(".codex/rules/shared.rules"))
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--min-covered", type=int, default=90)
     args = parser.parse_args()

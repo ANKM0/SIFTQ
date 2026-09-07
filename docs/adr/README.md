@@ -19,7 +19,7 @@
 | [ADR 0013: worktree ごとの graphify 更新 Task](0013-worktree-scoped-graphify-update-task.md) | Accepted. | `task graphify:update` は worktree root を更新し、runtime 不在時は導入方法を含むエラーで止める。 |
 | [ADR 0014: `repo:pull-main` の pull と graphify 更新](0014-repo-pull-main-guards.md) | Accepted. | main 以外または dirty worktree では pull せず、pull が成功して HEAD が更新された場合だけ graphify を更新する。 |
 | [ADR 0015: 共有 Codex home とモデル profile](0015-worktree-scoped-codex-home.md) | Accepted. | skills・認証・session は `~/.codex` を共有し、モデルは静的 CLI profile、作業対象は worktree で分離する。 |
-| [ADR 0016: worktree ごとの `git pull` 振り分け shell function](0016-worktree-scoped-git-pull-shell-function.md) | Accepted. | Yoriwake の interactive shell で、SIFTQ worktree 内の引数なし `git pull` だけを `task repo:pull-main` へ振り分ける。 |
+| [ADR 0016: worktree ごとの `git pull` 振り分け shell function](0016-worktree-scoped-git-pull-shell-function.md) | Accepted. | Yoriwake の interactive shell で、project worktree 内の引数なし `git pull` だけを `task repo:pull-main` へ振り分ける。 |
 | [ADR 0017: `.learnings` を共有追跡成果物として維持する](0017-keep-learnings-tracked-as-shared-artifacts.md) | Accepted. | `.learnings/LEARNINGS.md` など 3 ファイルは追跡対象かつ PR レビュー・マージ対象のまま維持し、`.learnings/` は ignore しない。 |
 | [ADR 0018: Adopt HTML-driven UI with JSON only for DnD](0018-adopt-html-driven-ui-with-json-only-for-dnd.md) | Accepted. | 画面・フォームは HTML 駆動、JSON は DnD 確定のみに限定する。 |
 | [ADR 0019: Keep internal HTTP API private](0019-keep-internal-http-api-private.md) | Accepted. | API は公開せず内部 IF とし、HTML UI と `/api` を分離する。 |
@@ -34,7 +34,7 @@
 | [ADR 0028: Adopt common UI state and feedback rules](0028-adopt-common-ui-state-and-feedback-rules.md) | Accepted. | 全画面の 4 状態と通知の表示時間・閉じ方を定める。 |
 | [ADR 0029: Adopt Result type in domain and usecase](0029-adopt-result-type-in-domain-usecase.md) | Accepted. | domain / usecase は期待される失敗を inline union の `Result<T, E>` で返す。 |
 | [ADR 0030: Adopt static component catalog](0030-adopt-static-component-catalog.md) | Accepted. | Hono JSX component を static HTML catalog 化し、Review 済み component を再利用する。 |
-| [ADR 0031: Adopt Cloudflare Access for SIFTQ Worker access control](0031-adopt-cloudflare-access-for-worker.md) | Superseded by ADR 0032. | `siftq` Worker の公開アクセス制御に Cloudflare Access を採用していた。 |
+| [ADR 0031: Adopt Cloudflare Access for Worker access control](0031-adopt-cloudflare-access-for-worker.md) | Superseded by ADR 0032. | Worker の公開アクセス制御に Cloudflare Access を採用していた。 |
 | [ADR 0032: Adopt Worker-managed shared-password authentication](0032-adopt-worker-managed-shared-password-authentication.md) | Accepted. | Worker 内の共有パスワード認証と署名付き Cookie でアクセスを制御する。 |
 | [ADR 0033: md2idx は Bun の devDependency として導入する](0033-introduce-md2idx-as-bun-devdependency.md) | Accepted. | `md2idx` を `package.json` の devDependency で導入し、`bun x md2idx` で実行する。 |
 | [ADR 0034: リリースと Worker デプロイを分離する](0034-separate-release-and-worker-deployment.md) | Accepted. | GitHub Release はリポジトリ変更、Worker デプロイは本番更新として分離し、変更種別で実施有無を判断する。 |

@@ -51,7 +51,7 @@ def slugify_title(title: str) -> str:
 
 
 def default_body_file(issue_type: str, title: str) -> Path:
-    return Path("/tmp/siftq-issues") / f"{issue_type}-{slugify_title(title)}.md"
+    return Path("/tmp/app-issues") / f"{issue_type}-{slugify_title(title)}.md"
 
 
 def read_template(root: Path, issue_type: str) -> str:
@@ -91,7 +91,7 @@ def shell_command(args: list[str]) -> str:
 
 def parser() -> argparse.ArgumentParser:
     argument_parser = argparse.ArgumentParser(
-        description="Create or dry-run SIFTQ GitHub issue body files and gh commands.",
+        description="Create or dry-run project GitHub issue body files and gh commands.",
     )
     argument_parser.add_argument(
         "--type",
@@ -114,7 +114,7 @@ def parser() -> argparse.ArgumentParser:
     argument_parser.add_argument(
         "--body-file",
         type=Path,
-        help="Output issue body file. Defaults to /tmp/siftq-issues/<type>-<title>.md.",
+        help="Output issue body file. Defaults to /tmp/app-issues/<type>-<title>.md.",
     )
     argument_parser.add_argument(
         "--body-source",

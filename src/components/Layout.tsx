@@ -1,5 +1,6 @@
 import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
+import { BRAND_NAME } from "../brand";
 
 const HTMX_SCRIPT = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
 export const HTMX_CONFLICT_SWAP_SCRIPT = [
@@ -440,7 +441,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>SIFTQ</title>
+      <title>{BRAND_NAME}</title>
       <link rel="stylesheet" href="/styles.css" />
       <script src={HTMX_SCRIPT} defer></script>
       <script src="/htmx-conflict.js" defer></script>
@@ -451,7 +452,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
     </head>
     <body>
       <header class="topbar">
-        <a class="brand" href="/">SIFTQ</a>
+        <a class="brand" href="/">{BRAND_NAME}</a>
         <nav class="nav" aria-label="Primary">
           <a class={active === "matrix" ? "active" : undefined} href="/">
             Matrix

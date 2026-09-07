@@ -76,7 +76,7 @@ def ensure_version_matches(version: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Plan and execute SIFTQ releases and Worker deployments.")
+    parser = argparse.ArgumentParser(description="Plan and execute releases and Worker deployments.")
     subparsers = parser.add_subparsers(dest="operation", required=True)
     plan = subparsers.add_parser("plan")
     plan.add_argument("--version", required=True)
@@ -123,7 +123,7 @@ def main() -> int:
             tagged = command("git", "rev-parse", f"{args.tag}^{{commit}}")
             if tagged != command("git", "rev-parse", "HEAD"):
                 raise ValueError("checked-out HEAD must equal the deployment tag")
-            subprocess.run(["bun", "x", "wrangler", "d1", "migrations", "list", "siftq", "--remote"], check=True)
+            subprocess.run(["bun", "x", "wrangler", "d1", "migrations", "list", "app", "--remote"], check=True)
             subprocess.run(["bun", "x", "wrangler", "deploy"], check=True)
     except (ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))

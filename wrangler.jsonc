@@ -1,12 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "siftq",
+  "name": "app",
   "main": "src/index.tsx",
   "compatibility_date": "2025-06-01",
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "siftq",
+      "database_name": "app",
       "database_id": "20ca1496-cadc-4b40-9265-1d59d55d5b82",
       "migrations_dir": "migrations"
     }

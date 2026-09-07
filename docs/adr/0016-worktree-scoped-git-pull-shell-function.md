@@ -3,7 +3,7 @@
 ## 決定
 
 - `scripts/yoriwake_git_pull.sh` を追加し、Yoriwake の interactive shell で source して使う。
-- shell function `git` は、引数のない `git pull` かつカレントディレクトリが Yoriwake clone 配下の SIFTQ worktree である場合だけ `task repo:pull-main` を実行する。
+- shell function `git` は、引数のない `git pull` かつカレントディレクトリが Yoriwake clone 配下の project worktree である場合だけ `task repo:pull-main` を実行する。
 - worktree の判定は次の両方を満たすこととする。
   - `git rev-parse --show-toplevel` が script の source 元 clone root と同一、またはその配下。
   - worktree root に `.taqt/config/profiles.yaml` と `taskfile/core.yml` が存在する。
@@ -14,7 +14,7 @@
 ### 決定の理由
 
 - Git alias は組み込みの `pull` を置き換えられないため、shell function を使う。
-- source 元 clone root と SIFTQ の repository marker の両方で判定し、任意の Git repository や Yoriwake 配下の別 repository へ影響させないため。
+- source 元 clone root と project の repository marker の両方で判定し、任意の Git repository や Yoriwake 配下の別 repository へ影響させないため。
 - `command git` は shell 標準の function 迂回手段であり、追加の escape hatch option を設ける必要がないため。
 - 引数付きの `git pull` は `repo:pull-main` の固定した `git pull --ff-only` の意味と一致しないため、素の Git に委譲して引数を失わせないため。
 

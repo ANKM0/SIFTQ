@@ -17,6 +17,21 @@ function descriptionEditor(page: Page) {
   return page.getByRole("textbox", { name: "Description" });
 }
 
+async function waitForPageSettle(page: Page) {
+  // htmx swaps #page and settles (attaching submit handlers to the new form)
+  // asynchronously; submitting before htmx:afterSettle falls back to a native
+  // GET submit that stays on the form.
+  await page.evaluate(() =>
+    new Promise<void>((resolve) => {
+      if (!document.querySelector(".htmx-settling")) {
+        resolve();
+        return;
+      }
+      document.addEventListener("htmx:afterSettle", () => resolve(), { once: true });
+    }),
+  );
+}
+
 async function createMatrixTask(page: Page, title: string) {
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").fill(title);
@@ -327,6 +342,11 @@ test("creates exactly one task with Ctrl+Enter from the title or description", a
   for (const field of ["Title", "Description"] as const) {
     const taskTitle = `E2E shortcut ${field} ${Date.now()}`;
     await page.getByRole("link", { name: "New task" }).click();
+    // click() does not wait for the htmx swap; waitForURL alone can resolve
+    // before the form is settled (see waitForPageSettle).
+    await page.waitForURL(/\/tasks\/new/);
+    await page.getByLabel("Title").waitFor();
+    await waitForPageSettle(page);
     await page.getByLabel("Title").fill(taskTitle);
     if (field === "Description") await descriptionEditor(page).fill("created by shortcut");
     await (field === "Description" ? descriptionEditor(page) : page.getByLabel(field)).press("Control+Enter");

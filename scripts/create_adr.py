@@ -36,7 +36,7 @@ def render_template(root: Path, number: int, title: str) -> str:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Create a SIFTQ ADR from the template.")
+    p = argparse.ArgumentParser(description="Create an ADR from the template.")
     p.add_argument("--title", required=True)
     p.add_argument("--slug", help="File slug. Defaults to title slug.")
     p.add_argument("--number", type=int, help="ADR number. Defaults to next number.")
