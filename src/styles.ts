@@ -425,6 +425,32 @@ a {
   border-bottom: 0;
 }
 
+.pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.pagination .button.small.is-active {
+  background: #2da44e;
+  border-color: #2a9147;
+  color: #ffffff;
+}
+
+.pagination .button.small.is-disabled {
+  color: #8c959f;
+  cursor: default;
+}
+
+.pagination-ellipsis {
+  color: #57606a;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
 .detail-grid {
   display: grid;
   gap: 16px;

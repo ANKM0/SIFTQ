@@ -13,6 +13,17 @@ function request(path: string, init?: RequestInit) {
   return authenticatedRequest(path, repo, init);
 }
 
+async function seedDoTasks(count: number) {
+  for (let index = 1; index <= count; index += 1) {
+    const id = `seed-${String(index).padStart(3, "0")}`;
+    await repo.insert(taskFixture({ id, title: `seed title ${index}`, status: "do" }));
+  }
+}
+
+function countTaskRows(body: string): number {
+  return body.split('class="task-row"').length - 1;
+}
+
 describe("Matrix page", () => {
   it("renders the full page and an HTMX fragment", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
@@ -143,6 +154,102 @@ describe("Task list working filter", () => {
     const body = await (await request("/tasks?status=skip")).text();
 
     expect(body).toContain('href="/tasks?status=skip&amp;working=only"');
+  });
+});
+
+describe("Task list pagination", () => {
+  it("hides the page nav for 25 or fewer tasks", async () => {
+    await seedDoTasks(25);
+
+    const body = await (await request("/tasks?status=do")).text();
+
+    expect(countTaskRows(body)).toBe(25);
+    expect(body).not.toContain('aria-label="Task list pages"');
+  });
+
+  it("shows the first 25 tasks on page 1", async () => {
+    await seedDoTasks(26);
+
+    const firstBody = await (await request("/tasks?status=do")).text();
+    expect(countTaskRows(firstBody)).toBe(25);
+    expect(firstBody).toContain("seed-001");
+    expect(firstBody).toContain("seed-025");
+    expect(firstBody).not.toContain("seed-026");
+    expect(firstBody).toContain("#25");
+    expect(firstBody).toContain('href="/tasks?status=do&amp;page=2"');
+    expect(firstBody).toContain('aria-current="page"');
+    expect(firstBody).toContain('aria-disabled="true"');
+    expect(firstBody).toContain("前へ");
+    expect(firstBody).toContain("次へ");
+  });
+
+  it("shows the remaining tasks on page 2 with continuing issue numbers", async () => {
+    await seedDoTasks(26);
+
+    const secondBody = await (await request("/tasks?status=do&page=2")).text();
+    expect(countTaskRows(secondBody)).toBe(1);
+    expect(secondBody).toContain("seed-026");
+    expect(secondBody).not.toContain("seed-001");
+    expect(secondBody).toContain("#26");
+    expect(secondBody).toContain('href="/tasks?status=do&amp;page=1"');
+  });
+
+  it("keeps status filter links on page 1", async () => {
+    await seedDoTasks(26);
+
+    const body = await (await request("/tasks?status=do&page=2")).text();
+
+    expect(body).toContain('href="/tasks?status=done"');
+    expect(body).not.toContain("status=done&amp;page");
+  });
+
+  it("falls back to page 1 for a non-numeric page and clamps overflow to the last page", async () => {
+    await seedDoTasks(26);
+
+    const invalidBody = await (await request("/tasks?status=do&page=abc")).text();
+    expect(countTaskRows(invalidBody)).toBe(25);
+    expect(invalidBody).toContain("seed-001");
+
+    const overflowBody = await (await request("/tasks?status=do&page=999")).text();
+    expect(countTaskRows(overflowBody)).toBe(1);
+    expect(overflowBody).toContain("seed-026");
+  });
+
+  it("collapses the gap between the ends and the middle pages", async () => {
+    await seedDoTasks(250);
+
+    const body = await (await request("/tasks?status=do&page=5")).text();
+
+    expect(body.split("pagination-ellipsis").length - 1).toBe(2);
+    expect(body).toContain('href="/tasks?status=do&amp;page=1"');
+    expect(body).toContain('href="/tasks?status=do&amp;page=10"');
+    expect(body).toContain('aria-current="page"');
+  });
+
+  it("hides the page nav for an empty filtered list", async () => {
+    const body = await (await request("/tasks?status=skip")).text();
+
+    expect(body).toContain("該当するtaskはありません。");
+    expect(body).not.toContain('aria-label="Task list pages"');
+  });
+});
+
+describe("Task list working and pagination interaction", () => {
+  it("keeps the working filter in pagination links", async () => {
+    await repo.insert(
+      taskFixture({ id: "working-1", status: "do", working: true, title: "working task" }),
+    );
+
+    const body = await (await request("/tasks?status=do&working=only")).text();
+
+    expect(body).toContain("working task");
+  });
+
+  it("resets to page 1 when switching status from a working-filtered page", async () => {
+    const body = await (await request("/tasks?status=do&working=only&page=2")).text();
+
+    expect(body).toContain('href="/tasks?status=done&amp;working=only"');
+    expect(body).not.toContain("status=done&amp;working=only&amp;page");
   });
 });
 

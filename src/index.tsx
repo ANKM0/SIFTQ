@@ -6,6 +6,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
+  TASK_LIST_PAGE_SIZE,
   TASK_STATUS_FILTERS,
   TASK_STATUSES,
   changeTaskArea,
@@ -18,6 +19,9 @@ import {
   isTaskTitleValid,
   is_working,
   moveTask,
+  pageNavItems,
+  paginateTasks,
+  parsePageParam,
   sortForMatrix,
 } from "./task";
 import type { Task, TaskStatus } from "./task";
@@ -465,20 +469,120 @@ function TaskStatusFilter({ status, workingOnly }: { status: TaskStatus; working
   );
 }
 
+function PageNavLink({
+  status,
+  page,
+  workingOnly,
+}: {
+  status: TaskStatus;
+  page: number;
+  workingOnly: boolean;
+}) {
+  const workingParam = workingOnly ? "&working=only" : "";
+  return (
+    <a
+      class="button small"
+      href={`/tasks?status=${status}${workingParam}&page=${page}`}
+      aria-label={`Page ${page}`}
+    >
+      {page}
+    </a>
+  );
+}
+
+function PageNavItem({
+  item,
+  index,
+  status,
+  currentPage,
+  workingOnly,
+}: {
+  item: number | "ellipsis";
+  index: number;
+  status: TaskStatus;
+  currentPage: number;
+  workingOnly: boolean;
+}) {
+  if (item === "ellipsis") {
+    return (
+      <span key={`ellipsis-${index}`} class="pagination-ellipsis" aria-hidden="true">
+        …
+      </span>
+    );
+  }
+  if (item === currentPage) {
+    return (
+      <span key={item} class="button small is-active" aria-current="page">
+        {item}
+      </span>
+    );
+  }
+  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} />;
+}
+
+function PageNav({
+  status,
+  currentPage,
+  totalPages,
+  workingOnly,
+}: {
+  status: TaskStatus;
+  currentPage: number;
+  totalPages: number;
+  workingOnly: boolean;
+}) {
+  if (totalPages <= 1) return null;
+  const workingParam = workingOnly ? "&working=only" : "";
+  const href = (page: number) => `/tasks?status=${status}${workingParam}&page=${page}`;
+  return (
+    <nav class="pagination" aria-label="Task list pages">
+      {currentPage > 1 ? (
+        <a class="button small" href={href(currentPage - 1)} aria-label="Previous page">
+          前へ
+        </a>
+      ) : (
+        <span class="button small is-disabled" aria-disabled="true">
+          前へ
+        </span>
+      )}
+      {pageNavItems(currentPage, totalPages).map((item, index) => (
+        <PageNavItem
+          key={index}
+          item={item}
+          index={index}
+          status={status}
+          currentPage={currentPage}
+          workingOnly={workingOnly}
+        />
+      ))}
+      {currentPage < totalPages ? (
+        <a class="button small" href={href(currentPage + 1)} aria-label="Next page">
+          次へ
+        </a>
+      ) : (
+        <span class="button small is-disabled" aria-disabled="true">
+          次へ
+        </span>
+      )}
+    </nav>
+  );
+}
+
 function ListPage({
   tasks,
   status,
   workingOnly,
+  currentPage,
+  totalPages,
+  pageOffset,
 }: {
   tasks: readonly Task[];
   status: TaskStatus;
   workingOnly: boolean;
+  currentPage: number;
+  totalPages: number;
+  pageOffset: number;
 }) {
-  const filteredTasks = filterTasks(tasks, [
-    TASK_STATUS_FILTERS[status],
-    ...(workingOnly ? [is_working] : []),
-  ]);
-
   return (
     <div class="page page--list" data-state="normal">
       <div class="page-header">
@@ -490,12 +594,20 @@ function ListPage({
       </div>
       <TaskStatusFilter status={status} workingOnly={workingOnly} />
       <div class="list" aria-label="Task list">
-        {filteredTasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <p class="task-list-empty">該当するtaskはありません。</p>
         ) : (
-          filteredTasks.map((task, index) => <TaskRow key={task.id} task={task} issueNumber={index + 1} />)
+          tasks.map((task, index) => (
+            <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
+          ))
         )}
       </div>
+      <PageNav
+        status={status}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        workingOnly={workingOnly}
+      />
     </div>
   );
 }
@@ -764,7 +876,23 @@ app.get("/tasks", async (c) => {
   const rawStatus = c.req.query("status");
   const status = isTaskStatus(rawStatus) ? rawStatus : "do";
   const workingOnly = c.req.query("working") === "only";
-  return renderPage(c, <ListPage tasks={result.value} status={status} workingOnly={workingOnly} />);
+  const filteredTasks = filterTasks(result.value, [
+    TASK_STATUS_FILTERS[status],
+    ...(workingOnly ? [is_working] : []),
+  ]);
+  const requestedPage = parsePageParam(c.req.query("page")) ?? 1;
+  const { pageTasks, currentPage, totalPages } = paginateTasks(filteredTasks, requestedPage);
+  return renderPage(
+    c,
+    <ListPage
+      tasks={pageTasks}
+      status={status}
+      workingOnly={workingOnly}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
+    />,
+  );
 });
 
 app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm state={parseNewTaskState(c)} />));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  TASK_LIST_PAGE_SIZE,
   TASK_TITLE_MAX_CODE_POINTS,
   changeTaskArea,
   changeTaskStatus,
@@ -14,6 +15,9 @@ import {
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
+  pageNavItems,
+  paginateTasks,
+  parsePageParam,
   sortForMatrix,
   titleCodePointLength,
 } from "../src/task";
@@ -174,5 +178,65 @@ describe("task move", () => {
 
     expect(moveTask(tasks, "missing", 1, 0).ok).toBe(false);
     expect(moveTask(tasks, "task-1", 1, -1).ok).toBe(false);
+  });
+});
+
+describe("task list pagination", () => {
+  it("fixes the page size to 25", () => {
+    expect(TASK_LIST_PAGE_SIZE).toBe(25);
+  });
+
+  it("parses only positive integer page params", () => {
+    expect(parsePageParam("1")).toBe(1);
+    expect(parsePageParam("2")).toBe(2);
+
+    expect(parsePageParam(null)).toBeNull();
+    expect(parsePageParam(undefined)).toBeNull();
+    expect(parsePageParam("")).toBeNull();
+    expect(parsePageParam("0")).toBeNull();
+    expect(parsePageParam("-1")).toBeNull();
+    expect(parsePageParam("1.5")).toBeNull();
+    expect(parsePageParam("abc")).toBeNull();
+    expect(parsePageParam("1abc")).toBeNull();
+    expect(parsePageParam(2)).toBeNull();
+  });
+
+  it("slices 25 items per page and clamps out-of-range pages", () => {
+    const tasks = Array.from({ length: 26 }, (_, index) =>
+      taskFixture({ id: `task-${index + 1}` }),
+    );
+
+    const first = paginateTasks(tasks, 1);
+    expect(first.currentPage).toBe(1);
+    expect(first.totalPages).toBe(2);
+    expect(first.pageTasks.map((task) => task.id)).toEqual(
+      tasks.slice(0, 25).map((task) => task.id),
+    );
+
+    const second = paginateTasks(tasks, 2);
+    expect(second.currentPage).toBe(2);
+    expect(second.pageTasks.map((task) => task.id)).toEqual(["task-26"]);
+
+    const overflow = paginateTasks(tasks, 99);
+    expect(overflow.currentPage).toBe(2);
+    expect(overflow.pageTasks.map((task) => task.id)).toEqual(["task-26"]);
+
+    const below = paginateTasks(tasks, 0);
+    expect(below.currentPage).toBe(1);
+    expect(below.pageTasks).toHaveLength(25);
+  });
+
+  it("keeps a single page for 25 or fewer items", () => {
+    expect(paginateTasks([], 1).totalPages).toBe(1);
+    expect(paginateTasks(Array.from({ length: 25 }, (_, index) => taskFixture({ id: `t-${index}` })), 3).currentPage).toBe(1);
+  });
+
+  it("keeps the first and last pages and collapses gaps", () => {
+    expect(pageNavItems(1, 1)).toEqual([1]);
+    expect(pageNavItems(1, 2)).toEqual([1, 2]);
+    expect(pageNavItems(2, 3)).toEqual([1, 2, 3]);
+    expect(pageNavItems(1, 10)).toEqual([1, 2, "ellipsis", 10]);
+    expect(pageNavItems(5, 10)).toEqual([1, "ellipsis", 4, 5, 6, "ellipsis", 10]);
+    expect(pageNavItems(10, 10)).toEqual([1, "ellipsis", 9, 10]);
   });
 });
