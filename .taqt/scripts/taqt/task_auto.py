@@ -8,6 +8,7 @@ from .git_commit import main as commit_main
 from .git_push import main as push_main
 from .github_merge import main as merge_main
 from .github_pr import main as pr_main
+from .release_decision import main as release_decision_main
 from .task_run import main as run_main
 
 
@@ -31,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-commit", action="store_true")
     parser.add_argument("--skip-push", action="store_true")
     parser.add_argument("--skip-pr", action="store_true")
+    parser.add_argument("--release-decision", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -107,6 +109,8 @@ def _build_steps(args: argparse.Namespace) -> list[list[str]]:
                 *(["--force-worktree"] if args.force_worktree else []),
             ]
         )
+    if args.release_decision and args.merge:
+        steps.append(["taqt.release-decision", task, "--workspace", workspace])
     return steps
 
 
@@ -126,6 +130,8 @@ def _run_step(step: list[str]) -> int:
         return merge_main(args)
     if name == "taqt.cleanup":
         return cleanup_main(args)
+    if name == "taqt.release-decision":
+        return release_decision_main(args)
     raise ValueError(f"unknown taqt auto step: {name}")
 
 

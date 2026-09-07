@@ -77,7 +77,17 @@ task taqt:merge -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/I
 task taqt:cleanup -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --mark-done --sync-parent --delete-local-branch --force-worktree --execute
 ```
 
-8. Use `task taqt:report -- <run-dir>` to summarize a run.
+8. Decide release/deploy after merge with a read-only plan:
+
+```bash
+task taqt:release-decision -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number>
+```
+
+Classify Release-only vs Release+deploy per ADR 0034. Never push tags, apply remote
+migrations, or deploy Workers without explicit approval. Record the target SHA,
+deploy decision, and migration check per Release Notes policy.
+
+9. Use `task taqt:report -- <run-dir>` to summarize a run.
 
 ## Parallel Worker
 
@@ -97,8 +107,9 @@ Use `taqt:auto` only after the task is ready and the selected workspace is corre
 task taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
 ```
 
-The default auto route includes squash merge and worktree/local branch cleanup. Use the
-`--no-merge` or `--no-cleanup-worktree` options when those post-PR steps must be skipped.
+The default auto route includes squash merge, worktree/local branch cleanup, and a
+read-only release/deploy decision. Use the `--no-merge`, `--no-cleanup-worktree`,
+or `--no-release-decision` options when those post-PR steps must be skipped.
 
 ## Human Escalation And Self-Improvement
 

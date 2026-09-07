@@ -15,7 +15,7 @@ tasks:
       - uv run python -m taqt.task_run {{.CLI_ARGS}}
 
   auto:
-    desc: Run a taqt:enabled task through run, commit, push, PR, squash merge, and cleanup.
+    desc: Run a taqt:enabled task through run, commit, push, PR, squash merge, cleanup, and release decision.
     cmds:
       - uv run python -m taqt.task_auto {{.CLI_ARGS}}
 
@@ -73,6 +73,11 @@ tasks:
     desc: Check and merge the GitHub PR for a taqt task.
     cmds:
       - uv run python -m taqt.github_merge {{.CLI_ARGS}}
+
+  release-decision:
+    desc: Print the post-merge release/deploy decision checklist without changing state.
+    cmds:
+      - uv run python -m taqt.release_decision {{.CLI_ARGS}}
 
   route:dry-run:
     desc: Print the main post-run route commands for a taqt task without executing git or GitHub changes.
