@@ -6,6 +6,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   TASK_AREAS,
+  TASK_LIST_PAGE_SIZE,
   TASK_STATUS_FILTERS,
   TASK_STATUSES,
   changeTaskArea,
@@ -16,6 +17,9 @@ import {
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
+  pageNavItems,
+  paginateTasks,
+  parsePageParam,
   sortForMatrix,
 } from "./task";
 import type { Task, TaskStatus } from "./task";
@@ -445,9 +449,93 @@ function TaskStatusFilter({ status }: { status: TaskStatus }) {
   );
 }
 
-function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatus }) {
-  const filteredTasks = filterTasks(tasks, [TASK_STATUS_FILTERS[status]]);
+function PageNavLink({ status, page }: { status: TaskStatus; page: number }) {
+  return (
+    <a class="button small" href={`/tasks?status=${status}&page=${page}`} aria-label={`Page ${page}`}>
+      {page}
+    </a>
+  );
+}
 
+function PageNavItem({
+  item,
+  index,
+  status,
+  currentPage,
+}: {
+  item: number | "ellipsis";
+  index: number;
+  status: TaskStatus;
+  currentPage: number;
+}) {
+  if (item === "ellipsis") {
+    return (
+      <span key={`ellipsis-${index}`} class="pagination-ellipsis" aria-hidden="true">
+        …
+      </span>
+    );
+  }
+  if (item === currentPage) {
+    return (
+      <span key={item} class="button small is-active" aria-current="page">
+        {item}
+      </span>
+    );
+  }
+  return <PageNavLink key={item} status={status} page={item} />;
+}
+
+function PageNav({
+  status,
+  currentPage,
+  totalPages,
+}: {
+  status: TaskStatus;
+  currentPage: number;
+  totalPages: number;
+}) {
+  if (totalPages <= 1) return null;
+  const href = (page: number) => `/tasks?status=${status}&page=${page}`;
+  return (
+    <nav class="pagination" aria-label="Task list pages">
+      {currentPage > 1 ? (
+        <a class="button small" href={href(currentPage - 1)} aria-label="Previous page">
+          前へ
+        </a>
+      ) : (
+        <span class="button small is-disabled" aria-disabled="true">
+          前へ
+        </span>
+      )}
+      {pageNavItems(currentPage, totalPages).map((item, index) => (
+        <PageNavItem key={index} item={item} index={index} status={status} currentPage={currentPage} />
+      ))}
+      {currentPage < totalPages ? (
+        <a class="button small" href={href(currentPage + 1)} aria-label="Next page">
+          次へ
+        </a>
+      ) : (
+        <span class="button small is-disabled" aria-disabled="true">
+          次へ
+        </span>
+      )}
+    </nav>
+  );
+}
+
+function ListPage({
+  tasks,
+  status,
+  currentPage,
+  totalPages,
+  pageOffset,
+}: {
+  tasks: readonly Task[];
+  status: TaskStatus;
+  currentPage: number;
+  totalPages: number;
+  pageOffset: number;
+}) {
   return (
     <div class="page page--list" data-state="normal">
       <div class="page-header">
@@ -459,12 +547,15 @@ function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatu
       </div>
       <TaskStatusFilter status={status} />
       <div class="list" aria-label="Task list">
-        {filteredTasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <p class="task-list-empty">該当するtaskはありません。</p>
         ) : (
-          filteredTasks.map((task, index) => <TaskRow key={task.id} task={task} issueNumber={index + 1} />)
+          tasks.map((task, index) => (
+            <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
+          ))
         )}
       </div>
+      <PageNav status={status} currentPage={currentPage} totalPages={totalPages} />
     </div>
   );
 }
@@ -732,7 +823,19 @@ app.get("/tasks", async (c) => {
   if (!result.ok) return c.text("Internal Server Error", 500);
   const rawStatus = c.req.query("status");
   const status = isTaskStatus(rawStatus) ? rawStatus : "do";
-  return renderPage(c, <ListPage tasks={result.value} status={status} />);
+  const filteredTasks = filterTasks(result.value, [TASK_STATUS_FILTERS[status]]);
+  const requestedPage = parsePageParam(c.req.query("page")) ?? 1;
+  const { pageTasks, currentPage, totalPages } = paginateTasks(filteredTasks, requestedPage);
+  return renderPage(
+    c,
+    <ListPage
+      tasks={pageTasks}
+      status={status}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
+    />,
+  );
 });
 
 app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm state={parseNewTaskState(c)} />));

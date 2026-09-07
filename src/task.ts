@@ -67,6 +67,41 @@ export function filterTasks(tasks: readonly Task[], filters: readonly TaskFilter
   return tasks.filter((task) => filters.every((filter) => filter(task)));
 }
 
+export const TASK_LIST_PAGE_SIZE = 25;
+
+export type PageNavItem = number | "ellipsis";
+
+export function parsePageParam(value: unknown): number | null {
+  if (typeof value !== "string" || value === "") return null;
+  if (!/^\d+$/.test(value)) return null;
+  const page = Number(value);
+  if (!Number.isSafeInteger(page) || page < 1) return null;
+  return page;
+}
+
+export function paginateTasks(
+  tasks: readonly Task[],
+  page: number,
+  pageSize: number = TASK_LIST_PAGE_SIZE,
+): { pageTasks: Task[]; currentPage: number; totalPages: number } {
+  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  return { pageTasks: tasks.slice(start, start + pageSize), currentPage, totalPages };
+}
+
+export function pageNavItems(currentPage: number, totalPages: number): PageNavItem[] {
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const sorted = [...pages].filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  const items: PageNavItem[] = [];
+  sorted.forEach((page, index) => {
+    const previous = sorted[index - 1];
+    if (index > 0 && previous !== undefined && page - previous > 1) items.push("ellipsis");
+    items.push(page);
+  });
+  return items;
+}
+
 export function isTaskArea(value: unknown): value is TaskArea {
   return typeof value === "number" && TASK_AREAS.some((area) => area === value);
 }
