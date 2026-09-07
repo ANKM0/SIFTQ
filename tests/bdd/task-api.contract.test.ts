@@ -109,6 +109,33 @@ describe("BDD-TM-005 / BDD-TM-006: task update", () => {
     expect(response.status).toBe(409);
     expect(body.code).toBe("CONFLICT");
   });
+
+  it("toggles working without changing status", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", working: false }));
+
+    const response = await request("PATCH", "/api/tasks/task-1", {
+      working: true,
+      version: 1,
+    });
+    const task: Task = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(task.working).toBe(true);
+    expect(task.status).toBe("do");
+  });
+
+  it("rejects a non-boolean working value", async () => {
+    await repo.insert(taskFixture({ id: "task-1" }));
+
+    const response = await request("PATCH", "/api/tasks/task-1", {
+      working: "yes",
+      version: 1,
+    });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_WORKING");
+  });
 });
 
 describe("BDD-TM-008: bulk reorder", () => {

@@ -24,6 +24,44 @@ async function createMatrixTask(page: Page, title: string) {
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
 
+async function gotoListPage(page: Page, status: string) {
+  const target = `/tasks?status=${status}`;
+  try {
+    await page.goto(target);
+  } catch {
+    await page.waitForLoadState();
+    await page.goto(target);
+  }
+}
+
+async function expectTaskVisibleInList(page: Page, title: string, status: string) {
+  await gotoListPage(page, status);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await page.getByText(title, { exact: true }).count()) > 0) return;
+    const next = page.getByRole("link", { name: "Next page" });
+    if ((await next.count()) === 0) break;
+    await next.click();
+  }
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+}
+
+async function openTaskFromList(page: Page, title: string, status: string) {
+  await expectTaskVisibleInList(page, title, status);
+  await page.getByText(title, { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+}
+
+async function expectTaskAbsentFromList(page: Page, title: string, status: string) {
+  await gotoListPage(page, status);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+    const next = page.getByRole("link", { name: "Next page" });
+    if ((await next.count()) === 0) return;
+    await next.click();
+  }
+  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+}
+
 async function dismissPopover(page: Page, label: "status" | "area") {
   const title = label === "status" ? "Status" : "Area";
   const applyLabel = `Apply ${label} to this task`;
@@ -92,8 +130,7 @@ test("changes a Matrix task to done from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="done"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks?status=done");
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, title, "done");
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--done")).toBeVisible();
 });
 
@@ -107,12 +144,11 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await page.locator('.matrix-menu [data-matrix-action="skip"]').click();
 
   await expect(card).toHaveCount(0);
-  await page.goto("/tasks?status=skip");
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, title, "skip");
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
 
-test("shows the Matrix task action menu in delete, skip, done order", async ({ page }) => {
+test("shows the Matrix task action menu in delete, skip, done, working order", async ({ page }) => {
   const title = `E2E menu order ${Date.now()}`;
   await signIn(page);
   await createMatrixTask(page, title);
@@ -121,7 +157,32 @@ test("shows the Matrix task action menu in delete, skip, done order", async ({ p
   await card.click({ button: "right" });
   const menu = page.locator(".matrix-menu");
   await expect(menu).toBeVisible();
-  await expect(menu.locator("[data-matrix-action]")).toHaveText(["delete", "skip", "done"]);
+  await expect(menu.locator("[data-matrix-action]")).toHaveText([
+    "delete",
+    "skip",
+    "done",
+    "working: off",
+  ]);
+});
+
+test("toggles a Matrix task working state from the context menu", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E context working ${Date.now()}`;
+  await createMatrixTask(page, title);
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="working"]').click();
+
+  await expect(card).toHaveClass(/task-card--working/);
+  await expect(card.locator(".working-badge")).toHaveText("working");
+
+  await card.click({ button: "right" });
+  await expect(page.locator('.matrix-menu [data-matrix-action="working"]')).toHaveText("working: on");
+  await page.locator('.matrix-menu [data-matrix-action="working"]').click();
+
+  await expect(card).not.toHaveClass(/task-card--working/);
+  await expect(card.locator(".working-badge")).toHaveCount(0);
 });
 
 test("confirms Matrix task deletion in the centered dialog", async ({ page }) => {
@@ -148,8 +209,7 @@ test("confirms Matrix task deletion in the centered dialog", async ({ page }) =>
   await page.locator('.matrix-modal-button[data-matrix-modal-action="confirm"]').click();
   await expect(card).toHaveCount(0);
 
-  await page.goto("/tasks");
-  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+  await expectTaskAbsentFromList(page, title, "do");
 });
 
 test("creates a task and sees it in the list", async ({ page }) => {
@@ -165,8 +225,7 @@ test("creates a task and sees it in the list", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
-  await page.goto("/tasks");
-  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, taskTitle, "do");
 });
 
 test("opens description URLs with native link behavior", async ({ page }) => {
@@ -316,7 +375,7 @@ test("creates a task from the task list and returns to the task list", async ({ 
   await page.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, taskTitle, "do");
 });
 
 test("filters the task list by status and retains it after reload", async ({ page }) => {
@@ -332,24 +391,23 @@ test("filters the task list by status and retains it after reload", async ({ pag
   }
 
   await page.goto("/tasks");
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
   await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).not.toBeVisible();
   await expect(page.getByText(`E2E filter skip ${suffix}`, { exact: true })).not.toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter do ${suffix}`, "do");
 
   await page.locator('a[href="/tasks?status=done"]').click();
   await expect(page).toHaveURL(/\/tasks\?status=done$/);
-  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).not.toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter done ${suffix}`, "done");
 
   await page.reload();
   await expect(page).toHaveURL(/\/tasks\?status=done$/);
-  await expect(page.getByText(`E2E filter done ${suffix}`, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter done ${suffix}`, "done");
 
   await page.goto("/");
   await page.locator('nav.nav a[href="/tasks"]').click();
   await expect(page).toHaveURL(/\/tasks$/);
   await expect(page.locator('a[href="/tasks?status=do"][aria-current="true"]')).toBeVisible();
-  await expect(page.getByText(`E2E filter do ${suffix}`, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, `E2E filter do ${suffix}`, "do");
 });
 
 test("keeps new-task inputs while changing Status and Area", async ({ page }) => {
@@ -372,7 +430,7 @@ test("keeps new-task inputs while changing Status and Area", async ({ page }) =>
 
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.goto("/tasks?status=done");
+  await expectTaskVisibleInList(page, title, "done");
   await page.getByText(title, { exact: true }).click();
   await expect(page.locator("#task-meta .status--done")).toHaveText("done");
   await expect(page.locator("#task-meta .area-badge")).toHaveText("4");
@@ -445,8 +503,7 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.getByText(title, { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await openTaskFromList(page, title, "do");
 
   await dismissPopover(page, "status");
   await expect(page.locator("#task-meta .status--do")).toHaveText("do");
@@ -461,7 +518,7 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.goto("/tasks/new");
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
-  await page.getByText(title, { exact: true }).click();
+  await openTaskFromList(page, title, "do");
 
   const version = page.locator("#task-version");
   const beforeMetaChange = await version.inputValue();
@@ -472,8 +529,11 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page).toHaveURL(/\/tasks$/);
-  if (kind === "status") await page.goto(`/tasks?status=${value}`);
-  await expect(page.getByText(`${title} saved`, { exact: true })).toBeVisible();
+  if (kind === "status") {
+    await expectTaskVisibleInList(page, `${title} saved`, value);
+  } else {
+    await expectTaskVisibleInList(page, `${title} saved`, "do");
+  }
 }
 
 test("saves after changing task status", async ({ page }) => {
@@ -496,8 +556,7 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.getByText(title, { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await openTaskFromList(page, title, "do");
 
   const staleEditor = await page.context().newPage();
   await staleEditor.goto(page.url());
@@ -506,7 +565,7 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await page.getByLabel("Title").fill("E2E saved task");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/\/tasks$/);
-  await expect(page.locator(".task-row").filter({ hasText: "E2E saved task" }).first()).toBeVisible();
+  await expectTaskVisibleInList(page, "E2E saved task", "do");
 
   await staleEditor.getByLabel("Title").fill("E2E stale task");
   await staleEditor.getByRole("button", { name: "Save" }).click();

@@ -161,6 +161,7 @@ prefix_rule(pattern=["task", "taqt:commit"], decision="allow")
 prefix_rule(pattern=["task", "taqt:push"], decision="allow")
 prefix_rule(pattern=["task", "taqt:pr"], decision="allow")
 prefix_rule(pattern=["task", "taqt:merge"], decision="allow")
+prefix_rule(pattern=["task", "taqt:release-decision"], decision="allow")
 prefix_rule(pattern=["task", "taqt:route:dry-run"], decision="allow")
 prefix_rule(pattern=["task", "taqt:report"], decision="allow")
 

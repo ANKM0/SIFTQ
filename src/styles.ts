@@ -306,6 +306,11 @@ a {
   padding: 12px;
 }
 
+.task-card--working,
+.task-row--working {
+  border-left: 4px solid #8250df;
+}
+
 .task-card:hover {
   border-color: #0969da;
   box-shadow: 0 0 0 2px #ddf4ff;
@@ -362,6 +367,18 @@ a {
   color: #57606a;
 }
 
+.working-badge {
+  background: #fbefff;
+  border: 1px solid #c297ff;
+  border-radius: 999px;
+  color: #6639ba;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  width: max-content;
+}
+
 .list {
   border: 1px solid #d0d7de;
   border-radius: 8px;
@@ -406,6 +423,32 @@ a {
 
 .task-row:last-child {
   border-bottom: 0;
+}
+
+.pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.pagination .button.small.is-active {
+  background: #2da44e;
+  border-color: #2a9147;
+  color: #ffffff;
+}
+
+.pagination .button.small.is-disabled {
+  color: #8c959f;
+  cursor: default;
+}
+
+.pagination-ellipsis {
+  color: #57606a;
+  font-weight: 700;
+  padding: 0 4px;
 }
 
 .detail-grid {
