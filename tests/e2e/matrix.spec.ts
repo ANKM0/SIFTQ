@@ -35,6 +35,23 @@ async function expectTaskVisibleInList(page: Page, title: string, status: string
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 }
 
+async function openTaskFromList(page: Page, title: string, status: string) {
+  await expectTaskVisibleInList(page, title, status);
+  await page.getByText(title, { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+}
+
+async function expectTaskAbsentFromList(page: Page, title: string, status: string) {
+  await page.goto(`/tasks?status=${status}`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+    const next = page.getByRole("link", { name: "Next page" });
+    if ((await next.count()) === 0) return;
+    await next.click();
+  }
+  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+}
+
 async function dismissPopover(page: Page, label: "status" | "area") {
   const title = label === "status" ? "Status" : "Area";
   const applyLabel = `Apply ${label} to this task`;
@@ -157,8 +174,7 @@ test("confirms Matrix task deletion in the centered dialog", async ({ page }) =>
   await page.locator('.matrix-modal-button[data-matrix-modal-action="confirm"]').click();
   await expect(card).toHaveCount(0);
 
-  await page.goto("/tasks");
-  await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+  await expectTaskAbsentFromList(page, title, "do");
 });
 
 test("creates a task and sees it in the list", async ({ page }) => {
@@ -324,7 +340,7 @@ test("creates a task from the task list and returns to the task list", async ({ 
   await page.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+  await expectTaskVisibleInList(page, taskTitle, "do");
 });
 
 test("filters the task list by status and retains it after reload", async ({ page }) => {
@@ -452,8 +468,7 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.getByText(title, { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await openTaskFromList(page, title, "do");
 
   await dismissPopover(page, "status");
   await expect(page.locator("#task-meta .status--do")).toHaveText("do");
@@ -468,7 +483,7 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.goto("/tasks/new");
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
-  await page.getByText(title, { exact: true }).click();
+  await openTaskFromList(page, title, "do");
 
   const version = page.locator("#task-version");
   const beforeMetaChange = await version.inputValue();
@@ -479,8 +494,11 @@ async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: s
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page).toHaveURL(/\/tasks$/);
-  if (kind === "status") await page.goto(`/tasks?status=${value}`);
-  await expect(page.getByText(`${title} saved`, { exact: true })).toBeVisible();
+  if (kind === "status") {
+    await expectTaskVisibleInList(page, `${title} saved`, value);
+  } else {
+    await expectTaskVisibleInList(page, `${title} saved`, "do");
+  }
 }
 
 test("saves after changing task status", async ({ page }) => {
@@ -503,8 +521,7 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await page.getByLabel("Title").fill(title);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await page.getByText(title, { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await openTaskFromList(page, title, "do");
 
   const staleEditor = await page.context().newPage();
   await staleEditor.goto(page.url());
@@ -513,7 +530,7 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await page.getByLabel("Title").fill("E2E saved task");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/\/tasks$/);
-  await expect(page.locator(".task-row").filter({ hasText: "E2E saved task" }).first()).toBeVisible();
+  await expectTaskVisibleInList(page, "E2E saved task", "do");
 
   await staleEditor.getByLabel("Title").fill("E2E stale task");
   await staleEditor.getByRole("button", { name: "Save" }).click();
