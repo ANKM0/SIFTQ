@@ -12,6 +12,7 @@ export type Task = {
   title: string;
   description: string;
   status: TaskStatus;
+  working: boolean;
   area: TaskArea;
   order: number;
   version: number;
@@ -55,6 +56,10 @@ export function is_done(task: Task): boolean {
 
 export function is_skip(task: Task): boolean {
   return task.status === "skip";
+}
+
+export function is_working(task: Task): boolean {
+  return task.working;
 }
 
 export const TASK_STATUS_FILTERS: Record<TaskStatus, TaskFilter> = {
@@ -135,6 +140,7 @@ export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
     title: input.title,
     description: input.description,
     status: input.status ?? "do",
+    working: false,
     area: input.area ?? 1,
     order: 1,
     version: 1,
@@ -149,6 +155,10 @@ export function changeTaskStatus(task: Task, status: TaskStatus): Result<Task, D
 
 export function changeTaskArea(task: Task, area: TaskArea): Result<Task, DomainError> {
   return ok({ ...task, area });
+}
+
+export function changeTaskWorking(task: Task, working: boolean): Result<Task, DomainError> {
+  return ok({ ...task, working });
 }
 
 export function sortForMatrix(tasks: readonly Task[]): Task[] {

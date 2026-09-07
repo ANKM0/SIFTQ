@@ -23,8 +23,12 @@ describe("mock backend preview", () => {
     const list = await previewRequest("/tasks?status=done");
 
     expect(matrix.status).toBe(200);
-    expect(await matrix.text()).toContain("Matrix のタスクカードを見直す");
+    const matrixBody = await matrix.text();
+    expect(matrixBody).toContain("Matrix のタスクカードを見直す");
+    expect(matrixBody).toContain("working");
     expect(list.status).toBe(200);
-    expect(await list.text()).toContain("完了したタスクの表示を確認する");
+    const listBody = await list.text();
+    expect(listBody).toContain("完了したタスクの表示を確認する");
+    expect(listBody).toContain("working");
   });
 });

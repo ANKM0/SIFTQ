@@ -4,11 +4,13 @@ import {
   TASK_TITLE_MAX_CODE_POINTS,
   changeTaskArea,
   changeTaskStatus,
+  changeTaskWorking,
   createTask,
   filterTasks,
   is_do,
   is_done,
   is_skip,
+  is_working,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
@@ -64,6 +66,11 @@ describe("task filters", () => {
     expect(filterTasks(tasks, [is_skip]).map((task) => task.id)).toEqual(["skip"]);
     expect(filterTasks(tasks, [is_do, is_done])).toEqual([]);
   });
+
+  it("recognizes working tasks independently of status", () => {
+    expect(is_working(taskFixture({ status: "done", working: true }))).toBe(true);
+    expect(is_working(taskFixture({ status: "do", working: false }))).toBe(false);
+  });
 });
 
 describe("task domain", () => {
@@ -110,6 +117,29 @@ describe("task domain", () => {
     if (!changed.ok) return;
     expect(changed.value.area).toBe(4);
     expect(changed.value.status).toBe("do");
+  });
+
+  it("toggles working without changing status or area", () => {
+    const task = taskFixture({ id: "task-1", status: "do", area: 2, working: false });
+
+    const started = changeTaskWorking(task, true);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(started.value.working).toBe(true);
+    expect(started.value.status).toBe("do");
+    expect(started.value.area).toBe(2);
+  });
+});
+
+describe("task working preservation", () => {
+  it("keeps working when status changes to done", () => {
+    const task = taskFixture({ id: "task-1", status: "do", working: true });
+
+    const done = changeTaskStatus(task, "done");
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(done.value.status).toBe("done");
+    expect(done.value.working).toBe(true);
   });
 
   it("sorts matrix tasks by area and order", () => {

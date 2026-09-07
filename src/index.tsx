@@ -11,11 +11,13 @@ import {
   TASK_STATUSES,
   changeTaskArea,
   changeTaskStatus,
+  changeTaskWorking,
   createTask,
   filterTasks,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
+  is_working,
   moveTask,
   pageNavItems,
   paginateTasks,
@@ -152,7 +154,10 @@ function applyPatch(
   const withArea = applyArea(body, withStatus);
   if (!withArea) return { ok: false, code: "INVALID_AREA" };
 
-  return { ok: true, task: withArea };
+  const withWorking = applyWorking(body, withArea);
+  if (!withWorking) return { ok: false, code: "INVALID_WORKING" };
+
+  return { ok: true, task: withWorking };
 }
 
 function applyTitle(body: Record<string, unknown>, task: Task): Task | null {
@@ -178,6 +183,13 @@ function applyArea(body: Record<string, unknown>, task: Task): Task | null {
   if (!("area" in body)) return task;
   if (!isTaskArea(body["area"])) return null;
   const changed = changeTaskArea(task, body["area"]);
+  return changed.ok ? changed.value : null;
+}
+
+function applyWorking(body: Record<string, unknown>, task: Task): Task | null {
+  if (!("working" in body)) return task;
+  if (typeof body["working"] !== "boolean") return null;
+  const changed = changeTaskWorking(task, body["working"]);
   return changed.ok ? changed.value : null;
 }
 
@@ -432,7 +444,8 @@ const TASK_STATUS_OPTIONS: { status: TaskStatus; label: string }[] = TASK_STATUS
   label: status,
 }));
 
-function TaskStatusFilter({ status }: { status: TaskStatus }) {
+function TaskStatusFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+  const workingParam = workingOnly ? "&working=only" : "";
   return (
     <nav class="task-status-filter" aria-label="Filter tasks by status">
       {TASK_STATUS_OPTIONS.map((option) => (
@@ -440,18 +453,38 @@ function TaskStatusFilter({ status }: { status: TaskStatus }) {
           key={option.status}
           class={option.status === status ? "button small is-active" : "button small"}
           aria-current={option.status === status ? "true" : undefined}
-          href={`/tasks?status=${option.status}`}
+          href={`/tasks?status=${option.status}${workingParam}`}
         >
           {option.label}
         </a>
       ))}
+      <a
+        class={workingOnly ? "button small is-active" : "button small"}
+        aria-current={workingOnly ? "true" : undefined}
+        href={workingOnly ? `/tasks?status=${status}` : `/tasks?status=${status}&working=only`}
+      >
+        working only
+      </a>
     </nav>
   );
 }
 
-function PageNavLink({ status, page }: { status: TaskStatus; page: number }) {
+function PageNavLink({
+  status,
+  page,
+  workingOnly,
+}: {
+  status: TaskStatus;
+  page: number;
+  workingOnly: boolean;
+}) {
+  const workingParam = workingOnly ? "&working=only" : "";
   return (
-    <a class="button small" href={`/tasks?status=${status}&page=${page}`} aria-label={`Page ${page}`}>
+    <a
+      class="button small"
+      href={`/tasks?status=${status}${workingParam}&page=${page}`}
+      aria-label={`Page ${page}`}
+    >
       {page}
     </a>
   );
@@ -462,11 +495,13 @@ function PageNavItem({
   index,
   status,
   currentPage,
+  workingOnly,
 }: {
   item: number | "ellipsis";
   index: number;
   status: TaskStatus;
   currentPage: number;
+  workingOnly: boolean;
 }) {
   if (item === "ellipsis") {
     return (
@@ -482,20 +517,23 @@ function PageNavItem({
       </span>
     );
   }
-  return <PageNavLink key={item} status={status} page={item} />;
+  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} />;
 }
 
 function PageNav({
   status,
   currentPage,
   totalPages,
+  workingOnly,
 }: {
   status: TaskStatus;
   currentPage: number;
   totalPages: number;
+  workingOnly: boolean;
 }) {
   if (totalPages <= 1) return null;
-  const href = (page: number) => `/tasks?status=${status}&page=${page}`;
+  const workingParam = workingOnly ? "&working=only" : "";
+  const href = (page: number) => `/tasks?status=${status}${workingParam}&page=${page}`;
   return (
     <nav class="pagination" aria-label="Task list pages">
       {currentPage > 1 ? (
@@ -508,7 +546,14 @@ function PageNav({
         </span>
       )}
       {pageNavItems(currentPage, totalPages).map((item, index) => (
-        <PageNavItem key={index} item={item} index={index} status={status} currentPage={currentPage} />
+        <PageNavItem
+          key={index}
+          item={item}
+          index={index}
+          status={status}
+          currentPage={currentPage}
+          workingOnly={workingOnly}
+        />
       ))}
       {currentPage < totalPages ? (
         <a class="button small" href={href(currentPage + 1)} aria-label="Next page">
@@ -526,12 +571,14 @@ function PageNav({
 function ListPage({
   tasks,
   status,
+  workingOnly,
   currentPage,
   totalPages,
   pageOffset,
 }: {
   tasks: readonly Task[];
   status: TaskStatus;
+  workingOnly: boolean;
   currentPage: number;
   totalPages: number;
   pageOffset: number;
@@ -545,7 +592,7 @@ function ListPage({
         </div>
         <NewTaskLink from="tasks" />
       </div>
-      <TaskStatusFilter status={status} />
+      <TaskStatusFilter status={status} workingOnly={workingOnly} />
       <div class="list" aria-label="Task list">
         {tasks.length === 0 ? (
           <p class="task-list-empty">該当するtaskはありません。</p>
@@ -555,7 +602,12 @@ function ListPage({
           ))
         )}
       </div>
-      <PageNav status={status} currentPage={currentPage} totalPages={totalPages} />
+      <PageNav
+        status={status}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        workingOnly={workingOnly}
+      />
     </div>
   );
 }
@@ -823,7 +875,11 @@ app.get("/tasks", async (c) => {
   if (!result.ok) return c.text("Internal Server Error", 500);
   const rawStatus = c.req.query("status");
   const status = isTaskStatus(rawStatus) ? rawStatus : "do";
-  const filteredTasks = filterTasks(result.value, [TASK_STATUS_FILTERS[status]]);
+  const workingOnly = c.req.query("working") === "only";
+  const filteredTasks = filterTasks(result.value, [
+    TASK_STATUS_FILTERS[status],
+    ...(workingOnly ? [is_working] : []),
+  ]);
   const requestedPage = parsePageParam(c.req.query("page")) ?? 1;
   const { pageTasks, currentPage, totalPages } = paginateTasks(filteredTasks, requestedPage);
   return renderPage(
@@ -831,6 +887,7 @@ app.get("/tasks", async (c) => {
     <ListPage
       tasks={pageTasks}
       status={status}
+      workingOnly={workingOnly}
       currentPage={currentPage}
       totalPages={totalPages}
       pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
@@ -933,6 +990,22 @@ app.post("/tasks/:id/area", async (c) => {
 
   const changed = changeTaskArea(task, area);
   if (!changed.ok) return c.text("Invalid area", 400);
+  return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
+});
+
+app.post("/tasks/:id/working", async (c) => {
+  const task = await findTask(c, c.req.param("id"));
+  if (!task) return c.notFound();
+
+  const body = await c.req.parseBody();
+  const rawWorking = body["working"];
+  const version = parseTaskVersion(body["version"]);
+  if ((rawWorking !== "true" && rawWorking !== "false") || version === null) {
+    return c.text("Invalid working", 400);
+  }
+
+  const changed = changeTaskWorking(task, rawWorking === "true");
+  if (!changed.ok) return c.text("Invalid working", 400);
   return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
 });
 

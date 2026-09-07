@@ -7,6 +7,7 @@ export function taskFixture(overrides: Partial<Task> = {}): Task {
     title: "seed task",
     description: "",
     status: "do",
+    working: false,
     area: 1,
     order: 1,
     version: 1,

@@ -148,7 +148,7 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
 
-test("shows the Matrix task action menu in delete, skip, done order", async ({ page }) => {
+test("shows the Matrix task action menu in delete, skip, done, working order", async ({ page }) => {
   const title = `E2E menu order ${Date.now()}`;
   await signIn(page);
   await createMatrixTask(page, title);
@@ -157,7 +157,32 @@ test("shows the Matrix task action menu in delete, skip, done order", async ({ p
   await card.click({ button: "right" });
   const menu = page.locator(".matrix-menu");
   await expect(menu).toBeVisible();
-  await expect(menu.locator("[data-matrix-action]")).toHaveText(["delete", "skip", "done"]);
+  await expect(menu.locator("[data-matrix-action]")).toHaveText([
+    "delete",
+    "skip",
+    "done",
+    "working: off",
+  ]);
+});
+
+test("toggles a Matrix task working state from the context menu", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E context working ${Date.now()}`;
+  await createMatrixTask(page, title);
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  await page.locator('.matrix-menu [data-matrix-action="working"]').click();
+
+  await expect(card).toHaveClass(/task-card--working/);
+  await expect(card.locator(".working-badge")).toHaveText("working");
+
+  await card.click({ button: "right" });
+  await expect(page.locator('.matrix-menu [data-matrix-action="working"]')).toHaveText("working: on");
+  await page.locator('.matrix-menu [data-matrix-action="working"]').click();
+
+  await expect(card).not.toHaveClass(/task-card--working/);
+  await expect(card.locator(".working-badge")).toHaveCount(0);
 });
 
 test("confirms Matrix task deletion in the centered dialog", async ({ page }) => {

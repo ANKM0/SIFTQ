@@ -43,3 +43,4 @@
 | [ADR 0037: LLMクライアントをcodexからopencodeに変更する](0037-switch-llm-client-to-opencode.md) | Accepted. | LLMクライアントをcodexからopencodeに変更する。 |
 | [ADR 0038: Task一覧のページングにoffset方式を採用する](0038-task-list-offset-pagination.md) | Accepted. | Task一覧を25件固定のoffset分割とし、`?page=`で指定する。 |
 | [ADR 0039: Task一覧のページングUIはGitHub issue一覧と同様にする](0039-task-list-pagination-ui.md) | Accepted. | ページ番号＋前へ/次へ、中間省略、status切替で1ページ目、一覧下のみ配置。 |
+| [ADR 0040: 実施中を直交boolean workingで表す](0040-represent-working-as-orthogonal-boolean.md) | Accepted. | 実施中はstatusと直交するboolean `working`で表し、終了時も自動解除しない。 |

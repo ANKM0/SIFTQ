@@ -24,6 +24,7 @@ export const TaskSidePanel: FC<{
   const detailPath = `/tasks/${task.id}?from=${returnTo}`;
   const statusPath = `/tasks/${task.id}/status/menu?from=${returnTo}`;
   const areaPath = `/tasks/${task.id}/area/menu?from=${returnTo}`;
+  const workingPath = `/tasks/${task.id}/working?from=${returnTo}`;
 
   return (
     <aside
@@ -51,6 +52,19 @@ export const TaskSidePanel: FC<{
       >
         {task.area}
       </a>
+      <div class="meta-row meta-row--spaced">
+        <h2>Working</h2>
+      </div>
+      <button
+        class={task.working ? "status working-badge" : "status"}
+        hx-post={workingPath}
+        hx-vals={JSON.stringify({ working: task.working ? "false" : "true", version: task.version })}
+        hx-target="#task-meta"
+        hx-swap="innerHTML"
+        aria-pressed={task.working ? "true" : "false"}
+      >
+        {task.working ? "working" : "not working"}
+      </button>
       {children}
     </aside>
   );

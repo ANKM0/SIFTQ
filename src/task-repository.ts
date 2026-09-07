@@ -13,7 +13,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function toTask(value: unknown): Task | undefined {
   if (!isRecord(value)) return undefined;
 
-  const { id, owner_id, title, description, status, area, order, version, created_at, updated_at } =
+  const { id, owner_id, title, description, status, working, area, order, version, created_at, updated_at } =
     value;
 
   if (typeof id !== "string") return undefined;
@@ -21,6 +21,7 @@ function toTask(value: unknown): Task | undefined {
   if (typeof title !== "string") return undefined;
   if (typeof description !== "string") return undefined;
   if (!isTaskStatus(status)) return undefined;
+  if (working !== 0 && working !== 1) return undefined;
   if (!isTaskArea(area)) return undefined;
   if (typeof order !== "number") return undefined;
   if (typeof version !== "number") return undefined;
@@ -33,6 +34,7 @@ function toTask(value: unknown): Task | undefined {
     title,
     description,
     status,
+    working: working === 1,
     area,
     order,
     version,
@@ -60,7 +62,7 @@ export class D1TaskRepository implements TaskRepository {
   async list(): Promise<Result<Task[], RepositoryError>> {
     const result = await this.db
       .prepare(
-        'SELECT id, owner_id, title, description, status, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? ORDER BY id',
+        'SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? ORDER BY id',
       )
       .bind(OWNER_ID)
       .all<Record<string, unknown>>();
@@ -71,7 +73,7 @@ export class D1TaskRepository implements TaskRepository {
   async find(id: string, owner_id: string): Promise<Result<Task | undefined, RepositoryError>> {
     const row = await this.db
       .prepare(
-        'SELECT id, owner_id, title, description, status, area, "order", version, created_at, updated_at FROM tasks WHERE id = ? AND owner_id = ?',
+        'SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE id = ? AND owner_id = ?',
       )
       .bind(id, owner_id)
       .first<Record<string, unknown>>();
@@ -82,7 +84,7 @@ export class D1TaskRepository implements TaskRepository {
   async insert(task: Task): Promise<Result<Task, RepositoryError>> {
     await this.db
       .prepare(
-        'INSERT INTO tasks (id, owner_id, title, description, status, area, "order", version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO tasks (id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .bind(
         task.id,
@@ -90,6 +92,7 @@ export class D1TaskRepository implements TaskRepository {
         task.title,
         task.description,
         task.status,
+        task.working ? 1 : 0,
         task.area,
         task.order,
         task.version,
@@ -105,12 +108,13 @@ export class D1TaskRepository implements TaskRepository {
     const updatedAt = new Date().toISOString();
     const result = await this.db
       .prepare(
-        'UPDATE tasks SET title = ?, description = ?, status = ?, area = ?, "order" = ?, version = version + 1, updated_at = ? WHERE id = ? AND owner_id = ? AND version = ?',
+        'UPDATE tasks SET title = ?, description = ?, status = ?, working = ?, area = ?, "order" = ?, version = version + 1, updated_at = ? WHERE id = ? AND owner_id = ? AND version = ?',
       )
       .bind(
         task.title,
         task.description,
         task.status,
+        task.working ? 1 : 0,
         task.area,
         task.order,
         updatedAt,
