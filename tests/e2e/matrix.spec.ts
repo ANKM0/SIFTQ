@@ -25,6 +25,7 @@ async function createMatrixTask(page: Page, title: string) {
 }
 
 async function expectTaskVisibleInList(page: Page, title: string, status: string) {
+  await page.waitForLoadState();
   await page.goto(`/tasks?status=${status}`);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if ((await page.getByText(title, { exact: true }).count()) > 0) return;
@@ -42,6 +43,7 @@ async function openTaskFromList(page: Page, title: string, status: string) {
 }
 
 async function expectTaskAbsentFromList(page: Page, title: string, status: string) {
+  await page.waitForLoadState();
   await page.goto(`/tasks?status=${status}`);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await expect(page.getByText(title, { exact: true })).toHaveCount(0);
