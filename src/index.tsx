@@ -10,11 +10,13 @@ import {
   TASK_STATUSES,
   changeTaskArea,
   changeTaskStatus,
+  changeTaskWorking,
   createTask,
   filterTasks,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
+  is_working,
   moveTask,
   sortForMatrix,
 } from "./task";
@@ -148,7 +150,10 @@ function applyPatch(
   const withArea = applyArea(body, withStatus);
   if (!withArea) return { ok: false, code: "INVALID_AREA" };
 
-  return { ok: true, task: withArea };
+  const withWorking = applyWorking(body, withArea);
+  if (!withWorking) return { ok: false, code: "INVALID_WORKING" };
+
+  return { ok: true, task: withWorking };
 }
 
 function applyTitle(body: Record<string, unknown>, task: Task): Task | null {
@@ -174,6 +179,13 @@ function applyArea(body: Record<string, unknown>, task: Task): Task | null {
   if (!("area" in body)) return task;
   if (!isTaskArea(body["area"])) return null;
   const changed = changeTaskArea(task, body["area"]);
+  return changed.ok ? changed.value : null;
+}
+
+function applyWorking(body: Record<string, unknown>, task: Task): Task | null {
+  if (!("working" in body)) return task;
+  if (typeof body["working"] !== "boolean") return null;
+  const changed = changeTaskWorking(task, body["working"]);
   return changed.ok ? changed.value : null;
 }
 
@@ -428,7 +440,8 @@ const TASK_STATUS_OPTIONS: { status: TaskStatus; label: string }[] = TASK_STATUS
   label: status,
 }));
 
-function TaskStatusFilter({ status }: { status: TaskStatus }) {
+function TaskStatusFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+  const workingParam = workingOnly ? "&working=only" : "";
   return (
     <nav class="task-status-filter" aria-label="Filter tasks by status">
       {TASK_STATUS_OPTIONS.map((option) => (
@@ -436,17 +449,35 @@ function TaskStatusFilter({ status }: { status: TaskStatus }) {
           key={option.status}
           class={option.status === status ? "button small is-active" : "button small"}
           aria-current={option.status === status ? "true" : undefined}
-          href={`/tasks?status=${option.status}`}
+          href={`/tasks?status=${option.status}${workingParam}`}
         >
           {option.label}
         </a>
       ))}
+      <a
+        class={workingOnly ? "button small is-active" : "button small"}
+        aria-current={workingOnly ? "true" : undefined}
+        href={workingOnly ? `/tasks?status=${status}` : `/tasks?status=${status}&working=only`}
+      >
+        working only
+      </a>
     </nav>
   );
 }
 
-function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatus }) {
-  const filteredTasks = filterTasks(tasks, [TASK_STATUS_FILTERS[status]]);
+function ListPage({
+  tasks,
+  status,
+  workingOnly,
+}: {
+  tasks: readonly Task[];
+  status: TaskStatus;
+  workingOnly: boolean;
+}) {
+  const filteredTasks = filterTasks(tasks, [
+    TASK_STATUS_FILTERS[status],
+    ...(workingOnly ? [is_working] : []),
+  ]);
 
   return (
     <div class="page page--list" data-state="normal">
@@ -457,7 +488,7 @@ function ListPage({ tasks, status }: { tasks: readonly Task[]; status: TaskStatu
         </div>
         <NewTaskLink from="tasks" />
       </div>
-      <TaskStatusFilter status={status} />
+      <TaskStatusFilter status={status} workingOnly={workingOnly} />
       <div class="list" aria-label="Task list">
         {filteredTasks.length === 0 ? (
           <p class="task-list-empty">該当するtaskはありません。</p>
@@ -732,7 +763,8 @@ app.get("/tasks", async (c) => {
   if (!result.ok) return c.text("Internal Server Error", 500);
   const rawStatus = c.req.query("status");
   const status = isTaskStatus(rawStatus) ? rawStatus : "do";
-  return renderPage(c, <ListPage tasks={result.value} status={status} />);
+  const workingOnly = c.req.query("working") === "only";
+  return renderPage(c, <ListPage tasks={result.value} status={status} workingOnly={workingOnly} />);
 });
 
 app.get("/tasks/new", (c) => renderPage(c, <NewTaskForm state={parseNewTaskState(c)} />));
@@ -830,6 +862,22 @@ app.post("/tasks/:id/area", async (c) => {
 
   const changed = changeTaskArea(task, area);
   if (!changed.ok) return c.text("Invalid area", 400);
+  return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
+});
+
+app.post("/tasks/:id/working", async (c) => {
+  const task = await findTask(c, c.req.param("id"));
+  if (!task) return c.notFound();
+
+  const body = await c.req.parseBody();
+  const rawWorking = body["working"];
+  const version = parseTaskVersion(body["version"]);
+  if ((rawWorking !== "true" && rawWorking !== "false") || version === null) {
+    return c.text("Invalid working", 400);
+  }
+
+  const changed = changeTaskWorking(task, rawWorking === "true");
+  if (!changed.ok) return c.text("Invalid working", 400);
   return persistTaskMeta(c, task, { ...changed.value, version }, detailReturnTo(c));
 });
 

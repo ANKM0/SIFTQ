@@ -16,4 +16,10 @@ describe("TaskCard", () => {
     expect(html).not.toContain("status--do");
     expect(html).not.toContain(">do</span>");
   });
+
+  it("marks working tasks with a badge and working class", () => {
+    const html = renderToString(<TaskCard task={taskFixture({ working: true })} />);
+    expect(html).toContain('class="task-card task-card--working"');
+    expect(html).toContain('class="working-badge">working</span>');
+  });
 });

@@ -110,6 +110,42 @@ describe("Task list page", () => {
   });
 });
 
+describe("Task list working filter", () => {
+  it("filters the list to working tasks only when requested", async () => {
+    await repo.insert(
+      taskFixture({ id: "working-1", status: "do", working: true, title: "working task" }),
+    );
+    await repo.insert(taskFixture({ id: "idle-1", status: "do", working: false, title: "idle task" }));
+    await repo.insert(
+      taskFixture({
+        id: "working-done-1",
+        status: "done",
+        working: true,
+        title: "done working task",
+      }),
+    );
+
+    const body = await (await request("/tasks?status=do&working=only")).text();
+
+    expect(body).toContain("working task");
+    expect(body).not.toContain("idle task");
+    expect(body).not.toContain("done working task");
+    expect(body).toContain("working only");
+  });
+
+  it("keeps the status filter when toggling the working filter", async () => {
+    const body = await (await request("/tasks?status=done")).text();
+
+    expect(body).toContain('href="/tasks?status=done&amp;working=only"');
+  });
+
+  it("preserves the status filter on working filter links", async () => {
+    const body = await (await request("/tasks?status=skip")).text();
+
+    expect(body).toContain('href="/tasks?status=skip&amp;working=only"');
+  });
+});
+
 describe("Task creation", () => {
   it("redirects to the task list after creating a task by default", async () => {
     const response = await request("/tasks", {
@@ -341,5 +377,40 @@ describe("Task detail and metadata menus", () => {
 
     expect(response.status).toBe(200);
     expect(body).toContain('id="task-version" type="hidden" name="version" value="4" hx-swap-oob="true"');
+  });
+});
+
+describe("Task detail working toggle", () => {
+  it("toggles working from the detail metadata and refreshes the version", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3, working: false }));
+
+    const response = await request("/tasks/task-1/working", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ working: "true", version: "3" }).toString(),
+    });
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain(
+      'id="task-version" type="hidden" name="version" value="4" hx-swap-oob="true"',
+    );
+    expect(body).toContain(">working</button>");
+
+    const saved = await repo.find("task-1", "local");
+    expect(saved).toEqual(expect.objectContaining({ ok: true }));
+    if (saved.ok && saved.value) expect(saved.value.working).toBe(true);
+  });
+
+  it("rejects an invalid working value from the detail metadata", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3 }));
+
+    const response = await request("/tasks/task-1/working", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ working: "yes", version: "3" }).toString(),
+    });
+
+    expect(response.status).toBe(400);
   });
 });

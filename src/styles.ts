@@ -306,6 +306,11 @@ a {
   padding: 12px;
 }
 
+.task-card--working,
+.task-row--working {
+  border-left: 4px solid #8250df;
+}
+
 .task-card:hover {
   border-color: #0969da;
   box-shadow: 0 0 0 2px #ddf4ff;
@@ -360,6 +365,18 @@ a {
   background: #f6f8fa;
   border-color: #d0d7de;
   color: #57606a;
+}
+
+.working-badge {
+  background: #fbefff;
+  border: 1px solid #c297ff;
+  border-radius: 999px;
+  color: #6639ba;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  width: max-content;
 }
 
 .list {
