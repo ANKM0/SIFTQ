@@ -27,7 +27,7 @@
   - task card は title のみを表示する。
   - task card は matrix 上で drag and drop できる。
   - task card を右クリックすると task action menu を表示する。
-  - task action menu の選択肢は `done`、`skip`、`delete` とする。
+  - task action menu の選択肢は `delete`、`skip`、`done` の順で表示する。
   - `done` を選択すると task の status を `done` に変更し、Matrix から除外する。
   - `skip` を選択すると task の status を `skip` に変更し、Matrix から除外する。
   - `delete` を選択すると Delete confirmation dialog を表示する。

@@ -112,6 +112,18 @@ test("changes a Matrix task to skip from the context menu", async ({ page }) => 
   await expect(page.locator(".task-row").filter({ hasText: title }).locator(".status--skip")).toBeVisible();
 });
 
+test("shows the Matrix task action menu in delete, skip, done order", async ({ page }) => {
+  const title = `E2E menu order ${Date.now()}`;
+  await signIn(page);
+  await createMatrixTask(page, title);
+
+  const card = page.locator(".task-card", { hasText: title });
+  await card.click({ button: "right" });
+  const menu = page.locator(".matrix-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.locator("[data-matrix-action]")).toHaveText(["delete", "skip", "done"]);
+});
+
 test("confirms Matrix task deletion in the centered dialog", async ({ page }) => {
   await signIn(page);
 
