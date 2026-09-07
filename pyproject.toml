@@ -1,7 +1,7 @@
 [project]
-name = "siftq"
+name = "app"
 version = "0.2.0"
-description = "SIFTQ project workspace"
+description = "Project workspace"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

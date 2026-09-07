@@ -1,4 +1,5 @@
 import type { JSX } from "hono/jsx/jsx-runtime";
+import { BRAND_NAME } from "../brand";
 
 export function safeNextPath(next: string | undefined): string {
   if (next !== undefined && next.startsWith("/") && !next.startsWith("//")) return next;
@@ -17,13 +18,13 @@ export function LoginPage({
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>SIFTQ</title>
+        <title>{BRAND_NAME}</title>
         <link rel="stylesheet" href="/styles.css" />
       </head>
       <body>
         <main class="login">
           <form class="login-card" method="post" action="/login">
-            <h1 class="brand">SIFTQ</h1>
+            <h1 class="brand">{BRAND_NAME}</h1>
             <input type="hidden" name="next" value={safeNextPath(next)} />
             <label>
               Password

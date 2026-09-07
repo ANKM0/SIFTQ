@@ -31,7 +31,7 @@
 
 - `graphify` コマンドは利用者または環境側で導入済みであることを要求し、Task は導入状態の検査と更新実行のみを担う。
 - 導入方法のエラーは `uv tool install graphifyy` と `python3 -m pip install graphifyy` の両方を提示する。
-- `task graphify:update` の追加時は、Codex の Task 許可 rule（`.codex/rules/siftq.rules`）にも `task graphify:update` を追加する。
+- `task graphify:update` の追加時は、Codex の Task 許可 rule（`.codex/rules/shared.rules`）にも `task graphify:update` を追加する。
 - この ADR は slice 01 の範囲を定め、`repo:pull-main` や `CODEX_HOME` の分離は後続 slice で扱う。
 
 ## 参考リンク

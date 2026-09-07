@@ -2,7 +2,7 @@
 
 ## 決定
 
-- `siftq` Worker のアクセス制御は、Cloudflare Access ではなく Worker 内の共有パスワード認証で行う。
+- Worker のアクセス制御は、Cloudflare Access ではなく Worker 内の共有パスワード認証で行う。
 - パスワードとセッション署名鍵は Wrangler Secrets（`AUTH_PASSWORD` / `SESSION_SECRET`）で管理する。
 - ログイン成功時に署名付き HttpOnly Cookie を発行し、middleware で全 HTML / API を保護する。
 

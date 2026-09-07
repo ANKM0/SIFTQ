@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "siftq",
+      "name": "app",
       "dependencies": {
         "hono": "^4.13.4",
       },

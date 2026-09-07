@@ -176,7 +176,7 @@ tasks:
         task --list --json \
           | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
           | sort -u > "$tasks"
-        grep -E 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/siftq.rules \
+        grep -E 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/shared.rules \
           | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
           | sort -u > "$allowed"
 
@@ -269,7 +269,7 @@ tasks:
           exit 0
         fi
 
-        bun x wrangler d1 migrations apply siftq --local
+        bun x wrangler d1 migrations apply app --local
         touch "$marker"
 
   ci:build:
