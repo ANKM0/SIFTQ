@@ -151,6 +151,21 @@ describe("Task list query UI", () => {
     expect(body).not.toContain("idle");
     expect(body).toContain('href="/tasks?status=do&amp;working=only"');
   });
+
+  it("keeps a valid query when navigating labels", async () => {
+    const body = await (await request("/tasks?q=is:do%20label:working")).text();
+
+    expect(body).toContain('href="/tasks?status=do&amp;q=is%3Ado"');
+    expect(body).toContain('href="/tasks?status=do&amp;working=only&amp;q=is%3Ado%20label%3Aworking"');
+  });
+
+  it("keeps a valid query in pagination links", async () => {
+    await seedDoTasks(26);
+
+    const body = await (await request("/tasks?q=is:do&page=1")).text();
+
+    expect(body).toContain('href="/tasks?status=do&amp;q=is%3Ado&amp;page=2"');
+  });
 });
 
 describe("Task list working filter", () => {

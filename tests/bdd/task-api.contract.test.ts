@@ -254,6 +254,26 @@ describe("BDD-TM-020: bulk status update", () => {
     expect(response.status).toBe(400);
     expect(body.code).toBe("INVALID_BULK_INPUT");
   });
+
+});
+
+describe("BDD-TM-020: bulk input parsing", () => {
+  it.each([
+    ["PATCH", "/api/tasks/bulk/status"],
+    ["DELETE", "/api/tasks/bulk"],
+  ])("rejects malformed JSON safely for %s %s", async (method, path) => {
+    for (const body of ["null", "{"]) {
+      const response = await authenticatedRequest(path, repo, {
+        method,
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      const result: { code?: string } = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(result.code).toBe("INVALID_BULK_INPUT");
+    }
+  });
 });
 
 describe("BDD-TM-021: bulk deletion", () => {

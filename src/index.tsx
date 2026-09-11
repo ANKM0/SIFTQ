@@ -142,6 +142,19 @@ function bulkProblem(c: Context<AppEnv>, code: string) {
   return problem(c, code === "NOT_FOUND" ? 404 : 409, code);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function readJsonRecord(c: Context<AppEnv>): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await c.req.json<unknown>();
+    return isRecord(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseVersion(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     return null;
@@ -488,16 +501,19 @@ function PageNavLink({
   status,
   page,
   workingOnly,
+  query,
 }: {
   status: TaskStatus;
   page: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   const workingParam = workingOnly ? "&working=only" : "";
+  const queryParam = query === undefined ? "" : `&q=${encodeURIComponent(query)}`;
   return (
     <a
       class="button small"
-      href={`/tasks?status=${status}${workingParam}&page=${page}`}
+      href={`/tasks?status=${status}${workingParam}${queryParam}&page=${page}`}
       aria-label={`Page ${page}`}
     >
       {page}
@@ -511,12 +527,14 @@ function PageNavItem({
   status,
   currentPage,
   workingOnly,
+  query,
 }: {
   item: number | "ellipsis";
   index: number;
   status: TaskStatus;
   currentPage: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   if (item === "ellipsis") {
     return (
@@ -532,7 +550,7 @@ function PageNavItem({
       </span>
     );
   }
-  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} />;
+  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} query={query} />;
 }
 
 function PageNav({
@@ -540,15 +558,18 @@ function PageNav({
   currentPage,
   totalPages,
   workingOnly,
+  query,
 }: {
   status: TaskStatus;
   currentPage: number;
   totalPages: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   if (totalPages <= 1) return null;
   const workingParam = workingOnly ? "&working=only" : "";
-  const href = (page: number) => `/tasks?status=${status}${workingParam}&page=${page}`;
+  const queryParam = query === undefined ? "" : `&q=${encodeURIComponent(query)}`;
+  const href = (page: number) => `/tasks?status=${status}${workingParam}${queryParam}&page=${page}`;
   return (
     <nav class="pagination" aria-label="Task list pages">
       {currentPage > 1 ? (
@@ -568,6 +589,7 @@ function PageNav({
           status={status}
           currentPage={currentPage}
           workingOnly={workingOnly}
+          query={query}
         />
       ))}
       {currentPage < totalPages ? (
@@ -583,17 +605,37 @@ function PageNav({
   );
 }
 
-function TaskLabelsFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+function queryWithWorkingLabel(query: string, workingOnly: boolean): string {
+  const tokens = query.trim().split(/\s+/).filter((token) => token !== "label:working");
+  if (workingOnly) tokens.push("label:working");
+  return tokens.join(" ");
+}
+
+function TaskLabelsFilter({
+  status,
+  workingOnly,
+  query,
+}: {
+  status: TaskStatus;
+  workingOnly: boolean;
+  query: string | undefined;
+}) {
+  const allLabelsQuery = query === undefined ? undefined : queryWithWorkingLabel(query, false);
+  const workingQuery = query === undefined ? undefined : queryWithWorkingLabel(query, true);
+  const queryParam = (value: string | undefined) => (value === undefined ? "" : `&q=${encodeURIComponent(value)}`);
   return (
     <details class={workingOnly ? "task-label-filter is-active" : "task-label-filter"}>
       <summary class="button small">Labels</summary>
       <div class="task-label-menu">
-        <a class={!workingOnly ? "is-selected" : undefined} href={`/tasks?status=${status}`}>
+        <a
+          class={!workingOnly ? "is-selected" : undefined}
+          href={`/tasks?status=${status}${queryParam(allLabelsQuery)}`}
+        >
           All labels
         </a>
         <a
           class={workingOnly ? "is-selected" : undefined}
-          href={`/tasks?status=${status}&working=only`}
+          href={`/tasks?status=${status}&working=only${queryParam(workingQuery)}`}
         >
           working only
         </a>
@@ -636,10 +678,12 @@ function TaskListToolbar({
   hasTasks,
   status,
   workingOnly,
+  query,
 }: {
   hasTasks: boolean;
   status: TaskStatus;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   return (
     <>
@@ -664,7 +708,7 @@ function TaskListToolbar({
               </div>
             </details>
           </div>
-          <TaskLabelsFilter status={status} workingOnly={workingOnly} />
+          <TaskLabelsFilter status={status} workingOnly={workingOnly} query={query} />
           <button
             class="button small button--danger"
             type="button"
@@ -703,6 +747,7 @@ function ListPage({
   currentPage,
   totalPages,
   pageOffset,
+  queryInUrl,
 }: {
   tasks: readonly Task[];
   status: TaskStatus;
@@ -711,6 +756,7 @@ function ListPage({
   currentPage: number;
   totalPages: number;
   pageOffset: number;
+  queryInUrl: string | undefined;
 }) {
   return (
     <div class="page page--list" data-state="normal">
@@ -723,7 +769,12 @@ function ListPage({
       </div>
       <div class="task-list-shell" data-task-list>
         <TaskListSearch status={status} workingOnly={workingOnly} query={query} />
-        <TaskListToolbar hasTasks={tasks.length > 0} status={status} workingOnly={workingOnly} />
+        <TaskListToolbar
+          hasTasks={tasks.length > 0}
+          status={status}
+          workingOnly={workingOnly}
+          query={queryInUrl}
+        />
         <TaskListRows tasks={tasks} pageOffset={pageOffset} />
       </div>
       <PageNav
@@ -731,6 +782,7 @@ function ListPage({
         currentPage={currentPage}
         totalPages={totalPages}
         workingOnly={workingOnly}
+        query={queryInUrl}
       />
     </div>
   );
@@ -930,7 +982,8 @@ app.post("/api/tasks", async (c) => {
 });
 
 app.patch("/api/tasks/bulk/status", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
+  const body = await readJsonRecord(c);
+  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
   const status = body["status"];
   const inputs = parseTaskVersionInputs(body["tasks"]);
   if (!isTaskStatus(status)) return problem(c, 400, "INVALID_STATUS");
@@ -942,7 +995,8 @@ app.patch("/api/tasks/bulk/status", async (c) => {
 });
 
 app.delete("/api/tasks/bulk", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
+  const body = await readJsonRecord(c);
+  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
   const inputs = parseTaskVersionInputs(body["tasks"]);
   if (!inputs.ok) return problem(c, 400, inputs.error.code);
 
@@ -1055,6 +1109,7 @@ app.get("/tasks", async (c) => {
       currentPage={currentPage}
       totalPages={totalPages}
       pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
+      queryInUrl={rawQuery}
     />,
   );
 });
