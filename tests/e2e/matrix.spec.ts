@@ -9,8 +9,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => url.pathname === "/");
-  await page.waitForLoadState("networkidle");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
 
 function descriptionEditor(page: Page) {
@@ -41,11 +41,14 @@ async function createMatrixTask(page: Page, title: string) {
 
 async function gotoListPage(page: Page, status: string) {
   const target = `/tasks?status=${status}`;
+  // A save navigation can still be settling when the list assertion starts.
+  // Wait before starting the next navigation to avoid Playwright cancelling it.
+  await page.waitForLoadState("networkidle");
   try {
-    await page.goto(target);
+    await page.goto(target, { waitUntil: "networkidle" });
   } catch {
-    await page.waitForLoadState();
-    await page.goto(target);
+    await page.waitForLoadState("networkidle");
+    await page.goto(target, { waitUntil: "networkidle" });
   }
 }
 
