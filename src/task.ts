@@ -112,6 +112,21 @@ export function parseTaskListQuery(value: unknown): TaskListQuery | null {
   return status === undefined ? null : { status, workingOnly };
 }
 
+export function changeTaskStatuses(
+  tasks: readonly Task[],
+  status: TaskStatus,
+  updatedAt?: string,
+): Result<Task[], DomainError> {
+  const updated: Task[] = [];
+  for (const task of tasks) {
+    const changed = changeTaskStatus(task, status);
+    if (!changed.ok) return err(changed.error);
+    const next = { ...changed.value, version: task.version + 1 };
+    updated.push(updatedAt === undefined ? next : { ...next, updated_at: updatedAt });
+  }
+  return ok(updated);
+}
+
 export function is_do(task: Task): boolean {
   return task.status === "do";
 }

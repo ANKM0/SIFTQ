@@ -1,5 +1,6 @@
 import { changeTaskStatus, err, ok } from "../../src/task";
 import type { Result, Task, TaskStatus, TaskVersionInput } from "../../src/task";
+import { validateBulkTasks } from "../../src/task-repository";
 import type { RepositoryError, TaskRepository } from "../../src/task-repository";
 
 export class MemoryTaskRepository implements TaskRepository {
@@ -43,20 +44,11 @@ export class MemoryTaskRepository implements TaskRepository {
     return ok<null, RepositoryError>(null);
   }
 
-  private findBulkTasks(inputs: readonly TaskVersionInput[]): Result<Task[], RepositoryError> {
-    const current = inputs.map((input) => this.tasks.get(input.id));
-    if (current.some((task) => task === undefined)) return err({ code: "NOT_FOUND" });
-    if (current.some((task, index) => task?.version !== inputs[index]?.version)) {
-      return err({ code: "CONFLICT" });
-    }
-    return ok(current.filter((task): task is Task => task !== undefined));
-  }
-
   async bulkUpdateStatus(
     inputs: readonly TaskVersionInput[],
     status: TaskStatus,
   ): Promise<Result<Task[], RepositoryError>> {
-    const current = this.findBulkTasks(inputs);
+    const current = validateBulkTasks(inputs, (id) => this.tasks.get(id));
     if (!current.ok) return current;
     const updated: Task[] = [];
     for (const task of current.value) {
@@ -69,7 +61,7 @@ export class MemoryTaskRepository implements TaskRepository {
   }
 
   async bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>> {
-    const current = this.findBulkTasks(inputs);
+    const current = validateBulkTasks(inputs, (id) => this.tasks.get(id));
     if (!current.ok) return current;
     current.value.forEach((task) => this.tasks.delete(task.id));
     return ok(null);

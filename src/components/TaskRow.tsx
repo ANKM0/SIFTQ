@@ -13,7 +13,7 @@ export const TaskRow: FC<{ task: Task; issueNumber: number }> = ({ task, issueNu
       <input
         type="checkbox"
         value={task.id}
-        aria-label={`Select ${task.title}`}
+        aria-label={`Select task #${issueNumber}`}
         data-task-select
       />
     </label>

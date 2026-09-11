@@ -138,6 +138,10 @@ function problem(c: Context<AppEnv>, status: ContentfulStatusCode, code: string)
   return c.json({ code }, status);
 }
 
+function bulkProblem(c: Context<AppEnv>, code: string) {
+  return problem(c, code === "NOT_FOUND" ? 404 : 409, code);
+}
+
 function parseVersion(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     return null;
@@ -933,11 +937,7 @@ app.patch("/api/tasks/bulk/status", async (c) => {
   if (!inputs.ok) return problem(c, 400, inputs.error.code);
 
   const result = await repository(c).bulkUpdateStatus(inputs.value, status);
-  if (!result.ok) {
-    return result.error.code === "NOT_FOUND"
-      ? problem(c, 404, result.error.code)
-      : problem(c, 409, result.error.code);
-  }
+  if (!result.ok) return bulkProblem(c, result.error.code);
   return c.json(result.value);
 });
 
@@ -947,11 +947,7 @@ app.delete("/api/tasks/bulk", async (c) => {
   if (!inputs.ok) return problem(c, 400, inputs.error.code);
 
   const result = await repository(c).bulkRemove(inputs.value);
-  if (!result.ok) {
-    return result.error.code === "NOT_FOUND"
-      ? problem(c, 404, result.error.code)
-      : problem(c, 409, result.error.code);
-  }
+  if (!result.ok) return bulkProblem(c, result.error.code);
   return c.body(null, 204);
 });
 
