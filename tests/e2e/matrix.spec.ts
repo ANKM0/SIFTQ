@@ -10,6 +10,7 @@ async function signIn(page: Page) {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/$/);
+  await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
 
