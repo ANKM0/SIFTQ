@@ -1,5 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "@dietrichgebert/ponytail@4.9.0"
+  ],
   "permission": {
     "bash": {
       "rm -rf /*": "deny",
