@@ -113,6 +113,48 @@ export const DESCRIPTION_EDITOR_SCRIPT = [
   'document.addEventListener("DOMContentLoaded", initializeDescriptionEditors);',
   'document.addEventListener("htmx:load", initializeDescriptionEditors);',
 ].join("\n");
+export const TASK_LIST_SELECTION_SCRIPT = [
+  "function initializeTaskListSelection() {",
+  '  var list = document.querySelector("[data-task-list]");',
+  '  if (!list || list.dataset.selectionInitialized === "true") return;',
+  '  list.dataset.selectionInitialized = "true";',
+  '  var selectAll = list.querySelector("[data-task-select-all]");',
+  '  var statusTabs = list.querySelector("[data-task-status-tabs]");',
+  '  var selectionSummary = list.querySelector("[data-task-selection-summary]");',
+  '  var actionButtons = list.querySelectorAll("[data-task-action]");',
+  '  var feedback = list.querySelector("[data-task-selection-feedback]");',
+  '  var selects = function () { return Array.prototype.slice.call(list.querySelectorAll("[data-task-select]")); };',
+  "  function syncSelection() {",
+  "    var checkboxes = selects();",
+  '    var selected = checkboxes.filter(function (checkbox) { return checkbox.checked; });',
+  '    if (selectAll) { selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length; selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length; }',
+  '    if (statusTabs) statusTabs.hidden = selected.length > 0;',
+  '    if (selectionSummary) { selectionSummary.hidden = selected.length === 0; selectionSummary.textContent = selected.length + " of " + checkboxes.length + " selected"; }',
+  '    actionButtons.forEach(function (button) { button.disabled = selected.length === 0; });',
+  '    list.querySelectorAll("[data-task-row]").forEach(function (row) {',
+  '      var checkbox = row.querySelector("[data-task-select]");',
+  '      if (checkbox) row.classList.toggle("is-selected", checkbox.checked);',
+  "    });",
+  "  }",
+  '  if (selectAll) selectAll.addEventListener("change", function () { selects().forEach(function (checkbox) { checkbox.checked = selectAll.checked; }); syncSelection(); });',
+  '  list.addEventListener("change", function (event) { if (event.target.matches("[data-task-select]")) syncSelection(); });',
+  '  list.addEventListener("click", function (event) {',
+  '    var action = event.target.closest ? event.target.closest("[data-task-action]") : null;',
+  '    if (!action) return;',
+  '    var selected = selects().filter(function (checkbox) { return checkbox.checked; });',
+  '    if (selected.length === 0) return;',
+  '    event.preventDefault();',
+  '    if (feedback) { feedback.hidden = false; feedback.textContent = "[モック] " + action.textContent.trim() + " を " + selected.length + "件に適用しました。"; }',
+  '    var menu = action.closest(".task-bulk-menu");',
+  '    if (menu) menu.removeAttribute("open");',
+  '    selected.forEach(function (checkbox) { checkbox.checked = false; });',
+  '    syncSelection();',
+  "  });",
+  "  syncSelection();",
+  "}",
+  'document.addEventListener("DOMContentLoaded", initializeTaskListSelection);',
+  'document.addEventListener("htmx:load", initializeTaskListSelection);',
+].join("\n");
 export const MATRIX_DND_SCRIPT = [
   "var matrixDraggingCard = null;",
   "var matrixDropTarget = null;",
@@ -449,6 +491,7 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
       <script src="/task-form-shortcut.js" defer></script>
       <script src="/description-editor.js" defer></script>
       <script src="/matrix-dnd.js" defer></script>
+      <script src="/task-list-selection.js" defer></script>
     </head>
     <body>
       <header class="topbar">

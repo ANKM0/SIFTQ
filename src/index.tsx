@@ -31,6 +31,7 @@ import {
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
   DESCRIPTION_EDITOR_SCRIPT,
+  TASK_LIST_SELECTION_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
 } from "./components/Layout";
 import { splitDescription } from "./description";
@@ -76,6 +77,7 @@ const PUBLIC_PATHS = new Set([
   "/popover-dismiss.js",
   "/task-form-shortcut.js",
   "/matrix-dnd.js",
+  "/task-list-selection.js",
 ]);
 
 function isPublicPath(path: string): boolean {
@@ -447,25 +449,32 @@ const TASK_STATUS_OPTIONS: { status: TaskStatus; label: string }[] = TASK_STATUS
 function TaskStatusFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
   const workingParam = workingOnly ? "&working=only" : "";
   return (
-    <nav class="task-status-filter" aria-label="Filter tasks by status">
-      {TASK_STATUS_OPTIONS.map((option) => (
-        <a
-          key={option.status}
-          class={option.status === status ? "button small is-active" : "button small"}
-          aria-current={option.status === status ? "true" : undefined}
-          href={`/tasks?status=${option.status}${workingParam}`}
-        >
-          {option.label}
-        </a>
-      ))}
-      <a
-        class={workingOnly ? "button small is-active" : "button small"}
-        aria-current={workingOnly ? "true" : undefined}
-        href={workingOnly ? `/tasks?status=${status}` : `/tasks?status=${status}&working=only`}
+    <>
+      <nav
+        class="task-status-filter task-status-filter--toolbar"
+        aria-label="Filter tasks by status"
+        data-task-status-tabs
       >
-        working only
-      </a>
-    </nav>
+        {TASK_STATUS_OPTIONS.map((option) => (
+          <a
+            key={option.status}
+            class={option.status === status ? "button small is-active" : "button small"}
+            aria-current={option.status === status ? "true" : undefined}
+            href={`/tasks?status=${option.status}${workingParam}`}
+          >
+            {option.label}
+          </a>
+        ))}
+      </nav>
+      <p
+        class="task-selection-summary task-selection-summary--toolbar"
+        data-task-selection-summary
+        aria-live="polite"
+        hidden
+      >
+        0 of 0 selected
+      </p>
+    </>
   );
 }
 
@@ -568,6 +577,110 @@ function PageNav({
   );
 }
 
+function TaskLabelsFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+  return (
+    <details class={workingOnly ? "task-label-filter is-active" : "task-label-filter"}>
+      <summary class="button small">Labels</summary>
+      <div class="task-label-menu">
+        <a class={!workingOnly ? "is-selected" : undefined} href={`/tasks?status=${status}`}>
+          All labels
+        </a>
+        <a
+          class={workingOnly ? "is-selected" : undefined}
+          href={`/tasks?status=${status}&working=only`}
+        >
+          working only
+        </a>
+      </div>
+    </details>
+  );
+}
+
+function TaskListSearch({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+  return (
+    <form class="task-search" action="/tasks" method="get">
+      <input type="hidden" name="status" value={status} />
+      {workingOnly ? <input type="hidden" name="working" value="only" /> : null}
+      <input
+        type="search"
+        name="q"
+        aria-label="Search tasks"
+        value={`is:${status}`}
+        placeholder="is:issue state:closed"
+      />
+      <button class="button small task-search-button" type="submit" aria-label="Submit search" title="Search">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="8.5" cy="8.5" r="5.5" />
+          <path d="m13 13 4 4" />
+        </svg>
+      </button>
+    </form>
+  );
+}
+
+function TaskListToolbar({
+  hasTasks,
+  status,
+  workingOnly,
+}: {
+  hasTasks: boolean;
+  status: TaskStatus;
+  workingOnly: boolean;
+}) {
+  return (
+    <>
+      <div class="task-list-toolbar">
+        <label class="task-select-all">
+          <input
+            type="checkbox"
+            aria-label="Select all tasks on this page"
+            data-task-select-all
+            disabled={!hasTasks}
+          />
+        </label>
+        <TaskStatusFilter status={status} workingOnly={workingOnly} />
+        <div class="task-bulk-actions">
+          <div data-task-bulk-actions>
+            <details class="task-bulk-menu">
+              <summary class="button small">Mark as</summary>
+              <div class="task-bulk-menu-items">
+                <button type="button" data-task-action="do">do</button>
+                <button type="button" data-task-action="done">done</button>
+                <button type="button" data-task-action="skip">skip</button>
+              </div>
+            </details>
+          </div>
+          <TaskLabelsFilter status={status} workingOnly={workingOnly} />
+          <button
+            class="button small button--danger"
+            type="button"
+            data-task-action="delete"
+            data-task-bulk-delete
+            disabled
+          >
+            delete
+          </button>
+        </div>
+      </div>
+      <p class="task-selection-feedback" data-task-selection-feedback role="status" hidden></p>
+    </>
+  );
+}
+
+function TaskListRows({ tasks, pageOffset }: { tasks: readonly Task[]; pageOffset: number }) {
+  return (
+    <div class="list" aria-label="Task list">
+      {tasks.length === 0 ? (
+        <p class="task-list-empty">該当するtaskはありません。</p>
+      ) : (
+        tasks.map((task, index) => (
+          <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
+        ))
+      )}
+    </div>
+  );
+}
+
 function ListPage({
   tasks,
   status,
@@ -592,15 +705,10 @@ function ListPage({
         </div>
         <NewTaskLink from="tasks" />
       </div>
-      <TaskStatusFilter status={status} workingOnly={workingOnly} />
-      <div class="list" aria-label="Task list">
-        {tasks.length === 0 ? (
-          <p class="task-list-empty">該当するtaskはありません。</p>
-        ) : (
-          tasks.map((task, index) => (
-            <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
-          ))
-        )}
+      <div class="task-list-shell" data-task-list>
+        <TaskListSearch status={status} workingOnly={workingOnly} />
+        <TaskListToolbar hasTasks={tasks.length > 0} status={status} workingOnly={workingOnly} />
+        <TaskListRows tasks={tasks} pageOffset={pageOffset} />
       </div>
       <PageNav
         status={status}
@@ -759,6 +867,12 @@ app.get("/task-form-shortcut.js", (c) => {
 
 app.get("/description-editor.js", (c) => {
   return c.body(DESCRIPTION_EDITOR_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
+app.get("/task-list-selection.js", (c) => {
+  return c.body(TASK_LIST_SELECTION_SCRIPT, 200, {
     "content-type": "application/javascript",
   });
 });
