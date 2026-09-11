@@ -62,6 +62,29 @@ test.describe("task list bulk actions", () => {
     await expectTaskVisible(page, "done", title);
   });
 
+  test("supports multi-selection, select-all, and indeterminate state", async ({ page }) => {
+    await signIn(page);
+    await createTask(page, `bulk selection first ${Date.now()}`);
+    await createTask(page, `bulk selection second ${Date.now()}`);
+    await page.goto("/tasks?status=do");
+
+    const checkboxes = page.locator("[data-task-select]");
+    await expect(checkboxes.nth(1)).toBeVisible();
+    const selectAll = page.getByRole("checkbox", { name: "Select all tasks on this page" });
+    await checkboxes.nth(0).check();
+    await expect(selectAll).toHaveJSProperty("indeterminate", true);
+    await expect(page.locator("[data-task-selection-summary]")).toHaveText(/1 of \d+ selected/);
+
+    await selectAll.check();
+    const rowCount = await checkboxes.count();
+    await expect(page.locator("[data-task-selection-summary]")).toHaveText(`${rowCount} of ${rowCount} selected`);
+    await selectAll.uncheck();
+
+    await checkboxes.nth(0).check();
+    await checkboxes.nth(1).check();
+    await expect(page.locator("[data-task-selection-summary]")).toHaveText(/2 of \d+ selected/);
+  });
+
   test("confirms and cancels bulk deletion", async ({ page }) => {
     const title = `bulk delete ${Date.now()}`;
     await signIn(page);
