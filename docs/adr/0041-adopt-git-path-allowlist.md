@@ -2,16 +2,11 @@
 
 ## 決定
 
-- セキュリティ上の理由から、Git の追跡対象を個別に除外する deny-list 方式から、追跡を許可するパスを明示する allowlist 方式へ変更する。
-- リポジトリのソース、テスト、文書、設定、マイグレーション、共有開発成果物は明示的に許可する。
-- 生成物、作業状態、依存関係、環境変数、秘密情報などは明示的に拒否する。
-- このルールは意図しないコミットを防ぐ Git 運用上のガードであり、秘密情報を完全に保護するセキュリティ境界とは扱わない。
+- セキュリティ上の理由から、Git の追跡対象を個別に除外するdeny-list方式から、追跡を許可するパスを明示する allowlist 方式へ変更する。
 
 ### 決定の理由
 
-- 未知のローカルファイルを個別に ignore し忘れても、既定では Git の追加対象にならない。
-- allowlist により、追跡対象とローカル成果物の境界を `.gitignore` から確認できる。
-- このリポジトリには `.learnings/`、`.agents/`、`.codex/` など共有すべき成果物があり、path 単位で許可範囲を表現できる。
+- allowlist により、明示的に追跡対象を指定できるため。
 
 ## 不採用
 
@@ -26,10 +21,7 @@
 
 ### 背景
 
-- 現在の `.gitignore` は `node_modules/`、`graphify-out/`、`.taqt/runs/` などを個別に除外している。
-- `.taqt/` には共有設定・スクリプトとローカル状態が混在するため、ディレクトリ全体ではなく path 単位の許可・拒否が必要である。
-- `.learnings/` は ADR 0017 により共有追跡成果物として維持し、`graphify-out/` は ADR 0013 により worktree ローカル成果物として除外する。
-- 実装と検証は Issue #385 で行う。
+gitの指定がdeny-list方式のため意図しないファイルがコミットされる恐れがあった
 
 ### 制約事項
 
@@ -41,6 +33,3 @@
 ## 参考リンク
 
 - [記事: .gitignore everything by default](https://packagemain.tech/p/gitignore-everything-by-default)
-- [ADR 0013: worktree ごとの graphify 更新 Task](0013-worktree-scoped-graphify-update-task.md)
-- [ADR 0017: `.learnings` を共有追跡成果物として維持する](0017-keep-learnings-tracked-as-shared-artifacts.md)
-- [Issue #385](https://github.com/ANKM0/SIFTQ/issues/385)
