@@ -10,6 +10,8 @@ describe("TaskRow", () => {
     expect(html).toContain("seed task");
     expect(html).toContain("1");
     expect(html).toContain("do");
+    expect(html).toContain('data-task-id="task-1"');
+    expect(html).toContain('data-version="1"');
   });
 
   it("marks working tasks with a badge and working class", () => {

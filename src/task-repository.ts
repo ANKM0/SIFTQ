@@ -1,6 +1,6 @@
 import type { D1Database, D1Result } from "@cloudflare/workers-types";
-import { err, isTaskArea, isTaskStatus, ok } from "./task";
-import type { DomainError, Result, Task } from "./task";
+import { changeTaskStatus, err, isTaskArea, isTaskStatus, ok } from "./task";
+import type { DomainError, Result, Task, TaskStatus, TaskVersionInput } from "./task";
 
 export type RepositoryError = DomainError;
 
@@ -53,6 +53,11 @@ export interface TaskRepository {
   insert(task: Task): Promise<Result<Task, RepositoryError>>;
   update(task: Task): Promise<Result<Task, RepositoryError>>;
   remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>>;
+  bulkUpdateStatus(
+    inputs: readonly TaskVersionInput[],
+    status: TaskStatus,
+  ): Promise<Result<Task[], RepositoryError>>;
+  bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>>;
   move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>>;
 }
 
@@ -142,6 +147,69 @@ export class D1TaskRepository implements TaskRepository {
       .run();
 
     if (changes(result) === 0) return err({ code: "CONFLICT" });
+    return ok(null);
+  }
+
+  private async findBulkTasks(
+    inputs: readonly TaskVersionInput[],
+  ): Promise<Result<Task[], RepositoryError>> {
+    const placeholders = inputs.map(() => "?").join(", ");
+    const result = await this.db
+      .prepare(
+        `SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? AND id IN (${placeholders})`,
+      )
+      .bind(OWNER_ID, ...inputs.map((input) => input.id))
+      .all<Record<string, unknown>>();
+    const found = result.results.map(toTask).filter((task): task is Task => task !== undefined);
+    const byId = new Map(found.map((task) => [task.id, task]));
+    const ordered: Task[] = [];
+    for (const input of inputs) {
+      const task = byId.get(input.id);
+      if (!task) return err({ code: "NOT_FOUND" });
+      if (task.version !== input.version) return err({ code: "CONFLICT" });
+      ordered.push(task);
+    }
+    return ok(ordered);
+  }
+
+  async bulkUpdateStatus(
+    inputs: readonly TaskVersionInput[],
+    status: TaskStatus,
+  ): Promise<Result<Task[], RepositoryError>> {
+    const current = await this.findBulkTasks(inputs);
+    if (!current.ok) return current;
+
+    const updatedAt = new Date().toISOString();
+    const statements = current.value.map((task) =>
+      this.db
+        .prepare(
+          "UPDATE tasks SET status = ?, version = version + 1, updated_at = ? WHERE id = ? AND owner_id = ? AND version = ?",
+        )
+        .bind(status, updatedAt, task.id, OWNER_ID, task.version),
+    );
+    const results = await this.db.batch(statements);
+    if (results.some((result) => changes(result) === 0)) return err({ code: "CONFLICT" });
+
+    const updated: Task[] = [];
+    for (const task of current.value) {
+      const changed = changeTaskStatus(task, status);
+      if (!changed.ok) return err(changed.error);
+      updated.push({ ...changed.value, version: task.version + 1, updated_at: updatedAt });
+    }
+    return ok(updated);
+  }
+
+  async bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>> {
+    const current = await this.findBulkTasks(inputs);
+    if (!current.ok) return current;
+
+    const statements = current.value.map((task) =>
+      this.db
+        .prepare("DELETE FROM tasks WHERE id = ? AND owner_id = ? AND version = ?")
+        .bind(task.id, OWNER_ID, task.version),
+    );
+    const results = await this.db.batch(statements);
+    if (results.some((result) => changes(result) === 0)) return err({ code: "CONFLICT" });
     return ok(null);
   }
 

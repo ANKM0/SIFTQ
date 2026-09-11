@@ -17,7 +17,9 @@ import {
   moveTask,
   pageNavItems,
   paginateTasks,
+  parseTaskListQuery,
   parsePageParam,
+  parseTaskVersionInputs,
   sortForMatrix,
   titleCodePointLength,
 } from "../src/task";
@@ -70,6 +72,45 @@ describe("task filters", () => {
   it("recognizes working tasks independently of status", () => {
     expect(is_working(taskFixture({ status: "done", working: true }))).toBe(true);
     expect(is_working(taskFixture({ status: "do", working: false }))).toBe(false);
+  });
+});
+
+describe("task list query", () => {
+  it("parses status and working label filters", () => {
+    expect(parseTaskListQuery("is:do")).toEqual({ status: "do", workingOnly: false });
+    expect(parseTaskListQuery("is:done label:working")).toEqual({
+      status: "done",
+      workingOnly: true,
+    });
+    expect(parseTaskListQuery("is:issue state:closed")).toBeNull();
+  });
+});
+
+describe("bulk task input", () => {
+  it("accepts unique task ids with positive integer versions", () => {
+    expect(
+      parseTaskVersionInputs([
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 2 },
+      ]),
+    ).toEqual({
+      ok: true,
+      value: [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 2 },
+      ],
+    });
+  });
+
+  it("rejects empty, duplicate, and invalid inputs", () => {
+    expect(parseTaskVersionInputs([]).ok).toBe(false);
+    expect(
+      parseTaskVersionInputs([
+        { id: "task-1", version: 1 },
+        { id: "task-1", version: 1 },
+      ]).ok,
+    ).toBe(false);
+    expect(parseTaskVersionInputs([{ id: "task-1", version: 0 }]).ok).toBe(false);
   });
 });
 

@@ -196,6 +196,84 @@ describe("BDD-TM-009: reorder conflict", () => {
   });
 });
 
+describe("BDD-TM-020: bulk status update", () => {
+  it("updates selected tasks in one request", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", version: 1 }));
+    await repo.insert(taskFixture({ id: "task-2", status: "do", version: 1 }));
+
+    const response = await request("PATCH", "/api/tasks/bulk/status", {
+      status: "done",
+      tasks: [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 1 },
+      ],
+    });
+    const tasks: Task[] = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "task-1", status: "done", version: 2 }),
+        expect.objectContaining({ id: "task-2", status: "done", version: 2 }),
+      ]),
+    );
+  });
+
+  it("rejects a stale task without partially updating the selection", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", version: 1 }));
+    await repo.insert(taskFixture({ id: "task-2", status: "do", version: 2 }));
+
+    const response = await request("PATCH", "/api/tasks/bulk/status", {
+      status: "done",
+      tasks: [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 1 },
+      ],
+    });
+    const body: { code?: string } = await response.json();
+    const listed = await repo.list();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("CONFLICT");
+    expect(listed).toEqual({
+      ok: true,
+      value: expect.arrayContaining([
+        expect.objectContaining({ id: "task-1", status: "do", version: 1 }),
+        expect.objectContaining({ id: "task-2", status: "do", version: 2 }),
+      ]),
+    });
+  });
+
+  it("rejects invalid bulk inputs", async () => {
+    const response = await request("PATCH", "/api/tasks/bulk/status", {
+      status: "done",
+      tasks: [],
+    });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_BULK_INPUT");
+  });
+});
+
+describe("BDD-TM-021: bulk deletion", () => {
+  it("deletes selected tasks", async () => {
+    await repo.insert(taskFixture({ id: "task-1" }));
+    await repo.insert(taskFixture({ id: "task-2" }));
+
+    const response = await request("DELETE", "/api/tasks/bulk", {
+      tasks: [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 1 },
+      ],
+    });
+    const listed = await repo.list();
+
+    expect(response.status).toBe(204);
+    expect(listed).toEqual({ ok: true, value: [] });
+  });
+});
+
 describe("BDD-TM-013 / BDD-TM-015: task deletion", () => {
   it("deletes a task with the current version", async () => {
     await repo.insert(taskFixture({ id: "task-1", version: 1 }));

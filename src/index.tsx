@@ -21,10 +21,12 @@ import {
   moveTask,
   pageNavItems,
   paginateTasks,
+  parseTaskListQuery,
+  parseTaskVersionInputs,
   parsePageParam,
   sortForMatrix,
 } from "./task";
-import type { Task, TaskStatus } from "./task";
+import type { Task, TaskListQuery, TaskStatus } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
@@ -596,7 +598,15 @@ function TaskLabelsFilter({ status, workingOnly }: { status: TaskStatus; working
   );
 }
 
-function TaskListSearch({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
+function TaskListSearch({
+  status,
+  workingOnly,
+  query,
+}: {
+  status: TaskStatus;
+  workingOnly: boolean;
+  query: string;
+}) {
   return (
     <form class="task-search" action="/tasks" method="get">
       <input type="hidden" name="status" value={status} />
@@ -605,7 +615,7 @@ function TaskListSearch({ status, workingOnly }: { status: TaskStatus; workingOn
         type="search"
         name="q"
         aria-label="Search tasks"
-        value={`is:${status}`}
+        value={query}
         placeholder="is:issue state:closed"
       />
       <button class="button small task-search-button" type="submit" aria-label="Submit search" title="Search">
@@ -685,6 +695,7 @@ function ListPage({
   tasks,
   status,
   workingOnly,
+  query,
   currentPage,
   totalPages,
   pageOffset,
@@ -692,6 +703,7 @@ function ListPage({
   tasks: readonly Task[];
   status: TaskStatus;
   workingOnly: boolean;
+  query: string;
   currentPage: number;
   totalPages: number;
   pageOffset: number;
@@ -701,12 +713,12 @@ function ListPage({
       <div class="page-header">
         <div>
           <h1 class="page-title">Tasks</h1>
-          <p class="muted">GitHub Issues-like list without search in this scope.</p>
+          <p class="muted">GitHub Issues-like task list.</p>
         </div>
         <NewTaskLink from="tasks" />
       </div>
       <div class="task-list-shell" data-task-list>
-        <TaskListSearch status={status} workingOnly={workingOnly} />
+        <TaskListSearch status={status} workingOnly={workingOnly} query={query} />
         <TaskListToolbar hasTasks={tasks.length > 0} status={status} workingOnly={workingOnly} />
         <TaskListRows tasks={tasks} pageOffset={pageOffset} />
       </div>
@@ -913,6 +925,36 @@ app.post("/api/tasks", async (c) => {
   return c.json(inserted.value, 201);
 });
 
+app.patch("/api/tasks/bulk/status", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  const status = body["status"];
+  const inputs = parseTaskVersionInputs(body["tasks"]);
+  if (!isTaskStatus(status)) return problem(c, 400, "INVALID_STATUS");
+  if (!inputs.ok) return problem(c, 400, inputs.error.code);
+
+  const result = await repository(c).bulkUpdateStatus(inputs.value, status);
+  if (!result.ok) {
+    return result.error.code === "NOT_FOUND"
+      ? problem(c, 404, result.error.code)
+      : problem(c, 409, result.error.code);
+  }
+  return c.json(result.value);
+});
+
+app.delete("/api/tasks/bulk", async (c) => {
+  const body = await c.req.json<Record<string, unknown>>();
+  const inputs = parseTaskVersionInputs(body["tasks"]);
+  if (!inputs.ok) return problem(c, 400, inputs.error.code);
+
+  const result = await repository(c).bulkRemove(inputs.value);
+  if (!result.ok) {
+    return result.error.code === "NOT_FOUND"
+      ? problem(c, 404, result.error.code)
+      : problem(c, 409, result.error.code);
+  }
+  return c.body(null, 204);
+});
+
 app.patch("/api/tasks/:id", async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const found = await findApiTask(c, c.req.param("id"));
@@ -988,8 +1030,19 @@ app.get("/tasks", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
   const rawStatus = c.req.query("status");
-  const status = isTaskStatus(rawStatus) ? rawStatus : "do";
-  const workingOnly = c.req.query("working") === "only";
+  const rawQuery = c.req.query("q");
+  const parsedQuery: TaskListQuery | null = parseTaskListQuery(rawQuery);
+  let status: TaskStatus = "do";
+  if (parsedQuery !== null) {
+    status = parsedQuery.status;
+  } else if (isTaskStatus(rawStatus)) {
+    status = rawStatus;
+  }
+  let workingOnly = c.req.query("working") === "only";
+  if (parsedQuery !== null) workingOnly = parsedQuery.workingOnly;
+  let query = `is:${status}`;
+  if (workingOnly) query += " label:working";
+  if (parsedQuery !== null && rawQuery !== undefined) query = rawQuery.trim();
   const filteredTasks = filterTasks(result.value, [
     TASK_STATUS_FILTERS[status],
     ...(workingOnly ? [is_working] : []),
@@ -1002,6 +1055,7 @@ app.get("/tasks", async (c) => {
       tasks={pageTasks}
       status={status}
       workingOnly={workingOnly}
+      query={query}
       currentPage={currentPage}
       totalPages={totalPages}
       pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}

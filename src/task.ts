@@ -27,6 +27,7 @@ export type DomainErrorCode =
   | "INVALID_STATUS"
   | "INVALID_AREA"
   | "INVALID_ORDER"
+  | "INVALID_BULK_INPUT"
   | "NOT_FOUND"
   | "CONFLICT";
 
@@ -44,6 +45,71 @@ export function err<T, E>(error: E): Result<T, E> {
 
 export function isTaskStatus(value: unknown): value is TaskStatus {
   return typeof value === "string" && TASK_STATUSES.some((status) => status === value);
+}
+
+export type TaskVersionInput = {
+  id: string;
+  version: number;
+};
+
+export const TASK_BULK_MAX_ITEMS = 50;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function parseTaskVersionInputs(value: unknown): Result<TaskVersionInput[], DomainError> {
+  if (!Array.isArray(value) || value.length === 0 || value.length > TASK_BULK_MAX_ITEMS) {
+    return err({ code: "INVALID_BULK_INPUT" });
+  }
+
+  const ids = new Set<string>();
+  const inputs: TaskVersionInput[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return err({ code: "INVALID_BULK_INPUT" });
+    const id = item["id"];
+    const version = item["version"];
+    if (
+      typeof id !== "string" ||
+      id.length === 0 ||
+      ids.has(id) ||
+      typeof version !== "number" ||
+      !Number.isSafeInteger(version) ||
+      version < 1
+    ) {
+      return err({ code: "INVALID_BULK_INPUT" });
+    }
+    ids.add(id);
+    inputs.push({ id, version });
+  }
+  return ok(inputs);
+}
+
+export type TaskListQuery = {
+  status: TaskStatus;
+  workingOnly: boolean;
+};
+
+export function parseTaskListQuery(value: unknown): TaskListQuery | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+
+  let status: TaskStatus | undefined;
+  let workingOnly = false;
+  for (const token of value.trim().split(/\s+/)) {
+    if (token.startsWith("is:")) {
+      const candidate = token.slice(3);
+      if (!isTaskStatus(candidate) || status !== undefined) return null;
+      status = candidate;
+      continue;
+    }
+    if (token === "label:working" && !workingOnly) {
+      workingOnly = true;
+      continue;
+    }
+    return null;
+  }
+
+  return status === undefined ? null : { status, workingOnly };
 }
 
 export function is_do(task: Task): boolean {

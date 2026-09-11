@@ -48,6 +48,12 @@
   - 25件以下ではページナビを表示しない。
   - ページ指定は `/tasks?status=<status>&page=<page>` で保持する。status 切替時は1ページ目に戻る。
   - 数値以外のページ指定は1ページ目へ、範囲超過は最終ページへ寄せる。
+  - 検索欄は `q` query で保持し、`is:do`、`is:done`、`is:skip`、`label:working` を status・label 絞り込みとして解釈する。
+  - `Labels` メニューから全label表示と `working only` を切り替える。
+  - 各行に checkbox を表示し、一覧内の全選択と選択件数（`N of M selected`）を提供する。
+  - 選択時は status 切り替えを隠し、`Mark as`（`do`、`done`、`skip`）、`Labels`、`delete` を表示する。
+  - bulk 操作は選択中のtaskへ適用し、delete前には選択件数を含む確認ダイアログを表示する。
+  - bulk 操作で競合または通信エラーが発生した場合は一覧上にエラーを表示し、競合時は再読み込みを促す。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。

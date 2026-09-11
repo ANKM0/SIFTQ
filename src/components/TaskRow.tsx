@@ -6,6 +6,8 @@ export const TaskRow: FC<{ task: Task; issueNumber: number }> = ({ task, issueNu
   <div
     class={is_working(task) ? "task-row task-row--working" : "task-row"}
     data-task-row={task.id}
+    data-task-id={task.id}
+    data-version={task.version}
   >
     <label class="task-row-selection">
       <input

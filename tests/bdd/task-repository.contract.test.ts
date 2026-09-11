@@ -83,3 +83,63 @@ describe("repository contract", () => {
     expect(moved.value.map((task: Task) => task.version)).toEqual([2, 2]);
   });
 });
+
+describe("bulk repository contract", () => {
+  it("updates multiple statuses with version increments", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", version: 1 }));
+    await repo.insert(taskFixture({ id: "task-2", status: "do", version: 3 }));
+
+    const updated = await repo.bulkUpdateStatus(
+      [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 3 },
+      ],
+      "done",
+    );
+
+    expect(updated).toEqual({
+      ok: true,
+      value: expect.arrayContaining([
+        expect.objectContaining({ id: "task-1", status: "done", version: 2 }),
+        expect.objectContaining({ id: "task-2", status: "done", version: 4 }),
+      ]),
+    });
+  });
+
+  it("does not partially update on a stale bulk status input", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do", version: 1 }));
+    await repo.insert(taskFixture({ id: "task-2", status: "do", version: 2 }));
+
+    const updated = await repo.bulkUpdateStatus(
+      [
+        { id: "task-1", version: 1 },
+        { id: "task-2", version: 1 },
+      ],
+      "done",
+    );
+    const listed = await repo.list();
+
+    expect(updated).toEqual({ ok: false, error: { code: "CONFLICT" } });
+    expect(listed).toEqual({
+      ok: true,
+      value: expect.arrayContaining([
+        expect.objectContaining({ id: "task-1", status: "do", version: 1 }),
+        expect.objectContaining({ id: "task-2", status: "do", version: 2 }),
+      ]),
+    });
+  });
+
+  it("removes multiple tasks with current versions", async () => {
+    await repo.insert(taskFixture({ id: "task-1" }));
+    await repo.insert(taskFixture({ id: "task-2" }));
+
+    const removed = await repo.bulkRemove([
+      { id: "task-1", version: 1 },
+      { id: "task-2", version: 1 },
+    ]);
+    const listed = await repo.list();
+
+    expect(removed).toEqual({ ok: true, value: null });
+    expect(listed).toEqual({ ok: true, value: [] });
+  });
+});
