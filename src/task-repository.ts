@@ -1,6 +1,6 @@
-import type { D1Database, D1Result } from "@cloudflare/workers-types";
-import { err, isTaskArea, isTaskStatus, ok } from "./task";
-import type { DomainError, Result, Task } from "./task";
+import type { D1Database, D1PreparedStatement, D1Result } from "@cloudflare/workers-types";
+import { changeTaskStatuses, err, isTaskArea, isTaskStatus, ok } from "./task";
+import type { DomainError, Result, Task, TaskStatus, TaskVersionInput } from "./task";
 
 export type RepositoryError = DomainError;
 
@@ -53,11 +53,50 @@ export interface TaskRepository {
   insert(task: Task): Promise<Result<Task, RepositoryError>>;
   update(task: Task): Promise<Result<Task, RepositoryError>>;
   remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>>;
+  bulkUpdateStatus(
+    inputs: readonly TaskVersionInput[],
+    status: TaskStatus,
+  ): Promise<Result<Task[], RepositoryError>>;
+  bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>>;
   move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>>;
+}
+
+export function validateBulkTasks(
+  inputs: readonly TaskVersionInput[],
+  getTask: (id: string) => Task | undefined,
+): Result<Task[], RepositoryError> {
+  const ordered: Task[] = [];
+  for (const input of inputs) {
+    const task = getTask(input.id);
+    if (!task) return err({ code: "NOT_FOUND" });
+    if (task.version !== input.version) return err({ code: "CONFLICT" });
+    ordered.push(task);
+  }
+  return ok(ordered);
 }
 
 export class D1TaskRepository implements TaskRepository {
   constructor(private readonly db: D1Database) {}
+
+  async bulkUpdateStatus(
+    inputs: readonly TaskVersionInput[],
+    status: TaskStatus,
+  ): Promise<Result<Task[], RepositoryError>> {
+    const current = await this.findBulkTasks(inputs);
+    if (!current.ok) return current;
+
+    const updatedAt = new Date().toISOString();
+    const executed = await this.executeBulk(current.value, (task) =>
+      this.db
+        .prepare(
+          "UPDATE tasks SET status = ?, version = version + 1, updated_at = ? WHERE id = ? AND owner_id = ? AND version = ?",
+        )
+        .bind(status, updatedAt, task.id, OWNER_ID, task.version),
+    );
+    if (!executed.ok) return executed;
+
+    return changeTaskStatuses(current.value, status, updatedAt);
+  }
 
   async list(): Promise<Result<Task[], RepositoryError>> {
     const result = await this.db
@@ -130,6 +169,19 @@ export class D1TaskRepository implements TaskRepository {
     return ok({ ...task, version: task.version + 1, updated_at: updatedAt });
   }
 
+  async bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>> {
+    const current = await this.findBulkTasks(inputs);
+    if (!current.ok) return current;
+
+    const executed = await this.executeBulk(current.value, (task) =>
+      this.db
+        .prepare("DELETE FROM tasks WHERE id = ? AND owner_id = ? AND version = ?")
+        .bind(task.id, OWNER_ID, task.version),
+    );
+    if (!executed.ok) return executed;
+    return ok(null);
+  }
+
   async remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>> {
     const found = await this.find(id, owner_id);
     if (!found.ok) return err(found.error);
@@ -143,6 +195,22 @@ export class D1TaskRepository implements TaskRepository {
 
     if (changes(result) === 0) return err({ code: "CONFLICT" });
     return ok(null);
+  }
+
+  private async findBulkTasks(
+    inputs: readonly TaskVersionInput[],
+  ): Promise<Result<Task[], RepositoryError>> {
+    const placeholders = inputs.map(() => "?").join(", ");
+    const result = await this.db
+      .prepare(
+        `SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? AND id IN (${placeholders})`,
+      )
+      .bind(OWNER_ID, ...inputs.map((input) => input.id))
+      .all<Record<string, unknown>>();
+    const found = result.results.map(toTask).filter((task): task is Task => task !== undefined);
+    const byId = new Map(found.map((task) => [task.id, task]));
+    const validated = validateBulkTasks(inputs, (id) => byId.get(id));
+    return validated.ok ? validated : err(validated.error);
   }
 
   async move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {
@@ -168,5 +236,14 @@ export class D1TaskRepository implements TaskRepository {
         updated_at: updatedAt,
       })),
     );
+  }
+
+  private async executeBulk(
+    tasks: readonly Task[],
+    prepare: (task: Task) => D1PreparedStatement,
+  ): Promise<Result<null, RepositoryError>> {
+    const results = await this.db.batch(tasks.map(prepare));
+    if (results.some((result) => changes(result) === 0)) return err({ code: "CONFLICT" });
+    return ok(null);
   }
 }

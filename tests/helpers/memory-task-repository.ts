@@ -1,5 +1,6 @@
-import { err, ok } from "../../src/task";
-import type { Result, Task } from "../../src/task";
+import { changeTaskStatus, err, ok } from "../../src/task";
+import type { Result, Task, TaskStatus, TaskVersionInput } from "../../src/task";
+import { validateBulkTasks } from "../../src/task-repository";
 import type { RepositoryError, TaskRepository } from "../../src/task-repository";
 
 export class MemoryTaskRepository implements TaskRepository {
@@ -41,6 +42,29 @@ export class MemoryTaskRepository implements TaskRepository {
 
     this.tasks.delete(id);
     return ok<null, RepositoryError>(null);
+  }
+
+  async bulkUpdateStatus(
+    inputs: readonly TaskVersionInput[],
+    status: TaskStatus,
+  ): Promise<Result<Task[], RepositoryError>> {
+    const current = validateBulkTasks(inputs, (id) => this.tasks.get(id));
+    if (!current.ok) return current;
+    const updated: Task[] = [];
+    for (const task of current.value) {
+      const changed = changeTaskStatus(task, status);
+      if (!changed.ok) return err(changed.error);
+      updated.push({ ...changed.value, version: task.version + 1 });
+    }
+    updated.forEach((task) => this.tasks.set(task.id, task));
+    return ok(updated);
+  }
+
+  async bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>> {
+    const current = validateBulkTasks(inputs, (id) => this.tasks.get(id));
+    if (!current.ok) return current;
+    current.value.forEach((task) => this.tasks.delete(task.id));
+    return ok(null);
   }
 
   async move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>> {

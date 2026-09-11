@@ -21,16 +21,19 @@ import {
   moveTask,
   pageNavItems,
   paginateTasks,
+  parseTaskListQuery,
+  parseTaskVersionInputs,
   parsePageParam,
   sortForMatrix,
 } from "./task";
-import type { Task, TaskStatus } from "./task";
+import type { Task, TaskListQuery, TaskStatus } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
   DESCRIPTION_EDITOR_SCRIPT,
+  TASK_LIST_SELECTION_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
 } from "./components/Layout";
 import { splitDescription } from "./description";
@@ -76,6 +79,7 @@ const PUBLIC_PATHS = new Set([
   "/popover-dismiss.js",
   "/task-form-shortcut.js",
   "/matrix-dnd.js",
+  "/task-list-selection.js",
 ]);
 
 function isPublicPath(path: string): boolean {
@@ -132,6 +136,23 @@ function repository(c: Context<AppEnv>): TaskRepository {
 
 function problem(c: Context<AppEnv>, status: ContentfulStatusCode, code: string) {
   return c.json({ code }, status);
+}
+
+function bulkProblem(c: Context<AppEnv>, code: string) {
+  return problem(c, code === "NOT_FOUND" ? 404 : 409, code);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function readJsonRecord(c: Context<AppEnv>): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await c.req.json<unknown>();
+    return isRecord(body) ? body : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseVersion(value: unknown): number | null {
@@ -447,25 +468,32 @@ const TASK_STATUS_OPTIONS: { status: TaskStatus; label: string }[] = TASK_STATUS
 function TaskStatusFilter({ status, workingOnly }: { status: TaskStatus; workingOnly: boolean }) {
   const workingParam = workingOnly ? "&working=only" : "";
   return (
-    <nav class="task-status-filter" aria-label="Filter tasks by status">
-      {TASK_STATUS_OPTIONS.map((option) => (
-        <a
-          key={option.status}
-          class={option.status === status ? "button small is-active" : "button small"}
-          aria-current={option.status === status ? "true" : undefined}
-          href={`/tasks?status=${option.status}${workingParam}`}
-        >
-          {option.label}
-        </a>
-      ))}
-      <a
-        class={workingOnly ? "button small is-active" : "button small"}
-        aria-current={workingOnly ? "true" : undefined}
-        href={workingOnly ? `/tasks?status=${status}` : `/tasks?status=${status}&working=only`}
+    <>
+      <nav
+        class="task-status-filter task-status-filter--toolbar"
+        aria-label="Filter tasks by status"
+        data-task-status-tabs
       >
-        working only
-      </a>
-    </nav>
+        {TASK_STATUS_OPTIONS.map((option) => (
+          <a
+            key={option.status}
+            class={option.status === status ? "button small is-active" : "button small"}
+            aria-current={option.status === status ? "true" : undefined}
+            href={`/tasks?status=${option.status}${workingParam}`}
+          >
+            {option.label}
+          </a>
+        ))}
+      </nav>
+      <p
+        class="task-selection-summary task-selection-summary--toolbar"
+        data-task-selection-summary
+        aria-live="polite"
+        hidden
+      >
+        0 of 0 selected
+      </p>
+    </>
   );
 }
 
@@ -473,16 +501,19 @@ function PageNavLink({
   status,
   page,
   workingOnly,
+  query,
 }: {
   status: TaskStatus;
   page: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   const workingParam = workingOnly ? "&working=only" : "";
+  const queryParam = query === undefined ? "" : `&q=${encodeURIComponent(query)}`;
   return (
     <a
       class="button small"
-      href={`/tasks?status=${status}${workingParam}&page=${page}`}
+      href={`/tasks?status=${status}${workingParam}${queryParam}&page=${page}`}
       aria-label={`Page ${page}`}
     >
       {page}
@@ -496,12 +527,14 @@ function PageNavItem({
   status,
   currentPage,
   workingOnly,
+  query,
 }: {
   item: number | "ellipsis";
   index: number;
   status: TaskStatus;
   currentPage: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   if (item === "ellipsis") {
     return (
@@ -517,7 +550,7 @@ function PageNavItem({
       </span>
     );
   }
-  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} />;
+  return <PageNavLink key={item} status={status} page={item} workingOnly={workingOnly} query={query} />;
 }
 
 function PageNav({
@@ -525,15 +558,18 @@ function PageNav({
   currentPage,
   totalPages,
   workingOnly,
+  query,
 }: {
   status: TaskStatus;
   currentPage: number;
   totalPages: number;
   workingOnly: boolean;
+  query: string | undefined;
 }) {
   if (totalPages <= 1) return null;
   const workingParam = workingOnly ? "&working=only" : "";
-  const href = (page: number) => `/tasks?status=${status}${workingParam}&page=${page}`;
+  const queryParam = query === undefined ? "" : `&q=${encodeURIComponent(query)}`;
+  const href = (page: number) => `/tasks?status=${status}${workingParam}${queryParam}&page=${page}`;
   return (
     <nav class="pagination" aria-label="Task list pages">
       {currentPage > 1 ? (
@@ -553,6 +589,7 @@ function PageNav({
           status={status}
           currentPage={currentPage}
           workingOnly={workingOnly}
+          query={query}
         />
       ))}
       {currentPage < totalPages ? (
@@ -568,45 +605,184 @@ function PageNav({
   );
 }
 
+function queryWithWorkingLabel(query: string, workingOnly: boolean): string {
+  const tokens = query.trim().split(/\s+/).filter((token) => token !== "label:working");
+  if (workingOnly) tokens.push("label:working");
+  return tokens.join(" ");
+}
+
+function TaskLabelsFilter({
+  status,
+  workingOnly,
+  query,
+}: {
+  status: TaskStatus;
+  workingOnly: boolean;
+  query: string | undefined;
+}) {
+  const allLabelsQuery = query === undefined ? undefined : queryWithWorkingLabel(query, false);
+  const workingQuery = query === undefined ? undefined : queryWithWorkingLabel(query, true);
+  const queryParam = (value: string | undefined) => (value === undefined ? "" : `&q=${encodeURIComponent(value)}`);
+  return (
+    <details class={workingOnly ? "task-label-filter is-active" : "task-label-filter"}>
+      <summary class="button small">Labels</summary>
+      <div class="task-label-menu">
+        <a
+          class={!workingOnly ? "is-selected" : undefined}
+          href={`/tasks?status=${status}${queryParam(allLabelsQuery)}`}
+        >
+          All labels
+        </a>
+        <a
+          class={workingOnly ? "is-selected" : undefined}
+          href={`/tasks?status=${status}&working=only${queryParam(workingQuery)}`}
+        >
+          working only
+        </a>
+      </div>
+    </details>
+  );
+}
+
+function TaskListSearch({
+  status,
+  workingOnly,
+  query,
+}: {
+  status: TaskStatus;
+  workingOnly: boolean;
+  query: string;
+}) {
+  return (
+    <form class="task-search" action="/tasks" method="get">
+      <input type="hidden" name="status" value={status} />
+      {workingOnly ? <input type="hidden" name="working" value="only" /> : null}
+      <input
+        type="search"
+        name="q"
+        aria-label="Search tasks"
+        value={query}
+        placeholder="is:issue state:closed"
+      />
+      <button class="button small task-search-button" type="submit" aria-label="Submit search" title="Search">
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+          <circle cx="8.5" cy="8.5" r="5.5" />
+          <path d="m13 13 4 4" />
+        </svg>
+      </button>
+    </form>
+  );
+}
+
+function TaskListToolbar({
+  hasTasks,
+  status,
+  workingOnly,
+  query,
+}: {
+  hasTasks: boolean;
+  status: TaskStatus;
+  workingOnly: boolean;
+  query: string | undefined;
+}) {
+  return (
+    <>
+      <div class="task-list-toolbar">
+        <label class="task-select-all">
+          <input
+            type="checkbox"
+            aria-label="Select all tasks on this page"
+            data-task-select-all
+            disabled={!hasTasks}
+          />
+        </label>
+        <TaskStatusFilter status={status} workingOnly={workingOnly} />
+        <div class="task-bulk-actions">
+          <div data-task-bulk-actions>
+            <details class="task-bulk-menu">
+              <summary class="button small">Mark as</summary>
+              <div class="task-bulk-menu-items">
+                <button type="button" data-task-action="do">do</button>
+                <button type="button" data-task-action="done">done</button>
+                <button type="button" data-task-action="skip">skip</button>
+              </div>
+            </details>
+          </div>
+          <TaskLabelsFilter status={status} workingOnly={workingOnly} query={query} />
+          <button
+            class="button small button--danger"
+            type="button"
+            data-task-action="delete"
+            data-task-bulk-delete
+            disabled
+          >
+            delete
+          </button>
+        </div>
+      </div>
+      <p class="task-selection-feedback" data-task-selection-feedback role="status" hidden></p>
+    </>
+  );
+}
+
+function TaskListRows({ tasks, pageOffset }: { tasks: readonly Task[]; pageOffset: number }) {
+  return (
+    <div class="list" aria-label="Task list">
+      {tasks.length === 0 ? (
+        <p class="task-list-empty">該当するtaskはありません。</p>
+      ) : (
+        tasks.map((task, index) => (
+          <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
+        ))
+      )}
+    </div>
+  );
+}
+
 function ListPage({
   tasks,
   status,
   workingOnly,
+  query,
   currentPage,
   totalPages,
   pageOffset,
+  queryInUrl,
 }: {
   tasks: readonly Task[];
   status: TaskStatus;
   workingOnly: boolean;
+  query: string;
   currentPage: number;
   totalPages: number;
   pageOffset: number;
+  queryInUrl: string | undefined;
 }) {
   return (
     <div class="page page--list" data-state="normal">
       <div class="page-header">
         <div>
           <h1 class="page-title">Tasks</h1>
-          <p class="muted">GitHub Issues-like list without search in this scope.</p>
+          <p class="muted">GitHub Issues-like task list.</p>
         </div>
         <NewTaskLink from="tasks" />
       </div>
-      <TaskStatusFilter status={status} workingOnly={workingOnly} />
-      <div class="list" aria-label="Task list">
-        {tasks.length === 0 ? (
-          <p class="task-list-empty">該当するtaskはありません。</p>
-        ) : (
-          tasks.map((task, index) => (
-            <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
-          ))
-        )}
+      <div class="task-list-shell" data-task-list>
+        <TaskListSearch status={status} workingOnly={workingOnly} query={query} />
+        <TaskListToolbar
+          hasTasks={tasks.length > 0}
+          status={status}
+          workingOnly={workingOnly}
+          query={queryInUrl}
+        />
+        <TaskListRows tasks={tasks} pageOffset={pageOffset} />
       </div>
       <PageNav
         status={status}
         currentPage={currentPage}
         totalPages={totalPages}
         workingOnly={workingOnly}
+        query={queryInUrl}
       />
     </div>
   );
@@ -763,6 +939,12 @@ app.get("/description-editor.js", (c) => {
   });
 });
 
+app.get("/task-list-selection.js", (c) => {
+  return c.body(TASK_LIST_SELECTION_SCRIPT, 200, {
+    "content-type": "application/javascript",
+  });
+});
+
 app.get("/styles.css", (c) => {
   return c.body(STYLES_CSS, 200, { "content-type": "text/css" });
 });
@@ -797,6 +979,30 @@ app.post("/api/tasks", async (c) => {
 
   c.header("Location", `/api/tasks/${inserted.value.id}`);
   return c.json(inserted.value, 201);
+});
+
+app.patch("/api/tasks/bulk/status", async (c) => {
+  const body = await readJsonRecord(c);
+  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
+  const status = body["status"];
+  const inputs = parseTaskVersionInputs(body["tasks"]);
+  if (!isTaskStatus(status)) return problem(c, 400, "INVALID_STATUS");
+  if (!inputs.ok) return problem(c, 400, inputs.error.code);
+
+  const result = await repository(c).bulkUpdateStatus(inputs.value, status);
+  if (!result.ok) return bulkProblem(c, result.error.code);
+  return c.json(result.value);
+});
+
+app.delete("/api/tasks/bulk", async (c) => {
+  const body = await readJsonRecord(c);
+  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
+  const inputs = parseTaskVersionInputs(body["tasks"]);
+  if (!inputs.ok) return problem(c, 400, inputs.error.code);
+
+  const result = await repository(c).bulkRemove(inputs.value);
+  if (!result.ok) return bulkProblem(c, result.error.code);
+  return c.body(null, 204);
 });
 
 app.patch("/api/tasks/:id", async (c) => {
@@ -874,8 +1080,19 @@ app.get("/tasks", async (c) => {
   const result = await repository(c).list();
   if (!result.ok) return c.text("Internal Server Error", 500);
   const rawStatus = c.req.query("status");
-  const status = isTaskStatus(rawStatus) ? rawStatus : "do";
-  const workingOnly = c.req.query("working") === "only";
+  const rawQuery = c.req.query("q");
+  const parsedQuery: TaskListQuery | null = parseTaskListQuery(rawQuery);
+  let status: TaskStatus = "do";
+  if (parsedQuery !== null) {
+    status = parsedQuery.status;
+  } else if (isTaskStatus(rawStatus)) {
+    status = rawStatus;
+  }
+  let workingOnly = c.req.query("working") === "only";
+  if (parsedQuery !== null) workingOnly = parsedQuery.workingOnly;
+  let query = `is:${status}`;
+  if (workingOnly) query += " label:working";
+  if (parsedQuery !== null && rawQuery !== undefined) query = rawQuery.trim();
   const filteredTasks = filterTasks(result.value, [
     TASK_STATUS_FILTERS[status],
     ...(workingOnly ? [is_working] : []),
@@ -888,9 +1105,11 @@ app.get("/tasks", async (c) => {
       tasks={pageTasks}
       status={status}
       workingOnly={workingOnly}
+      query={query}
       currentPage={currentPage}
       totalPages={totalPages}
       pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
+      queryInUrl={rawQuery}
     />,
   );
 });

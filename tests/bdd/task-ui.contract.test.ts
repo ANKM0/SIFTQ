@@ -77,6 +77,9 @@ describe("Task list page", () => {
     expect(body).toContain('aria-current="true" href="/tasks?status=do"');
     expect(body).toContain('href="/tasks?status=done"');
     expect(body).toContain('href="/tasks?status=skip"');
+    expect(body).toContain('name="q"');
+    expect(body).toContain('value="is:do"');
+    expect(body).toContain("Submit search");
   });
 
   it.each(["do", "done", "skip"] as const)("filters tasks by %s status", async (status) => {
@@ -118,6 +121,50 @@ describe("Task list page", () => {
     expect(body).toContain("seed task");
     expect(body).toContain("status area-badge");
     expect(body).toContain("status--do");
+    expect(body).toContain('data-version="1"');
+    expect(body).toContain('data-task-select');
+  });
+});
+
+describe("Task list query UI", () => {
+  it.each(["do", "done", "skip"] as const)("filters by query expression is:%s", async (status) => {
+    await repo.insert(taskFixture({ id: "do-1", status: "do" }));
+    await repo.insert(taskFixture({ id: "done-1", status: "done" }));
+    await repo.insert(taskFixture({ id: "skip-1", status: "skip" }));
+
+    const body = await (await request(`/tasks?q=is:${status}`)).text();
+
+    expect(body).toContain(`${status}-1`);
+    expect(body).toContain(`value="is:${status}"`);
+    for (const other of ["do", "done", "skip"] as const) {
+      if (other !== status) expect(body).not.toContain(`${other}-1`);
+    }
+  });
+
+  it("combines a status query with the working label", async () => {
+    await repo.insert(taskFixture({ id: "working", status: "do", working: true }));
+    await repo.insert(taskFixture({ id: "idle", status: "do", working: false }));
+
+    const body = await (await request("/tasks?q=is:do%20label:working")).text();
+
+    expect(body).toContain("working");
+    expect(body).not.toContain("idle");
+    expect(body).toContain('href="/tasks?status=do&amp;working=only"');
+  });
+
+  it("keeps a valid query when navigating labels", async () => {
+    const body = await (await request("/tasks?q=is:do%20label:working")).text();
+
+    expect(body).toContain('href="/tasks?status=do&amp;q=is%3Ado"');
+    expect(body).toContain('href="/tasks?status=do&amp;working=only&amp;q=is%3Ado%20label%3Aworking"');
+  });
+
+  it("keeps a valid query in pagination links", async () => {
+    await seedDoTasks(26);
+
+    const body = await (await request("/tasks?q=is:do&page=1")).text();
+
+    expect(body).toContain('href="/tasks?status=do&amp;q=is%3Ado&amp;page=2"');
   });
 });
 

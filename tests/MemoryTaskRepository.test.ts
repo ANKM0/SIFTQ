@@ -50,4 +50,27 @@ describe("MemoryTaskRepository", () => {
 
     expect(result).toEqual({ ok: false, error: { code: "CONFLICT" } });
   });
+
+  it("updates multiple tasks atomically", async () => {
+    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const first = PREVIEW_TASKS[0];
+    const second = PREVIEW_TASKS[1];
+    if (!first || !second) throw new Error("The preview scenario must include two tasks.");
+
+    const result = await repository.bulkUpdateStatus(
+      [
+        { id: first.id, version: first.version },
+        { id: second.id, version: second.version },
+      ],
+      "done",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.arrayContaining([
+        expect.objectContaining({ id: first.id, status: "done", version: 2 }),
+        expect.objectContaining({ id: second.id, status: "done", version: 2 }),
+      ]),
+    });
+  });
 });
