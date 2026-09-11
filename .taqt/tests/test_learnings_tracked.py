@@ -3,7 +3,8 @@
 `.learnings/LEARNINGS.md`, `.learnings/ERRORS.md`, and
 `.learnings/FEATURE_REQUESTS.md` must stay Git-tracked and PR-reviewable shared
 artifacts. They must appear in `git ls-files` and must not be ignored by
-`.gitignore` (ADR 0017).
+`.gitignore` (ADR 0017). The deny-by-default allowlist explicitly permits
+these shared artifacts.
 """
 
 import subprocess
@@ -41,6 +42,6 @@ def test_learning_artifact_is_not_ignored(path: str) -> None:
     assert result.returncode != 0, f"{path} is ignored by .gitignore"
 
 
-def test_gitignore_has_no_learnings_entry() -> None:
+def test_gitignore_explicitly_allows_learnings_directory() -> None:
     gitignore = (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8")
-    assert ".learnings/" not in gitignore
+    assert "!/.learnings/" in gitignore

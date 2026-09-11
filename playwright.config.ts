@@ -6,6 +6,8 @@ const e2eSecret = atob("dGVzdC1zZWNyZXQ=");
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  // E2E files share one local D1 database and Worker process.
+  workers: 1,
   retries: 0,
   use: {
     baseURL: "http://127.0.0.1:4173",
