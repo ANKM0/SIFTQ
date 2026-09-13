@@ -117,9 +117,12 @@ describe("bulk task input", () => {
 describe("task domain", () => {
   it("creates a task and rejects an invalid title", () => {
     const created = createTask({
+      id: "task-1",
       owner_id: "owner-1",
       title: "Buy milk",
       description: "",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
     });
 
     expect(created.ok).toBe(true);
@@ -128,11 +131,17 @@ describe("task domain", () => {
     expect(created.value.area).toBe(1);
     expect(created.value.order).toBe(1);
     expect(created.value.version).toBe(1);
+    expect(created.value.id).toBe("task-1");
+    expect(created.value.created_at).toBe("2026-01-01T00:00:00.000Z");
+    expect(created.value.updated_at).toBe("2026-01-01T00:00:00.000Z");
 
     const invalid = createTask({
+      id: "task-2",
       owner_id: "owner-1",
       title: "",
       description: "",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
     });
     expect(invalid.ok).toBe(false);
     if (!invalid.ok) {

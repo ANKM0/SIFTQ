@@ -13,12 +13,14 @@ import {
   changeTaskStatus,
   changeTaskWorking,
   createTask,
+  err,
   filterTasks,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
   is_working,
   moveTask,
+  ok,
   pageNavItems,
   paginateTasks,
   parseTaskListQuery,
@@ -26,7 +28,7 @@ import {
   parsePageParam,
   sortForMatrix,
 } from "./task";
-import type { Task, TaskListQuery, TaskStatus } from "./task";
+import type { DomainError, Result, Task, TaskListQuery, TaskStatus } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
@@ -51,10 +53,10 @@ import {
   isPasswordValid,
   isValidSession,
 } from "./auth";
-import { D1TaskRepository } from "./task-repository";
+import { createD1TaskRepository } from "./task-repository";
 import type { TaskRepository } from "./task-repository";
 import { STYLES_CSS } from "./styles";
-import { MemoryTaskRepository } from "./preview/MemoryTaskRepository";
+import { createMemoryTaskRepository } from "./preview/MemoryTaskRepository";
 import { PREVIEW_TASKS } from "./preview/tasks";
 
 type Env = {
@@ -70,7 +72,7 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
-const previewRepository = new MemoryTaskRepository(PREVIEW_TASKS);
+const previewRepository = createMemoryTaskRepository(PREVIEW_TASKS);
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -130,7 +132,7 @@ app.use("*", async (c, next) => {
 function repository(c: Context<AppEnv>): TaskRepository {
   if (c.env.PREVIEW_MODE === "true") return previewRepository;
   if (c.env.TASK_REPOSITORY) return c.env.TASK_REPOSITORY;
-  if (c.env.DB) return new D1TaskRepository(c.env.DB);
+  if (c.env.DB) return createD1TaskRepository(c.env.DB);
   throw new Error("task repository is not configured");
 }
 
@@ -162,56 +164,47 @@ function parseVersion(value: unknown): number | null {
   return value;
 }
 
-function applyPatch(
-  body: Record<string, unknown>,
-  task: Task,
-): { ok: true; task: Task } | { ok: false; code: string } {
+function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
   const withTitle = applyTitle(body, task);
-  if (!withTitle) return { ok: false, code: "INVALID_TITLE" };
+  if (!withTitle.ok) return withTitle;
 
-  const withStatus = applyStatus(body, withTitle);
-  if (!withStatus) return { ok: false, code: "INVALID_STATUS" };
+  const withStatus = applyStatus(body, withTitle.value);
+  if (!withStatus.ok) return withStatus;
 
-  const withArea = applyArea(body, withStatus);
-  if (!withArea) return { ok: false, code: "INVALID_AREA" };
+  const withArea = applyArea(body, withStatus.value);
+  if (!withArea.ok) return withArea;
 
-  const withWorking = applyWorking(body, withArea);
-  if (!withWorking) return { ok: false, code: "INVALID_WORKING" };
-
-  return { ok: true, task: withWorking };
+  return applyWorking(body, withArea.value);
 }
 
-function applyTitle(body: Record<string, unknown>, task: Task): Task | null {
+function applyTitle(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
   if (typeof body["title"] !== "string" && typeof body["description"] !== "string") {
-    return task;
+    return ok(task);
   }
 
   const title = typeof body["title"] === "string" ? body["title"].trim() : task.title;
   const description =
     typeof body["description"] === "string" ? body["description"] : task.description;
-  if (!isTaskTitleValid(title)) return null;
-  return { ...task, title, description };
+  if (!isTaskTitleValid(title)) return err({ code: "INVALID_TITLE" });
+  return ok({ ...task, title, description });
 }
 
-function applyStatus(body: Record<string, unknown>, task: Task): Task | null {
-  if (!("status" in body)) return task;
-  if (!isTaskStatus(body["status"])) return null;
-  const changed = changeTaskStatus(task, body["status"]);
-  return changed.ok ? changed.value : null;
+function applyStatus(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
+  if (!("status" in body)) return ok(task);
+  if (!isTaskStatus(body["status"])) return err({ code: "INVALID_STATUS" });
+  return changeTaskStatus(task, body["status"]);
 }
 
-function applyArea(body: Record<string, unknown>, task: Task): Task | null {
-  if (!("area" in body)) return task;
-  if (!isTaskArea(body["area"])) return null;
-  const changed = changeTaskArea(task, body["area"]);
-  return changed.ok ? changed.value : null;
+function applyArea(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
+  if (!("area" in body)) return ok(task);
+  if (!isTaskArea(body["area"])) return err({ code: "INVALID_AREA" });
+  return changeTaskArea(task, body["area"]);
 }
 
-function applyWorking(body: Record<string, unknown>, task: Task): Task | null {
-  if (!("working" in body)) return task;
-  if (typeof body["working"] !== "boolean") return null;
-  const changed = changeTaskWorking(task, body["working"]);
-  return changed.ok ? changed.value : null;
+function applyWorking(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
+  if (!("working" in body)) return ok(task);
+  if (typeof body["working"] !== "boolean") return err({ code: "INVALID_WORKING" });
+  return changeTaskWorking(task, body["working"]);
 }
 
 async function findTask(c: Context<AppEnv>, id: string): Promise<Task | undefined> {
@@ -971,7 +964,15 @@ app.post("/api/tasks", async (c) => {
     return problem(c, 400, "INVALID_TITLE");
   }
 
-  const created = createTask({ owner_id: "local", title, description });
+  const now = new Date().toISOString();
+  const created = createTask({
+    id: crypto.randomUUID(),
+    owner_id: "local",
+    title,
+    description,
+    created_at: now,
+    updated_at: now,
+  });
   if (!created.ok) return problem(c, 400, created.error.code);
 
   const inserted = await repository(c).insert(created.value);
@@ -1011,8 +1012,8 @@ app.patch("/api/tasks/:id", async (c) => {
   if (!found.ok) return problem(c, found.status, found.code);
 
   const patched = applyPatch(body, found.task);
-  if (!patched.ok) return problem(c, 400, patched.code);
-  const task = patched.task;
+  if (!patched.ok) return problem(c, 400, patched.error.code);
+  const task = patched.value;
 
   const version = parseVersion(body["version"]);
   if (version === null) {
@@ -1150,7 +1151,17 @@ app.post("/tasks", async (c) => {
     );
   }
 
-  const created = createTask({ owner_id: "local", title, description, status: state.status, area: state.area });
+  const now = new Date().toISOString();
+  const created = createTask({
+    id: crypto.randomUUID(),
+    owner_id: "local",
+    title,
+    description,
+    status: state.status,
+    area: state.area,
+    created_at: now,
+    updated_at: now,
+  });
   if (!created.ok) return c.text("Invalid title", 400);
 
   const inserted = await repository(c).insert(created.value);

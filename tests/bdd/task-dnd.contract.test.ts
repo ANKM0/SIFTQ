@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
-import { MemoryTaskRepository } from "../helpers/memory-task-repository";
+import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
 
 describe("Matrix drag and drop", () => {
   it("enables native drag and drop and posts to the JSON reorder API", async () => {
-    const repo = new MemoryTaskRepository();
+    const repo = createMemoryTaskRepository();
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
     const response = await authenticatedRequest("/", repo);
@@ -19,7 +19,7 @@ describe("Matrix drag and drop", () => {
   });
 
   it("includes the conflict notice and restore hook", async () => {
-    const repo = new MemoryTaskRepository();
+    const repo = createMemoryTaskRepository();
     const response = await authenticatedRequest("/matrix-dnd.js", repo);
     const body = await response.text();
 
@@ -41,7 +41,7 @@ describe("Matrix drag and drop", () => {
   });
 
   it("includes Matrix status and delete actions", async () => {
-    const repo = new MemoryTaskRepository();
+    const repo = createMemoryTaskRepository();
     const response = await authenticatedRequest("/matrix-dnd.js", repo);
     const body = await response.text();
 

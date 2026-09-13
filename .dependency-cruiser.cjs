@@ -20,7 +20,7 @@ module.exports = {
       severity: "error",
       comment: "domain は presentation / repository へ依存しない。",
       from: { path: "^src/task\\.ts$" },
-      to: { path: "^src/(index|task-repository)\\." },
+      to: { path: "^src/(index\\.tsx|components/|preview/|task-repository\\.ts$)" },
     },
     {
       name: "repository-no-presentation-dependency",

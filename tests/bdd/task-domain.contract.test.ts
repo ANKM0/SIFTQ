@@ -12,9 +12,12 @@ import { taskFixture } from "../helpers/task-fixture";
 describe("BDD-TM-001: domain task creation", () => {
   it("creates a task with display and edit attributes", () => {
     const result = createTask({
+      id: "task-1",
       owner_id: "owner-1",
       title: "Buy milk",
       description: "low-fat",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
     });
 
     expect(result.ok).toBe(true);
@@ -25,8 +28,31 @@ describe("BDD-TM-001: domain task creation", () => {
     expect(result.value.area).toBe(1);
     expect(result.value.order).toBe(1);
     expect(result.value.version).toBe(1);
-    expect(result.value.id).toEqual(expect.any(String));
+    expect(result.value.id).toBe("task-1");
+    expect(result.value.created_at).toBe("2026-01-01T00:00:00.000Z");
+    expect(result.value.updated_at).toBe("2026-01-01T00:00:00.000Z");
     expect(result.value.owner_id).toBe("owner-1");
+  });
+
+  it("returns expected validation failures as Result errors", () => {
+    const invalidTitle = createTask({
+      id: "task-1",
+      owner_id: "owner-1",
+      title: "",
+      description: "",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(invalidTitle).toEqual({ ok: false, error: { code: "INVALID_TITLE" } });
+    expect(moveTask([], "missing", 1, 0)).toEqual({
+      ok: false,
+      error: { code: "NOT_FOUND" },
+    });
+    expect(moveTask([taskFixture()], "task-1", 1, -1)).toEqual({
+      ok: false,
+      error: { code: "INVALID_ORDER" },
+    });
   });
 });
 

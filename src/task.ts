@@ -26,6 +26,7 @@ export type DomainErrorCode =
   | "INVALID_TITLE"
   | "INVALID_STATUS"
   | "INVALID_AREA"
+  | "INVALID_WORKING"
   | "INVALID_ORDER"
   | "INVALID_BULK_INPUT"
   | "NOT_FOUND"
@@ -202,11 +203,14 @@ export function isTaskTitleValid(title: string): boolean {
 }
 
 export type CreateTaskInput = {
+  id: string;
   owner_id: string;
   title: string;
   description: string;
   status?: TaskStatus;
   area?: TaskArea;
+  created_at: string;
+  updated_at: string;
 };
 
 export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
@@ -214,9 +218,8 @@ export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
     return err({ code: "INVALID_TITLE" });
   }
 
-  const now = new Date().toISOString();
   return ok({
-    id: crypto.randomUUID(),
+    id: input.id,
     owner_id: input.owner_id,
     title: input.title,
     description: input.description,
@@ -225,8 +228,8 @@ export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
     area: input.area ?? 1,
     order: 1,
     version: 1,
-    created_at: now,
-    updated_at: now,
+    created_at: input.created_at,
+    updated_at: input.updated_at,
   });
 }
 

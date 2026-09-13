@@ -1,6 +1,8 @@
 %% Lightweight application architecture.
 %% Arrows show use / dependency direction.
-%% Regenerate SVG with: pnpm run docs:app-architecture:svg
+%% Domain uses structural types, pure functions, and Result. Interfaces are limited
+%% to the side-effect boundary; adapters use factory functions and object literals.
+%% Regenerate SVG with: bun run docs:app-architecture:svg
 block-beta
   columns 5
 
@@ -21,17 +23,17 @@ block-beta
   space
   block:GATEWAY:2
     columns 2
-    dbAdapter["DB adapter"] saasAdapter["SaaS adapter"]
+    dbAdapter["DB adapter<br/>factory + object"] saasAdapter["SaaS adapter<br/>factory + object"]
   end
 
   block:USECASE_LAYER:5
     columns 5
-    space usecase["usecase"] space repository["repository"] space
+    space usecase["usecase"] space repository["repository port<br/>minimal interface"] space
   end
 
   block:DOMAIN:5
     columns 5
-    space:2 entity["entity"] space:2
+    space:2 domain["types<br/>pure functions<br/>Result"] space:2
   end
 
   Browser --> controller
@@ -39,8 +41,8 @@ block-beta
   controller --> usecase
   cmd --> usecase
   usecase --> repository
-  usecase --> entity
-  repository --> entity
+  usecase --> domain
+  repository --> domain
   repository --> dbAdapter
   repository --> saasAdapter
   dbAdapter --> DB
@@ -56,7 +58,7 @@ block-beta
   style saasAdapter fill:#b6d7a8,stroke:#6f8f66,color:#4d6847;
   style usecase fill:#ea9999,stroke:#9f5454,color:#6b3a3a;
   style repository fill:#ea9999,stroke:#9f5454,color:#6b3a3a;
-  style entity fill:#ffe599,stroke:#ad8b2f,color:#6f5b22;
+  style domain fill:#ffe599,stroke:#ad8b2f,color:#6f5b22;
   style DRIVER_PORT fill:#f2f2f2,stroke:#f2f2f2,color:#666;
   style EXTERNAL fill:#f2f2f2,stroke:#f2f2f2,color:#666;
   style PRESENTATION fill:#d9ead3,stroke:#d9ead3,color:#666;
