@@ -136,6 +136,30 @@ function repository(c: Context<AppEnv>): TaskRepository {
   throw new Error("task repository is not configured");
 }
 
+function createTaskAtBoundary({
+  title,
+  description,
+  status,
+  area,
+}: {
+  title: string;
+  description: string;
+  status?: TaskStatus;
+  area?: Task["area"];
+}) {
+  const now = new Date().toISOString();
+  return createTask({
+    id: crypto.randomUUID(),
+    owner_id: "local",
+    title,
+    description,
+    ...(status === undefined ? {} : { status }),
+    ...(area === undefined ? {} : { area }),
+    created_at: now,
+    updated_at: now,
+  });
+}
+
 function problem(c: Context<AppEnv>, status: ContentfulStatusCode, code: string) {
   return c.json({ code }, status);
 }
@@ -964,15 +988,7 @@ app.post("/api/tasks", async (c) => {
     return problem(c, 400, "INVALID_TITLE");
   }
 
-  const now = new Date().toISOString();
-  const created = createTask({
-    id: crypto.randomUUID(),
-    owner_id: "local",
-    title,
-    description,
-    created_at: now,
-    updated_at: now,
-  });
+  const created = createTaskAtBoundary({ title, description });
   if (!created.ok) return problem(c, 400, created.error.code);
 
   const inserted = await repository(c).insert(created.value);
@@ -1151,16 +1167,11 @@ app.post("/tasks", async (c) => {
     );
   }
 
-  const now = new Date().toISOString();
-  const created = createTask({
-    id: crypto.randomUUID(),
-    owner_id: "local",
+  const created = createTaskAtBoundary({
     title,
     description,
     status: state.status,
     area: state.area,
-    created_at: now,
-    updated_at: now,
   });
   if (!created.ok) return c.text("Invalid title", 400);
 
