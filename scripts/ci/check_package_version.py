@@ -29,7 +29,7 @@ def package_version(root: Path) -> tuple[int, int, int]:
 
 def latest_release_version(root: Path) -> tuple[int, int, int] | None:
     tags = subprocess.check_output(
-        ["git", "-C", str(root), "tag", "--list", "v[0-9]*"],
+        ["git", "-C", str(root), "tag", "--merged", "HEAD", "--list", "v[0-9]*"],
         text=True,
     ).splitlines()
     versions = [parse_version(tag) for tag in tags]
