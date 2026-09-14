@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { chromium, expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
@@ -312,6 +312,43 @@ test("restores a saved new task draft on initial page load", async ({ page }) =>
   await expect(page.getByLabel("Title")).toHaveValue(title);
   await expect(descriptionEditor(page)).toHaveText(description);
   await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+});
+
+test("restores a new task draft after a browser restart", async ({ browserName }, testInfo) => {
+  expect(browserName).toBe("chromium");
+  const title = `E2E browser restart draft ${Date.now()}`;
+  const description = "restored after browser restart";
+  const userDataDir = testInfo.outputPath(`draft-browser-profile-${Date.now()}`);
+  const firstContext = await chromium.launchPersistentContext(userDataDir, {
+    baseURL: "http://127.0.0.1:4173",
+  });
+  const firstPage = firstContext.pages()[0] ?? (await firstContext.newPage());
+
+  try {
+    await signIn(firstPage);
+    await firstPage.goto("/tasks/new?from=tasks");
+    await firstPage.getByLabel("Title").waitFor();
+    await firstPage.clock.install();
+    await firstPage.getByLabel("Title").fill(title);
+    await descriptionEditor(firstPage).fill(description);
+    await expectDraftSaved(firstPage, title, description);
+  } finally {
+    await firstContext.close();
+  }
+
+  const restartedContext = await chromium.launchPersistentContext(userDataDir, {
+    baseURL: "http://127.0.0.1:4173",
+  });
+  const restartedPage = restartedContext.pages()[0] ?? (await restartedContext.newPage());
+
+  try {
+    await restartedPage.goto("/tasks/new?from=tasks");
+    await expect(restartedPage.getByLabel("Title")).toHaveValue(title);
+    await expect(descriptionEditor(restartedPage)).toHaveText(description);
+    await expect(restartedPage.locator('textarea[data-description-value]')).toHaveValue(description);
+  } finally {
+    await restartedContext.close();
+  }
 });
 
 test("restores a saved new task draft after an HTMX navigation", async ({ page }) => {
