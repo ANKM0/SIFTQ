@@ -90,6 +90,12 @@ test.describe("task list bulk actions", () => {
     await signIn(page);
     await createTask(page, title);
     const row = await selectTask(page, "do", title);
+    const taskId = await row.getAttribute("data-task-id");
+    if (!taskId) throw new Error("Task ID is missing from the task row");
+    const draftKey = `siftq.task-draft:${taskId}`;
+    await page.evaluate(({ key }) => {
+      localStorage.setItem(key, JSON.stringify({ title: "draft", description: "draft", updatedAt: Date.now() }));
+    }, { key: draftKey });
     await page.getByRole("button", { name: "delete" }).click();
     const dialog = page.locator(".matrix-modal");
     await expect(dialog).toContainText("選択した1件のタスクを削除しますか？");
@@ -99,5 +105,6 @@ test.describe("task list bulk actions", () => {
     await page.getByRole("button", { name: "delete" }).click();
     await page.locator('[data-task-list-delete="confirm"]').click();
     await expect(page.locator("[data-task-row]", { hasText: title })).toHaveCount(0);
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
   });
 });

@@ -237,6 +237,12 @@ test("confirms Matrix task deletion in the centered dialog", async ({ page }) =>
   const title = `E2E context delete ${Date.now()}`;
   await createMatrixTask(page, title);
   const card = page.locator(".task-card", { hasText: title });
+  const taskId = await card.getAttribute("data-task-id");
+  if (!taskId) throw new Error("Task ID is missing from the task card");
+  const draftKey = `siftq.task-draft:${taskId}`;
+  await page.evaluate(({ key }) => {
+    localStorage.setItem(key, JSON.stringify({ title: "draft", description: "draft", updatedAt: Date.now() }));
+  }, { key: draftKey });
   await card.click({ button: "right" });
   await page.locator('.matrix-menu [data-matrix-action="delete"]').click();
 
@@ -254,6 +260,7 @@ test("confirms Matrix task deletion in the centered dialog", async ({ page }) =>
   await page.locator('.matrix-menu [data-matrix-action="delete"]').click();
   await page.locator('.matrix-modal-button[data-matrix-modal-action="confirm"]').click();
   await expect(card).toHaveCount(0);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
 
   await expectTaskAbsentFromList(page, title, "do");
 });
