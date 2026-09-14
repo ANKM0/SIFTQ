@@ -4,6 +4,7 @@
 
 - New task と Task detail の未保存 title / description は、ブラウザの `localStorage` に一時draftとして保存する。
 - draftは新規taskで1件、既存taskでtask IDごとに管理し、最終編集から24時間保持する。
+- 同じtaskを複数タブで編集する場合は、task IDごとの同一キーへ保存し、最後に `localStorage` へ保存されたdraftを復元する。draftのマージやタブ間通信は行わない。
 - Create / Save またはtask削除の成功後、対象draftを削除する。ログアウト時は現在のブラウザプロファイル内のdraftを削除する。
 - D1はtaskの唯一の正本として維持し、draftをtaskデータの複製として扱わない。
 
@@ -11,6 +12,7 @@
 
 - ブラウザ再起動後の復元を満たしつつ、既存のHTML駆動UIへ少ない変更で追加できる。
 - title / description程度の小さいデータでは、入力停止後に保存することで性能上の負担を抑えられる。
+- 同一オリジンの `localStorage` はタブ間で共有され、同じキーの `setItem` は既存値を置き換えるため、追加の同期機構なしで最後の保存を採用できる。
 - D1にdraftを保存する方式と異なり、draft用のschema、認可、TTL削除、通信失敗処理を追加する必要がない。
 
 ## 不採用
