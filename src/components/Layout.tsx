@@ -228,6 +228,18 @@ export const DESCRIPTION_EDITOR_SCRIPT = [
   '  if (!key) return;',
   '  try { localStorage.removeItem(key); } catch (e) {}',
   '});',
+  'document.addEventListener("submit", function (event) {',
+  '  var form = event.target;',
+  '  if (!form || !form.matches || !form.matches(\'form[action="/logout"]\')) return;',
+  "  try {",
+  "    var remove = [];",
+  "    for (var i = 0; i < localStorage.length; i += 1) {",
+  "      var key = localStorage.key(i);",
+  '      if (key && key.indexOf("siftq.task-draft:") === 0) remove.push(key);',
+  "    }",
+  "    remove.forEach(function (key) { localStorage.removeItem(key); });",
+  "  } catch (e) {}",
+  "});",
 ].join("\n");
 export const TASK_LIST_SELECTION_SCRIPT = [
   "function initializeTaskListSelection() {",
@@ -688,6 +700,9 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
             Tasks
           </a>
         </nav>
+        <form action="/logout" method="post">
+          <button type="submit">Logout</button>
+        </form>
       </header>
       <main id="page">{children}</main>
     </body>

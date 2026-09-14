@@ -356,6 +356,38 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
 });
 
+test("clears only the current browser profile drafts on logout", async ({ browser }) => {
+  const currentContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
+  const otherContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
+  const currentPage = await currentContext.newPage();
+  const otherPage = await otherContext.newPage();
+  const draftKeys = ["siftq.task-draft:new", "siftq.task-draft:task-from-another-device"];
+  const draftValue = JSON.stringify({ title: "draft", description: "draft", updatedAt: Date.now() });
+
+  try {
+    await signIn(currentPage);
+    await otherPage.goto("/login");
+    for (const page of [currentPage, otherPage]) {
+      await page.evaluate(({ draftKeys, draftValue }) => {
+        for (const key of draftKeys) localStorage.setItem(key, draftValue);
+        localStorage.setItem("siftq.preference", "keep");
+      }, { draftKeys, draftValue });
+    }
+
+    await currentPage.locator('form[action="/logout"] button[type="submit"]').click();
+    await expect(currentPage).toHaveURL(/\/login$/);
+    await expect.poll(() => currentPage.evaluate(() =>
+      Object.keys(localStorage).filter((key) => key.startsWith("siftq.task-draft:")),
+    )).toEqual([]);
+    expect(await currentPage.evaluate(() => localStorage.getItem("siftq.preference"))).toBe("keep");
+    expect(await otherPage.evaluate(() =>
+      Object.keys(localStorage).filter((key) => key.startsWith("siftq.task-draft:")).sort(),
+    )).toEqual(draftKeys.sort());
+  } finally {
+    await Promise.all([currentContext.close(), otherContext.close()]);
+  }
+});
+
 test("keeps a new task draft after a failed Create request", async ({ page }) => {
   const title = `E2E failed create draft ${Date.now()}`;
   const description = "draft retained after communication failure";
