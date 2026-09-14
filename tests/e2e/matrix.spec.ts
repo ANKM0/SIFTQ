@@ -553,6 +553,47 @@ test("restores a task detail draft for its task ID", async ({ page }) => {
   await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
 });
 
+test("restores the last saved task draft across multiple tabs", async ({ page }) => {
+  const originalTitle = `E2E multi-tab draft ${Date.now()}`;
+  const firstTitle = `${originalTitle} first`;
+  const firstDescription = "first tab draft";
+  const lastTitle = `${originalTitle} last`;
+  const lastDescription = "last tab draft";
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+
+  const draftKey = await getTaskDraftKey(page);
+  const secondPage = await page.context().newPage();
+  try {
+    await secondPage.goto(page.url());
+    await expect(secondPage.getByRole("heading", { name: "Task detail" })).toBeVisible();
+    await waitForPageSettle(secondPage);
+    await page.evaluate(() => localStorage.clear());
+
+    await page.getByLabel("Title").fill(firstTitle);
+    await descriptionEditor(page).fill(firstDescription);
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(firstTitle);
+
+    await secondPage.getByLabel("Title").fill(lastTitle);
+    await descriptionEditor(secondPage).fill(lastDescription);
+    await expect
+      .poll(() => secondPage.evaluate((key) => localStorage.getItem(key), draftKey))
+      .toContain(lastTitle);
+    expect(await page.evaluate((key) => localStorage.getItem(key), draftKey)).not.toContain(firstTitle);
+
+    await page.reload();
+    await expect(page.getByLabel("Title")).toHaveValue(lastTitle);
+    await expect(descriptionEditor(page)).toHaveText(lastDescription);
+    await expect(page.locator('textarea[data-description-value]')).toHaveValue(lastDescription);
+  } finally {
+    await secondPage.close();
+  }
+});
+
 test("discards a task detail draft when its base version is stale", async ({ page }) => {
   const serverTitle = `E2E server task ${Date.now()}`;
   const serverDescription = "server description remains authoritative";
