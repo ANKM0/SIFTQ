@@ -879,25 +879,36 @@ test("dismisses task detail Status and Area popovers when clicking outside", asy
 
 async function saveAfterMetaChange(page: Page, kind: "status" | "area", value: string) {
   const title = `E2E ${kind} save ${Date.now()}`;
+  const description = `E2E ${kind} draft`;
 
   await page.goto("/tasks/new");
   await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
   await page.getByRole("button", { name: "Create" }).click();
   await openTaskFromList(page, title, "do");
+
+  const draftTitle = `${title} saved`;
+  const draftKey = await getTaskDraftKey(page);
+  await page.evaluate(() => localStorage.clear());
+  await page.clock.install();
+  await page.getByLabel("Title").fill(draftTitle);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, draftTitle, description);
 
   const version = page.locator("#task-version");
   const beforeMetaChange = await version.inputValue();
   await page.getByRole("link", { name: new RegExp(`^${kind === "status" ? "Status" : "Area"}`) }).click();
   await page.locator(`[aria-label="Apply ${kind} to this task"] .status-choice`, { hasText: value }).click();
   await expect(version).not.toHaveValue(beforeMetaChange);
-  await page.getByLabel("Title").fill(`${title} saved`);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(draftTitle);
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page).toHaveURL(/\/tasks$/);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
   if (kind === "status") {
-    await expectTaskVisibleInList(page, `${title} saved`, value);
+    await expectTaskVisibleInList(page, draftTitle, value);
   } else {
-    await expectTaskVisibleInList(page, `${title} saved`, "do");
+    await expectTaskVisibleInList(page, draftTitle, "do");
   }
 }
 
