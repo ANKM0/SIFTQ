@@ -28,6 +28,15 @@ async function hasDraft(page: Page, title: string, description: string): Promise
   }, { title, description });
 }
 
+async function getTaskDraftKey(page: Page): Promise<string> {
+  return page.locator('form[data-task-form="edit"]').evaluate((form) => {
+    const match = (form.getAttribute("action") ?? "").match(/\/tasks\/([^/?#]+)/);
+    const taskId = match?.[1];
+    if (!taskId) throw new Error("Task ID is missing from the edit form action");
+    return `siftq.task-draft:${decodeURIComponent(taskId)}`;
+  });
+}
+
 async function expectDraftSaved(page: Page, title: string, description: string) {
   // The fake clock advances with real time, so keep a margin around the 500ms boundary.
   await page.clock.fastForward(400);
@@ -327,12 +336,7 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
   await page.locator(".task-card", { hasText: originalTitle }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
   await waitForPageSettle(page);
-  const draftKey = await page.locator('form[data-task-form="edit"]').evaluate((form) => {
-    const match = (form.getAttribute("action") ?? "").match(/\/tasks\/([^/?#]+)/);
-    const taskId = match?.[1];
-    if (!taskId) throw new Error("Task ID is missing from the edit form action");
-    return `siftq.task-draft:${decodeURIComponent(taskId)}`;
-  });
+  const draftKey = await getTaskDraftKey(page);
 
   await page.evaluate(() => localStorage.clear());
   await page.clock.install();
@@ -345,9 +349,9 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
 });
 
-test("keeps a new task draft after a non-2xx Create response", async ({ page }) => {
+test("keeps a new task draft after a failed Create request", async ({ page }) => {
   const title = `E2E failed create draft ${Date.now()}`;
-  const description = "draft retained after create failure";
+  const description = "draft retained after communication failure";
 
   await signIn(page);
   await page.route("**/tasks", async (route) => {
@@ -355,7 +359,7 @@ test("keeps a new task draft after a non-2xx Create response", async ({ page }) 
       await route.continue();
       return;
     }
-    await route.fulfill({ status: 500, body: "Internal Server Error" });
+    await route.abort("failed");
   });
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").waitFor();
@@ -365,13 +369,40 @@ test("keeps a new task draft after a non-2xx Create response", async ({ page }) 
   await descriptionEditor(page).fill(description);
   await expectDraftSaved(page, title, description);
 
-  const responsePromise = page.waitForResponse(
-    (response) => response.request().method() === "POST" && response.url().endsWith("/tasks"),
-  );
+  const requestFailed = page.waitForEvent("requestfailed", {
+    predicate: (request) => request.method() === "POST" && request.url().endsWith("/tasks"),
+  });
   await page.getByRole("button", { name: "Create" }).click();
-  expect((await responsePromise).status()).toBe(500);
+  await requestFailed;
   await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
   await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+});
+
+test("keeps a task detail draft after an input error", async ({ page }) => {
+  const originalTitle = `E2E invalid input ${Date.now()}`;
+  const title = `${originalTitle} updated`;
+  const description = "draft retained after input error";
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  const draftKey = await getTaskDraftKey(page);
+  await page.evaluate(() => localStorage.clear());
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
+
+  await page.locator("#task-version").evaluate((input) => input.remove());
+  const responsePromise = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().includes("/tasks/"),
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  expect((await responsePromise).status()).toBe(400);
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(title);
 });
 
 test("restores a saved new task draft on initial page load", async ({ page }) => {
@@ -471,12 +502,7 @@ test("restores a task detail draft for its task ID", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
   await waitForPageSettle(page);
 
-  const draftKey = await page.locator('form[data-task-form="edit"]').evaluate((form) => {
-    const match = (form.getAttribute("action") ?? "").match(/\/tasks\/([^/?#]+)/);
-    const taskId = match?.[1];
-    if (!taskId) throw new Error("Task ID is missing from the edit form action");
-    return `siftq.task-draft:${decodeURIComponent(taskId)}`;
-  });
+  const draftKey = await getTaskDraftKey(page);
   await page.evaluate(({ key, title, description }) => {
     localStorage.setItem(key, JSON.stringify({ title, description, updatedAt: Date.now() }));
   }, { key: draftKey, title, description });
@@ -906,10 +932,16 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await expect(page).toHaveURL(/\/tasks$/);
   await expectTaskVisibleInList(page, "E2E saved task", "do");
 
-  await staleEditor.getByLabel("Title").fill("E2E stale task");
+  const staleTitle = "E2E stale task";
+  const staleDescription = "draft retained after conflict";
+  await staleEditor.clock.install();
+  await staleEditor.getByLabel("Title").fill(staleTitle);
+  await descriptionEditor(staleEditor).fill(staleDescription);
+  await expectDraftSaved(staleEditor, staleTitle, staleDescription);
   await staleEditor.getByRole("button", { name: "Save" }).click();
   await expect(staleEditor.getByText("Task was updated elsewhere.")).toBeVisible();
   await expect(staleEditor.getByRole("link", { name: "Load latest" })).toBeVisible();
+  await expect.poll(() => hasDraft(staleEditor, staleTitle, staleDescription)).toBe(true);
 });
 
 test("cancels a new task from the matrix and returns to the matrix", async ({ page }) => {
