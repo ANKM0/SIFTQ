@@ -299,6 +299,81 @@ test("saves task detail title and description as a local draft after input stops
   await expectDraftSaved(page, title, description);
 });
 
+test("deletes a new task draft after a successful Create", async ({ page }) => {
+  const title = `E2E create draft cleanup ${Date.now()}`;
+  const description = "draft removed after create";
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
+
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("siftq.task-draft:new"))).toBeNull();
+});
+
+test("deletes a task detail draft after a successful Save", async ({ page }) => {
+  const originalTitle = `E2E save draft cleanup ${Date.now()}`;
+  const title = `${originalTitle} updated`;
+  const description = "draft removed after save";
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  const draftKey = await page.locator('form[data-task-form="edit"]').evaluate((form) => {
+    const match = (form.getAttribute("action") ?? "").match(/\/tasks\/([^/?#]+)/);
+    const taskId = match?.[1];
+    if (!taskId) throw new Error("Task ID is missing from the edit form action");
+    return `siftq.task-draft:${decodeURIComponent(taskId)}`;
+  });
+
+  await page.evaluate(() => localStorage.clear());
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
+
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
+});
+
+test("keeps a new task draft after a non-2xx Create response", async ({ page }) => {
+  const title = `E2E failed create draft ${Date.now()}`;
+  const description = "draft retained after create failure";
+
+  await signIn(page);
+  await page.route("**/tasks", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({ status: 500, body: "Internal Server Error" });
+  });
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
+
+  const responsePromise = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().endsWith("/tasks"),
+  );
+  await page.getByRole("button", { name: "Create" }).click();
+  expect((await responsePromise).status()).toBe(500);
+  await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+});
+
 test("restores a saved new task draft on initial page load", async ({ page }) => {
   const title = `E2E restored new draft ${Date.now()}`;
   const description = "restored new task description";
