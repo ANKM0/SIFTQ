@@ -40,6 +40,19 @@ describe("Matrix drag and drop", () => {
     expect(body).toContain('updatedCard.setAttribute("data-version", String(task.version))');
   });
 
+  it("resolves drag targets from the whole quadrant", async () => {
+    const repo = createMemoryTaskRepository();
+    const response = await authenticatedRequest("/matrix-dnd.js", repo);
+    const body = await response.text();
+    const targetResolution = "var target = matrixDropList(event);";
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("function matrixDropList(event) {");
+    expect(body).toContain('var quadrant = event.target.closest(".area--quadrant[data-drop-area]");');
+    expect(body).toContain('return quadrant ? quadrant.querySelector(".matrix-cards[data-dnd-group]") : null;');
+    expect(body.split(targetResolution).length - 1).toBe(2);
+  });
+
   it("includes Matrix status and delete actions", async () => {
     const repo = createMemoryTaskRepository();
     const response = await authenticatedRequest("/matrix-dnd.js", repo);
