@@ -53,6 +53,23 @@ def package_version(path: Path) -> str:
     return str(json.loads(path.read_text(encoding="utf-8"))["version"])
 
 
+def d1_binding(path: Path = Path("wrangler.jsonc")) -> str:
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"(?m)//.*$", "", text)
+        payload = json.loads(text)
+    databases = payload.get("d1_databases") or []
+    for entry in databases:
+        if entry.get("binding") == "DB":
+            return "DB"
+    if databases and databases[0].get("binding"):
+        return str(databases[0]["binding"])
+    raise ValueError("D1 binding not found in wrangler.jsonc")
+
+
 def update_package_version(path: Path, version: str) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["version"] = normalized_version(version)
@@ -123,7 +140,7 @@ def main() -> int:
             tagged = command("git", "rev-parse", f"{args.tag}^{{commit}}")
             if tagged != command("git", "rev-parse", "HEAD"):
                 raise ValueError("checked-out HEAD must equal the deployment tag")
-            subprocess.run(["bun", "x", "wrangler", "d1", "migrations", "list", "app", "--remote"], check=True)
+            subprocess.run(["bun", "x", "wrangler", "d1", "migrations", "list", d1_binding(Path("wrangler.jsonc")), "--remote"], check=True)
             subprocess.run(["bun", "x", "wrangler", "deploy"], check=True)
     except (ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
