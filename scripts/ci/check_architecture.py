@@ -8,6 +8,10 @@ from checker import repository_root, source_files
 ALLOWLIST_PATH = "scripts/ci/architecture_allowlist.json"
 ALLOWED_EXTERNAL = {"hono", "@cloudflare/workers-types"}
 DOMAIN_PATH = "src/task.ts"
+REPOSITORY_ADAPTER_PATHS = {
+    "src/task-repository.ts",
+    "src/preview/MemoryTaskRepository.ts",
+}
 DOMAIN_SIDE_EFFECT_IMPORTS = {
     "hono",
     "@cloudflare/workers-types",
@@ -22,7 +26,7 @@ DOMAIN_SIDE_EFFECT_APIS = (
     ("fetch", re.compile(r"\bfetch\s*\(")),
     ("database", re.compile(r"\.\s*(?:prepare|batch)\s*\(")),
 )
-IMPORT_RE = re.compile(r'\bfrom\s+["\']([^"\']+)["\']')
+IMPORT_RE = re.compile(r'(?:\bfrom\s+|\bimport\s*\(\s*)["\']([^"\']+)["\']')
 
 
 def load_allowlist(root) -> set[tuple[str, str]]:
@@ -41,13 +45,17 @@ def package_name(specifier: str) -> str:
 
 
 def find_domain_violations(text: str, relative_path: str) -> list[str]:
-    if relative_path != DOMAIN_PATH:
+    if relative_path not in {DOMAIN_PATH, *REPOSITORY_ADAPTER_PATHS}:
         return []
 
     violations: list[str] = []
     for index, line in enumerate(text.splitlines(), start=1):
-        if DOMAIN_CLASS_RE.search(line):
+        if relative_path == DOMAIN_PATH and DOMAIN_CLASS_RE.search(line):
             violations.append(f"{relative_path}:{index}: domain class usage")
+        if relative_path in REPOSITORY_ADAPTER_PATHS and DOMAIN_CLASS_RE.search(line):
+            violations.append(f"{relative_path}:{index}: repository adapter class usage")
+        if relative_path != DOMAIN_PATH:
+            continue
         for name, pattern in DOMAIN_SIDE_EFFECT_APIS:
             if pattern.search(line):
                 violations.append(

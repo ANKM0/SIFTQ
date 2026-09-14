@@ -67,6 +67,20 @@ def test_rejects_domain_side_effect_import() -> None:
     ]
 
 
+def test_rejects_dynamic_domain_side_effect_import() -> None:
+    text = 'const crypto = await import("node:crypto");\n'
+    assert architecture.find_violations(text, "src/task.ts", set()) == [
+        "src/task.ts:1: domain side-effect import (node:crypto)"
+    ]
+
+
+def test_rejects_repository_adapter_classes() -> None:
+    text = "export class D1TaskRepository {}\n"
+    assert architecture.find_violations(text, "src/task-repository.ts", set()) == [
+        "src/task-repository.ts:1: repository adapter class usage"
+    ]
+
+
 def test_allows_side_effect_apis_outside_domain() -> None:
     text = "const now = new Date();\nconst response = fetch('/tasks');\n"
     assert architecture.find_violations(text, "src/index.tsx", set()) == []

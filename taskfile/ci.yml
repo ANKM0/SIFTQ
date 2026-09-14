@@ -109,6 +109,7 @@ tasks:
     cmds:
       - vp exec depcruise src --config .dependency-cruiser.cjs
       - uv run python scripts/ci/check_architecture.py
+      - uv run python -m pytest .taqt/tests/test_check_architecture.py .taqt/tests/test_dependency_cruiser_config.py .taqt/tests/test_architecture_documentation.py
 
   ci:architecture:metrics:
     desc: Print dependency stability metrics with dependency-cruiser.
