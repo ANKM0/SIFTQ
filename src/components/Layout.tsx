@@ -43,6 +43,11 @@ export const TASK_FORM_SHORTCUT_SCRIPT = [
   '  form.dataset.shortcutSubmitting = "true";',
   "  form.requestSubmit();",
   "});",
+  'window.addEventListener("pageshow", function (event) {',
+  "  if (!event.persisted) return;",
+  "  if (!document.querySelector('form[data-task-form=\"edit\"]')) return;",
+  "  window.location.reload();",
+  "});",
 ].join("\n");
 export const DESCRIPTION_EDITOR_SCRIPT = [
   "function descriptionEditorValue(editor) {",

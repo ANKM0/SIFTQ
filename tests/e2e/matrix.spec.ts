@@ -376,6 +376,50 @@ test("saves exactly one task with Ctrl+Enter from the detail form", async ({ pag
   await expect(page.locator(".task-card", { hasText: updatedTitle })).toHaveCount(1);
 });
 
+test("refreshes task detail after browser back before Ctrl+Enter and Save", async ({ page }) => {
+  const originalTitle = `E2E browser back ${Date.now()}`;
+  const shortcutTitle = `${originalTitle} shortcut`;
+  const resavedTitle = `${shortcutTitle} resaved`;
+  const saveTitle = `${resavedTitle} saved`;
+  const conflictResponses: string[] = [];
+
+  await signIn(page);
+  page.on("response", (response) => {
+    if (response.status() === 409) conflictResponses.push(response.url());
+  });
+
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  const initialVersion = await page.locator("#task-version").inputValue();
+
+  await page.getByLabel("Title").fill(shortcutTitle);
+  await page.getByLabel("Title").press("Control+Enter");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await expect(page.getByLabel("Title")).toHaveValue(shortcutTitle);
+  await expect(page.locator("#task-version")).not.toHaveValue(initialVersion);
+  const shortcutVersion = await page.locator("#task-version").inputValue();
+
+  await page.getByLabel("Title").fill(resavedTitle);
+  await page.getByLabel("Title").press("Control+Enter");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect(page.locator(".task-card", { hasText: resavedTitle })).toHaveCount(1);
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await expect(page.getByLabel("Title")).toHaveValue(resavedTitle);
+  await expect(page.locator("#task-version")).not.toHaveValue(shortcutVersion);
+
+  await page.getByLabel("Title").fill(saveTitle);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect(page.locator(".task-card", { hasText: saveTitle })).toHaveCount(1);
+  expect(conflictResponses).toHaveLength(0);
+});
+
 test("keeps native task validation on Ctrl+Enter", async ({ page }) => {
   await signIn(page);
   await page.getByRole("link", { name: "New task" }).click();

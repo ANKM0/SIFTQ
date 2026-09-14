@@ -39,6 +39,9 @@ describe("smoke", () => {
     expect(body).toContain('event.ctrlKey || event.key !== "Enter"');
     expect(body).toContain('form[data-task-form]');
     expect(body).toContain("form.requestSubmit()");
+    expect(body).toContain("pageshow");
+    expect(body).toContain("event.persisted");
+    expect(body).toContain('data-task-form="edit"');
   });
 
   it("serves the matrix area navigation handler without authentication", async () => {
