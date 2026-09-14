@@ -351,6 +351,23 @@ test("restores a new task draft after a browser restart", async ({ browserName }
   }
 });
 
+test("deletes an expired new task draft on initial page load", async ({ page }) => {
+  const title = `E2E expired draft ${Date.now()}`;
+  const description = "expired draft description";
+  const updatedAt = Date.now() - 24 * 60 * 60 * 1000;
+
+  await signIn(page);
+  await page.evaluate(({ title, description, updatedAt }) => {
+    localStorage.setItem("siftq.task-draft:new", JSON.stringify({ title, description, updatedAt }));
+  }, { title, description, updatedAt });
+  await page.goto("/tasks/new?from=tasks");
+
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("siftq.task-draft:new"))).toBeNull();
+});
+
 test("restores a saved new task draft after an HTMX navigation", async ({ page }) => {
   const title = `E2E restored HTMX draft ${Date.now()}`;
   const description = "restored after HTMX navigation";
