@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Task } from "../../src/task";
 import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
-import { MemoryTaskRepository } from "../helpers/memory-task-repository";
+import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
+import type { TaskRepository } from "../../src/task-repository";
 
-let repo: MemoryTaskRepository;
+let repo: TaskRepository;
 
 beforeEach(() => {
-  repo = new MemoryTaskRepository();
+  repo = createMemoryTaskRepository();
 });
 
 function request(method: string, path: string, body?: unknown) {
@@ -40,6 +41,17 @@ describe("BDD-TM-001: task creation", () => {
     expect(task.order).toBe(1);
     expect(task.version).toBe(1);
     expect(task.id).toEqual(expect.any(String));
+  });
+
+  it("maps a domain validation failure to an HTTP status and error code", async () => {
+    const response = await request("POST", "/api/tasks", {
+      title: "",
+      description: "invalid",
+    });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_TITLE");
   });
 });
 

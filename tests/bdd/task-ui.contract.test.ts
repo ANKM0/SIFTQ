@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
-import { MemoryTaskRepository } from "../helpers/memory-task-repository";
+import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
+import type { TaskRepository } from "../../src/task-repository";
 
-let repo: MemoryTaskRepository;
+let repo: TaskRepository;
 
 beforeEach(() => {
-  repo = new MemoryTaskRepository();
+  repo = createMemoryTaskRepository();
 });
 
 function request(path: string, init?: RequestInit) {

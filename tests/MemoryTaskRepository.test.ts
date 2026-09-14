@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { MemoryTaskRepository } from "../src/preview/MemoryTaskRepository";
+import { createMemoryTaskRepository } from "../src/preview/MemoryTaskRepository";
 import { PREVIEW_TASKS } from "../src/preview/tasks";
 import type { Task } from "../src/task";
 
@@ -11,7 +11,7 @@ function firstPreviewTask(): Task {
 
 describe("MemoryTaskRepository", () => {
   it("stores updates with an incremented version", async () => {
-    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const repository = createMemoryTaskRepository(PREVIEW_TASKS);
     const task = firstPreviewTask();
 
     const result = await repository.update({ ...task, title: "更新済み" });
@@ -24,7 +24,7 @@ describe("MemoryTaskRepository", () => {
   });
 
   it("rejects a stale update", async () => {
-    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const repository = createMemoryTaskRepository(PREVIEW_TASKS);
     const task = firstPreviewTask();
 
     const result = await repository.update({ ...task, version: 2 });
@@ -33,7 +33,7 @@ describe("MemoryTaskRepository", () => {
   });
 
   it("removes a task with the current version", async () => {
-    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const repository = createMemoryTaskRepository(PREVIEW_TASKS);
     const task = firstPreviewTask();
 
     const result = await repository.remove(task.id, task.owner_id, task.version);
@@ -43,7 +43,7 @@ describe("MemoryTaskRepository", () => {
   });
 
   it("rejects removing a task with a stale version", async () => {
-    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const repository = createMemoryTaskRepository(PREVIEW_TASKS);
     const task = firstPreviewTask();
 
     const result = await repository.remove(task.id, task.owner_id, task.version + 1);
@@ -52,7 +52,7 @@ describe("MemoryTaskRepository", () => {
   });
 
   it("updates multiple tasks atomically", async () => {
-    const repository = new MemoryTaskRepository(PREVIEW_TASKS);
+    const repository = createMemoryTaskRepository(PREVIEW_TASKS);
     const first = PREVIEW_TASKS[0];
     const second = PREVIEW_TASKS[1];
     if (!first || !second) throw new Error("The preview scenario must include two tasks.");

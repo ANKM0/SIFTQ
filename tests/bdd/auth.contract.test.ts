@@ -2,9 +2,10 @@ import { describe, expect, it } from "vite-plus/test";
 import app from "../../src/index";
 import { SESSION_COOKIE_NAME } from "../../src/auth";
 import { TEST_PASSWORD, authBindings } from "../helpers/authenticated-request";
-import { MemoryTaskRepository } from "../helpers/memory-task-repository";
+import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
+import type { TaskRepository } from "../../src/task-repository";
 
-function loginRequest(repo: MemoryTaskRepository, body: string) {
+function loginRequest(repo: TaskRepository, body: string) {
   return app.request(
     "/login",
     {
@@ -18,7 +19,7 @@ function loginRequest(repo: MemoryTaskRepository, body: string) {
 
 describe("authentication contract", () => {
   it("redirects unauthenticated HTML to /login", async () => {
-    const response = await app.request("/", undefined, authBindings(new MemoryTaskRepository()));
+    const response = await app.request("/", undefined, authBindings(createMemoryTaskRepository()));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("/login");
@@ -28,7 +29,7 @@ describe("authentication contract", () => {
     const response = await app.request(
       "/api/tasks",
       undefined,
-      authBindings(new MemoryTaskRepository()),
+      authBindings(createMemoryTaskRepository()),
     );
 
     expect(response.status).toBe(401);
@@ -37,7 +38,7 @@ describe("authentication contract", () => {
 
   it("issues an HttpOnly session cookie after a successful login", async () => {
     const response = await loginRequest(
-      new MemoryTaskRepository(),
+      createMemoryTaskRepository(),
       `password=${TEST_PASSWORD}`,
     );
 
@@ -48,7 +49,7 @@ describe("authentication contract", () => {
   });
 
   it("does not issue a session cookie after a failed login", async () => {
-    const response = await loginRequest(new MemoryTaskRepository(), "password=wrong");
+    const response = await loginRequest(createMemoryTaskRepository(), "password=wrong");
 
     expect(response.status).toBe(401);
     expect(response.headers.get("set-cookie")).toBeNull();
@@ -56,7 +57,7 @@ describe("authentication contract", () => {
 
   it("clears the session cookie on logout", async () => {
     const login = await loginRequest(
-      new MemoryTaskRepository(),
+      createMemoryTaskRepository(),
       `password=${TEST_PASSWORD}&next=%2Ftasks`,
     );
     const cookie = login.headers.get("set-cookie")?.split(";")[0];
@@ -69,7 +70,7 @@ describe("authentication contract", () => {
         method: "POST",
         headers,
       },
-      authBindings(new MemoryTaskRepository()),
+      authBindings(createMemoryTaskRepository()),
     );
 
     expect(response.status).toBe(302);
