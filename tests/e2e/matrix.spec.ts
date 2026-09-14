@@ -503,14 +503,86 @@ test("restores a task detail draft for its task ID", async ({ page }) => {
   await waitForPageSettle(page);
 
   const draftKey = await getTaskDraftKey(page);
-  await page.evaluate(({ key, title, description }) => {
-    localStorage.setItem(key, JSON.stringify({ title, description, updatedAt: Date.now() }));
-  }, { key: draftKey, title, description });
+  const version = Number(await page.locator("#task-version").inputValue());
+  await page.evaluate(({ key, title, description, version }) => {
+    localStorage.setItem(key, JSON.stringify({ title, description, version, updatedAt: Date.now() }));
+  }, { key: draftKey, title, description, version });
   await page.reload();
 
   await expect(page.getByLabel("Title")).toHaveValue(title);
   await expect(descriptionEditor(page)).toHaveText(description);
   await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+});
+
+test("discards a task detail draft when its base version is stale", async ({ page }) => {
+  const serverTitle = `E2E server task ${Date.now()}`;
+  const serverDescription = "server description remains authoritative";
+  const draftTitle = `${serverTitle} stale draft`;
+  const draftDescription = "stale draft description";
+
+  await signIn(page);
+  await page.goto("/tasks/new");
+  await page.getByLabel("Title").fill(serverTitle);
+  await descriptionEditor(page).fill(serverDescription);
+  await page.getByRole("button", { name: "Create" }).click();
+  await openTaskFromList(page, serverTitle, "do");
+
+  const draftKey = await getTaskDraftKey(page);
+  const serverVersion = Number(await page.locator("#task-version").inputValue());
+  await page.evaluate(({ key, title, description, version }) => {
+    localStorage.setItem(key, JSON.stringify({
+      title,
+      description,
+      version: version + 1,
+      updatedAt: Date.now(),
+    }));
+  }, { key: draftKey, title: draftTitle, description: draftDescription, version: serverVersion });
+  await page.reload();
+
+  await expect(page.getByLabel("Title")).toHaveValue(serverTitle);
+  await expect(descriptionEditor(page)).toHaveText(serverDescription);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(serverDescription);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
+});
+
+test("discards a stale task detail draft after an HTMX navigation", async ({ page }) => {
+  const serverTitle = `E2E htmx stale ${Date.now()}`;
+  const serverDescription = "server description remains authoritative via HTMX";
+  const draftTitle = `${serverTitle} stale draft`;
+  const draftDescription = "stale draft description via HTMX";
+
+  await signIn(page);
+  await page.goto("/tasks/new");
+  await page.getByLabel("Title").fill(serverTitle);
+  await descriptionEditor(page).fill(serverDescription);
+  await page.getByRole("button", { name: "Create" }).click();
+  await openTaskFromList(page, serverTitle, "do");
+
+  const draftKey = await getTaskDraftKey(page);
+  const serverVersion = Number(await page.locator("#task-version").inputValue());
+  const detailUrl = page.url();
+  await page.evaluate(({ key, title, description, version }) => {
+    localStorage.setItem(key, JSON.stringify({
+      title,
+      description,
+      version: version + 1,
+      updatedAt: Date.now(),
+    }));
+  }, { key: draftKey, title: draftTitle, description: draftDescription, version: serverVersion });
+
+  // HTMX navigation re-renders the edit form via swap; restoration (htmx:load)
+  // must run before the version refresh (htmx:afterSettle) so the stale draft
+  // is discarded instead of being re-based onto the new server version.
+  await page.evaluate(
+    `htmx.ajax("GET", ${JSON.stringify(detailUrl)}, { target: "#page", swap: "innerHTML" })`,
+  );
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+
+  await expect(page.getByLabel("Title")).toHaveValue(serverTitle);
+  await expect(descriptionEditor(page)).toHaveText(serverDescription);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(serverDescription);
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toBeNull();
 });
 
 test("ignores an invalid saved task draft", async ({ page }) => {
