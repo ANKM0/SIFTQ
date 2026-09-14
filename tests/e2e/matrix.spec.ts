@@ -60,6 +60,17 @@ async function waitForPageSettle(page: Page) {
   );
 }
 
+async function disableLocalStorage(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("localStorage is unavailable");
+      },
+    });
+  });
+}
+
 async function createMatrixTask(page: Page, title: string) {
   await page.getByRole("link", { name: "New task" }).click();
   await page.getByLabel("Title").fill(title);
@@ -279,6 +290,40 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await expectTaskVisibleInList(page, taskTitle, "do");
+});
+
+test("creates a task when localStorage is unavailable", async ({ page }) => {
+  const taskTitle = `E2E create without localStorage ${Date.now()}`;
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await disableLocalStorage(page);
+  await page.getByLabel("Title").fill(taskTitle);
+  await descriptionEditor(page).fill("created without localStorage");
+  await page.getByRole("button", { name: "Create" }).click();
+
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expectTaskVisibleInList(page, taskTitle, "do");
+});
+
+test("saves a task when localStorage is unavailable", async ({ page }) => {
+  const originalTitle = `E2E save without localStorage ${Date.now()}`;
+  const title = `${originalTitle} updated`;
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  await disableLocalStorage(page);
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill("saved without localStorage");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expectTaskVisibleInList(page, title, "do");
 });
 
 test("saves new task title and description as a local draft after input stops", async ({ page }) => {
