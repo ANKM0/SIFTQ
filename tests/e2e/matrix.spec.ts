@@ -944,15 +944,29 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await expect.poll(() => hasDraft(staleEditor, staleTitle, staleDescription)).toBe(true);
 });
 
-test("cancels a new task from the matrix and returns to the matrix", async ({ page }) => {
+test("keeps a new task draft when cancelling from the matrix", async ({ page }) => {
+  const title = `E2E cancel draft ${Date.now()}`;
+  const description = "draft retained after cancel";
+
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.getByRole("link", { name: "New task" }).click();
   await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
 
   await page.getByRole("link", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect(descriptionEditor(page)).toHaveText(description);
 });
 
 test("cancels a new task from the task list and returns to the task list", async ({ page }) => {
@@ -965,4 +979,26 @@ test("cancels a new task from the task list and returns to the task list", async
 
   await page.getByRole("link", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+});
+
+test("keeps a new task draft when navigating to another screen", async ({ page }) => {
+  const title = `E2E navigation draft ${Date.now()}`;
+  const description = "draft retained after navigation";
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+  await expectDraftSaved(page, title, description);
+
+  await page.locator('nav.nav a[href="/"]').click();
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+
+  await page.getByRole("link", { name: "New task" }).click();
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect(descriptionEditor(page)).toHaveText(description);
 });
