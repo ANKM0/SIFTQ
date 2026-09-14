@@ -299,6 +299,96 @@ test("saves task detail title and description as a local draft after input stops
   await expectDraftSaved(page, title, description);
 });
 
+test("restores a saved new task draft on initial page load", async ({ page }) => {
+  const title = `E2E restored new draft ${Date.now()}`;
+  const description = "restored new task description";
+
+  await signIn(page);
+  await page.evaluate(({ title, description }) => {
+    localStorage.setItem("siftq.task-draft:new", JSON.stringify({ title, description, updatedAt: Date.now() }));
+  }, { title, description });
+  await page.goto("/tasks/new?from=tasks");
+
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect(descriptionEditor(page)).toHaveText(description);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+});
+
+test("restores a saved new task draft after an HTMX navigation", async ({ page }) => {
+  const title = `E2E restored HTMX draft ${Date.now()}`;
+  const description = "restored after HTMX navigation";
+
+  await signIn(page);
+  await page.evaluate(({ title, description }) => {
+    localStorage.setItem("siftq.task-draft:new", JSON.stringify({ title, description, updatedAt: Date.now() }));
+  }, { title, description });
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect(descriptionEditor(page)).toHaveText(description);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+});
+
+test("restores a task detail draft for its task ID", async ({ page }) => {
+  const originalTitle = `E2E restored detail ${Date.now()}`;
+  const title = `${originalTitle} updated`;
+  const description = "restored task detail description";
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+
+  const draftKey = await page.locator('form[data-task-form="edit"]').evaluate((form) => {
+    const match = (form.getAttribute("action") ?? "").match(/\/tasks\/([^/?#]+)/);
+    const taskId = match?.[1];
+    if (!taskId) throw new Error("Task ID is missing from the edit form action");
+    return `siftq.task-draft:${decodeURIComponent(taskId)}`;
+  });
+  await page.evaluate(({ key, title, description }) => {
+    localStorage.setItem(key, JSON.stringify({ title, description, updatedAt: Date.now() }));
+  }, { key: draftKey, title, description });
+  await page.reload();
+
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect(descriptionEditor(page)).toHaveText(description);
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+});
+
+test("ignores an invalid saved task draft", async ({ page }) => {
+  await signIn(page);
+  await page.evaluate(() => localStorage.setItem("siftq.task-draft:new", "not-json"));
+  await page.goto("/tasks/new?from=tasks");
+
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
+});
+
+test("continues normally when localStorage draft reading fails", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+  await page.addInitScript(() => {
+    Object.defineProperty(Storage.prototype, "getItem", {
+      configurable: true,
+      value: () => {
+        throw new Error("localStorage is unavailable");
+      },
+    });
+  });
+
+  await signIn(page);
+  await page.goto("/tasks/new?from=tasks");
+
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
+  expect(pageErrors).toHaveLength(0);
+});
+
 test("opens description URLs with native link behavior", async ({ page }) => {
   const taskTitle = `E2E description links ${Date.now()}`;
   const taskUrl = "http://127.0.0.1:4173/tasks";
