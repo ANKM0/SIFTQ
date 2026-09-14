@@ -18,6 +18,24 @@ function descriptionEditor(page: Page) {
   return page.getByRole("textbox", { name: "Description" });
 }
 
+async function hasDraft(page: Page, title: string, description: string): Promise<boolean> {
+  return page.evaluate(({ title, description }) => {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const value = localStorage.getItem(localStorage.key(index) ?? "");
+      if (value !== null && value.includes(title) && value.includes(description)) return true;
+    }
+    return false;
+  }, { title, description });
+}
+
+async function expectDraftSaved(page: Page, title: string, description: string) {
+  // The fake clock advances with real time, so keep a margin around the 500ms boundary.
+  await page.clock.fastForward(400);
+  expect(await hasDraft(page, title, description)).toBe(false);
+  await page.clock.fastForward(200);
+  expect(await hasDraft(page, title, description)).toBe(true);
+}
+
 async function waitForPageSettle(page: Page) {
   // htmx swaps #page and settles (attaching submit handlers to the new form)
   // asynchronously; submitting before htmx:afterSettle falls back to a native
@@ -245,6 +263,40 @@ test("creates a task and sees it in the list", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await expectTaskVisibleInList(page, taskTitle, "do");
+});
+
+test("saves new task title and description as a local draft after input stops", async ({ page }) => {
+  const title = `E2E new draft ${Date.now()}`;
+  const description = "draft description for a new task";
+
+  await signIn(page);
+  await page.getByRole("link", { name: "New task" }).click();
+  await page.getByLabel("Title").waitFor();
+  await waitForPageSettle(page);
+  await page.clock.install();
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+
+  await expectDraftSaved(page, title, description);
+});
+
+test("saves task detail title and description as a local draft after input stops", async ({ page }) => {
+  const originalTitle = `E2E detail draft ${Date.now()}`;
+  const title = `${originalTitle} updated`;
+  const description = "draft description for task detail";
+
+  await signIn(page);
+  await createMatrixTask(page, originalTitle);
+  await page.locator(".task-card", { hasText: originalTitle }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  await page.evaluate(() => localStorage.clear());
+  await page.clock.install();
+
+  await page.getByLabel("Title").fill(title);
+  await descriptionEditor(page).fill(description);
+
+  await expectDraftSaved(page, title, description);
 });
 
 test("opens description URLs with native link behavior", async ({ page }) => {
