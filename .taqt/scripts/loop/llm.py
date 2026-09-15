@@ -327,6 +327,23 @@ def _parse_opencode_stdout(stdout: str) -> dict[str, Any]:
     return _parse_stdout("\n".join(texts))
 
 
+IMPLEMENTATION_ROLES = {"implementation", "implementation_fixer"}
+
+VERIFICATION_PRINCIPLES = (
+    "Before declaring the step done, prove the change against the real artifact "
+    "(run the feature, read the actual value, inspect the diff) per the "
+    "`principle-prove-it-works` skill.",
+    "When fixing, reproduce first and fix the root cause per the "
+    "`principle-fix-root-causes` skill.",
+)
+
+
+def _verification_principles(role: str, *, readonly: bool) -> list[str]:
+    if readonly or role in IMPLEMENTATION_ROLES:
+        return list(VERIFICATION_PRINCIPLES)
+    return []
+
+
 def _build_prompt(
     *,
     task: dict[str, Any],
@@ -335,26 +352,26 @@ def _build_prompt(
     context: dict[str, Any],
 ) -> str:
     role = agent.get("role") or step.get("agent") or "agent"
+    readonly = bool(agent.get("readonly"))
     review_contract = (
         "Return exactly one JSON object with status=success and verdict set to exactly one of "
         "approve, changes_requested, or human_required. Do not modify files."
-        if agent.get("readonly")
+        if readonly
         else "Return JSON with at least a status field. Use status=success when the step is complete."
     )
-    return "\n".join(
-        [
-            f"Role: {role}",
-            f"Task: {task.get('id')}",
-            f"Step: {step.get('id')}",
-            "",
-            "Use the repository files and task context to complete this step.",
-            "Make the minimal scoped code or test changes required for this step.",
-            review_contract,
-            "Use status=failure and feedback when the loop should route to another step.",
-            "",
-            json.dumps(context, ensure_ascii=False, indent=2, sort_keys=True),
-        ]
-    )
+    lines = [
+        f"Role: {role}",
+        f"Task: {task.get('id')}",
+        f"Step: {step.get('id')}",
+        "",
+        "Use the repository files and task context to complete this step.",
+        "Make the minimal scoped code or test changes required for this step.",
+        review_contract,
+        "Use status=failure and feedback when the loop should route to another step.",
+    ]
+    lines.extend(_verification_principles(str(role), readonly=readonly))
+    lines.extend(["", json.dumps(context, ensure_ascii=False, indent=2, sort_keys=True)])
+    return "\n".join(lines)
 
 
 def _parse_stdout(stdout: str) -> dict[str, Any]:
