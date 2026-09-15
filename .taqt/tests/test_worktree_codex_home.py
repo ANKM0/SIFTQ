@@ -26,8 +26,9 @@ def test_profiles_have_no_worktree_codex_home_or_qwen_profile() -> None:
         )
     )["profiles"]
 
-    assert set(profiles) == {"main", "deepseek", "burn"}
+    assert set(profiles) == {"main", "quick", "deepseek", "burn"}
     assert all("codex_home" not in profile for profile in profiles.values())
+    assert profiles["quick"]["loop"] == "quick_loop"
     assert profiles["deepseek"]["env_keys"] == [
         "DEEPSEEK_API_KEY",
         "OPENCODE_API_KEY",
