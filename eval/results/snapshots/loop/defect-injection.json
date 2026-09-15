@@ -1,0 +1,47 @@
+{
+  "records": [
+    {
+      "mutant": "broken-is-task-status",
+      "expected_catch": true,
+      "arms": {
+        "A": true,
+        "B": true
+      }
+    },
+    {
+      "mutant": "matrix-menu-order-swapped",
+      "expected_catch": true,
+      "arms": {
+        "A": false,
+        "B": true
+      }
+    },
+    {
+      "mutant": "type-error-in-task-title-limit",
+      "expected_catch": true,
+      "arms": {
+        "A": true,
+        "B": true
+      }
+    }
+  ],
+  "summary": {
+    "arms": {
+      "A": {
+        "caught": 2,
+        "total": 3,
+        "rate": 0.6667
+      },
+      "B": {
+        "caught": 3,
+        "total": 3,
+        "rate": 1.0
+      }
+    },
+    "mcnemar": {
+      "both_caught": 2,
+      "a_caught_b_missed": 0,
+      "a_missed_b_caught": 1
+    }
+  }
+}

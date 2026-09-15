@@ -164,6 +164,16 @@ def main(argv: list[str] | None = None) -> int:
             workspace=args.workspace,
             run_dir=Path(result["run_dir"]),
         )
+    elif task["status"] == "done":
+        request_self_improvement(
+            task_path=task_path,
+            task=task,
+            reason="loop completed",
+            event="loop_done",
+            runs_root=args.runs_root,
+            workspace=args.workspace,
+            run_dir=Path(result["run_dir"]),
+        )
     save_task(task_path, task)
     print(result["run_dir"])
     return 0 if result["status"] in {"done", "human"} else 1

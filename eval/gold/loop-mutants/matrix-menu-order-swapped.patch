@@ -1,0 +1,14 @@
+diff --git a/src/components/Layout.tsx b/src/components/Layout.tsx
+index a63ba57..fee0c36 100644
+--- a/src/components/Layout.tsx
++++ b/src/components/Layout.tsx
+@@ -569,8 +569,8 @@ export const MATRIX_DND_SCRIPT = [
+   "function renderMatrixMenuItems(menu, card) {",
+   "  var actions = [",
+   '    { key: "delete", label: "delete" },',
+-  '    { key: "skip", label: "skip" },',
+   '    { key: "done", label: "done" },',
++  '    { key: "skip", label: "skip" },',
+   "  ];",
+   '  var working = card && card.classList.contains("task-card--working");',
+   '  actions.push({ key: "working", label: working ? "working: on" : "working: off" });',

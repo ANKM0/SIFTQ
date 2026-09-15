@@ -95,6 +95,47 @@ def test_load_replay_spec_reads_arms_and_checks(tmp_path: Path) -> None:
     assert payload["checks"] == ["task ci:test:unit"]
 
 
+def test_run_replay_executes_a_real_command_adapter_loop(tmp_path: Path) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    loop_path.write_text(
+        "version: 1\n"
+        "id: replay-fixture\n"
+        "agents:\n"
+        "  implement:\n"
+        "    role: implementation\n"
+        "    command: 'true'\n"
+        "steps:\n"
+        "  - id: implement\n"
+        "    kind: llm\n"
+        "    agent: implement\n"
+        "    next: done\n"
+        "  - id: done\n"
+        "    kind: terminal\n",
+        encoding="utf-8",
+    )
+    task_path = tmp_path / "task.yaml"
+    task_path.write_text(
+        "id: ISSUE-1\n"
+        "status: pending\n"
+        "source:\n"
+        "  type: github_issue\n"
+        "  repo: owner/repo\n"
+        "  issue_number: 1\n",
+        encoding="utf-8",
+    )
+
+    result = run_replay(
+        task_path=task_path,
+        arms={"A": loop_path},
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+        checks=["true"],
+    )
+
+    assert result["records"][0]["status"] == "done"
+    assert result["summary"]["arms"]["A"]["closure_rate"] == 1.0
+
+
 @pytest.mark.parametrize(
     "body",
     [

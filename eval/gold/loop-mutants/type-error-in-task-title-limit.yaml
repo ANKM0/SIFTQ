@@ -1,0 +1,3 @@
+name: type-error-in-task-title-limit
+patch_file: type-error-in-task-title-limit.patch
+expected_catch: true

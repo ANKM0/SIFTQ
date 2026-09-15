@@ -9,6 +9,11 @@ from .task_store import DEFAULT_TASK_ROOT, load_task, save_task
 
 DEFAULT_RUNS_ROOT = Path(".taqt/runs")
 DEFAULT_SKILL_PATH = Path(".agents/skills/self-improvement/SKILL.md")
+COMPLETION_EVENTS = {"loop_done"}
+
+
+def self_improvement_kind(event: str) -> str:
+    return "completion" if event in COMPLETION_EVENTS else "escalation"
 
 
 def request_self_improvement(
@@ -34,8 +39,11 @@ def request_self_improvement(
     request_path.parent.mkdir(parents=True, exist_ok=True)
     request_path.write_text(render_request(request), encoding="utf-8")
     task["self_improvement"] = request
-    if run_dir is not None:
-        append_event(run_dir, {"type": "self_improvement_requested", "request": request})
+    if run_dir is not None and run_dir.exists():
+        append_event(
+            run_dir,
+            {"type": "self_improvement_requested", "kind": request["kind"], "request": request},
+        )
     return request
 
 
@@ -54,6 +62,7 @@ def build_request(
         "requested_at": utc_now(),
         "skill": "self-improvement",
         "skill_path": str(skill_path),
+        "kind": self_improvement_kind(event),
         "event": event,
         "reason": reason,
         "task_id": task.get("id"),
@@ -73,6 +82,7 @@ def render_request(request: dict[str, Any]) -> str:
         "",
         f"- skill: `{request['skill']}`",
         f"- skill path: `{request['skill_path']}`",
+        f"- kind: `{request['kind']}`",
         f"- event: `{request['event']}`",
         f"- reason: `{request['reason']}`",
         f"- task: `{request['task_id']}`",
