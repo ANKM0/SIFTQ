@@ -802,7 +802,7 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
     ]
 
 
-def test_verification_runs_only_fast_checks(tmp_path: Path, monkeypatch) -> None:
+def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
@@ -826,6 +826,7 @@ def test_verification_runs_only_fast_checks(tmp_path: Path, monkeypatch) -> None
         "task ci:lint:python",
         "task ci:typecheck",
         "task ci:test:unit",
+        "task ci:test:e2e",
     ]
 
 
