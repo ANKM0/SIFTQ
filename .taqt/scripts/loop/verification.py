@@ -11,6 +11,7 @@ FAST_COMMANDS = (
     "task ci:typecheck",
     "task ci:test:unit",
 )
+E2E_COMMANDS = ("task ci:test:e2e",)
 FRONTEND_DEPENDENCY_COMMAND = "task setup:frontend:ci"
 
 
@@ -22,6 +23,7 @@ def run_verification(
         ("diff_check", ("git diff --check",)),
         ("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)),
         ("fast_checks", FAST_COMMANDS),
+        ("e2e_checks", E2E_COMMANDS),
     ]
     results: list[dict[str, Any]] = []
     for phase, phase_commands in commands:
