@@ -7,7 +7,7 @@ fallback:
 
 limits:
   max_iterations: 12
-  max_fix_attempts: 2
+  max_fix_attempts: 3
 
 agents:
   design:
@@ -15,21 +15,11 @@ agents:
     adapter: opencode
     model: openai/gpt-5.6-luna
     reasoning_effort: xhigh
-    writes:
-      - .taqt/loops/
-      - .taqt/tests/
-      - docs/requirements/
-      - docs/wireframes/
-      - docs/adr/
-      - docs/contributing/
   test:
     role: test_author
     adapter: opencode
     model: openai/gpt-5.6-luna
     reasoning_effort: xhigh
-    writes:
-      - tests/
-      - .taqt/tests/
   implement:
     role: implementation
     adapter: opencode

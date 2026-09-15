@@ -70,16 +70,6 @@ def validate_agent_changes(agent: dict[str, Any], paths: Iterable[Path]) -> None
 def validate_write_path(agent: dict[str, Any], path: Path) -> None:
     if agent.get("readonly"):
         raise ValueError(f"readonly agent cannot write: {path}")
-    patterns = agent.get("writes") or []
-    if not patterns:
-        return
-    normalized = path.as_posix()
-    for pattern in patterns:
-        prefix = str(pattern).removesuffix("**")
-        directory_prefix = prefix.removesuffix("/")
-        if normalized == directory_prefix or normalized.startswith(prefix):
-            return
-    raise ValueError(f"path outside agent write scope: {path}")
 
 
 def _digest_path(path: Path) -> str:

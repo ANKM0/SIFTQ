@@ -109,12 +109,6 @@ def _validate_agents(value: Any) -> set[str]:
                 raise ValueError(f"agent {agent_id}.{key} must be a string")
         _validate_reasoning_effort(agent, f"agent {agent_id}")
         _validate_opencode_model(agent, f"agent {agent_id}")
-        writes = agent.get("writes")
-        if writes is not None and (
-            not isinstance(writes, list)
-            or any(not isinstance(pattern, str) or not pattern for pattern in writes)
-        ):
-            raise ValueError(f"agent {agent_id}.writes must be a list of strings")
     return agent_ids
 
 

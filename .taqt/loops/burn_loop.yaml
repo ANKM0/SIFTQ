@@ -3,7 +3,7 @@ id: burn_loop
 
 limits:
   max_iterations: 12
-  max_fix_attempts: 2
+  max_fix_attempts: 3
 
 agents:
   design:
@@ -11,21 +11,11 @@ agents:
     adapter: opencode
     model: deepseek/deepseek-v4-pro
     reasoning_effort: high
-    writes:
-      - .taqt/loops/
-      - .taqt/tests/
-      - docs/requirements/
-      - docs/wireframes/
-      - docs/adr/
-      - docs/contributing/
   test:
     role: test_author
     adapter: opencode
     model: deepseek/deepseek-v4-pro
     reasoning_effort: high
-    writes:
-      - tests/
-      - .taqt/tests/
   implement:
     role: implementation
     adapter: opencode

@@ -1,21 +1,11 @@
 version: 1
-id: sub_loop
+id: quick_loop
 
 limits:
   max_iterations: 12
   max_fix_attempts: 3
 
 agents:
-  design:
-    role: design
-    adapter: opencode
-    model: opencode-go/gpt-5.6-luna
-    reasoning_effort: xhigh
-  test:
-    role: test_author
-    adapter: opencode
-    model: opencode-go/gpt-5.6-luna
-    reasoning_effort: xhigh
   implement:
     role: implementation
     adapter: opencode
@@ -29,19 +19,11 @@ agents:
   checker:
     role: checker
     adapter: opencode
-    model: opencode-go/gpt-5.6-luna
+    model: openai/gpt-5.6-luna
     reasoning_effort: xhigh
     readonly: true
 
 steps:
-  - id: design
-    kind: llm
-    agent: design
-    next: test
-  - id: test
-    kind: llm
-    agent: test
-    next: implement
   - id: implement
     kind: llm
     agent: implement
@@ -64,7 +46,7 @@ steps:
       - when: test_feedback
         next: fix
       - when: local_design_feedback
-        next: design
+        next: human
       - when: specification_feedback
         next: human
       - when: product_feedback
