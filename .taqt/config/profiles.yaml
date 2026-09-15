@@ -4,6 +4,11 @@ profiles:
     env_keys:
       - DEEPSEEK_API_KEY
       - OPENCODE_API_KEY
+  quick:
+    loop: quick_loop
+    env_keys:
+      - DEEPSEEK_API_KEY
+      - OPENCODE_API_KEY
   deepseek:
     loop: sub_loop
     env_keys:

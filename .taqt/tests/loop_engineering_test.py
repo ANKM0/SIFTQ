@@ -686,10 +686,8 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert agents["checker"]["reasoning_effort"] == "xhigh"
 
     assert agents["checker"]["readonly"] is True
-    assert ".taqt/loops/" in agents["design"]["writes"]
-    assert "docs/adr/" in agents["design"]["writes"]
-    assert "tests/" in agents["test"]["writes"]
-    assert ".taqt/tests/" in agents["test"]["writes"]
+    assert "writes" not in agents["design"]
+    assert "writes" not in agents["test"]
 
     steps_by_id = {step["id"]: step for step in steps}
     assert steps_by_id["fix"]["kind"] == "llm"
@@ -723,6 +721,26 @@ def test_sub_loop_verification_and_decide_are_model_free() -> None:
     assert decide["kind"] == "policy"
     assert "routes" in decide and decide["routes"]
     assert model_keys.isdisjoint(decide)
+
+
+def test_quick_loop_is_a_lightweight_loop_and_profile() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+
+    loop = load_document(repository_root / ".taqt/loops/quick_loop.yaml")
+    validate_loop_definition(loop)
+
+    assert loop["id"] == "quick_loop"
+    assert {"implement", "fix", "checker"} == set(loop["agents"])
+    assert loop["agents"]["checker"]["readonly"] is True
+    assert loop["limits"]["max_fix_attempts"] == 3
+
+    step_ids = [step["id"] for step in loop["steps"]]
+    assert "design" not in step_ids
+    assert "test" not in step_ids
+    assert step_ids.index("implement") < step_ids.index("verification")
+
+    profiles = load_profiles(repository_root / ".taqt/loops")
+    assert profiles["quick"]["loop"] == "quick_loop"
 
 
 def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
@@ -1168,9 +1186,11 @@ blocked_reason: null
     assert response["stdout"] == "agent output\n"
 
 
-def test_loop_guard_allows_directory_itself_for_prefix_scope() -> None:
-    validate_write_path({"writes": ["tests/"]}, Path("tests"))
-    validate_write_path({"writes": ["tests/"]}, Path("tests/example_test.py"))
+def test_loop_guard_only_blocks_readonly_agents() -> None:
+    validate_write_path({}, Path("src/index.tsx"))
+    validate_write_path({"writes": ["tests/"]}, Path("src/index.tsx"))
+    with pytest.raises(ValueError, match="readonly agent cannot write"):
+        validate_write_path({"readonly": True}, Path("src/index.tsx"))
 
 
 def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> None:
