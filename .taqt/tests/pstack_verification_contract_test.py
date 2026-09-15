@@ -6,6 +6,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+from loop.llm import _build_prompt
 from loop.verification import E2E_COMMANDS, FAST_COMMANDS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -45,3 +46,30 @@ def test_pstack_verification_skill_is_discoverable(name: str) -> None:
 def test_verification_runs_e2e_after_fast_checks() -> None:
     assert "task ci:test:e2e" in E2E_COMMANDS
     assert "task ci:test:e2e" not in FAST_COMMANDS
+
+
+def _prompt(role: str, *, readonly: bool = False) -> str:
+    return _build_prompt(
+        task={"id": "TASK-1"},
+        step={"id": "step-1"},
+        agent={"role": role, "readonly": readonly},
+        context={},
+    )
+
+
+@pytest.mark.parametrize(
+    ("role", "readonly"),
+    [("implementation", False), ("implementation_fixer", False), ("checker", True)],
+)
+def test_implementation_and_checker_prompts_include_verification_principles(
+    role: str, readonly: bool
+) -> None:
+    prompt = _prompt(role, readonly=readonly)
+
+    assert "principle-prove-it-works" in prompt
+    assert "principle-fix-root-causes" in prompt
+
+
+def test_other_roles_do_not_include_verification_principles() -> None:
+    assert "principle-prove-it-works" not in _prompt("design")
+    assert "principle-fix-root-causes" not in _prompt("test_author")
