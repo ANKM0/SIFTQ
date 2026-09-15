@@ -1,0 +1,13 @@
+diff --git a/src/task.ts b/src/task.ts
+index f11353b..df4700b 100644
+--- a/src/task.ts
++++ b/src/task.ts
+@@ -4,7 +4,7 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
+ export const TASK_AREAS = [1, 2, 3, 4] as const;
+ export type TaskArea = (typeof TASK_AREAS)[number];
+ 
+-export const TASK_TITLE_MAX_CODE_POINTS = 256;
++export const TASK_TITLE_MAX_CODE_POINTS: string = 256;
+ 
+ export type Task = {
+   id: string;

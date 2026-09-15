@@ -109,7 +109,16 @@ def evaluate_mutants(
 
 
 def subprocess_runner(command: str, cwd: Path) -> int:
-    return subprocess.run(command, cwd=cwd, shell=True, check=False).returncode
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        shell=True,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return completed.returncode
 
 
 def git_apply(patch: Path, repo: Path) -> None:

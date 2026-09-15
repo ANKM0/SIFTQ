@@ -1,0 +1,13 @@
+diff --git a/src/task.ts b/src/task.ts
+index f11353b..baf3189 100644
+--- a/src/task.ts
++++ b/src/task.ts
+@@ -45,7 +45,7 @@ export function err<T, E>(error: E): Result<T, E> {
+ }
+ 
+ export function isTaskStatus(value: unknown): value is TaskStatus {
+-  return typeof value === "string" && TASK_STATUSES.some((status) => status === value);
++  return false;
+ }
+ 
+ export type TaskVersionInput = {

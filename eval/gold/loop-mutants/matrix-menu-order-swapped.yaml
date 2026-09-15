@@ -1,0 +1,3 @@
+name: matrix-menu-order-swapped
+patch_file: matrix-menu-order-swapped.patch
+expected_catch: true

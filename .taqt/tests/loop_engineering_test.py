@@ -23,6 +23,7 @@ from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
 from loop.verification import run_verification, validate_review
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
+from taqt.self_improvement import self_improvement_kind
 from taqt.task_store import (
     create_issue_task,
     decomposition_errors,
@@ -1696,6 +1697,7 @@ steps:
     assert task["phase"] == "human"
     assert task["blocked_reason"] == "human escalation required"
     assert task["self_improvement"]["event"] == "loop_human"
+    assert task["self_improvement"]["kind"] == "escalation"
     assert task["self_improvement"]["run_path"]
     assert Path(task["self_improvement"]["request_path"]).is_file()
 
@@ -1773,6 +1775,16 @@ steps:
     assert calls[0]["child_environment"]["DEEPSEEK_API_KEY"] == "secret"
     assert calls[0]["child_environment"]["OPENROUTER_API_KEY"] == "qwen-secret"
     assert calls[0]["child_environment"]["CODEX_HOME"] == str(deepseek_home)
+
+    task = load_document(task_path)
+    assert task["self_improvement"]["event"] == "loop_done"
+    assert task["self_improvement"]["kind"] == "completion"
+
+
+def test_self_improvement_kind_separates_completion_from_escalation() -> None:
+    assert self_improvement_kind("loop_done") == "completion"
+    for event in ("loop_human", "loop_failed", "readiness_failed", "worktree_failed", "manual"):
+        assert self_improvement_kind(event) == "escalation"
 
 
 def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> None:
