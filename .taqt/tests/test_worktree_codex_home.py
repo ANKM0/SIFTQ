@@ -90,7 +90,7 @@ def test_task_run_inherits_shared_home_and_passes_deepseek_keys(
     task_root = tmp_path / "tasks"
     task_root.mkdir()
     task_path, _ = create_issue_task(
-        repo="owner/repo", issue_number=273, loop="test", task_root=task_root
+        repo="owner/repo", issue_number=273, task_root=task_root
     )
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(

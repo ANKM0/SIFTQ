@@ -65,7 +65,6 @@ def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
     path, task = create_issue_task(
         repo="owner/repo",
         issue_number=123,
-        loop="main_loop",
         requirement="docs/requirements/feature.md",
         task_root=tmp_path,
     )
@@ -102,8 +101,6 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
             "owner/repo",
             "--issue",
             "136",
-            "--loop",
-            "main_loop",
             "--task-root",
             str(tmp_path),
         ]
@@ -116,73 +113,20 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
     assert calls[0][0][:3] == ["gh", "issue", "view"]
 
 
-def test_task_create_uses_profile_loop_when_loop_omitted(tmp_path: Path, monkeypatch) -> None:
-    loop_root = tmp_path / "loops"
-    loop_root.mkdir()
-    (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "profiles.yaml").write_text(
-        """
-profiles:
-  main:
-    loop: main_loop
-  deepseek:
-    loop: sub_loop
-""",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(
-        "taqt.task_create._fetch_issue",
-        lambda *_args: {
-            "title": "Use DeepSeek profile",
-            "body": "",
-            "labels": ["taqt:enabled"],
-        },
-    )
-    calls: list[dict[str, object]] = []
-
-    def fake_create_issue_task(**kwargs):
-        calls.append(kwargs)
-        return (tmp_path / "ISSUE-136.yaml", {"id": "ISSUE-136"})
-
-    monkeypatch.setattr("taqt.task_create.create_issue_task", fake_create_issue_task)
-
-    exit_code = task_create_main(
-        [
-            "--repo",
-            "owner/repo",
-            "--issue",
-            "136",
-            "--id",
-            "ISSUE-136",
-            "--profile",
-            "deepseek",
-            "--loop-root",
-            str(loop_root),
-            "--task-root",
-            str(tmp_path),
-        ]
-    )
-
-    assert exit_code == 0
-    assert calls[0]["loop"] == "sub_loop"
-
-
-def test_issue_branch_uses_dev_issue_number_and_normalized_loop_purpose(tmp_path: Path) -> None:
+def test_issue_branch_defaults_purpose_without_branch_summary(tmp_path: Path) -> None:
     _path, task = create_issue_task(
         repo="owner/repo",
         issue_number=7,
-        loop="Design Review!",
         task_root=tmp_path,
     )
 
-    assert issue_branch(task) == "dev/#7_design_review"
+    assert issue_branch(task) == "dev/#7_development"
 
 
 def test_issue_branch_prefers_normalized_branch_summary(tmp_path: Path) -> None:
     path, task = create_issue_task(
         repo="owner/repo",
         issue_number=8,
-        loop="main_loop",
         branch_summary="Add User Profile!",
         task_root=tmp_path,
     )
@@ -1600,7 +1544,6 @@ steps:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=9,
-        loop="main_loop",
         task_root=task_root,
     )
 
@@ -1665,7 +1608,6 @@ steps:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=21,
-        loop="main_loop",
         task_root=task_root,
     )
     monkeypatch.setenv("DEEPSEEK_API_KEY", "secret")
@@ -1717,7 +1659,6 @@ def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> 
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=14,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "running"
@@ -1736,7 +1677,6 @@ def test_taqt_task_run_rejects_mismatched_resume_dir(tmp_path: Path) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=15,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["run"]["id"] = "expected"
@@ -1757,14 +1697,12 @@ def test_next_pending_task_prefers_high_priority(tmp_path: Path) -> None:
     create_issue_task(
         repo="owner/repo",
         issue_number=10,
-        loop="main_loop",
         priority="low",
         task_root=tmp_path,
     )
     high_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=11,
-        loop="main_loop",
         priority="high",
         task_root=tmp_path,
     )
@@ -1779,7 +1717,6 @@ def test_upsert_issue_task_updates_issue_metadata(tmp_path: Path) -> None:
     path, task, created = upsert_issue_task(
         repo="owner/repo",
         issue_number=12,
-        loop="main_loop",
         issue_title="Add profile",
         issue_body="Body",
         issue_labels=["taqt"],
@@ -1793,7 +1730,6 @@ def test_upsert_issue_task_updates_issue_metadata(tmp_path: Path) -> None:
     _path, updated, created = upsert_issue_task(
         repo="owner/repo",
         issue_number=12,
-        loop="main_loop",
         issue_title="Add profile v2",
         issue_body="Body v2",
         issue_labels=["taqt", "ready"],
@@ -1808,7 +1744,6 @@ def test_readiness_errors_require_acceptance_criteria_and_dod(tmp_path: Path) ->
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=13,
-        loop="main_loop",
         issue_title="Add profile",
         issue_body="""
 ## Acceptance Criteria
@@ -1826,7 +1761,6 @@ def test_readiness_errors_require_acceptance_criteria_and_dod(tmp_path: Path) ->
     _path, incomplete, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=14,
-        loop="main_loop",
         issue_title="Incomplete",
         issue_body="Need this soon.",
         task_root=tmp_path,
@@ -1842,7 +1776,6 @@ def test_readiness_errors_follow_research_template(tmp_path: Path) -> None:
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=15,
-        loop="main_loop",
         issue_title="Research",
         issue_body="""
 ## 調べたいこと
@@ -1859,7 +1792,6 @@ def test_readiness_errors_follow_research_template(tmp_path: Path) -> None:
     _path, incomplete, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=16,
-        loop="main_loop",
         issue_title="Research incomplete",
         issue_body="""
 ## 調べたいこと
@@ -1875,7 +1807,6 @@ def test_readiness_warnings_follow_bug_template(tmp_path: Path) -> None:
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=17,
-        loop="main_loop",
         issue_title="Bug",
         issue_body="""
 ## 概要
@@ -1895,7 +1826,6 @@ def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path, 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=18,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -1926,7 +1856,6 @@ def test_task_decompose_creates_five_minute_slice_tasks(tmp_path: Path, capsys) 
     task_path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=19,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -1963,7 +1892,6 @@ def test_task_run_requires_decomposition_for_large_ready_task(tmp_path: Path) ->
     task_path, _task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=20,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -1989,7 +1917,6 @@ def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> No
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=42,
-        loop="main_loop",
         branch_summary="Add User",
         task_root=tmp_path,
     )
@@ -2013,7 +1940,6 @@ def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=44,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2033,7 +1959,6 @@ def test_github_pr_waits_for_checks_and_falls_back_when_required_checks_are_not_
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=57,
-        loop="main_loop",
         task_root=tmp_path,
     )
     commands = []
@@ -2075,7 +2000,6 @@ def test_task_auto_stops_before_merge_when_pr_checks_fail(tmp_path: Path, monkey
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=58,
-        loop="main_loop",
         task_root=tmp_path,
     )
     calls = []
@@ -2130,7 +2054,6 @@ def test_github_merge_falls_back_when_required_checks_are_not_configured(
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=49,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2174,7 +2097,6 @@ def test_github_merge_keeps_blocking_on_other_required_check_failures(
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=50,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2205,7 +2127,6 @@ def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path,
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=48,
-        loop="main_loop",
         branch_summary="Cleanup Flow",
         task_root=tmp_path,
     )
@@ -2235,7 +2156,6 @@ def test_task_cleanup_execute_marks_child_and_parent_done(tmp_path: Path, monkey
     parent_path, _parent, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=49,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2283,7 +2203,6 @@ def test_task_cleanup_recovers_stale_running_task(tmp_path: Path) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=54,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "running"
@@ -2326,7 +2245,6 @@ def test_task_auto_dry_run_includes_merge_route(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=45,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2344,7 +2262,6 @@ def test_task_auto_dry_run_defaults_to_merge_and_cleanup(tmp_path: Path, capsys)
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=56,
-        loop="development_feedback_loop",
         task_root=tmp_path,
     )
 
@@ -2364,7 +2281,6 @@ def test_task_auto_post_pr_steps_have_explicit_opt_outs(tmp_path: Path, capsys) 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=57,
-        loop="development_feedback_loop",
         task_root=tmp_path,
     )
 
@@ -2383,7 +2299,6 @@ def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=55,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2412,7 +2327,6 @@ def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, c
         upsert_issue_task(
             repo="owner/repo",
             issue_number=issue_number,
-            loop="main_loop",
             issue_title=f"Task {issue_number}",
             issue_body="""
 ## Acceptance Criteria
@@ -2437,7 +2351,6 @@ def test_task_worker_defaults_to_merge_and_cleanup(tmp_path: Path, capsys) -> No
     upsert_issue_task(
         repo="owner/repo",
         issue_number=58,
-        loop="development_feedback_loop",
         issue_title="Task 58",
         issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
         task_root=tmp_path,
@@ -2456,7 +2369,6 @@ def test_task_worker_supports_post_pr_opt_outs(tmp_path: Path, capsys) -> None:
     upsert_issue_task(
         repo="owner/repo",
         issue_number=59,
-        loop="development_feedback_loop",
         issue_title="Task 59",
         issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
         task_root=tmp_path,
@@ -2484,7 +2396,6 @@ def test_task_worker_plans_decomposed_child_tasks(tmp_path: Path, capsys) -> Non
     task_path, _task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=53,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2511,7 +2422,6 @@ def test_task_worker_blocks_not_ready_tasks_when_executing(tmp_path: Path, capsy
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=52,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2528,7 +2438,6 @@ def test_git_commit_is_dry_run_by_default(tmp_path: Path, monkeypatch, capsys) -
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=43,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2553,7 +2462,6 @@ def test_git_commit_execute_requires_verified_run(tmp_path: Path, monkeypatch, c
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=46,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2576,7 +2484,6 @@ def test_github_sync_dry_run_prints_progress_comment_only(tmp_path: Path, capsys
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=47,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "done"
