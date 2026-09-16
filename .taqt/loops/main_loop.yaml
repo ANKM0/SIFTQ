@@ -10,16 +10,6 @@ limits:
   max_fix_attempts: 3
 
 agents:
-  design:
-    role: design
-    adapter: opencode
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
-  test:
-    role: test_author
-    adapter: opencode
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
   implement:
     role: implementation
     adapter: opencode
@@ -38,14 +28,6 @@ agents:
     readonly: true
 
 steps:
-  - id: design
-    kind: llm
-    agent: design
-    next: test
-  - id: test
-    kind: llm
-    agent: test
-    next: implement
   - id: implement
     kind: llm
     agent: implement
@@ -68,7 +50,7 @@ steps:
       - when: test_feedback
         next: fix
       - when: local_design_feedback
-        next: design
+        next: human
       - when: specification_feedback
         next: human
       - when: product_feedback
