@@ -129,9 +129,9 @@ tasks:
       - uv run python scripts/ci/check_docs.py
 
   ci:domain:
-    desc: Validate the domain model and regenerate its diagrams.
+    desc: Validate the domain model (schema and cross-checks).
     cmds:
-      - task: docs:domain:svg
+      - bun scripts/domain-model/generate.ts
 
   ci:llm-eval:
     desc: Run the LLM evaluation smoke suite.
