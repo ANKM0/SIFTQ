@@ -42,7 +42,7 @@ describe("task title validation", () => {
 });
 
 describe("task enums", () => {
-  it("recognizes valid status and area values", () => {
+  it("INV-TM-001: recognizes valid status and area values", () => {
     expect(isTaskStatus("do")).toBe(true);
     expect(isTaskStatus("done")).toBe(true);
     expect(isTaskStatus("skip")).toBe(true);
@@ -149,7 +149,7 @@ describe("task domain", () => {
     }
   });
 
-  it("keeps area when status changes", () => {
+  it("INV-TM-002: keeps area when status changes", () => {
     const task = taskFixture({ id: "task-1", area: 3 });
 
     const done = changeTaskStatus(task, "done");
@@ -169,7 +169,7 @@ describe("task domain", () => {
     expect(changed.value.status).toBe("do");
   });
 
-  it("toggles working without changing status or area", () => {
+  it("INV-TM-003: toggles working without changing status or area", () => {
     const task = taskFixture({ id: "task-1", status: "do", area: 2, working: false });
 
     const started = changeTaskWorking(task, true);
@@ -205,7 +205,7 @@ describe("task working preservation", () => {
 });
 
 describe("task move", () => {
-  it("normalizes order when moving to another area", () => {
+  it("INV-TM-004: normalizes order when moving to another area", () => {
     const tasks = [
       taskFixture({ id: "task-1", area: 1, order: 0 }),
       taskFixture({ id: "task-2", area: 1, order: 1 }),

@@ -1,0 +1,85 @@
+{
+  "domains": {
+    "string": { "kind": "primitive" },
+    "boolean": { "kind": "primitive" },
+    "number": { "kind": "primitive" },
+    "datetime": { "kind": "primitive" },
+    "status": { "kind": "state", "logical": "string", "values": ["do", "done", "skip"] },
+    "area": { "kind": "quadrant", "logical": "number", "values": [1, 2, 3, 4] }
+  },
+  "entities": {
+    "tasks": {
+      "description": "タスク。実行対象・完了・見送りを status で表す。",
+      "attributes": {
+        "id": { "domain": "string", "pk": true },
+        "owner_id": { "domain": "string" },
+        "title": { "domain": "string", "note": "1..256 code point" },
+        "description": { "domain": "string" },
+        "status": { "domain": "status", "rules": ["INV-TM-001"] },
+        "area": { "domain": "area", "rules": ["INV-TM-002"] },
+        "working": { "domain": "boolean", "rules": ["INV-TM-003"] },
+        "order": { "domain": "number" },
+        "version": { "domain": "number" },
+        "created_at": { "domain": "datetime" },
+        "updated_at": { "domain": "datetime" }
+      },
+      "transitions": [
+        { "on": "complete", "domain": "status", "from": "do", "to": "done" },
+        { "on": "skip", "domain": "status", "from": "do", "to": "skip" },
+        { "on": "reopen", "domain": "status", "from": ["done", "skip"], "to": "do" }
+      ],
+      "rules": ["INV-TM-004"]
+    }
+  },
+  "relations": [],
+  "flows": {
+    "task_management": {
+      "name": "タスクを管理する",
+      "actor": "user",
+      "steps": [
+        { "name": "タスクを登録する", "entity": "tasks", "changes": { "status": "do" } },
+        { "name": "重要度・緊急度で area を決める", "entity": "tasks", "changes": { "area": [1, 2, 3, 4] } },
+        { "name": "実行中にする", "entity": "tasks", "changes": { "working": true } },
+        { "name": "完了または見送りにする", "entity": "tasks", "changes": { "status": ["done", "skip"] } },
+        { "name": "一覧で振り返る", "entity": "tasks" }
+      ]
+    }
+  },
+  "screens": {
+    "P00": { "name": "Login", "entities": ["tasks"], "actions": ["login"] },
+    "P01": { "name": "Matrix", "entities": ["tasks"], "actions": ["dnd", "context-menu"] },
+    "P02": { "name": "Task list", "entities": ["tasks"], "actions": ["filter", "bulk", "delete"] },
+    "P03": { "name": "Task detail", "entities": ["tasks"], "actions": ["edit", "save"] },
+    "P04": { "name": "New task", "entities": ["tasks"], "actions": ["create", "cancel"] },
+    "P05": { "name": "Status popover", "entities": ["tasks"], "actions": ["select-status"] },
+    "P06": { "name": "Area popover", "entities": ["tasks"], "actions": ["select-area"] },
+    "P07": { "name": "Delete confirmation dialog", "entities": ["tasks"], "actions": ["confirm-delete", "cancel"] }
+  },
+  "navigation": [
+    { "from": "P00", "on": "ログイン成功", "to": "P01" },
+    { "from": "P01", "on": "Tasks 押下", "to": "P02" },
+    { "from": "P02", "on": "Matrix 押下", "to": "P01" },
+    { "from": "P01", "on": "New task / area 空白押下", "to": "P04" },
+    { "from": "P02", "on": "New task 押下", "to": "P04" },
+    { "from": "P04", "on": "Create 押下", "to": "P03" },
+    { "from": "P04", "on": "Cancel 押下", "to": "P01" },
+    { "from": "P04", "on": "Cancel 押下", "to": "P02" },
+    { "from": "P01", "on": "task card 押下", "to": "P03" },
+    { "from": "P02", "on": "task row 押下", "to": "P03" },
+    { "from": "P03", "on": "Tasks / Cancel 押下", "to": "P02" },
+    { "from": "P03", "on": "Save 押下", "to": "P03" },
+    { "from": "P04", "on": "Status 押下", "to": "P05" },
+    { "from": "P05", "on": "status 選択 / 外側押下", "to": "P04" },
+    { "from": "P04", "on": "Area 押下", "to": "P06" },
+    { "from": "P06", "on": "area 選択 / 外側押下", "to": "P04" },
+    { "from": "P03", "on": "Status 押下", "to": "P05" },
+    { "from": "P05", "on": "status 選択 / 外側押下", "to": "P03" },
+    { "from": "P03", "on": "Area 押下", "to": "P06" },
+    { "from": "P06", "on": "area 選択 / 外側押下", "to": "P03" },
+    { "from": "P05", "on": "Area 押下", "to": "P06" },
+    { "from": "P06", "on": "Status 押下", "to": "P05" },
+    { "from": "P01", "on": "ドラッグ&ドロップ", "to": "P01" },
+    { "from": "P01", "on": "delete 選択", "to": "P07" },
+    { "from": "P07", "on": "キャンセル / 削除", "to": "P01" }
+  ]
+}
