@@ -216,7 +216,9 @@ def _run_step(
         except ValueError as error:
             response["status"] = "failure"
             response["guard_error"] = str(error)
-        if response["status"] == "success" and _is_design_step(step, agent_id, agent):
+        if response["status"] == "success" and (
+            _is_design_step(step, agent_id, agent) or _design_notes(response) is not None
+        ):
             try:
                 artifact_path = _write_design_decision_artifact(
                     run_dir,
@@ -237,7 +239,7 @@ def _run_step(
                         "step": step["id"],
                         "artifact_path": artifact_path,
                         "summary": _artifact_value(
-                            response,
+                            _design_source(response),
                             ("summary", "selected_option", "decision"),
                             "未記載",
                         ),
@@ -272,6 +274,20 @@ def _is_design_step(step: dict[str, Any], agent_id: object, agent: dict[str, Any
     )
 
 
+def _design_notes(response: dict[str, Any]) -> dict[str, Any] | None:
+    notes = response.get("design_notes")
+    if isinstance(notes, dict):
+        return notes
+    if isinstance(notes, str) and notes.strip():
+        return {"summary": notes}
+    return None
+
+
+def _design_source(response: dict[str, Any]) -> dict[str, Any]:
+    notes = _design_notes(response)
+    return {**response, **notes} if notes else response
+
+
 def _write_design_decision_artifact(
     run_dir: Path,
     *,
@@ -281,53 +297,54 @@ def _write_design_decision_artifact(
 ) -> str:
     artifact = run_dir / "artifacts" / "design-decision.md"
     artifact.parent.mkdir(parents=True, exist_ok=True)
+    source = _design_source(response)
     problem = _artifact_value(
-        response,
+        source,
         ("problem", "issue", "challenge"),
         "未記載",
     )
     constraints = _artifact_value(
-        response,
+        source,
         ("constraints", "constraint"),
         "未記載",
     )
     selected_option = _artifact_value(
-        response,
+        source,
         ("selected_option", "adopted_option", "decision", "summary"),
         "未記載",
     )
     rationale = _artifact_value(
-        response,
+        source,
         ("rationale", "reason", "decision_rationale"),
         "未記載",
     )
     rejected_options = _artifact_value(
-        response,
+        source,
         ("rejected_options", "rejected_option", "alternatives_rejected"),
         "未記載",
     )
     rejected_rationale = _artifact_value(
-        response,
+        source,
         ("rejected_rationale", "rejection_reason", "rejected_reasons"),
         "未記載",
     )
     impact_scope = _artifact_value(
-        response,
+        source,
         ("impact_scope", "impact", "scope"),
         "未記載",
     )
     validation_result = _artifact_value(
-        response,
+        source,
         ("validation_result", "validation", "verification", "tests"),
         "未記載",
     )
     open_items = _artifact_value(
-        response,
+        source,
         ("open_items", "unresolved", "open_questions"),
         "なし",
     )
     human_escalation = _artifact_value(
-        response,
+        source,
         ("human_escalation", "escalation", "escalate_to_human"),
         "なし",
     )

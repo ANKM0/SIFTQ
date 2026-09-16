@@ -68,8 +68,10 @@ def test_implementation_and_checker_prompts_include_verification_principles(
 
     assert "principle-prove-it-works" in prompt
     assert "principle-fix-root-causes" in prompt
+    assert "principle-test-behavior-not-implementation" in prompt
 
 
 def test_other_roles_do_not_include_verification_principles() -> None:
     assert "principle-prove-it-works" not in _prompt("design")
     assert "principle-fix-root-causes" not in _prompt("test_author")
+    assert "principle-test-behavior-not-implementation" not in _prompt("test_author")

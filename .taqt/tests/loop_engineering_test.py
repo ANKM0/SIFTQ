@@ -529,6 +529,36 @@ def test_design_decision_artifact_renders_structured_response_fields(tmp_path: P
     assert "None" in content
 
 
+def test_implement_design_notes_create_design_decision_artifact(tmp_path: Path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {
+            "status": "success",
+            "parsed_json": True,
+            "design_notes": {"summary": "Use Hono JSX", "rationale": "Matches the stack"},
+        },
+    )
+
+    next_step = _run_step(
+        loop_definition={"agents": {"implement": {"role": "implementation"}}},
+        task={"id": "ISSUE-427"},
+        step={"id": "implement", "kind": "llm", "agent": "implement"},
+        state={},
+        run_dir=run_dir,
+        workspace=tmp_path,
+        max_fix_attempts=3,
+    )
+
+    assert next_step == "done"
+    content = (run_dir / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
+    assert "Use Hono JSX" in content
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    assert any(event["type"] == "design_artifact" for event in events)
+
+
 def test_loop_schema_rejects_unknown_step_reference() -> None:
     try:
         validate_loop_definition(
