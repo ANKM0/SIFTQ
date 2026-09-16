@@ -12,7 +12,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", required=True)
     parser.add_argument("--label", action="append", default=[])
     parser.add_argument("--limit", type=int, default=20)
-    parser.add_argument("--loop", default="development_feedback_loop")
     parser.add_argument("--priority", default="normal", choices=["low", "normal", "high"])
     parser.add_argument("--task-root", type=Path, default=DEFAULT_TASK_ROOT)
     parser.add_argument("--dry-run", action="store_true")
@@ -61,7 +60,6 @@ def main(argv: list[str] | None = None) -> int:
         path, _task, created = upsert_issue_task(
             repo=args.repo,
             issue_number=issue_number,
-            loop=args.loop,
             priority=args.priority,
             issue_title=issue.get("title"),
             issue_body=issue.get("body"),

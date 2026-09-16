@@ -82,7 +82,6 @@ def create_issue_task(
     *,
     repo: str,
     issue_number: int,
-    loop: str,
     priority: str = "normal",
     requirement: str | None = None,
     branch_summary: str | None = None,
@@ -103,7 +102,6 @@ def create_issue_task(
         "status": "pending",
         "phase": "spec",
         "priority": priority,
-        "loop": loop,
         "input": {},
         "run": {
             "id": None,
@@ -135,7 +133,6 @@ def upsert_issue_task(
     *,
     repo: str,
     issue_number: int,
-    loop: str,
     priority: str = "normal",
     requirement: str | None = None,
     branch_summary: str | None = None,
@@ -149,7 +146,6 @@ def upsert_issue_task(
         created_path, created = create_issue_task(
             repo=repo,
             issue_number=issue_number,
-            loop=loop,
             priority=priority,
             requirement=requirement,
             branch_summary=branch_summary or issue_title,
@@ -171,7 +167,6 @@ def upsert_issue_task(
         "repo": repo,
         "issue_number": issue_number,
     }
-    task["loop"] = loop
     task["priority"] = priority
     if requirement:
         task.setdefault("input", {})["requirement"] = requirement
@@ -196,7 +191,7 @@ def issue_branch(task: dict[str, Any]) -> str:
 
 
 def branch_purpose(task: dict[str, Any]) -> str:
-    purpose = str(task.get("branch_summary") or task.get("loop") or "development")
+    purpose = str(task.get("branch_summary") or "development")
     normalized = re.sub(r"[^a-z0-9_]+", "_", purpose.lower()).strip("_")
     return normalized or "development"
 
@@ -284,7 +279,6 @@ def build_slice_task(
         "status": "pending",
         "phase": "spec",
         "priority": parent_task.get("priority", "normal"),
-        "loop": parent_task["loop"],
         "input": {
             "issue": {
                 "title": f"{parent_title} / slice {index:02d}: {title}",

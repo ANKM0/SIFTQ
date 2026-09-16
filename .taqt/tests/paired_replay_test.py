@@ -84,14 +84,14 @@ def test_run_replay_skips_checks_when_not_done(tmp_path: Path) -> None:
 def test_load_replay_spec_reads_arms_and_checks(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yaml"
     spec.write_text(
-        "name: ISSUE-1\narms:\n  A: .taqt/loops/main_loop.yaml\n  B: .taqt/loops/quick_loop.yaml\nchecks:\n  - task ci:test:unit\n",
+        "name: ISSUE-1\narms:\n  A: .taqt/loops/main_loop.yaml\n  B: eval/baselines/loop/main_loop_full_structure.yaml\nchecks:\n  - task ci:test:unit\n",
         encoding="utf-8",
     )
 
     payload = load_replay_spec(spec)
 
     assert payload["name"] == "ISSUE-1"
-    assert payload["arms"]["B"] == ".taqt/loops/quick_loop.yaml"
+    assert payload["arms"]["B"] == "eval/baselines/loop/main_loop_full_structure.yaml"
     assert payload["checks"] == ["task ci:test:unit"]
 
 
