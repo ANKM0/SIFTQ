@@ -31,6 +31,17 @@
 - `done` / `skip` の task も `area` を保持する。
 - `status` を `do` に戻した場合は、保持している `area` に再表示する。
 
+## 不変条件
+
+実装とテストが守るべき不変条件。ID は `domain-model.json` の `rules` から参照し、テスト名にも含める。
+
+| ID | 不変条件 |
+| --- | --- |
+| INV-TM-001 | `status` は `do` / `done` / `skip` のいずれかである。 |
+| INV-TM-002 | `status` を `done` または `skip` にしても `area` を保持する。 |
+| INV-TM-003 | `working` は `status` と直交し、終了時も自動解除しない。 |
+| INV-TM-004 | `order` は `owner_id + area` 内で連番を保つ。 |
+
 ## 状態遷移ルール
 
 - `status` と `area` は分離する。

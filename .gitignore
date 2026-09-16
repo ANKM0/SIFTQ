@@ -86,3 +86,6 @@ target/
 !.env.example
 *.key
 *.pem
+
+# Generated diagrams for the domain model
+docs/requirements/assets/domain-model/generated/
