@@ -45,6 +45,8 @@ steps:
   - id: decide
     kind: policy
     routes:
+      - when: verification_fix
+        next: fix
       - when: implementation_feedback
         next: fix
       - when: test_feedback
