@@ -1,0 +1,25 @@
+{
+  "harness": "loop_eval.defect_injection",
+  "command": "PYTHONPATH=.taqt/scripts uv run python -m loop_eval.defect_injection --repo . --mutant-root eval/gold/loop-mutants",
+  "baseline_commit": "5add2618afe3709800baf7b93c0d3069a40e87cc",
+  "clean_checks": "pass (git diff --check, setup:frontend:ci, ci:lint, ci:lint:python, ci:typecheck, ci:test:unit, ci:test:e2e)",
+  "mutant_count": 3,
+  "records": [
+    { "mutant": "broken-is-task-status", "expected_catch": true, "arms": { "A": true, "B": true } },
+    { "mutant": "matrix-menu-order-swapped", "expected_catch": true, "arms": { "A": false, "B": true } },
+    { "mutant": "type-error-in-task-title-limit", "expected_catch": true, "arms": { "A": true, "B": true } }
+  ],
+  "summary": {
+    "arms": {
+      "A": { "caught": 2, "total": 3, "rate": 0.6667 },
+      "B": { "caught": 3, "total": 3, "rate": 1.0 }
+    },
+    "mcnemar": { "both_caught": 2, "a_caught_b_missed": 0, "a_missed_b_caught": 1 }
+  },
+  "adoption_criterion": {
+    "arm_b_rate_gt_arm_a": true,
+    "a_missed_b_caught_gt_a_caught_b_missed": true,
+    "clean_false_failures": false,
+    "met": true
+  }
+}

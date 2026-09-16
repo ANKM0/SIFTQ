@@ -1,7 +1,7 @@
 name: ISSUE-140-01
 arms:
-  A: .taqt/loops/main_loop.yaml
-  B: .taqt/loops/quick_loop.yaml
+  A: eval/baselines/loop/main_loop_full_structure.yaml
+  B: .taqt/loops/main_loop.yaml
 checks:
   - task ci:typecheck
   - task ci:test:unit
