@@ -328,6 +328,8 @@ VERIFICATION_PRINCIPLES = (
     "`principle-prove-it-works` skill.",
     "When fixing, reproduce first and fix the root cause per the "
     "`principle-fix-root-causes` skill.",
+    "Write tests for observable behavior, not implementation details, per the "
+    "`principle-test-behavior-not-implementation` skill.",
 )
 
 
