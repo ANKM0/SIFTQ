@@ -1,10 +1,6 @@
 version: 1
 id: main_loop
 
-fallback:
-  model: opencode-go/muse-spark-1.3-contributor-free
-  reasoning_effort: high
-
 limits:
   max_iterations: 12
   max_fix_attempts: 3
