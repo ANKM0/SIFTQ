@@ -1,5 +1,7 @@
 # ADR 0012: taqt 中心の loop engineering 実行方針
 
+> Status: Superseded by [ADR 0043](0043-unify-taqt-loop-execution-policy.md).
+
 ## 決定
 
 - GitHub Issue を要求、CUJ、AC/DoD、議論の正本とする。taqt task は Issue を source として作成し、status、phase、worker、run などの実行状態を管理する。
