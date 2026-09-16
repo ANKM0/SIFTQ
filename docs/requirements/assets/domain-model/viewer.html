@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>domain model</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body { font: 14px system-ui, sans-serif; display: flex; flex-direction: column; }
+      header {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        padding: 8px 12px; border-bottom: 1px solid #ddd; background: #fff; flex: 0 0 auto;
+      }
+      header .group { display: flex; gap: 8px; align-items: center; }
+      button[aria-pressed="true"] { font-weight: 700; }
+      main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; }
+      #image { display: block; flex: none; margin: auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="group">
+        <button data-view="domain" aria-pressed="true">ドメイン</button>
+        <button data-view="logical" aria-pressed="false">論理ER</button>
+        <button data-view="physical" aria-pressed="false">物理ER</button>
+        <button data-view="flow" aria-pressed="false">業務フロー</button>
+        <button data-view="nav" aria-pressed="false">画面遷移</button>
+      </div>
+      <div class="group">
+        <button id="zoom-out">−</button>
+        <span id="zoom-value">-</span>
+        <button id="zoom-in">＋</button>
+        <button id="zoom-fit">fit</button>
+      </div>
+    </header>
+    <main id="main">
+      <img id="image" alt="" />
+    </main>
+    <script>
+      const main = document.getElementById("main");
+      const image = document.getElementById("image");
+      const value = document.getElementById("zoom-value");
+      const SOURCES = {
+        domain: "generated/domain-model.svg",
+        logical: "generated/logical.svg",
+        physical: "generated/physical.svg",
+        flow: "generated/flow.svg",
+        nav: "generated/nav.svg",
+      };
+      const MIN = 0.1;
+      const MAX = 3;
+      const PAD = 16;
+      let scale = 1;
+      let userZoomed = false;
+
+      const clamp = (v) => Math.min(MAX, Math.max(MIN, v));
+      const apply = () => {
+        image.style.width = image.naturalWidth * scale + "px";
+        image.style.height = image.naturalHeight * scale + "px";
+        value.textContent = Math.round(scale * 100) + "%";
+      };
+      const setScale = (v) => {
+        scale = clamp(v);
+        if (image.naturalWidth > 0) apply();
+      };
+      const fit = () => {
+        if (image.naturalWidth === 0 || userZoomed) return;
+        const x = (main.clientWidth - PAD) / image.naturalWidth;
+        const y = (main.clientHeight - PAD) / image.naturalHeight;
+        setScale(Math.min(1, x, y));
+      };
+      const show = (view) => {
+        userZoomed = false;
+        image.src = SOURCES[view];
+        image.alt = view;
+      };
+
+      image.addEventListener("load", () => {
+        requestAnimationFrame(fit);
+      });
+      new ResizeObserver(fit).observe(main);
+      document.querySelectorAll("button[data-view]").forEach((b) => {
+        b.onclick = () => {
+          document.querySelectorAll("button[data-view]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+          show(b.dataset.view);
+        };
+      });
+      document.getElementById("zoom-in").onclick = () => {
+        userZoomed = true;
+        setScale(scale * 1.2);
+      };
+      document.getElementById("zoom-out").onclick = () => {
+        userZoomed = true;
+        setScale(scale / 1.2);
+      };
+      document.getElementById("zoom-fit").onclick = () => {
+        userZoomed = false;
+        fit();
+      };
+      main.addEventListener(
+        "wheel",
+        (e) => {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          userZoomed = true;
+          setScale(scale * (e.deltaY < 0 ? 1.1 : 0.9));
+        },
+        { passive: false },
+      );
+
+      show("domain");
+    </script>
+  </body>
+</html>

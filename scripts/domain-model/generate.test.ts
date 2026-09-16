@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import {
   check,
@@ -6,6 +9,7 @@ import {
   logicalD2,
   navD2,
   parseMigrations,
+  patchSvgDimensions,
   physicalD2,
   validate,
   type Migrations,
@@ -91,5 +95,17 @@ describe("domain model generation", () => {
   it("validate rejects schema violations", () => {
     expect(validate(model, schema)).toEqual([]);
     expect(validate({ entities: {} }, schema).length).toBeGreaterThan(0);
+  });
+
+  it("patchSvgDimensions adds width and height from the viewBox", () => {
+    const dir = mkdtempSync(join(tmpdir(), "domain-model-"));
+    try {
+      const file = pathToFileURL(join(dir, "diagram.svg"));
+      writeFileSync(file, `<svg viewBox="0 0 12 34"><svg width="12" height="34" viewBox="0 0 12 34"></svg></svg>`);
+      patchSvgDimensions(file);
+      expect(readFileSync(file, "utf8").startsWith(`<svg viewBox="0 0 12 34" width="12" height="34">`)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

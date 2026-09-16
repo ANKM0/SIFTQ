@@ -15,3 +15,10 @@ tasks:
         for name in logical physical flow nav; do
           d2 --pad 10 "docs/requirements/assets/domain-model/generated/${name}.d2" "docs/requirements/assets/domain-model/generated/${name}.svg"
         done
+      - bun scripts/domain-model/patch-svg.ts
+
+  domain:viewer:
+    desc: Generate the domain diagrams and report the viewer entry point.
+    cmds:
+      - task: domain:svg
+      - echo "Open docs/requirements/assets/domain-model/viewer.html"

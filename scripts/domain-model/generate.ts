@@ -341,6 +341,20 @@ export function readMigrations(dir: URL): Migrations {
   return migrations;
 }
 
+export function patchSvgDimensions(file: URL): void {
+  const svg = readFileSync(file, "utf8");
+  const tag = /<svg\b([^>]*)>/.exec(svg);
+  if (tag === null) return;
+  const match = tag[0];
+  const attrs = tag[1];
+  if (match === undefined || attrs === undefined || attrs.includes("width=")) return;
+  const viewBox = /viewBox="[-\d.]+ [-\d.]+ ([-\d.]+) ([-\d.]+)"/.exec(attrs);
+  const width = viewBox?.[1];
+  const height = viewBox?.[2];
+  if (width === undefined || height === undefined) return;
+  writeFileSync(file, svg.replace(match, `<svg${attrs} width="${width}" height="${height}">`));
+}
+
 function main(): void {
   const modelPath = new URL("../../docs/requirements/assets/domain-model/domain-model.json", import.meta.url);
   const schemaPath = new URL("../../docs/requirements/assets/domain-model/domain-model.schema.json", import.meta.url);
