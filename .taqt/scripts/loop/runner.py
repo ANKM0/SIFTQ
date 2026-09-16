@@ -255,8 +255,6 @@ def _run_step(
         if response["status"] != "success":
             state["last_feedback"] = response.get("feedback") or "unknown"
             state["last_failed_step"] = step["id"]
-            if response.get("fallback_used"):
-                return "human"
             return str(step.get("on_failure", "human"))
         return next_step
 

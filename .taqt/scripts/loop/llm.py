@@ -40,7 +40,6 @@ def run_agent(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             child_environment=child_environment,
-            fallback=loop_definition.get("fallback"),
         )
     if adapter == "opencode" and not command:
         return _run_opencode(
@@ -51,7 +50,6 @@ def run_agent(
             cwd=cwd,
             timeout_seconds=timeout_seconds,
             child_environment=child_environment,
-            fallback=loop_definition.get("fallback"),
         )
 
     if not command:
@@ -101,7 +99,6 @@ def _run_codex(
     cwd: Path,
     timeout_seconds: int,
     child_environment: Mapping[str, str] | None,
-    fallback: Any = None,
 ) -> dict[str, Any]:
     workspace = cwd.resolve()
     command = [
@@ -150,6 +147,15 @@ def _run_codex(
             "feedback": "unknown",
             "stderr": "codex executable was not found",
         }
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "failure",
+            "mode": "codex",
+            "agent": agent_id,
+            "command": " ".join(command),
+            "feedback": "timeout",
+            "stderr": f"codex timed out after {timeout_seconds}s",
+        }
 
     parsed = _parse_stdout(completed.stdout)
     response = {
@@ -167,19 +173,11 @@ def _run_codex(
         if completed.returncode != 0:
             response["status"] = "failure"
     if response["status"] != "success":
-        response.setdefault("feedback", "unknown")
-        if isinstance(fallback, dict) and is_fallback_error(completed.stdout, completed.stderr):
-            fb_profile = fallback.get("profile")
-            if isinstance(fb_profile, str) and fb_profile:
-                fb_agent = {**agent, "profile": fb_profile}
-                if isinstance(fallback.get("model"), str): fb_agent["model"] = fallback["model"]
-                if isinstance(fallback.get("reasoning_effort"), str): fb_agent["reasoning_effort"] = fallback["reasoning_effort"]
-                retry = _run_codex(payload=payload, agent_id=agent_id, agent=fb_agent, step=step, cwd=cwd, timeout_seconds=timeout_seconds, child_environment=child_environment, fallback=None)
-                retry["fallback_used"] = True
-                retry["fallback_profile"] = fb_profile
-                retry["fallback_from_profile"] = profile
-                retry["initial_failure"] = {"exit_code": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
-                return retry
+        response["feedback"] = response.get("feedback") or (
+            "model_limit"
+            if is_usage_limit_error(completed.stdout, completed.stderr)
+            else "unknown"
+        )
     return response
 
 
@@ -192,7 +190,6 @@ def _run_opencode(
     cwd: Path,
     timeout_seconds: int,
     child_environment: Mapping[str, str] | None,
-    fallback: Any = None,
 ) -> dict[str, Any]:
     workspace = cwd.resolve()
     model = step.get("model") or agent.get("model") or os.environ.get("LOOP_OPENCODE_MODEL")
@@ -247,6 +244,15 @@ def _run_opencode(
             "feedback": "unknown",
             "stderr": "opencode executable was not found",
         }
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "failure",
+            "mode": "opencode",
+            "agent": agent_id,
+            "command": shlex.join(command[:-1]),
+            "feedback": "timeout",
+            "stderr": f"opencode timed out after {timeout_seconds}s",
+        }
 
     parsed = _parse_opencode_stdout(completed.stdout)
     response = {
@@ -264,30 +270,17 @@ def _run_opencode(
         if completed.returncode != 0:
             response["status"] = "failure"
     if response["status"] != "success":
-        response.setdefault("feedback", "unknown")
-        if isinstance(fallback, dict) and is_opencode_fallback_error(completed.stdout, completed.stderr):
-            fb_model = fallback.get("model")
-            if isinstance(fb_model, str) and fb_model:
-                fb_agent = {**agent, "model": fb_model}
-                if isinstance(fallback.get("reasoning_effort"), str):
-                    fb_agent["reasoning_effort"] = fallback["reasoning_effort"]
-                retry = _run_opencode(payload=payload, agent_id=agent_id, agent=fb_agent, step=step, cwd=cwd, timeout_seconds=timeout_seconds, child_environment=child_environment, fallback=None)
-                retry["fallback_used"] = True
-                retry["fallback_model"] = fb_model
-                retry["fallback_from_model"] = model
-                retry["initial_failure"] = {"exit_code": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
-                return retry
+        response["feedback"] = response.get("feedback") or (
+            "model_limit"
+            if is_opencode_fallback_error(completed.stdout, completed.stderr)
+            else "unknown"
+        )
     return response
 
 
 def is_usage_limit_error(stdout: str, stderr: str) -> bool:
     text = f"{stdout}\n{stderr}".lower()
     return any(token in text for token in ("you've hit your usage limit", "usage limit", "usage_limit_reached", "rate_limit_reached"))
-
-
-def is_fallback_error(stdout: str, stderr: str) -> bool:
-    text = f"{stdout}\n{stderr}".lower()
-    return is_usage_limit_error(stdout, stderr) or "recursive json schemas are not currently supported" in text
 
 
 def is_opencode_fallback_error(stdout: str, stderr: str) -> bool:

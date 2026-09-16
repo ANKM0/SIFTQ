@@ -12,7 +12,6 @@ from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
 from loop.llm import (
     _parse_opencode_stdout,
-    is_fallback_error,
     is_opencode_fallback_error,
     run_agent,
 )
@@ -1141,10 +1140,6 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert kwargs["env"]["CODEX_HOME"] == "/tmp/deepseek"
 
 
-def test_recursive_schema_error_uses_provider_fallback() -> None:
-    assert is_fallback_error("", "Recursive JSON schemas are not currently supported")
-
-
 def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:
     calls = []
 
@@ -1376,22 +1371,17 @@ def test_opencode_fallback_error_detects_rate_limits() -> None:
     assert not is_opencode_fallback_error("all good", "")
 
 
-def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch) -> None:
+def test_opencode_agent_reports_model_limit_without_switching(tmp_path: Path, monkeypatch) -> None:
     calls = []
 
-    class Failed:
+    class LimitHit:
         returncode = 1
         stdout = ""
         stderr = "429 Too Many Requests"
 
-    class Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
     def fake_run(command, **kwargs):
         calls.append(command)
-        return Completed() if len(calls) > 1 else Failed()
+        return LimitHit()
 
     monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
 
@@ -1404,7 +1394,6 @@ def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch)
                     "model": "opencode/muse-spark-1.3-contributor-free",
                 }
             },
-            "fallback": {"model": "deepseek/deepseek-v4-pro"},
         },
         task={"id": "ISSUE-1"},
         step={"id": "implement", "agent": "implement"},
@@ -1412,10 +1401,35 @@ def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch)
         cwd=tmp_path,
     )
 
-    assert response["fallback_used"] is True
-    assert response["fallback_model"] == "deepseek/deepseek-v4-pro"
-    assert response["fallback_from_model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert calls[1][calls[1].index("-m") + 1] == "deepseek/deepseek-v4-pro"
+    assert response["status"] == "failure"
+    assert response["feedback"] == "model_limit"
+    assert len(calls) == 1
+
+
+def test_opencode_agent_normalizes_timeout_to_failure(tmp_path: Path, monkeypatch) -> None:
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, 1)
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "opencode",
+                    "model": "opencode/muse-spark-1.3-contributor-free",
+                }
+            },
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={},
+        cwd=tmp_path,
+    )
+
+    assert response["status"] == "failure"
+    assert response["feedback"] == "timeout"
 
 
 def test_loop_schema_rejects_bare_model_for_opencode_adapter() -> None:
@@ -1436,26 +1450,6 @@ def test_loop_schema_rejects_bare_model_for_opencode_adapter() -> None:
         assert "provider/model" in str(error)
     else:
         raise AssertionError("expected ValueError")
-
-
-def test_loop_schema_rejects_fallback_without_full_model_id() -> None:
-    for fallback in (
-        {"profile": "deepseek"},
-        {"model": "deepseek-v4-pro"},
-        {"model": 1},
-    ):
-        loop = {
-            "version": 1,
-            "id": "bad-fallback",
-            "fallback": fallback,
-            "steps": [{"id": "done", "kind": "terminal"}],
-        }
-        try:
-            validate_loop_definition(loop)
-        except ValueError as error:
-            assert "fallback" in str(error)
-        else:
-            raise AssertionError(f"expected ValueError for {fallback}")
 
 
 def test_build_context_compacts_large_events(tmp_path: Path) -> None:
