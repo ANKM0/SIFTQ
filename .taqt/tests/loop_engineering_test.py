@@ -265,20 +265,6 @@ blocked_reason: null
     assert state["status"] == "done"
 
 
-def test_sub_loop_definition_uses_go_luna_for_reviewers_and_muse_for_implementation() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-    loop = load_document(repository_root / ".taqt/loops/sub_loop.yaml")
-
-    validate_loop_definition(loop)
-    assert loop["agents"]["design"]["adapter"] == "opencode"
-    assert loop["agents"]["design"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "profile" not in loop["agents"]["design"]
-    assert loop["agents"]["implement"]["adapter"] == "opencode"
-    assert loop["agents"]["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert loop["agents"]["checker"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "judge" not in loop["agents"]
-
-
 def test_load_profiles_reads_loop_and_deepseek_settings(tmp_path: Path) -> None:
     loop_root = tmp_path / "loops"
     (tmp_path / "config").mkdir()
@@ -604,63 +590,25 @@ steps:
     assert loop["steps"][0]["reasoning_effort"] == "high"
 
 
-def test_main_loop_uses_luna_reviewers_and_muse_free_implementers() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
+def test_main_loop_is_a_single_lightweight_structure() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
 
-    agents = load_document(loop_path)["agents"]
-
-    assert agents["checker"]["readonly"] is True
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
-    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
-
-
-def test_sub_loop_uses_go_luna_reviewers_and_muse_implementers() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
-
-    loop = load_document(loop_path)
+    loop = load_document(repository_root / ".taqt/loops/main_loop.yaml")
     validate_loop_definition(loop)
 
-    assert loop["id"] == "sub_loop"
-    agents = loop["agents"]
-    steps = loop["steps"]
-    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
-    assert {"decompose", "orchestrate", "judge"}.isdisjoint(agents)
-    assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
+    assert loop["id"] == "main_loop"
+    assert {"implement", "fix", "checker"} == set(loop["agents"])
+    assert loop["agents"]["checker"]["readonly"] is True
+    assert loop["limits"]["max_fix_attempts"] == 3
 
-    assert agents["checker"]["readonly"] is True
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "profile" not in agents["design"]
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
-    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
-
-    step_ids = [step["id"] for step in steps]
-    assert step_ids.index("design") < step_ids.index("test")
-    assert step_ids.index("test") < step_ids.index("implement")
+    step_ids = [step["id"] for step in loop["steps"]]
+    assert "design" not in step_ids
+    assert "test" not in step_ids
     assert step_ids.index("implement") < step_ids.index("verification")
-    assert step_ids.index("checker") < step_ids.index("done")
 
-    design = next(step for step in steps if step["id"] == "design")
-    assert design["kind"] == "llm"
-    assert design["next"] == "test"
-
-    checker = next(step for step in steps if step["id"] == "checker")
-    assert checker["kind"] == "llm"
-    assert checker["next"] == "post_review"
+    profiles = load_profiles(repository_root / ".taqt/loops")
+    assert set(profiles) == {"main"}
+    assert profiles["main"]["loop"] == "main_loop"
 
 
 def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
@@ -672,13 +620,8 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert loop["id"] == "main_loop"
     agents = loop["agents"]
     steps = loop["steps"]
-    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
+    assert {"implement", "fix", "checker"} == set(agents)
 
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
     assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
     assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
@@ -687,8 +630,6 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert agents["checker"]["reasoning_effort"] == "xhigh"
 
     assert agents["checker"]["readonly"] is True
-    assert "writes" not in agents["design"]
-    assert "writes" not in agents["test"]
 
     steps_by_id = {step["id"]: step for step in steps}
     assert steps_by_id["fix"]["kind"] == "llm"
@@ -699,49 +640,10 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     routes = {route["when"]: route["next"] for route in decide["routes"]}
     assert routes["implementation_feedback"] == "fix"
     assert routes["test_feedback"] == "fix"
-    assert routes["local_design_feedback"] == "design"
+    assert routes["local_design_feedback"] == "human"
     assert routes["specification_feedback"] == "human"
     assert routes["product_feedback"] == "human"
     assert routes["unknown"] == "human"
-
-
-def test_sub_loop_verification_and_decide_are_model_free() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
-
-    loop = load_document(loop_path)
-    validate_loop_definition(loop)
-
-    steps = {step["id"]: step for step in loop["steps"]}
-    model_keys = {"agent", "model", "reasoning_effort"}
-
-    verification = steps["verification"]
-    assert verification["kind"] == "verification"
-    assert model_keys.isdisjoint(verification)
-
-    decide = steps["decide"]
-    assert decide["kind"] == "policy"
-    assert "routes" in decide and decide["routes"]
-    assert model_keys.isdisjoint(decide)
-
-
-def test_quick_loop_is_a_lightweight_loop_and_profile() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-
-    loop = load_document(repository_root / ".taqt/loops/quick_loop.yaml")
-    validate_loop_definition(loop)
-
-    assert loop["id"] == "quick_loop"
-    assert {"implement", "fix", "checker"} == set(loop["agents"])
-    assert loop["agents"]["checker"]["readonly"] is True
-    assert loop["limits"]["max_fix_attempts"] == 3
-
-    step_ids = [step["id"] for step in loop["steps"]]
-    assert "design" not in step_ids
-    assert "test" not in step_ids
-    assert step_ids.index("implement") < step_ids.index("verification")
-
-    profiles = load_profiles(repository_root / ".taqt/loops")
-    assert profiles["quick"]["loop"] == "quick_loop"
 
 
 def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
