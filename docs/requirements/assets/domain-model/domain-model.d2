@@ -1,0 +1,36 @@
+# ドメインモデル図。正本の補助。正本は domain.md と domain-model.json。
+direction: right
+
+task: "Task（集約ルート）" {
+  shape: class
+  +title: string
+  +description: string
+  +working: boolean
+  +order: number
+}
+
+status: "Status（値オブジェクト）" {
+  do: "do"
+  done: "done"
+  skip: "skip"
+
+  do -> done: complete
+  do -> skip: skip
+  done -> do: reopen
+  skip -> do: reopen
+}
+
+area: "Area（値オブジェクト）" {
+  q1: "1"
+  q2: "2"
+  q3: "3"
+  q4: "4"
+}
+
+invariants: "不変条件（domain.md）\nINV-TM-001  status ∈ { do, done, skip }\nINV-TM-002  done / skip でも area を保持\nINV-TM-003  working は status と直交し、終了時も自動解除しない\nINV-TM-004  order は owner_id + area 内で連番" {
+  style: { fill: "#fff2cc" }
+}
+
+task -> status: status
+task -> area: area
+invariants -> task: 制約 {style: {stroke-dash: 4}}
