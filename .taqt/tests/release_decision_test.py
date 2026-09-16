@@ -57,7 +57,6 @@ def test_task_auto_dry_run_appends_release_decision_after_cleanup(tmp_path: Path
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=68,
-        loop="main_loop",
         task_root=tmp_path,
     )
     assert task_auto_main([str(task_path), "--workspace", str(tmp_path / "worktree")]) == 0
@@ -70,7 +69,6 @@ def test_task_auto_release_decision_has_explicit_opt_out(tmp_path: Path, capsys)
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=69,
-        loop="main_loop",
         task_root=tmp_path,
     )
     assert (

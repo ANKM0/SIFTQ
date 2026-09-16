@@ -27,7 +27,6 @@ def main(argv: list[str] | None = None) -> int:
     body = (
         f"Implements {issue_ref(task)} through taqt development feedback loop.\n\n"
         f"- task: `{task['id']}`\n"
-        f"- loop: `{task['loop']}`\n"
         f"- run state: `{task.get('run', {}).get('state_path')}`\n"
     )
     command = [

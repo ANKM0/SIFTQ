@@ -37,7 +37,6 @@ def validate_loop_definition(loop: dict[str, Any]) -> None:
         raise ValueError("loop.steps must be a non-empty list")
 
     _validate_limits(loop.get("limits"))
-    _validate_fallback(loop.get("fallback"))
     agents = _validate_agents(loop.get("agents"))
     seen: set[str] = set()
     for index, step in enumerate(steps, start=1):
@@ -220,12 +219,3 @@ def _validate_opencode_model(payload: dict[str, Any], subject: str) -> None:
     model = payload["model"]
     if not isinstance(model, str) or "/" not in model:
         raise ValueError(f"{subject}.model must be a full opencode model id (provider/model)")
-
-
-def _validate_fallback(value: Any) -> None:
-    if value is None: return
-    if not isinstance(value, dict): raise ValueError("loop.fallback must be a mapping")
-    if not isinstance(value.get("model"), str) or not value["model"]: raise ValueError("loop.fallback.model is required")
-    if "/" not in value["model"]: raise ValueError("loop.fallback.model must be a full opencode model id (provider/model)")
-    if "profile" in value and not isinstance(value["profile"], str): raise ValueError("loop.fallback.profile must be a string")
-    _validate_reasoning_effort(value, "loop.fallback")

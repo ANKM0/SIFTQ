@@ -12,7 +12,6 @@ from loop.context import MAX_EVENT_CHARS, MAX_EVENT_STRING_CHARS, build_context
 from loop.guard import validate_write_path
 from loop.llm import (
     _parse_opencode_stdout,
-    is_fallback_error,
     is_opencode_fallback_error,
     run_agent,
 )
@@ -66,7 +65,6 @@ def test_create_issue_task_writes_taqt_yaml(tmp_path: Path) -> None:
     path, task = create_issue_task(
         repo="owner/repo",
         issue_number=123,
-        loop="main_loop",
         requirement="docs/requirements/feature.md",
         task_root=tmp_path,
     )
@@ -103,8 +101,6 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
             "owner/repo",
             "--issue",
             "136",
-            "--loop",
-            "main_loop",
             "--task-root",
             str(tmp_path),
         ]
@@ -117,73 +113,20 @@ def test_task_create_fetches_issue_metadata(tmp_path: Path, monkeypatch) -> None
     assert calls[0][0][:3] == ["gh", "issue", "view"]
 
 
-def test_task_create_uses_profile_loop_when_loop_omitted(tmp_path: Path, monkeypatch) -> None:
-    loop_root = tmp_path / "loops"
-    loop_root.mkdir()
-    (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "profiles.yaml").write_text(
-        """
-profiles:
-  main:
-    loop: main_loop
-  deepseek:
-    loop: sub_loop
-""",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(
-        "taqt.task_create._fetch_issue",
-        lambda *_args: {
-            "title": "Use DeepSeek profile",
-            "body": "",
-            "labels": ["taqt:enabled"],
-        },
-    )
-    calls: list[dict[str, object]] = []
-
-    def fake_create_issue_task(**kwargs):
-        calls.append(kwargs)
-        return (tmp_path / "ISSUE-136.yaml", {"id": "ISSUE-136"})
-
-    monkeypatch.setattr("taqt.task_create.create_issue_task", fake_create_issue_task)
-
-    exit_code = task_create_main(
-        [
-            "--repo",
-            "owner/repo",
-            "--issue",
-            "136",
-            "--id",
-            "ISSUE-136",
-            "--profile",
-            "deepseek",
-            "--loop-root",
-            str(loop_root),
-            "--task-root",
-            str(tmp_path),
-        ]
-    )
-
-    assert exit_code == 0
-    assert calls[0]["loop"] == "sub_loop"
-
-
-def test_issue_branch_uses_dev_issue_number_and_normalized_loop_purpose(tmp_path: Path) -> None:
+def test_issue_branch_defaults_purpose_without_branch_summary(tmp_path: Path) -> None:
     _path, task = create_issue_task(
         repo="owner/repo",
         issue_number=7,
-        loop="Design Review!",
         task_root=tmp_path,
     )
 
-    assert issue_branch(task) == "dev/#7_design_review"
+    assert issue_branch(task) == "dev/#7_development"
 
 
 def test_issue_branch_prefers_normalized_branch_summary(tmp_path: Path) -> None:
     path, task = create_issue_task(
         repo="owner/repo",
         issue_number=8,
-        loop="main_loop",
         branch_summary="Add User Profile!",
         task_root=tmp_path,
     )
@@ -263,20 +206,6 @@ blocked_reason: null
     assert result["status"] == "done"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
     assert state["status"] == "done"
-
-
-def test_sub_loop_definition_uses_go_luna_for_reviewers_and_muse_for_implementation() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-    loop = load_document(repository_root / ".taqt/loops/sub_loop.yaml")
-
-    validate_loop_definition(loop)
-    assert loop["agents"]["design"]["adapter"] == "opencode"
-    assert loop["agents"]["design"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "profile" not in loop["agents"]["design"]
-    assert loop["agents"]["implement"]["adapter"] == "opencode"
-    assert loop["agents"]["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert loop["agents"]["checker"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "judge" not in loop["agents"]
 
 
 def test_load_profiles_reads_loop_and_deepseek_settings(tmp_path: Path) -> None:
@@ -544,6 +473,36 @@ def test_design_decision_artifact_renders_structured_response_fields(tmp_path: P
     assert "None" in content
 
 
+def test_implement_design_notes_create_design_decision_artifact(tmp_path: Path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {
+            "status": "success",
+            "parsed_json": True,
+            "design_notes": {"summary": "Use Hono JSX", "rationale": "Matches the stack"},
+        },
+    )
+
+    next_step = _run_step(
+        loop_definition={"agents": {"implement": {"role": "implementation"}}},
+        task={"id": "ISSUE-427"},
+        step={"id": "implement", "kind": "llm", "agent": "implement"},
+        state={},
+        run_dir=run_dir,
+        workspace=tmp_path,
+        max_fix_attempts=3,
+    )
+
+    assert next_step == "done"
+    content = (run_dir / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
+    assert "Use Hono JSX" in content
+    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
+    assert any(event["type"] == "design_artifact" for event in events)
+
+
 def test_loop_schema_rejects_unknown_step_reference() -> None:
     try:
         validate_loop_definition(
@@ -604,63 +563,25 @@ steps:
     assert loop["steps"][0]["reasoning_effort"] == "high"
 
 
-def test_main_loop_uses_luna_reviewers_and_muse_free_implementers() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "main_loop.yaml"
+def test_main_loop_is_a_single_lightweight_structure() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
 
-    agents = load_document(loop_path)["agents"]
-
-    assert agents["checker"]["readonly"] is True
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
-    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
-
-
-def test_sub_loop_uses_go_luna_reviewers_and_muse_implementers() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
-
-    loop = load_document(loop_path)
+    loop = load_document(repository_root / ".taqt/loops/main_loop.yaml")
     validate_loop_definition(loop)
 
-    assert loop["id"] == "sub_loop"
-    agents = loop["agents"]
-    steps = loop["steps"]
-    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
-    assert {"decompose", "orchestrate", "judge"}.isdisjoint(agents)
-    assert {"decompose", "orchestrate", "judge"}.isdisjoint(step["id"] for step in steps)
+    assert loop["id"] == "main_loop"
+    assert {"implement", "fix", "checker"} == set(loop["agents"])
+    assert loop["agents"]["checker"]["readonly"] is True
+    assert loop["limits"]["max_fix_attempts"] == 3
 
-    assert agents["checker"]["readonly"] is True
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert "profile" not in agents["design"]
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
-    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "opencode-go/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
-
-    step_ids = [step["id"] for step in steps]
-    assert step_ids.index("design") < step_ids.index("test")
-    assert step_ids.index("test") < step_ids.index("implement")
+    step_ids = [step["id"] for step in loop["steps"]]
+    assert "design" not in step_ids
+    assert "test" not in step_ids
     assert step_ids.index("implement") < step_ids.index("verification")
-    assert step_ids.index("checker") < step_ids.index("done")
 
-    design = next(step for step in steps if step["id"] == "design")
-    assert design["kind"] == "llm"
-    assert design["next"] == "test"
-
-    checker = next(step for step in steps if step["id"] == "checker")
-    assert checker["kind"] == "llm"
-    assert checker["next"] == "post_review"
+    profiles = load_profiles(repository_root / ".taqt/loops")
+    assert set(profiles) == {"main"}
+    assert profiles["main"]["loop"] == "main_loop"
 
 
 def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
@@ -672,13 +593,8 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert loop["id"] == "main_loop"
     agents = loop["agents"]
     steps = loop["steps"]
-    assert {"design", "test", "implement", "fix", "checker"} == set(agents)
+    assert {"implement", "fix", "checker"} == set(agents)
 
-    assert agents["design"]["adapter"] == "opencode"
-    assert agents["design"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["design"]["reasoning_effort"] == "xhigh"
-    assert agents["test"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["test"]["reasoning_effort"] == "xhigh"
     assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert agents["implement"]["reasoning_effort"] == "high"
     assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
@@ -687,8 +603,6 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert agents["checker"]["reasoning_effort"] == "xhigh"
 
     assert agents["checker"]["readonly"] is True
-    assert "writes" not in agents["design"]
-    assert "writes" not in agents["test"]
 
     steps_by_id = {step["id"]: step for step in steps}
     assert steps_by_id["fix"]["kind"] == "llm"
@@ -699,49 +613,10 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     routes = {route["when"]: route["next"] for route in decide["routes"]}
     assert routes["implementation_feedback"] == "fix"
     assert routes["test_feedback"] == "fix"
-    assert routes["local_design_feedback"] == "design"
+    assert routes["local_design_feedback"] == "human"
     assert routes["specification_feedback"] == "human"
     assert routes["product_feedback"] == "human"
     assert routes["unknown"] == "human"
-
-
-def test_sub_loop_verification_and_decide_are_model_free() -> None:
-    loop_path = Path(__file__).resolve().parents[1] / "loops" / "sub_loop.yaml"
-
-    loop = load_document(loop_path)
-    validate_loop_definition(loop)
-
-    steps = {step["id"]: step for step in loop["steps"]}
-    model_keys = {"agent", "model", "reasoning_effort"}
-
-    verification = steps["verification"]
-    assert verification["kind"] == "verification"
-    assert model_keys.isdisjoint(verification)
-
-    decide = steps["decide"]
-    assert decide["kind"] == "policy"
-    assert "routes" in decide and decide["routes"]
-    assert model_keys.isdisjoint(decide)
-
-
-def test_quick_loop_is_a_lightweight_loop_and_profile() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-
-    loop = load_document(repository_root / ".taqt/loops/quick_loop.yaml")
-    validate_loop_definition(loop)
-
-    assert loop["id"] == "quick_loop"
-    assert {"implement", "fix", "checker"} == set(loop["agents"])
-    assert loop["agents"]["checker"]["readonly"] is True
-    assert loop["limits"]["max_fix_attempts"] == 3
-
-    step_ids = [step["id"] for step in loop["steps"]]
-    assert "design" not in step_ids
-    assert "test" not in step_ids
-    assert step_ids.index("implement") < step_ids.index("verification")
-
-    profiles = load_profiles(repository_root / ".taqt/loops")
-    assert profiles["quick"]["loop"] == "quick_loop"
 
 
 def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
@@ -1239,10 +1114,6 @@ def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> 
     assert kwargs["env"]["CODEX_HOME"] == "/tmp/deepseek"
 
 
-def test_recursive_schema_error_uses_provider_fallback() -> None:
-    assert is_fallback_error("", "Recursive JSON schemas are not currently supported")
-
-
 def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:
     calls = []
 
@@ -1474,22 +1345,17 @@ def test_opencode_fallback_error_detects_rate_limits() -> None:
     assert not is_opencode_fallback_error("all good", "")
 
 
-def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch) -> None:
+def test_opencode_agent_reports_model_limit_without_switching(tmp_path: Path, monkeypatch) -> None:
     calls = []
 
-    class Failed:
+    class LimitHit:
         returncode = 1
         stdout = ""
         stderr = "429 Too Many Requests"
 
-    class Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
     def fake_run(command, **kwargs):
         calls.append(command)
-        return Completed() if len(calls) > 1 else Failed()
+        return LimitHit()
 
     monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
 
@@ -1502,7 +1368,6 @@ def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch)
                     "model": "opencode/muse-spark-1.3-contributor-free",
                 }
             },
-            "fallback": {"model": "deepseek/deepseek-v4-pro"},
         },
         task={"id": "ISSUE-1"},
         step={"id": "implement", "agent": "implement"},
@@ -1510,10 +1375,35 @@ def test_opencode_agent_adapter_uses_fallback_model(tmp_path: Path, monkeypatch)
         cwd=tmp_path,
     )
 
-    assert response["fallback_used"] is True
-    assert response["fallback_model"] == "deepseek/deepseek-v4-pro"
-    assert response["fallback_from_model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert calls[1][calls[1].index("-m") + 1] == "deepseek/deepseek-v4-pro"
+    assert response["status"] == "failure"
+    assert response["feedback"] == "model_limit"
+    assert len(calls) == 1
+
+
+def test_opencode_agent_normalizes_timeout_to_failure(tmp_path: Path, monkeypatch) -> None:
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, 1)
+
+    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
+
+    response = run_agent(
+        loop_definition={
+            "agents": {
+                "implement": {
+                    "role": "implementation",
+                    "adapter": "opencode",
+                    "model": "opencode/muse-spark-1.3-contributor-free",
+                }
+            },
+        },
+        task={"id": "ISSUE-1"},
+        step={"id": "implement", "agent": "implement"},
+        context={},
+        cwd=tmp_path,
+    )
+
+    assert response["status"] == "failure"
+    assert response["feedback"] == "timeout"
 
 
 def test_loop_schema_rejects_bare_model_for_opencode_adapter() -> None:
@@ -1534,26 +1424,6 @@ def test_loop_schema_rejects_bare_model_for_opencode_adapter() -> None:
         assert "provider/model" in str(error)
     else:
         raise AssertionError("expected ValueError")
-
-
-def test_loop_schema_rejects_fallback_without_full_model_id() -> None:
-    for fallback in (
-        {"profile": "deepseek"},
-        {"model": "deepseek-v4-pro"},
-        {"model": 1},
-    ):
-        loop = {
-            "version": 1,
-            "id": "bad-fallback",
-            "fallback": fallback,
-            "steps": [{"id": "done", "kind": "terminal"}],
-        }
-        try:
-            validate_loop_definition(loop)
-        except ValueError as error:
-            assert "fallback" in str(error)
-        else:
-            raise AssertionError(f"expected ValueError for {fallback}")
 
 
 def test_build_context_compacts_large_events(tmp_path: Path) -> None:
@@ -1674,7 +1544,6 @@ steps:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=9,
-        loop="main_loop",
         task_root=task_root,
     )
 
@@ -1739,7 +1608,6 @@ steps:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=21,
-        loop="main_loop",
         task_root=task_root,
     )
     monkeypatch.setenv("DEEPSEEK_API_KEY", "secret")
@@ -1791,7 +1659,6 @@ def test_taqt_task_run_rejects_task_locked_by_another_worker(tmp_path: Path) -> 
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=14,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "running"
@@ -1810,7 +1677,6 @@ def test_taqt_task_run_rejects_mismatched_resume_dir(tmp_path: Path) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=15,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["run"]["id"] = "expected"
@@ -1831,14 +1697,12 @@ def test_next_pending_task_prefers_high_priority(tmp_path: Path) -> None:
     create_issue_task(
         repo="owner/repo",
         issue_number=10,
-        loop="main_loop",
         priority="low",
         task_root=tmp_path,
     )
     high_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=11,
-        loop="main_loop",
         priority="high",
         task_root=tmp_path,
     )
@@ -1853,7 +1717,6 @@ def test_upsert_issue_task_updates_issue_metadata(tmp_path: Path) -> None:
     path, task, created = upsert_issue_task(
         repo="owner/repo",
         issue_number=12,
-        loop="main_loop",
         issue_title="Add profile",
         issue_body="Body",
         issue_labels=["taqt"],
@@ -1867,7 +1730,6 @@ def test_upsert_issue_task_updates_issue_metadata(tmp_path: Path) -> None:
     _path, updated, created = upsert_issue_task(
         repo="owner/repo",
         issue_number=12,
-        loop="main_loop",
         issue_title="Add profile v2",
         issue_body="Body v2",
         issue_labels=["taqt", "ready"],
@@ -1882,7 +1744,6 @@ def test_readiness_errors_require_acceptance_criteria_and_dod(tmp_path: Path) ->
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=13,
-        loop="main_loop",
         issue_title="Add profile",
         issue_body="""
 ## Acceptance Criteria
@@ -1900,7 +1761,6 @@ def test_readiness_errors_require_acceptance_criteria_and_dod(tmp_path: Path) ->
     _path, incomplete, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=14,
-        loop="main_loop",
         issue_title="Incomplete",
         issue_body="Need this soon.",
         task_root=tmp_path,
@@ -1916,7 +1776,6 @@ def test_readiness_errors_follow_research_template(tmp_path: Path) -> None:
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=15,
-        loop="main_loop",
         issue_title="Research",
         issue_body="""
 ## 調べたいこと
@@ -1933,7 +1792,6 @@ def test_readiness_errors_follow_research_template(tmp_path: Path) -> None:
     _path, incomplete, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=16,
-        loop="main_loop",
         issue_title="Research incomplete",
         issue_body="""
 ## 調べたいこと
@@ -1949,7 +1807,6 @@ def test_readiness_warnings_follow_bug_template(tmp_path: Path) -> None:
     _path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=17,
-        loop="main_loop",
         issue_title="Bug",
         issue_body="""
 ## 概要
@@ -1969,7 +1826,6 @@ def test_task_run_moves_task_missing_readiness_inputs_to_triage(tmp_path: Path, 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=18,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2000,7 +1856,6 @@ def test_task_decompose_creates_five_minute_slice_tasks(tmp_path: Path, capsys) 
     task_path, task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=19,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2037,7 +1892,6 @@ def test_task_run_requires_decomposition_for_large_ready_task(tmp_path: Path) ->
     task_path, _task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=20,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2063,7 +1917,6 @@ def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> No
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=42,
-        loop="main_loop",
         branch_summary="Add User",
         task_root=tmp_path,
     )
@@ -2087,7 +1940,6 @@ def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=44,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2107,7 +1959,6 @@ def test_github_pr_waits_for_checks_and_falls_back_when_required_checks_are_not_
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=57,
-        loop="main_loop",
         task_root=tmp_path,
     )
     commands = []
@@ -2149,7 +2000,6 @@ def test_task_auto_stops_before_merge_when_pr_checks_fail(tmp_path: Path, monkey
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=58,
-        loop="main_loop",
         task_root=tmp_path,
     )
     calls = []
@@ -2204,7 +2054,6 @@ def test_github_merge_falls_back_when_required_checks_are_not_configured(
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=49,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2248,7 +2097,6 @@ def test_github_merge_keeps_blocking_on_other_required_check_failures(
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=50,
-        loop="main_loop",
         branch_summary="Merge Flow",
         task_root=tmp_path,
     )
@@ -2279,7 +2127,6 @@ def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path,
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=48,
-        loop="main_loop",
         branch_summary="Cleanup Flow",
         task_root=tmp_path,
     )
@@ -2309,7 +2156,6 @@ def test_task_cleanup_execute_marks_child_and_parent_done(tmp_path: Path, monkey
     parent_path, _parent, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=49,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2357,7 +2203,6 @@ def test_task_cleanup_recovers_stale_running_task(tmp_path: Path) -> None:
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=54,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "running"
@@ -2400,7 +2245,6 @@ def test_task_auto_dry_run_includes_merge_route(tmp_path: Path, capsys) -> None:
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=45,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2418,7 +2262,6 @@ def test_task_auto_dry_run_defaults_to_merge_and_cleanup(tmp_path: Path, capsys)
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=56,
-        loop="development_feedback_loop",
         task_root=tmp_path,
     )
 
@@ -2438,7 +2281,6 @@ def test_task_auto_post_pr_steps_have_explicit_opt_outs(tmp_path: Path, capsys) 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=57,
-        loop="development_feedback_loop",
         task_root=tmp_path,
     )
 
@@ -2457,7 +2299,6 @@ def test_task_auto_dry_run_includes_cleanup_after_merge(tmp_path: Path, capsys) 
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=55,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2486,7 +2327,6 @@ def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, c
         upsert_issue_task(
             repo="owner/repo",
             issue_number=issue_number,
-            loop="main_loop",
             issue_title=f"Task {issue_number}",
             issue_body="""
 ## Acceptance Criteria
@@ -2511,7 +2351,6 @@ def test_task_worker_defaults_to_merge_and_cleanup(tmp_path: Path, capsys) -> No
     upsert_issue_task(
         repo="owner/repo",
         issue_number=58,
-        loop="development_feedback_loop",
         issue_title="Task 58",
         issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
         task_root=tmp_path,
@@ -2530,7 +2369,6 @@ def test_task_worker_supports_post_pr_opt_outs(tmp_path: Path, capsys) -> None:
     upsert_issue_task(
         repo="owner/repo",
         issue_number=59,
-        loop="development_feedback_loop",
         issue_title="Task 59",
         issue_body="## AC\n- Works.\n\n## DoD\n- Verified.\n",
         task_root=tmp_path,
@@ -2558,7 +2396,6 @@ def test_task_worker_plans_decomposed_child_tasks(tmp_path: Path, capsys) -> Non
     task_path, _task, _created = upsert_issue_task(
         repo="owner/repo",
         issue_number=53,
-        loop="main_loop",
         issue_title="Large task",
         issue_body="""
 ## AC
@@ -2585,7 +2422,6 @@ def test_task_worker_blocks_not_ready_tasks_when_executing(tmp_path: Path, capsy
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=52,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2602,7 +2438,6 @@ def test_git_commit_is_dry_run_by_default(tmp_path: Path, monkeypatch, capsys) -
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=43,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2627,7 +2462,6 @@ def test_git_commit_execute_requires_verified_run(tmp_path: Path, monkeypatch, c
     task_path, _task = create_issue_task(
         repo="owner/repo",
         issue_number=46,
-        loop="main_loop",
         task_root=tmp_path,
     )
 
@@ -2650,7 +2484,6 @@ def test_github_sync_dry_run_prints_progress_comment_only(tmp_path: Path, capsys
     task_path, task = create_issue_task(
         repo="owner/repo",
         issue_number=47,
-        loop="main_loop",
         task_root=tmp_path,
     )
     task["status"] = "done"
