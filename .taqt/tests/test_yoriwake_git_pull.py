@@ -45,7 +45,7 @@ def shell_env(tmp_path: Path):
     (root / ".taqt" / "config" / "profiles.yaml").write_text(
         "profiles: {}\n", encoding="utf-8"
     )
-    (root / "taskfile" / "core.yml").write_text(
+    (root / "taskfile" / "repository.yml").write_text(
         'version: "3"\n', encoding="utf-8"
     )
     shutil.copyfile(SCRIPT, root / "scripts" / "yoriwake_git_pull.sh")

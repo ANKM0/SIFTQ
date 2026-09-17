@@ -15,8 +15,8 @@ import pytest
 import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-CORE_TASKFILE = REPOSITORY_ROOT / "taskfile" / "core.yml"
-CODEX_RULES = REPOSITORY_ROOT / ".codex" / "rules" / "siftq.rules"
+CORE_TASKFILE = REPOSITORY_ROOT / "taskfile" / "repository.yml"
+CODEX_RULES = REPOSITORY_ROOT / ".codex" / "rules" / "shared.rules"
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from scripts.repo_pull_main import (
