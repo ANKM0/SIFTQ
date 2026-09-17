@@ -102,7 +102,7 @@
 
 ## 画面遷移
 
-![alt text](assets/screen-flow-fsm.svg)
+画面遷移は `domain-model.json` の `navigation` を正本とする。`task docs:domain:svg` で図（`nav.svg`）を生成する。
 
 ## モック BE プレビュー
 
