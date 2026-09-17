@@ -1,0 +1,10 @@
+{
+  "issue": 427,
+  "what": "verification_fix routing regression evidence from recorded runs",
+  "source": ".taqt/runs/*/*/events.jsonl and state.json",
+  "runs_with_verification_fix": 9,
+  "final_status": { "human": 8, "done": 1 },
+  "routed_to_human_by_verification_fix": 9,
+  "total_verification_fix_events": 11,
+  "interpretation": "Every run with a deterministic verification failure routed to human because decide had no route for verification_fix. After the fix these route to fix within max_fix_attempts. Counterfactual closure gain is LLM-dependent and not measured here."
+}
