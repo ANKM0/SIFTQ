@@ -68,7 +68,9 @@ describe("domain model generation", () => {
     expect(flowD2(model)).toContain("status=do");
     expect(navD2(model)).toContain("P01 -> P01");
   });
+});
 
+describe("domain model checks", () => {
   it("parseMigrations collects columns from CREATE and ALTER", () => {
     const into: Migrations = {};
     parseMigrations(
