@@ -6,11 +6,6 @@ tasks:
     cmds:
       - uv run python scripts/release_deploy.py plan {{.CLI_ARGS}}
 
-  release:version:
-    desc: Update package version before committing a release commit.
-    cmds:
-      - uv run python scripts/release_deploy.py version {{.CLI_ARGS}}
-
   release:create:
     desc: Create and push an annotated release tag at the checked-out SHA.
     cmds:

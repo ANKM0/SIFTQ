@@ -49,10 +49,6 @@ def build_plan(version: str, ref: str, base: str | None) -> ReleasePlan:
     return ReleasePlan(tag_name(version), resolved_ref, base, worker_change, migrations, "release+deploy" if worker_change else "release-only")
 
 
-def package_version(path: Path) -> str:
-    return str(json.loads(path.read_text(encoding="utf-8"))["version"])
-
-
 def d1_binding(path: Path = Path("wrangler.jsonc")) -> str:
     text = path.read_text(encoding="utf-8")
     try:
@@ -70,12 +66,6 @@ def d1_binding(path: Path = Path("wrangler.jsonc")) -> str:
     raise ValueError("D1 binding not found in wrangler.jsonc")
 
 
-def update_package_version(path: Path, version: str) -> None:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["version"] = normalized_version(version)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
 def require_execute(args: argparse.Namespace) -> None:
     if not args.execute:
         raise ValueError("This operation changes external or repository state; pass --execute.")
@@ -86,12 +76,6 @@ def require_clean() -> None:
         raise ValueError("worktree must be clean")
 
 
-def ensure_version_matches(version: str) -> None:
-    actual = package_version(Path("package.json"))
-    if actual != normalized_version(version):
-        raise ValueError(f"package.json version is {actual}; expected {normalized_version(version)}")
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Plan and execute releases and Worker deployments.")
     subparsers = parser.add_subparsers(dest="operation", required=True)
@@ -99,9 +83,6 @@ def main() -> int:
     plan.add_argument("--version", required=True)
     plan.add_argument("--ref", default="HEAD")
     plan.add_argument("--base")
-    version = subparsers.add_parser("version")
-    version.add_argument("--version", required=True)
-    version.add_argument("--execute", action="store_true")
     release = subparsers.add_parser("release")
     release.add_argument("--version", required=True)
     release.add_argument("--ref", default="HEAD")
@@ -113,14 +94,9 @@ def main() -> int:
     try:
         if args.operation == "plan":
             print(json.dumps(asdict(build_plan(args.version, args.ref, args.base)), ensure_ascii=False, indent=2))
-        elif args.operation == "version":
-            require_execute(args)
-            update_package_version(Path("package.json"), args.version)
-            print(f"package.json version updated to {normalized_version(args.version)}")
         elif args.operation == "release":
             require_execute(args)
             require_clean()
-            ensure_version_matches(args.version)
             ref = command("git", "rev-parse", f"{args.ref}^{{commit}}")
             if ref != command("git", "rev-parse", "HEAD"):
                 raise ValueError("release ref must equal the checked-out HEAD in the dedicated worktree")

@@ -50,3 +50,4 @@
 | [ADR 0044: Adopt single-source domain model JSON with generated diagrams](0044-adopt-single-source-domain-model-json.md) | Accepted. | ドメイン/データモデルの正本を `domain-model.json` に一本化し、D2 で図を生成する。`concept.d2` は廃止。 |
 | [ADR 0045: Place logical-to-physical mapping in the generator](0045-place-logical-to-physical-mapping-in-generator.md) | Accepted. | 論理→物理の mapping は生成器のコードに置き、`migrations` を物理の正本として一致検証する。 |
 | [ADR 0046: Track invariants with domain.md IDs and test names](0046-track-invariants-with-domain-md-ids-and-tests.md) | Accepted. | 不変条件は `domain.md` の `INV-TM-xxx` を正本とし、JSON は参照、テスト名に対応づけて検証する。 |
+| [ADR 0047: Manage release version with git tags](0047-manage-release-version-with-git-tags.md) | Accepted. | バージョンの正本を git タグとし、`package.json` の `version` を削除する。リリースは release commit を作らず SHA にタグする。 |
