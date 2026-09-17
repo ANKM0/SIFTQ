@@ -17,7 +17,7 @@ _yoriwake_git_worktree() {
         "$_yoriwake_git_pull_root"|"$_yoriwake_git_pull_root"/*) ;;
         *) return 1 ;;
     esac
-    [ -f "$top/.taqt/config/profiles.yaml" ] && [ -f "$top/taskfile/core.yml" ]
+    [ -f "$top/.taqt/config/profiles.yaml" ] && [ -f "$top/taskfile/repository.yml" ]
 }
 
 git() {
