@@ -10,13 +10,23 @@
 - 集計: arm A（fast のみ）2/3 = 0.667、arm B（+e2e）3/3 = 1.0。`a_missed_b_caught=1`、`a_caught_b_missed=0`、clean 誤検知なし。
 - 採用基準: 満たす（arm B 捕獲率 > arm A、差分が e2e 側に有利、clean 誤検知なし）。
 
-## T3: paired replay
+## routing リグレッションの決定論的証拠
 
-未実施。以下の阻害要因がある。
+- 結果: `routing-regression-evidence.json`
+- verification 失敗があった run は 9。最終 status は human 8 / done 1。
+- `verification_fix` で human へ落ちた run は 9/9。決定論的 verification 失敗が全件 human に流れ、自動 fix の機会が無かった。
+- これは LLM リプレイ不要で routing 修正の効果を直接示す。closure の回復量は LLM 依存のため未測定。
 
-- gold タスクが 1 件のみ（目標 10〜20）。
-- `eval/gold/loop-tasks/ISSUE-140-01.yaml` のタスクは `status: done` で既に main に取り込まれており、base commit を切っていないため現行 main での replay は汚染される（解が既に存在）。
-- `loop_eval.replay` は arm 間で workspace をリセットしない。arm A の変更が arm B に持ち越される。
-- R>=3 の反復は呼び出し側で行う必要があり、集計は外部。
+## T3: paired replay（保留）
 
-T3 を有効化するには、gold に base commit を持たせて隔離 workspace を arm ごとに用意し、リプレイハーネスに workspace リセットを追加する必要がある。詳細は #434。
+保留。理由:
+
+- #427 の主眼である routing 修正は上記で決定論的に検証済み。T3 の追加対象は loop 構造（design/test 廃止）の closure 効果のみで、refacta も従属証拠・ノイズ大と位置づける。
+- gold が 1 件のみ、対象タスクは既に main に取り込まれており base commit を切っていない（汚染）。
+- `loop_eval.replay` は arm 間で workspace をリセットせず、R>=3 集計も外部。フル実施は数時間規模の LLM 費用。
+
+T3 は「loop を継続的に変更する時の回帰ガード」として、次の loop 変更時に有効化する。有効化に必要な作業:
+
+1. gold に base commit / 期待 checks を持たせる（10〜20 件）。
+2. arm ごとに `git worktree add <ws> <base_commit>` した隔離 workspace を使う（単一 arm spec で実行すればハーネス改修なしで持ち越しを排除できる）。
+3. R>=3 で closure / escaped / human 率 / 自動復帰率 / コストを集計する。
