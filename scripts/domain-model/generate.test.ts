@@ -92,6 +92,16 @@ describe("domain model generation", () => {
     expect(broken.warnings.some((w) => w.includes("INV-TM"))).toBe(true);
   });
 
+  it("check treats missing tests and orphan invariants as errors", () => {
+    const result = check(model, {
+      invariantIds: ["INV-TM-001", "INV-TM-002"],
+      testIds: ["INV-TM-001"],
+      migrations,
+    });
+    expect(result.errors.some((e) => e.includes("INV-TM-002") && e.includes("テスト"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("INV-TM-002") && e.includes("rules"))).toBe(true);
+  });
+
   it("validate rejects schema violations", () => {
     expect(validate(model, schema)).toEqual([]);
     expect(validate({ entities: {} }, schema).length).toBeGreaterThan(0);
