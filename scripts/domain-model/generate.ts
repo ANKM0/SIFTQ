@@ -141,19 +141,18 @@ function transitionErrors(name: string, t: Transition, model: Model, domain: str
   return errors;
 }
 
-function checkTransitions(model: Model): { errors: string[]; warnings: string[] } {
+function checkTransitions(model: Model): string[] {
   const errors: string[] = [];
-  const warnings: string[] = [];
   for (const [name, entity] of Object.entries(model.entities)) {
     for (const t of entity.transitions ?? []) {
       if (t.domain === undefined) {
-        warnings.push(`entities.${name}.transitions "${t.on}" に domain が無く端点を検証できない`);
+        errors.push(`entities.${name}.transitions "${t.on}" に domain が無く端点を検証できない`);
         continue;
       }
       errors.push(...transitionErrors(name, t, model, t.domain));
     }
   }
-  return { errors, warnings };
+  return errors;
 }
 
 function checkRelations(model: Model): string[] {
@@ -230,10 +229,10 @@ function checkInvariantRules(model: Model, input: CheckInput): { errors: string[
   const known = new Set(input.invariantIds);
   const used = collectRuleIds(model);
   for (const id of used) if (!known.has(id)) errors.push(`rules の ID が domain.md に無い: ${id}`);
-  for (const id of known) if (!used.has(id)) warnings.push(`domain.md の ${id} を参照する rules が無い`);
+  for (const id of known) if (!used.has(id)) errors.push(`domain.md の ${id} を参照する rules が無い`);
 
   const tests = new Set(input.testIds ?? []);
-  for (const id of known) if (!tests.has(id)) warnings.push(`${id} を検証するテストが無い`);
+  for (const id of known) if (!tests.has(id)) errors.push(`${id} を検証するテストが無い`);
   for (const id of tests) if (!known.has(id)) errors.push(`テストの ID が domain.md に無い: ${id}`);
   return { errors, warnings };
 }
@@ -243,7 +242,7 @@ export function check(model: Model, input: CheckInput): { errors: string[]; warn
   const rules = checkInvariantRules(model, input);
   const errors = [
     ...checkAttributeDomains(model),
-    ...transitions.errors,
+    ...transitions,
     ...checkRelations(model),
     ...checkFlows(model),
     ...checkScreens(model),
@@ -251,7 +250,7 @@ export function check(model: Model, input: CheckInput): { errors: string[]; warn
     ...rules.errors,
   ];
   if (input.migrations !== undefined) errors.push(...checkMigrations(model, input.migrations));
-  return { errors, warnings: [...transitions.warnings, ...checkUnreferencedEntities(model), ...rules.warnings] };
+  return { errors, warnings: [...checkUnreferencedEntities(model), ...rules.warnings] };
 }
 
 function tableD2(model: Model, typeOf: (domain: string) => string): string {

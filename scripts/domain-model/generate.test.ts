@@ -68,7 +68,9 @@ describe("domain model generation", () => {
     expect(flowD2(model)).toContain("status=do");
     expect(navD2(model)).toContain("P01 -> P01");
   });
+});
 
+describe("domain model checks", () => {
   it("parseMigrations collects columns from CREATE and ALTER", () => {
     const into: Migrations = {};
     parseMigrations(
@@ -90,6 +92,16 @@ describe("domain model generation", () => {
     });
     expect(broken.errors.some((e) => e.includes("mapping 期待"))).toBe(true);
     expect(broken.warnings.some((w) => w.includes("INV-TM"))).toBe(true);
+  });
+
+  it("check treats missing tests and orphan invariants as errors", () => {
+    const result = check(model, {
+      invariantIds: ["INV-TM-001", "INV-TM-002"],
+      testIds: ["INV-TM-001"],
+      migrations,
+    });
+    expect(result.errors.some((e) => e.includes("INV-TM-002") && e.includes("テスト"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("INV-TM-002") && e.includes("rules"))).toBe(true);
   });
 
   it("validate rejects schema violations", () => {
