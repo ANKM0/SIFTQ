@@ -37,6 +37,88 @@ def test_build_plan_classifies_worker_and_migrations(monkeypatch) -> None:
     assert plan.migrations == ["migrations/0003_add.sql"]
 
 
+WRANGLER_BEFORE = json.dumps(
+    {
+        "$schema": "node_modules/wrangler/config-schema.json",
+        "main": "src/index.tsx",
+        "d1_databases": [{"binding": "DB", "migrations_dir": "migrations"}],
+    }
+)
+WRANGLER_AFTER_RELOCATION = json.dumps(
+    {
+        "$schema": "../node_modules/wrangler/config-schema.json",
+        "main": "../src/index.tsx",
+        "d1_databases": [{"binding": "DB", "migrations_dir": "../migrations"}],
+    }
+)
+WRANGLER_AFTER_BINDING_CHANGE = json.dumps(
+    {
+        "$schema": "../node_modules/wrangler/config-schema.json",
+        "main": "../src/index.tsx",
+        "d1_databases": [{"binding": "DB", "migrations_dir": "../migrations", "database_name": "renamed"}],
+    }
+)
+
+
+def _wrangler_command(contents: dict[str, str]):
+    def fake_command(*args: str) -> str:
+        if args[:2] == ("git", "rev-parse"):
+            return "commit"
+        if args[:3] == ("git", "diff", "--name-only"):
+            return ".config/wrangler.jsonc\nwrangler.jsonc"
+        if args[:2] == ("git", "show"):
+            key = args[2]
+            if key in contents:
+                return contents[key]
+            raise subprocess.CalledProcessError(128, args)
+        raise AssertionError(args)
+
+    return fake_command
+
+
+def test_effective_wrangler_normalizes_relocated_paths() -> None:
+    before = release_deploy.effective_wrangler("wrangler.jsonc", json.loads(WRANGLER_BEFORE))
+    after = release_deploy.effective_wrangler(".config/wrangler.jsonc", json.loads(WRANGLER_AFTER_RELOCATION))
+
+    assert before == after
+
+
+def test_build_plan_ignores_wrangler_config_relocation(monkeypatch) -> None:
+    monkeypatch.setattr(
+        release_deploy,
+        "command",
+        _wrangler_command(
+            {
+                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
+                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_RELOCATION,
+            }
+        ),
+    )
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", "v0.5.2")
+
+    assert plan.worker_change is False
+    assert plan.mode == "release-only"
+
+
+def test_build_plan_detects_wrangler_config_change(monkeypatch) -> None:
+    monkeypatch.setattr(
+        release_deploy,
+        "command",
+        _wrangler_command(
+            {
+                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
+                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_BINDING_CHANGE,
+            }
+        ),
+    )
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", "v0.5.2")
+
+    assert plan.worker_change is True
+    assert plan.mode == "release+deploy"
+
+
 def _prepare_deploy(monkeypatch, tmp_path, *, migration_fails: bool = False) -> list[list[str]]:
     (tmp_path / ".config").mkdir()
     (tmp_path / ".config" / "wrangler.jsonc").write_text(
