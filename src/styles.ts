@@ -14,6 +14,11 @@ body {
   margin: 0;
 }
 
+::selection {
+  background: #444444;
+  color: #ffffff;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -352,6 +357,23 @@ a {
   border-color: #0969da;
   box-shadow: 0 0 0 3px #ddf4ff;
   opacity: 0.72;
+}
+
+.matrix-drag-ghost {
+  left: 0;
+  margin: 0;
+  opacity: 0.85;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  z-index: 100;
+}
+
+.matrix-drag-placeholder {
+  background: #ddf4ff;
+  flex: none;
+  margin-bottom: 12px;
+  pointer-events: none;
 }
 
 .area--quadrant.drop-target {

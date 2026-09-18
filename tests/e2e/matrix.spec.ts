@@ -1,5 +1,6 @@
-import { chromium, expect, test } from "@playwright/test";
+import { chromium } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { expect, installHtmxRoute, test } from "./fixtures";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
@@ -200,6 +201,79 @@ test("moves a matrix card between quadrants with a pointer drag", async ({ page 
 
   await page.reload();
   await expect(page.locator('.area--quadrant[data-drop-area="4"] .task-card', { hasText: title })).toBeVisible();
+});
+
+test("shows a drag ghost and insertion placeholder during a pointer drag", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E drag feedback ${Date.now()}`;
+  await createMatrixTask(page, title);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  const card = page.locator(".task-card", { hasText: title });
+  const target = page.locator('.area--quadrant[data-drop-area="4"] .matrix-cards');
+  const cardBox = await card.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!cardBox || !targetBox) throw new Error("Drag boxes are missing");
+
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cardBox.x + cardBox.width / 2 + 16, cardBox.y + cardBox.height / 2 + 16, {
+    steps: 4,
+  });
+
+  const ghost = page.locator(".matrix-drag-ghost");
+  await expect(ghost).toBeVisible();
+  await expect(ghost).toContainText(title);
+
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 24, { steps: 6 });
+  const quadrant = page.locator('.area--quadrant[data-drop-area="4"]');
+  await expect(quadrant).toHaveClass(/drop-target/);
+  await expect(quadrant.locator(".matrix-drag-placeholder")).toBeVisible();
+
+  const reorder = page.waitForResponse(
+    (response) => response.url().includes("/api/tasks/reorder") && response.request().method() === "POST",
+  );
+  await page.mouse.up();
+  expect((await reorder).status()).toBe(200);
+
+  await expect(page.locator(".matrix-drag-ghost")).toHaveCount(0);
+  await expect(page.locator(".matrix-drag-placeholder")).toHaveCount(0);
+});
+
+test("clears the drag ghost and placeholder when the pointer is cancelled", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E drag cancel ${Date.now()}`;
+  await createMatrixTask(page, title);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  await page.evaluate(() => {
+    document.addEventListener("pointerdown", (event) => {
+      document.body.dataset["dragPointerId"] = String(event.pointerId);
+    });
+  });
+
+  const card = page.locator(".task-card", { hasText: title });
+  const cardBox = await card.boundingBox();
+  if (!cardBox) throw new Error("Drag box is missing");
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cardBox.x + cardBox.width / 2 + 16, cardBox.y + cardBox.height / 2 + 16, {
+    steps: 4,
+  });
+  await expect(page.locator(".matrix-drag-ghost")).toBeVisible();
+
+  const pointerId = await page.locator("body").getAttribute("data-drag-pointer-id");
+  await page.evaluate((id) => {
+    document.dispatchEvent(new PointerEvent("pointercancel", { pointerId: Number(id), bubbles: true }));
+  }, pointerId);
+  await page.mouse.up();
+
+  await expect(page.locator(".matrix-drag-ghost")).toHaveCount(0);
+  await expect(page.locator(".matrix-drag-placeholder")).toHaveCount(0);
 });
 
 test("keeps the matrix quadrant creation link working", async ({ page }) => {
@@ -460,6 +534,8 @@ test("clears only the current browser profile drafts on logout", async ({ browse
   const otherContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
   const currentPage = await currentContext.newPage();
   const otherPage = await otherContext.newPage();
+  await installHtmxRoute(currentContext);
+  await installHtmxRoute(otherContext);
   const draftKeys = ["siftq.task-draft:new", "siftq.task-draft:task-from-another-device"];
   const draftValue = JSON.stringify({ title: "draft", description: "draft", updatedAt: Date.now() });
 
@@ -566,6 +642,7 @@ test("restores a new task draft after a browser restart", async ({ browserName }
   const firstContext = await chromium.launchPersistentContext(userDataDir, {
     baseURL: "http://127.0.0.1:4173",
   });
+  await installHtmxRoute(firstContext);
   const firstPage = firstContext.pages()[0] ?? (await firstContext.newPage());
 
   try {
@@ -583,6 +660,7 @@ test("restores a new task draft after a browser restart", async ({ browserName }
   const restartedContext = await chromium.launchPersistentContext(userDataDir, {
     baseURL: "http://127.0.0.1:4173",
   });
+  await installHtmxRoute(restartedContext);
   const restartedPage = restartedContext.pages()[0] ?? (await restartedContext.newPage());
 
   try {
