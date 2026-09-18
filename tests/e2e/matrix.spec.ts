@@ -148,6 +148,32 @@ test("navigates to a new task from a matrix quadrant blank area", async ({ page 
   }
 });
 
+test("keeps the page interactive after dragging and dropping a matrix card", async ({ page }) => {
+  await signIn(page);
+
+  const suffix = Date.now();
+  const firstTitle = `E2E dnd first ${suffix}`;
+  const secondTitle = `E2E dnd second ${suffix}`;
+  await createMatrixTask(page, firstTitle);
+  await createMatrixTask(page, secondTitle);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  const firstCard = page.locator(".task-card", { hasText: firstTitle });
+  const secondCard = page.locator(".task-card", { hasText: secondTitle });
+  const reorder = page.waitForResponse(
+    (response) => response.url().includes("/api/tasks/reorder") && response.request().method() === "POST",
+  );
+  await secondCard.dragTo(firstCard, { targetPosition: { x: 5, y: 5 } });
+  expect((await reorder).status()).toBe(200);
+
+  // The drag session must end without leaving the page inert.
+  await expect(secondCard).not.toHaveClass(/dragging/);
+  // The first click after the drop must reach the card instead of being swallowed.
+  await secondCard.click();
+  await expect(page).toHaveURL(/\/tasks\/[^/]+\?from=matrix/);
+});
+
 test("keeps the matrix quadrant creation link working", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();

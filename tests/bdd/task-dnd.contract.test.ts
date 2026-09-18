@@ -69,3 +69,27 @@ describe("Matrix drag and drop", () => {
     expect(body).toContain("matrix-modal-backdrop");
   });
 });
+
+describe("Matrix drag and drop resilience", () => {
+  it("defers the dropped card move until the native drag session ends", async () => {
+    const repo = createMemoryTaskRepository();
+    const response = await authenticatedRequest("/matrix-dnd.js", repo);
+    const body = await response.text();
+    const start = body.indexOf('document.addEventListener("drop"');
+    const end = body.indexOf('document.addEventListener("dragend"');
+    const dropHandler = body.slice(start, end);
+
+    expect(response.status).toBe(200);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    // Moving the drag source inside the drop handler makes some browsers end
+    // the drag without firing dragend, leaving the whole page inert. The move
+    // must be deferred and every drop path must clear the drag state.
+    expect(dropHandler).toContain("clearMatrixDnd();");
+    expect(dropHandler).toContain("if (!target) { clearMatrixDnd(); return; }");
+    expect(dropHandler.indexOf("setTimeout")).toBeGreaterThan(-1);
+    expect(dropHandler.indexOf("setTimeout")).toBeLessThan(dropHandler.indexOf("target.insertBefore"));
+    expect(body).toContain('document.addEventListener("dragend", clearMatrixDnd);');
+  });
+});
