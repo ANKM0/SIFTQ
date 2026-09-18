@@ -20,6 +20,7 @@ permissions:
 env:
   UV_CACHE_DIR: /tmp/uv-cache
   AQUA_CONFIG: ${{ github.workspace }}/.config/aqua.yaml
+  AQUA_POLICY_CONFIG: ${{ github.workspace }}/.config/aqua-policy.yaml
 
 jobs:
   llm-eval:

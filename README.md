@@ -8,8 +8,8 @@ drag-and-drop, and task state is persisted in D1.
 
 Tool configuration lives under `.config/`. The Taskfile is at
 `.config/Taskfile.yml`, so every task runs as
-`task -t .config/Taskfile.yml <name>`. `.config/aqua.yaml` is not
-auto-discovered; export its path before using aqua-managed tools:
+`task -t .config/Taskfile.yml <name>`. `.config/aqua.yaml` and `.config/aqua-policy.yaml` are not
+auto-discovered; export their paths before using aqua-managed tools:
 
 ```bash
 . ./.config/env.sh
