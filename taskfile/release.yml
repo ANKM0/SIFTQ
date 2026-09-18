@@ -24,7 +24,7 @@ tasks:
   deploy:
     desc: Deploy the Worker to Cloudflare.
     cmds:
-      - bun x wrangler deploy
+      - bun x wrangler deploy -c .config/wrangler.jsonc
 
   deploy:secrets:
     desc: Set Worker auth secrets on Cloudflare.
@@ -41,5 +41,5 @@ tasks:
           printf 'SESSION_SECRET: '
           IFS= read -r secret
         fi
-        printf '%s' "$password" | bun x wrangler secret put AUTH_PASSWORD
-        printf '%s' "$secret" | bun x wrangler secret put SESSION_SECRET
+        printf '%s' "$password" | bun x wrangler secret put AUTH_PASSWORD -c .config/wrangler.jsonc
+        printf '%s' "$secret" | bun x wrangler secret put SESSION_SECRET -c .config/wrangler.jsonc

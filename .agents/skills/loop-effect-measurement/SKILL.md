@@ -23,9 +23,9 @@ PYTHONPATH=.taqt/scripts uv run python -m loop_eval.defect_injection \
 ```
 
 Before injecting mutants, confirm the clean checkout passes the commands used by
-arm B: `git diff --check`, `task setup:frontend:ci`, `task ci:lint`,
-`task ci:lint:python`, `task ci:typecheck`, `task ci:test:unit`, and
-`task ci:test:e2e`.
+arm B: `git diff --check`, `task -t .config/Taskfile.yml setup:frontend:ci`, `task -t .config/Taskfile.yml ci:lint`,
+`task -t .config/Taskfile.yml ci:lint:python`, `task -t .config/Taskfile.yml ci:typecheck`, `task -t .config/Taskfile.yml ci:test:unit`, and
+`task -t .config/Taskfile.yml ci:test:e2e`.
 
 Adopt the change when arm B's catch rate is higher than arm A's,
 `a_missed_b_caught` is higher than `a_caught_b_missed`, and the clean checks

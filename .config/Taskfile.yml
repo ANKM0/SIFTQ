@@ -1,0 +1,48 @@
+version: "3"
+
+env:
+  AQUA_CONFIG: "{{.ROOT_DIR}}/aqua.yaml"
+  UV_PROJECT_ENVIRONMENT: "{{.ROOT_DIR}}/.venv"
+  RUFF_CACHE_DIR: "{{.ROOT_DIR}}/.ruff_cache"
+  UV_CACHE_DIR: "{{.ROOT_DIR}}/../tmp/uv-cache"
+  PLAYWRIGHT_BROWSERS_PATH: "{{.ROOT_DIR}}/../tmp/playwright-browsers"
+  PUPPETEER_CACHE_DIR: "{{.ROOT_DIR}}/../tmp/puppeteer-cache"
+
+includes:
+  setup:
+    taskfile: ../taskfile/setup.yml
+    dir: ..
+    flatten: true
+  ci:
+    taskfile: ../taskfile/ci.yml
+    dir: ..
+    flatten: true
+  frontend:
+    taskfile: ../taskfile/frontend.yml
+    dir: ..
+    flatten: true
+  repository:
+    taskfile: ../taskfile/repository.yml
+    dir: ..
+    flatten: true
+  codex:
+    taskfile: ../taskfile/codex.yml
+    dir: ..
+    flatten: true
+  release:
+    taskfile: ../taskfile/release.yml
+    dir: ..
+    flatten: true
+  taqt:
+    taskfile: ../taskfile/taqt.yml
+    dir: ..
+  docs:
+    taskfile: ../taskfile/docs.yml
+    dir: ..
+
+tasks:
+  default:
+    desc: List available tasks.
+    dir: ..
+    cmds:
+      - task -t "{{.TASKFILE}}" --list

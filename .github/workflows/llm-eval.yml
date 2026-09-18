@@ -19,6 +19,7 @@ permissions:
 
 env:
   UV_CACHE_DIR: /tmp/uv-cache
+  AQUA_CONFIG: ${{ github.workspace }}/.config/aqua.yaml
 
 jobs:
   llm-eval:
@@ -36,7 +37,7 @@ jobs:
 
       - name: Install repository tools
         run: |
-          aqua policy allow aqua-policy.yaml
+          aqua policy allow .config/aqua-policy.yaml
           aqua install
 
       - name: Set up Bun
@@ -45,4 +46,4 @@ jobs:
           bun-version: 1.4.0
 
       - name: Run LLM eval smoke
-        run: task ci:llm-eval
+        run: task -t .config/Taskfile.yml ci:llm-eval

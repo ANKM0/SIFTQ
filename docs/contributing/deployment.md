@@ -11,7 +11,7 @@ Release と Worker デプロイの判断は [ADR 0034](../adr/0034-separate-rele
 ## 前提
 
 - Cloudflare アカウントがある。
-- `task setup` 済みで、`bun x wrangler` が実行できる。
+- `. ./.config/env.sh` を実行し、`task -t .config/Taskfile.yml setup` 済みで、`bun x wrangler` が実行できる。
 
 ## 認証
 
@@ -38,25 +38,25 @@ Token には次の権限が必要。
 
 `bun x wrangler d1 create app`
 
-`wrangler.jsonc` は `database_name` で D1 を参照するため、作成した database 名が
+`.config/wrangler.jsonc` は `database_name` で D1 を参照するため、作成した database 名が
 `app` であれば設定変更は不要。
 
 ## マイグレーションを適用する
 
-`bun x wrangler d1 migrations apply app --remote`
+`bun x wrangler d1 migrations apply app --remote -c .config/wrangler.jsonc`
 
 ## Worker 認証の secrets を設定する
 
 共有パスワード認証に必要な secrets を設定する。
 
 ```bash
-task deploy:secrets
+task -t .config/Taskfile.yml deploy:secrets
 ```
 
 対話入力を避ける場合は環境変数で渡す。
 
 ```bash
-AUTH_PASSWORD="<password>" SESSION_SECRET="<long-random-secret>" task deploy:secrets
+AUTH_PASSWORD="<password>" SESSION_SECRET="<long-random-secret>" task -t .config/Taskfile.yml deploy:secrets
 ```
 
 `SESSION_SECRET` は長いランダム文字列を設定する。
@@ -67,7 +67,7 @@ AUTH_PASSWORD="<password>" SESSION_SECRET="<long-random-secret>" task deploy:sec
 ## Worker をデプロイする
 
 ```bash
-task deploy
+task -t .config/Taskfile.yml deploy
 ```
 
 コマンド末尾に表示される production URL で UI を確認する。
@@ -76,5 +76,5 @@ task deploy
 
 - 未認証では `/login` が表示され、ログイン後に Matrix UI が表示される。
 - task の作成・更新・DnD 並べ替えが保存される。
-- `bun x wrangler d1 migrations list app --remote` で適用済み migration を確認できる。
+- `bun x wrangler d1 migrations list app --remote -c .config/wrangler.jsonc` で適用済み migration を確認できる。
 - Release Notes に対象 SHA、Worker デプロイ有無、migration 確認、本番確認結果を記録する。

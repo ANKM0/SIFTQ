@@ -1,5 +1,6 @@
 # Source this file from Yoriwake's interactive shell to route a bare
-# `git pull` to `task repo:pull-main` only inside this repository's worktrees.
+# `git pull` to `task -t .config/Taskfile.yml repo:pull-main` only inside this
+# repository's worktrees.
 #
 # Install:
 #   source /home/develop/Yoriwake/scripts/yoriwake_git_pull.sh
@@ -24,7 +25,7 @@ git() {
     if [ "${1:-}" = "pull" ] && [ "$#" -eq 1 ] && _yoriwake_git_worktree; then
         local top
         top="$(command git rev-parse --show-toplevel 2>/dev/null)"
-        (cd "$top" && command task repo:pull-main)
+        (cd "$top" && command task -t .config/Taskfile.yml repo:pull-main)
     else
         command git "$@"
     fi

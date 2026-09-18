@@ -76,7 +76,7 @@ def should_update_graphify(
 
 def graphify_update(root: Path) -> int:
     return subprocess.run(
-        ["task", "graphify:update"],
+        ["task", "-t", ".config/Taskfile.yml", "graphify:update"],
         cwd=root,
     ).returncode
 
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "error: graphify update failed; main is already updated and will "
             f"not be rolled back. Fix graphify and rerun "
-            "`task graphify:update`.",
+            "`task -t .config/Taskfile.yml graphify:update`.",
             file=sys.stderr,
         )
     return graphify_code
