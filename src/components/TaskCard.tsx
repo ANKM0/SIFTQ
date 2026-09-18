@@ -7,7 +7,7 @@ export const TaskCard: FC<{ task: Task }> = ({ task }) => (
     class={is_working(task) ? "task-card task-card--working" : "task-card"}
     data-task-id={task.id}
     data-version={task.version}
-    draggable="true"
+    draggable="false"
     href={`/tasks/${task.id}?from=matrix`}
   >
     <span class="task-card-header">

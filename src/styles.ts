@@ -327,6 +327,8 @@ a {
   margin-bottom: 12px;
   min-height: 72px;
   padding: 12px;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .task-card--working,
