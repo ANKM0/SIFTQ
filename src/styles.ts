@@ -354,6 +354,23 @@ a {
   opacity: 0.72;
 }
 
+.matrix-drag-ghost {
+  left: 0;
+  margin: 0;
+  opacity: 0.85;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  z-index: 100;
+}
+
+.matrix-drag-placeholder {
+  background: #ddf4ff;
+  flex: none;
+  margin-bottom: 12px;
+  pointer-events: none;
+}
+
 .area--quadrant.drop-target {
   background: #f6f8fa;
   border-radius: 8px;

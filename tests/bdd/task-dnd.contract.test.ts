@@ -106,3 +106,30 @@ describe("Matrix drag and drop resilience", () => {
     expect(body).toContain("matrixAutoScrollList.scrollTop += matrixAutoScrollDelta * 14;");
   });
 });
+
+describe("Matrix drag feedback", () => {
+  it("renders a drag ghost that follows the pointer", async () => {
+    const repo = createMemoryTaskRepository();
+    const response = await authenticatedRequest("/matrix-dnd.js", repo);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("matrix-drag-ghost");
+    expect(body).toContain("cloneNode(true)");
+    expect(body).toContain("matrixDragGrabOffset");
+    expect(body).toContain("positionMatrixGhost");
+  });
+
+  it("shows an insertion placeholder and clears it after the drag", async () => {
+    const repo = createMemoryTaskRepository();
+    const response = await authenticatedRequest("/matrix-dnd.js", repo);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("matrix-drag-placeholder");
+    expect(body).toContain("positionMatrixPlaceholder");
+    expect(body).toContain("matrixDropIndex(list, pointerY)");
+    expect(body).toContain("matrixDragGhost.remove()");
+    expect(body).toContain("matrixDragPlaceholder.remove()");
+  });
+});
