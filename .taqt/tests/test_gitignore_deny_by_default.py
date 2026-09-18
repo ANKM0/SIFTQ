@@ -22,6 +22,7 @@ ALLOWLISTED_PATHS = (
     ".agents/skills/graphify/SKILL.md",
     ".codex/rules/shared.rules",
     ".taqt/config/profiles.yaml",
+    ".aqua/aqua.yaml",
 )
 IGNORED_PATHS = (
     "graphify-out/",

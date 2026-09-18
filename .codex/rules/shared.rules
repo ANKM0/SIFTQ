@@ -93,6 +93,7 @@ prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "codex:profiles:check
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:codex"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:aqua"], decision="allow")
+prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:aqua-links"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:bun"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:ouch"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "setup:unzip"], decision="allow")

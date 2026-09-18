@@ -16,6 +16,9 @@
 /.config/.ruff_cache/
 /.config/.wrangler/
 !/.env.example
+!/.aqua/
+!/.aqua/aqua.yaml
+!/.aqua/aqua-code-mode-host-registry.yaml
 !/src/
 !/src/**
 !/tests/

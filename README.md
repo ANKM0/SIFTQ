@@ -8,16 +8,23 @@ pointer-event drag-and-drop, and task state is persisted in D1.
 
 Tool configuration lives under `.config/`. The Taskfile is at
 `.config/Taskfile.yml`, so every task runs as
-`task -t .config/Taskfile.yml <name>`. `.config/aqua.yaml` and `.config/aqua-policy.yaml` are not
-auto-discovered; export their paths before using aqua-managed tools:
+`task -t .config/Taskfile.yml <name>`. aqua discovers its configuration through
+the committed `.aqua/` symlinks (`aqua.yaml`, `aqua-code-mode-host-registry.yaml`)
+that point at `.config/`, so aqua-managed commands such as `opencode` work
+without exporting `AQUA_CONFIG`. Recreate the links if they are missing:
 
 ```bash
-. ./.config/env.sh
+task -t .config/Taskfile.yml setup:aqua-links
 ```
 
 `env.sh` also redirects `.venv`, Ruff cache, Wrangler state, and Puppeteer
 cache under `.config/` or `tmp/`. The Taskfile applies the same values for
-`task`-run commands.
+`task`-run commands. In non-interactive shells and CI, source the same file
+explicitly to get `AQUA_CONFIG` and `AQUA_POLICY_CONFIG`:
+
+```bash
+. ./.config/env.sh
+```
 
 ## Setup
 
