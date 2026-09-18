@@ -161,17 +161,45 @@ test("keeps the page interactive after dragging and dropping a matrix card", asy
 
   const firstCard = page.locator(".task-card", { hasText: firstTitle });
   const secondCard = page.locator(".task-card", { hasText: secondTitle });
+  await page.evaluate(() => {
+    document.body.dataset["dragstarts"] = "0";
+    document.addEventListener("dragstart", () => {
+      document.body.dataset["dragstarts"] = String(Number(document.body.dataset["dragstarts"] ?? "0") + 1);
+    });
+  });
   const reorder = page.waitForResponse(
     (response) => response.url().includes("/api/tasks/reorder") && response.request().method() === "POST",
   );
   await secondCard.dragTo(firstCard, { targetPosition: { x: 5, y: 5 } });
   expect((await reorder).status()).toBe(200);
 
+  // The native HTML5 drag session must never start.
+  await expect(page.locator("body")).toHaveAttribute("data-dragstarts", "0");
   // The drag session must end without leaving the page inert.
   await expect(secondCard).not.toHaveClass(/dragging/);
   // The first click after the drop must reach the card instead of being swallowed.
   await secondCard.click();
   await expect(page).toHaveURL(/\/tasks\/[^/]+\?from=matrix/);
+});
+
+test("moves a matrix card between quadrants with a pointer drag", async ({ page }) => {
+  await signIn(page);
+
+  const title = `E2E cross quadrant ${Date.now()}`;
+  await createMatrixTask(page, title);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  const card = page.locator(".task-card", { hasText: title });
+  const target = page.locator('.area--quadrant[data-drop-area="4"] .matrix-cards');
+  const reorder = page.waitForResponse(
+    (response) => response.url().includes("/api/tasks/reorder") && response.request().method() === "POST",
+  );
+  await card.dragTo(target);
+  expect((await reorder).status()).toBe(200);
+
+  await page.reload();
+  await expect(page.locator('.area--quadrant[data-drop-area="4"] .task-card', { hasText: title })).toBeVisible();
 });
 
 test("keeps the matrix quadrant creation link working", async ({ page }) => {
