@@ -1,11 +1,6 @@
 version: "3"
 
 tasks:
-  screen-flow:fsm:d2:svg:
-    desc: Generate the D2 screen-flow FSM SVG.
-    cmds:
-      - d2 docs/requirements/assets/screen-flow-fsm.d2 docs/requirements/assets/screen-flow-fsm.svg
-
   domain:svg:
     desc: Validate the domain model and generate its diagrams (domain / logical / physical / flow / nav).
     cmds:
