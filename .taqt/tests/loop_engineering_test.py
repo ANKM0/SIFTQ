@@ -1338,6 +1338,16 @@ def test_parse_opencode_stdout_ignores_non_text_events() -> None:
     assert _parse_opencode_stdout("not json\nnot json either") == {}
 
 
+def test_parse_opencode_stdout_extracts_fenced_json_review() -> None:
+    review = '```json\n{"status": "success", "verdict": "changes_requested"}\n```'
+    stdout = json.dumps({"type": "text", "part": {"type": "text", "text": review}})
+
+    parsed = _parse_opencode_stdout(stdout)
+
+    assert parsed["status"] == "success"
+    assert parsed["verdict"] == "changes_requested"
+
+
 def test_opencode_fallback_error_detects_rate_limits() -> None:
     assert is_opencode_fallback_error("", "429 Too Many Requests")
     assert is_opencode_fallback_error("quota exceeded", "")
