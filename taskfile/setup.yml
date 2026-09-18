@@ -5,6 +5,7 @@ tasks:
     desc: Install all local development tools and dependencies.
     cmds:
       - task: setup:aqua
+      - task: setup:aqua-links
       - task: setup:codex
       - task: setup:ouch
       - task: setup:bun
@@ -23,6 +24,11 @@ tasks:
           exit 1
         fi
         aqua install
+
+  setup:aqua-links:
+    desc: Link the .config aqua files into .aqua for aqua discovery.
+    cmds:
+      - uv run python scripts/setup_aqua_symlinks.py
 
   setup:codex:
     desc: Ensure the Codex code-mode host is installed.
