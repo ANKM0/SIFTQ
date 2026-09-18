@@ -19,8 +19,15 @@ def patterns(path: Path) -> list[tuple[str, ...]]:
     return result
 
 
+def normalized(rule: tuple[str, ...]) -> tuple[str, ...]:
+    if len(rule) >= 3 and rule[0] == "task" and rule[1] == "-t":
+        return (rule[0], *rule[3:])
+    return rule
+
+
 def covers(prefixes: list[tuple[str, ...]], rule: tuple[str, ...]) -> bool:
-    return any(rule[: len(prefix)] == prefix for prefix in prefixes)
+    target = normalized(rule)
+    return any(target[: len(prefix)] == prefix for prefix in map(normalized, prefixes))
 
 
 def main() -> int:

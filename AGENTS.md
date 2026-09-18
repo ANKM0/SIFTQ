@@ -17,8 +17,10 @@
 - `md2idx` が使えない場合は、`rg -n '^(#{1,6}[[:space:]]+|[=-]{3,}[[:space:]]*$)' path/to/file.md` で ATX 見出しと setext の下線位置を確認し、選択した見出しから次の見出し直前までを offset/limit（または `sed -n '開始,終了p'`）で読む。
 - `md2idx` は長い Markdown の section 抽出用であり、コードベースの関係調査や横断的な知識グラフには既存の `graphify` を使う。
 
-## 検証
+## 設定と検証
 
+- ツール設定は `.config/` に置く。タスクは `task -t .config/Taskfile.yml <name>` で実行する。
+- aqua 管理ツールを使う前に `. ./.config/env.sh` を source して環境変数を再現する。Task 経由なら同じ値を自動適用する。
 - 検証コマンドの正は Taskfile、CI、hook に置く。
 - 変更範囲に対して最小の意味ある検証を実行する。
 
