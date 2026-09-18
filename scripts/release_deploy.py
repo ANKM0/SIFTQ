@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import posixpath
 import re
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 VERSION_PATTERN = re.compile(r"^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-WORKER_PATHS = ("src/", "migrations/", ".config/wrangler.jsonc", "bun.lock")
+WORKER_PREFIXES = ("src/", "migrations/")
+WRANGLER_CONFIGS = (".config/wrangler.jsonc", "wrangler.jsonc")
 
 
 @dataclass(frozen=True)
@@ -21,7 +23,7 @@ class ReleasePlan:
 
 
 def command(*args: str) -> str:
-    return subprocess.check_output(args, text=True).strip()
+    return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL).strip()
 
 
 def normalized_version(value: str) -> str:
@@ -41,22 +43,55 @@ def changed_paths(base: str | None, ref: str) -> list[str]:
     return [line for line in command("git", "diff", "--name-only", f"{base}..{ref}").splitlines() if line]
 
 
+def parse_jsonc(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        stripped = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        stripped = re.sub(r"(?m)//.*$", "", stripped)
+        return json.loads(stripped)
+
+
+def effective_wrangler(path: str, payload: dict) -> dict:
+    result = json.loads(json.dumps(payload))
+    result.pop("$schema", None)
+    base = posixpath.dirname(path)
+    if "main" in result:
+        result["main"] = posixpath.normpath(posixpath.join(base, result["main"]))
+    for database in result.get("d1_databases") or []:
+        if isinstance(database, dict) and "migrations_dir" in database:
+            database["migrations_dir"] = posixpath.normpath(posixpath.join(base, database["migrations_dir"]))
+    return result
+
+
+def wrangler_config_at(ref: str) -> dict | None:
+    for path in WRANGLER_CONFIGS:
+        try:
+            text = command("git", "show", f"{ref}:{path}")
+        except subprocess.CalledProcessError:
+            continue
+        return effective_wrangler(path, parse_jsonc(text))
+    return None
+
+
+def worker_config_changed(base: str | None, ref: str) -> bool:
+    if base is None:
+        return False
+    return wrangler_config_at(base) != wrangler_config_at(ref)
+
+
 def build_plan(version: str, ref: str, base: str | None) -> ReleasePlan:
     resolved_ref = command("git", "rev-parse", f"{ref}^{{commit}}")
     paths = changed_paths(base, resolved_ref)
     migrations = [path for path in paths if path.startswith("migrations/")]
-    worker_change = any(path.startswith(WORKER_PATHS[:2]) or path in WORKER_PATHS[2:] for path in paths)
+    worker_change = any(path.startswith(WORKER_PREFIXES) or path == "bun.lock" for path in paths) or worker_config_changed(
+        base, resolved_ref
+    )
     return ReleasePlan(tag_name(version), resolved_ref, base, worker_change, migrations, "release+deploy" if worker_change else "release-only")
 
 
 def d1_binding(path: Path = Path(".config/wrangler.jsonc")) -> str:
-    text = path.read_text(encoding="utf-8")
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-        text = re.sub(r"(?m)//.*$", "", text)
-        payload = json.loads(text)
+    payload = parse_jsonc(path.read_text(encoding="utf-8"))
     databases = payload.get("d1_databases") or []
     for entry in databases:
         if entry.get("binding") == "DB":
