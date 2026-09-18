@@ -95,3 +95,15 @@ describe("styles regression guards", () => {
     expect(STYLES_CSS).toContain(".page--detail .detail-grid");
   });
 });
+
+describe("Matrix drag feedback styles", () => {
+  it("floats the Matrix drag ghost without capturing pointer events", () => {
+    const ghost = STYLES_CSS.match(/(?:^|\n)\.matrix-drag-ghost\s*\{[^}]*\}/);
+    expect(ghost?.[0]).toContain("position: fixed;");
+    expect(ghost?.[0]).toContain("pointer-events: none;");
+    expect(ghost?.[0]).toMatch(/z-index: \d+;/);
+
+    const placeholder = STYLES_CSS.match(/(?:^|\n)\.matrix-drag-placeholder\s*\{[^}]*\}/);
+    expect(placeholder?.[0]).toContain("pointer-events: none;");
+  });
+});

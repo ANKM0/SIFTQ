@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
@@ -42,7 +42,7 @@ test("shows 25 tasks per page with page navigation", async ({ page }) => {
   const nav = page.getByRole("navigation", { name: "Task list pages" });
   await expect(nav).toBeVisible();
   await expect(nav.locator('[aria-current="page"]')).toHaveText("1");
-  await expect(nav.getByRole("link", { name: "Page 2" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Page 2", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Next page" })).toBeVisible();
 });
 
@@ -53,7 +53,7 @@ test("moves between pages with page numbers and previous/next links", async ({ p
   await page.goto("/tasks?status=do");
   const firstPageTitles = await page.locator(".task-row").allTextContents();
 
-  await page.getByRole("link", { name: "Page 2" }).click();
+  await page.getByRole("link", { name: "Page 2", exact: true }).click();
   await expect(page).toHaveURL(/\/tasks\?status=do&page=2/);
   const secondPageRows = page.locator(".task-row");
   expect(await secondPageRows.count()).toBeGreaterThanOrEqual(1);
