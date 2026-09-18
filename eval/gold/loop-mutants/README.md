@@ -9,7 +9,7 @@
 3. arm A（現行検証）と arm B（e2e を含む検証）を各 mutant に実行する。
 4. mutant を revert し、捕獲可否を記録する。
 
-arm の定義は `.taqt/scripts/loop_eval/defect_injection.py` の `ARM_A` / `ARM_B`。arm B は arm A に `task ci:test:e2e` を加えたもの。
+arm の定義は `.taqt/scripts/loop_eval/defect_injection.py` の `ARM_A` / `ARM_B`。arm B は arm A に `task -t .config/Taskfile.yml ci:test:e2e` を加えたもの。
 
 ## mutant 定義
 
