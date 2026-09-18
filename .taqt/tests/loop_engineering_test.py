@@ -626,7 +626,7 @@ def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch)
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task ci:lint" else 0,
+            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:lint" else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -637,7 +637,7 @@ def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch)
 
     assert result["status"] == "fix"
     assert result["feedback"] == "verification_fix"
-    assert calls == ["git diff --check", "task setup:frontend:ci", "task ci:lint"]
+    assert calls == ["git diff --check", "task -t .config/Taskfile.yml setup:frontend:ci", "task -t .config/Taskfile.yml ci:lint"]
 
 
 def test_verification_installs_frontend_dependencies_before_checks_for_frontend_changes(
@@ -649,7 +649,7 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task ci:typecheck" else 0,
+            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -662,10 +662,10 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
 
     assert calls == [
         "git diff --check",
-        "task setup:frontend:ci",
-        "task ci:lint",
-        "task ci:lint:python",
-        "task ci:typecheck",
+        "task -t .config/Taskfile.yml setup:frontend:ci",
+        "task -t .config/Taskfile.yml ci:lint",
+        "task -t .config/Taskfile.yml ci:lint:python",
+        "task -t .config/Taskfile.yml ci:typecheck",
     ]
 
 
@@ -676,7 +676,7 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task ci:typecheck" else 0,
+            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -689,10 +689,10 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
 
     assert calls == [
         "git diff --check",
-        "task setup:frontend:ci",
-        "task ci:lint",
-        "task ci:lint:python",
-        "task ci:typecheck",
+        "task -t .config/Taskfile.yml setup:frontend:ci",
+        "task -t .config/Taskfile.yml ci:lint",
+        "task -t .config/Taskfile.yml ci:lint:python",
+        "task -t .config/Taskfile.yml ci:typecheck",
     ]
 
 
@@ -715,12 +715,12 @@ def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> 
     assert result["status"] == "pass"
     assert calls == [
         "git diff --check",
-        "task setup:frontend:ci",
-        "task ci:lint",
-        "task ci:lint:python",
-        "task ci:typecheck",
-        "task ci:test:unit",
-        "task ci:test:e2e",
+        "task -t .config/Taskfile.yml setup:frontend:ci",
+        "task -t .config/Taskfile.yml ci:lint",
+        "task -t .config/Taskfile.yml ci:lint:python",
+        "task -t .config/Taskfile.yml ci:typecheck",
+        "task -t .config/Taskfile.yml ci:test:unit",
+        "task -t .config/Taskfile.yml ci:test:e2e",
     ]
 
 

@@ -21,7 +21,7 @@ arms:
   A: .taqt/loops/main_loop.yaml
   B: .taqt/loops/quick_loop.yaml
 checks:
-  - task ci:test:unit
+  - task -t .config/Taskfile.yml ci:test:unit
 ```
 
 - `arms`: arm 名 → loop 定義パス。

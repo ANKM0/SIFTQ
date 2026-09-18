@@ -5,14 +5,15 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
+TASKFILE = "task -t .config/Taskfile.yml"
 FAST_COMMANDS = (
-    "task ci:lint",
-    "task ci:lint:python",
-    "task ci:typecheck",
-    "task ci:test:unit",
+    f"{TASKFILE} ci:lint",
+    f"{TASKFILE} ci:lint:python",
+    f"{TASKFILE} ci:typecheck",
+    f"{TASKFILE} ci:test:unit",
 )
-E2E_COMMANDS = ("task ci:test:e2e",)
-FRONTEND_DEPENDENCY_COMMAND = "task setup:frontend:ci"
+E2E_COMMANDS = (f"{TASKFILE} ci:test:e2e",)
+FRONTEND_DEPENDENCY_COMMAND = f"{TASKFILE} setup:frontend:ci"
 
 
 def run_verification(

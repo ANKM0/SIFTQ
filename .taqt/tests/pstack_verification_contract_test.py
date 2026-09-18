@@ -44,8 +44,8 @@ def test_pstack_verification_skill_is_discoverable(name: str) -> None:
 
 
 def test_verification_runs_e2e_after_fast_checks() -> None:
-    assert "task ci:test:e2e" in E2E_COMMANDS
-    assert "task ci:test:e2e" not in FAST_COMMANDS
+    assert "task -t .config/Taskfile.yml ci:test:e2e" in E2E_COMMANDS
+    assert "task -t .config/Taskfile.yml ci:test:e2e" not in FAST_COMMANDS
 
 
 def _prompt(role: str, *, readonly: bool = False) -> str:
