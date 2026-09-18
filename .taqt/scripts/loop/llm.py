@@ -369,15 +369,23 @@ def _build_prompt(
     return "\n".join(lines)
 
 
-def _parse_stdout(stdout: str) -> dict[str, Any]:
-    text = stdout.strip()
+def _extract_json_object(text: str) -> dict[str, Any] | None:
     if not text:
-        return {}
+        return None
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        return None
     try:
-        payload = json.loads(text)
+        payload = json.loads(text[start : end + 1])
     except json.JSONDecodeError:
-        return {}
-    if not isinstance(payload, dict):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _parse_stdout(stdout: str) -> dict[str, Any]:
+    payload = _extract_json_object(stdout.strip())
+    if payload is None:
         return {}
     status = payload.get("status")
     if status is not None and status not in {"success", "failure"}:
