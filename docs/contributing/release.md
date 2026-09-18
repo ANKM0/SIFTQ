@@ -2,6 +2,8 @@
 
 Release はリポジトリ変更の配布単位であり、Cloudflare Workers デプロイとは別に判断する。基準は [ADR 0034](../adr/0034-separate-release-and-worker-deployment.md) に従う。
 
+正規の本番URLは <https://app.siftq-app.workers.dev/>（Worker名 `app`）。旧 `siftq` Worker は廃止済みのため、デプロイおよびスモークは `app` を対象にする。
+
 ## 対象の判断
 
 - Worker 実行成果物、D1 migration、本番 secrets・設定に影響する変更は Release と Worker デプロイを行う。
@@ -36,4 +38,4 @@ Release はリポジトリ変更の配布単位であり、Cloudflare Workers �
 
 ## 本番確認
 
-デプロイ対象では、未認証時のログイン画面、ログイン後の主要な作成・更新操作、DnD を確認する。認証情報が必要な確認は、認証可能な担当者が実施結果を Release Notes に記録する。
+デプロイ対象では、正規URL <https://app.siftq-app.workers.dev/> に対して、未認証時のログイン画面、ログイン後の主要な作成・更新操作、DnD を確認する。認証情報が必要な確認は、認証可能な担当者が実施結果を Release Notes に記録する。

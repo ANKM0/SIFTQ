@@ -2,6 +2,8 @@
 
 Release と Worker デプロイの判断は [ADR 0034](../adr/0034-separate-release-and-worker-deployment.md) に従う。Release-only の手順は [Release](release.md) を参照する。
 
+正規の本番URLは <https://app.siftq-app.workers.dev/>（Worker名 `app`）。旧 `siftq` Worker は廃止済みで、デプロイ・スモークは `app` を対象にする。
+
 ## デプロイ対象の判断
 
 - Worker 実行成果物、D1 migration、または本番 secrets・設定を変更する場合は Worker をデプロイする。
@@ -36,14 +38,13 @@ Token には次の権限が必要。
 
 ## リモート D1 を作成する
 
-`bun x wrangler d1 create app`
+`bun x wrangler d1 create siftq`
 
-`.config/wrangler.jsonc` は `database_name` で D1 を参照するため、作成した database 名が
-`app` であれば設定変更は不要。
+`.config/wrangler.jsonc` の `database_name` は実際の D1 名 `siftq` に合わせている。既存D1を使う場合は `database_id` が一致していればよい。
 
 ## マイグレーションを適用する
 
-`bun x wrangler d1 migrations apply app --remote -c .config/wrangler.jsonc`
+`bun x wrangler d1 migrations apply siftq --remote -c .config/wrangler.jsonc`
 
 ## Worker 認証の secrets を設定する
 
@@ -74,7 +75,9 @@ task -t .config/Taskfile.yml deploy
 
 ## 動作確認
 
+正規URL <https://app.siftq-app.workers.dev/> を対象に確認する。
+
 - 未認証では `/login` が表示され、ログイン後に Matrix UI が表示される。
 - task の作成・更新・DnD 並べ替えが保存される。
-- `bun x wrangler d1 migrations list app --remote -c .config/wrangler.jsonc` で適用済み migration を確認できる。
+- `bun x wrangler d1 migrations list siftq --remote -c .config/wrangler.jsonc` で適用済み migration を確認できる。
 - Release Notes に対象 SHA、Worker デプロイ有無、migration 確認、本番確認結果を記録する。
