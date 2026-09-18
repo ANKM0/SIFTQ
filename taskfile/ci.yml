@@ -109,14 +109,14 @@ tasks:
   ci:architecture:
     desc: Reject unexpected imports, dependency-direction, and cycle violations.
     cmds:
-      - vp exec depcruise src --config .dependency-cruiser.cjs
+      - vp exec depcruise src --config .config/.dependency-cruiser.cjs
       - uv run python scripts/ci/check_architecture.py
       - uv run python -m pytest .taqt/tests/test_check_architecture.py .taqt/tests/test_dependency_cruiser_config.py .taqt/tests/test_architecture_documentation.py
 
   ci:architecture:metrics:
     desc: Print dependency stability metrics with dependency-cruiser.
     cmds:
-      - vp exec depcruise src --config .dependency-cruiser.cjs --metrics --output-type json
+      - vp exec depcruise src --config .config/.dependency-cruiser.cjs --metrics --output-type json
 
   ci:glossary:
     desc: Reject glossary term variants in documentation.
@@ -136,7 +136,7 @@ tasks:
   ci:llm-eval:
     desc: Run the LLM evaluation smoke suite.
     env:
-      PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
+      PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/../tmp/promptfoo"
     cmds:
       - uv run python scripts/ci/llm_eval_budget.py --limit-file eval/budget.json --spent-file tmp/llm-eval-spent.json
       - bunx promptfoo@0.122.0 eval --config eval/promptfoo/promptfooconfig.yaml
@@ -144,7 +144,7 @@ tasks:
   eval:review:
     desc: Run the real review classification eval using the active Codex provider.
     env:
-      PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/tmp/promptfoo"
+      PROMPTFOO_CONFIG_DIR: "{{.ROOT_DIR}}/../tmp/promptfoo"
     cmds:
       - uv run python scripts/ci/llm_eval_budget.py --limit-file eval/budget.json --spent-file tmp/llm-eval-spent.json
       - uv run python scripts/ci/llm_eval_provider.py
@@ -159,10 +159,10 @@ tasks:
         tasks="$(mktemp)"
         trap 'rm -f "$refs" "$tasks"' EXIT
 
-        grep -E '^[[:space:]]*run:[[:space:]]*task([[:space:]]|$)' .github/workflows/ci.yml \
-          | sed -E 's/^[[:space:]]*run:[[:space:]]*task[[:space:]]*//; s/[[:space:]].*$//; /^$/d' \
+        grep -E '^[[:space:]]*run:[[:space:]]*task[[:space:]]+-t[[:space:]]+\.config/Taskfile\.yml([[:space:]]|$)' .github/workflows/ci.yml \
+          | sed -E 's#^[[:space:]]*run:[[:space:]]*task[[:space:]]+-t[[:space:]]+\.config/Taskfile\.yml[[:space:]]*##; s/[[:space:]].*$//; /^$/d' \
           | sort -u > "$refs"
-        task --list --json \
+        task -t .config/Taskfile.yml --list --json \
           | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
           | sort -u > "$tasks"
 
@@ -182,11 +182,11 @@ tasks:
         allowed="$(mktemp)"
         trap 'rm -f "$tasks" "$allowed"' EXIT
 
-        task --list --json \
+        task -t .config/Taskfile.yml --list --json \
           | uv run python -c 'import json, sys; [print(task["name"]) for task in json.load(sys.stdin)["tasks"]]' \
           | sort -u > "$tasks"
-        grep -E 'prefix_rule\(pattern=\["task", "[^"]+"\], decision="allow"\)' .codex/rules/shared.rules \
-          | sed -E 's/.*\["task", "([^"]+)".*/\1/' \
+        grep -E 'prefix_rule\(pattern=\["task", "-t", "\.config/Taskfile\.yml", "[^"]+"\], decision="allow"\)' .codex/rules/shared.rules \
+          | sed -E 's/.*"\.config\/Taskfile\.yml", "([^"]+)".*/\1/' \
           | sort -u > "$allowed"
 
         missing="$(comm -23 "$tasks" "$allowed")"
@@ -277,7 +277,7 @@ tasks:
           exit 0
         fi
 
-        bun x wrangler d1 migrations apply app --local
+        bun x wrangler d1 migrations apply app --local -c .config/wrangler.jsonc --persist-to .config/.wrangler/state
         touch "$marker"
 
   ci:build:
@@ -288,7 +288,7 @@ tasks:
           echo "Skipping Worker build: src/index.tsx does not exist yet."
           exit 0
         fi
-        vp exec wrangler deploy --dry-run
+        vp exec wrangler deploy --dry-run -c .config/wrangler.jsonc
 
   ci:duplicate:
     desc: Reject duplicated production TypeScript code.
@@ -298,7 +298,7 @@ tasks:
           echo "Skipping duplication scan: src/ does not exist yet."
           exit 0
         fi
-        vp exec jscpd src --config .jscpd.json
+        vp exec jscpd src --config .config/.jscpd.json
 
   ci:dead-code:
     desc: Reject unused TypeScript exports, files, and types.
@@ -308,4 +308,4 @@ tasks:
           echo "Skipping dead-code scan: src/ does not exist yet."
           exit 0
         fi
-        vp exec knip --config knip.json
+        vp exec knip --config .config/knip.json

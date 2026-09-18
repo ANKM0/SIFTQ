@@ -82,10 +82,10 @@ tasks:
   route:dry-run:
     desc: Print the main post-run route commands for a taqt task without executing git or GitHub changes.
     cmds:
-      - task taqt:worktree -- {{.CLI_ARGS}}
-      - task taqt:commit -- {{.CLI_ARGS}}
-      - task taqt:push -- {{.CLI_ARGS}}
-      - task taqt:pr -- {{.CLI_ARGS}}
+      - task -t .config/Taskfile.yml taqt:worktree -- {{.CLI_ARGS}}
+      - task -t .config/Taskfile.yml taqt:commit -- {{.CLI_ARGS}}
+      - task -t .config/Taskfile.yml taqt:push -- {{.CLI_ARGS}}
+      - task -t .config/Taskfile.yml taqt:pr -- {{.CLI_ARGS}}
 
   report:
     desc: Print a Markdown summary for a taqt run directory.

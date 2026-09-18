@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 VERSION_PATTERN = re.compile(r"^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-WORKER_PATHS = ("src/", "migrations/", "wrangler.jsonc", "bun.lock")
+WORKER_PATHS = ("src/", "migrations/", ".config/wrangler.jsonc", "bun.lock")
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ def build_plan(version: str, ref: str, base: str | None) -> ReleasePlan:
     return ReleasePlan(tag_name(version), resolved_ref, base, worker_change, migrations, "release+deploy" if worker_change else "release-only")
 
 
-def d1_binding(path: Path = Path("wrangler.jsonc")) -> str:
+def d1_binding(path: Path = Path(".config/wrangler.jsonc")) -> str:
     text = path.read_text(encoding="utf-8")
     try:
         payload = json.loads(text)
@@ -63,7 +63,7 @@ def d1_binding(path: Path = Path("wrangler.jsonc")) -> str:
             return "DB"
     if databases and databases[0].get("binding"):
         return str(databases[0]["binding"])
-    raise ValueError("D1 binding not found in wrangler.jsonc")
+    raise ValueError("D1 binding not found in .config/wrangler.jsonc")
 
 
 def require_execute(args: argparse.Namespace) -> None:
@@ -116,8 +116,11 @@ def main() -> int:
             tagged = command("git", "rev-parse", f"{args.tag}^{{commit}}")
             if tagged != command("git", "rev-parse", "HEAD"):
                 raise ValueError("checked-out HEAD must equal the deployment tag")
-            subprocess.run(["bun", "x", "wrangler", "d1", "migrations", "list", d1_binding(Path("wrangler.jsonc")), "--remote"], check=True)
-            subprocess.run(["bun", "x", "wrangler", "deploy"], check=True)
+            subprocess.run(
+                ["bun", "x", "wrangler", "d1", "migrations", "list", d1_binding(Path(".config/wrangler.jsonc")), "--remote", "-c", ".config/wrangler.jsonc"],
+                check=True,
+            )
+            subprocess.run(["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"], check=True)
     except (ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
     return 0

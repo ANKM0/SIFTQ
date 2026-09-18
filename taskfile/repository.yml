@@ -13,7 +13,7 @@ tasks:
           echo "  python3 -m pip install graphifyy" >&2
           exit 1
         fi
-        graphify update {{.ROOT_DIR}}
+        graphify update {{.ROOT_DIR}}/..
 
   repo:pull-main:
     desc: Pull main only from a clean main worktree, then update graphify when HEAD moves.

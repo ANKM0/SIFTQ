@@ -38,7 +38,8 @@ def test_build_plan_classifies_worker_and_migrations(monkeypatch) -> None:
 
 
 def _prepare_deploy(monkeypatch, tmp_path, *, migration_fails: bool = False) -> list[list[str]]:
-    (tmp_path / "wrangler.jsonc").write_text(
+    (tmp_path / ".config").mkdir()
+    (tmp_path / ".config" / "wrangler.jsonc").write_text(
         json.dumps(
             {
                 "d1_databases": [
@@ -79,8 +80,8 @@ def test_deploy_checks_configured_d1_binding_before_worker(monkeypatch, tmp_path
 
     assert release_deploy.main() == 0
     assert calls == [
-        ["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote"],
-        ["bun", "x", "wrangler", "deploy"],
+        ["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote", "-c", ".config/wrangler.jsonc"],
+        ["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"],
     ]
 
 
@@ -90,4 +91,6 @@ def test_deploy_does_not_deploy_when_migration_check_fails(monkeypatch, tmp_path
     with pytest.raises(SystemExit):
         release_deploy.main()
 
-    assert calls == [["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote"]]
+    assert calls == [
+        ["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote", "-c", ".config/wrangler.jsonc"]
+    ]

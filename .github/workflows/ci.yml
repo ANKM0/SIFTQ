@@ -42,7 +42,7 @@ jobs:
           frontend: "true"
 
       - name: Run fast gate
-        run: task ci:fast
+        run: task -t .config/Taskfile.yml ci:fast
 
   extended:
     needs: [changes]
@@ -57,7 +57,7 @@ jobs:
         uses: ./.github/actions/setup-ci
 
       - name: Run extended gate
-        run: task ci:extended
+        run: task -t .config/Taskfile.yml ci:extended
 
   e2e:
     needs: [changes]
@@ -74,7 +74,7 @@ jobs:
           playwright: "true"
 
       - name: Run E2E gate
-        run: task ci:test:e2e
+        run: task -t .config/Taskfile.yml ci:test:e2e
 
   merge-gate:
     needs: [changes, fast, extended, e2e]

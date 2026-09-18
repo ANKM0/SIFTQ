@@ -33,7 +33,7 @@ runs:
       if: inputs.playwright == 'true'
       uses: actions/cache@v4
       with:
-        path: taskfile/tmp/playwright-browsers
+        path: tmp/playwright-browsers
         key: playwright-${{ runner.os }}-${{ hashFiles('package.json', 'bun.lock') }}
 
     - name: Set up Bun

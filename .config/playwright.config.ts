@@ -4,7 +4,7 @@ const e2ePassword = atob("dGVzdC1wYXNzd29yZA==");
 const e2eSecret = atob("dGVzdC1zZWNyZXQ=");
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "../tests/e2e",
   fullyParallel: true,
   // E2E files share one local D1 database and Worker process.
   workers: 1,
