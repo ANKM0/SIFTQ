@@ -45,7 +45,7 @@
 | [ADR 0039: Task一覧のページングUIはGitHub issue一覧と同様にする](0039-task-list-pagination-ui.md) | Accepted. | ページ番号＋前へ/次へ、中間省略、status切替で1ページ目、一覧下のみ配置。 |
 | [ADR 0040: 実施中を直交boolean workingで表す](0040-represent-working-as-orthogonal-boolean.md) | Accepted. | 実施中はstatusと直交するboolean `working`で表し、終了時も自動解除しない。 |
 | [ADR 0041: Git の untracked ファイルを deny-by-default の path allowlist で管理する](0041-adopt-git-path-allowlist.md) | Accepted. | Git の untracked ファイルは path allowlist で明示的に許可し、生成物・作業状態・秘密情報は既定で拒否する。 |
-| [ADR 0042: タスク編集draftをブラウザlocalStorageに保存する](0042-adopt-local-storage-task-edit-drafts.md) | Accepted. | 未保存のtitle / descriptionはブラウザのlocalStorageに一時draftとして保存し、D1はtaskの正本として維持する。 |
+| [ADR 0042: タスク編集draftをブラウザlocalStorageに保存する](0042-adopt-local-storage-task-edit-drafts.md) | Accepted. | 既存task編集の未保存title / descriptionはブラウザのlocalStorageに一時draftとして保存し、New taskの入力は保存しない。D1はtaskの正本として維持する。 |
 | [ADR 0043: taqt loop を単一構造へ変更する](0043-unify-taqt-loop-execution-policy.md) | Accepted. | taqt loop を `implement → verification → checker` の単一構造に統一し、limit 検知は human へエスカレーションする。 |
 | [ADR 0044: Adopt single-source domain model JSON with generated diagrams](0044-adopt-single-source-domain-model-json.md) | Accepted. | ドメイン/データモデルの正本を `domain-model.json` に一本化し、D2 で図を生成する。`concept.d2` は廃止。 |
 | [ADR 0045: Place logical-to-physical mapping in the generator](0045-place-logical-to-physical-mapping-in-generator.md) | Accepted. | 論理→物理の mapping は生成器のコードに置き、`migrations` を物理の正本として一致検証する。 |

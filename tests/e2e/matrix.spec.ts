@@ -1,4 +1,3 @@
-import { chromium } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { expect, installHtmxRoute, test } from "./fixtures";
 
@@ -44,6 +43,12 @@ async function expectDraftSaved(page: Page, title: string, description: string) 
   expect(await hasDraft(page, title, description)).toBe(false);
   await page.clock.fastForward(200);
   expect(await hasDraft(page, title, description)).toBe(true);
+}
+
+async function expectDraftNotSaved(page: Page, title: string, description: string) {
+  // New task drafts are disabled; wait past the save debounce and assert nothing is stored.
+  await page.clock.fastForward(600);
+  expect(await hasDraft(page, title, description)).toBe(false);
 }
 
 async function waitForPageSettle(page: Page) {
@@ -454,7 +459,7 @@ test("saves a task when localStorage is unavailable", async ({ page }) => {
   await expectTaskVisibleInList(page, title, "do");
 });
 
-test("saves new task title and description as a local draft after input stops", async ({ page }) => {
+test("does not save new task title and description as a local draft", async ({ page }) => {
   const title = `E2E new draft ${Date.now()}`;
   const description = "draft description for a new task";
 
@@ -466,7 +471,7 @@ test("saves new task title and description as a local draft after input stops", 
   await page.getByLabel("Title").fill(title);
   await descriptionEditor(page).fill(description);
 
-  await expectDraftSaved(page, title, description);
+  await expectDraftNotSaved(page, title, description);
 });
 
 test("saves task detail title and description as a local draft after input stops", async ({ page }) => {
@@ -486,24 +491,6 @@ test("saves task detail title and description as a local draft after input stops
   await descriptionEditor(page).fill(description);
 
   await expectDraftSaved(page, title, description);
-});
-
-test("deletes a new task draft after a successful Create", async ({ page }) => {
-  const title = `E2E create draft cleanup ${Date.now()}`;
-  const description = "draft removed after create";
-
-  await signIn(page);
-  await page.getByRole("link", { name: "New task" }).click();
-  await page.getByLabel("Title").waitFor();
-  await waitForPageSettle(page);
-  await page.clock.install();
-  await page.getByLabel("Title").fill(title);
-  await descriptionEditor(page).fill(description);
-  await expectDraftSaved(page, title, description);
-
-  await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("siftq.task-draft:new"))).toBeNull();
 });
 
 test("deletes a task detail draft after a successful Save", async ({ page }) => {
@@ -563,7 +550,7 @@ test("clears only the current browser profile drafts on logout", async ({ browse
   }
 });
 
-test("keeps a new task draft after a failed Create request", async ({ page }) => {
+test("does not keep a new task draft after a failed Create request", async ({ page }) => {
   const title = `E2E failed create draft ${Date.now()}`;
   const description = "draft retained after communication failure";
 
@@ -581,7 +568,7 @@ test("keeps a new task draft after a failed Create request", async ({ page }) =>
   await page.clock.install();
   await page.getByLabel("Title").fill(title);
   await descriptionEditor(page).fill(description);
-  await expectDraftSaved(page, title, description);
+  await expectDraftNotSaved(page, title, description);
 
   const requestFailed = page.waitForEvent("requestfailed", {
     predicate: (request) => request.method() === "POST" && request.url().endsWith("/tasks"),
@@ -589,7 +576,8 @@ test("keeps a new task draft after a failed Create request", async ({ page }) =>
   await page.getByRole("button", { name: "Create" }).click();
   await requestFailed;
   await expect(page.getByRole("heading", { name: "New task" })).toBeVisible();
-  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+  await expect(page.getByLabel("Title")).toHaveValue(title);
+  await expect.poll(() => hasDraft(page, title, description)).toBe(false);
 });
 
 test("keeps a task detail draft after an input error", async ({ page }) => {
@@ -619,7 +607,7 @@ test("keeps a task detail draft after an input error", async ({ page }) => {
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(title);
 });
 
-test("restores a saved new task draft on initial page load", async ({ page }) => {
+test("does not restore a saved new task draft on initial page load", async ({ page }) => {
   const title = `E2E restored new draft ${Date.now()}`;
   const description = "restored new task description";
 
@@ -629,68 +617,12 @@ test("restores a saved new task draft on initial page load", async ({ page }) =>
   }, { title, description });
   await page.goto("/tasks/new?from=tasks");
 
-  await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(descriptionEditor(page)).toHaveText(description);
-  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
-});
-
-test("restores a new task draft after a browser restart", async ({ browserName }, testInfo) => {
-  expect(browserName).toBe("chromium");
-  const title = `E2E browser restart draft ${Date.now()}`;
-  const description = "restored after browser restart";
-  const userDataDir = testInfo.outputPath(`draft-browser-profile-${Date.now()}`);
-  const firstContext = await chromium.launchPersistentContext(userDataDir, {
-    baseURL: "http://127.0.0.1:4173",
-  });
-  await installHtmxRoute(firstContext);
-  const firstPage = firstContext.pages()[0] ?? (await firstContext.newPage());
-
-  try {
-    await signIn(firstPage);
-    await firstPage.goto("/tasks/new?from=tasks");
-    await firstPage.getByLabel("Title").waitFor();
-    await firstPage.clock.install();
-    await firstPage.getByLabel("Title").fill(title);
-    await descriptionEditor(firstPage).fill(description);
-    await expectDraftSaved(firstPage, title, description);
-  } finally {
-    await firstContext.close();
-  }
-
-  const restartedContext = await chromium.launchPersistentContext(userDataDir, {
-    baseURL: "http://127.0.0.1:4173",
-  });
-  await installHtmxRoute(restartedContext);
-  const restartedPage = restartedContext.pages()[0] ?? (await restartedContext.newPage());
-
-  try {
-    await restartedPage.goto("/tasks/new?from=tasks");
-    await expect(restartedPage.getByLabel("Title")).toHaveValue(title);
-    await expect(descriptionEditor(restartedPage)).toHaveText(description);
-    await expect(restartedPage.locator('textarea[data-description-value]')).toHaveValue(description);
-  } finally {
-    await restartedContext.close();
-  }
-});
-
-test("deletes an expired new task draft on initial page load", async ({ page }) => {
-  const title = `E2E expired draft ${Date.now()}`;
-  const description = "expired draft description";
-  const updatedAt = Date.now() - 24 * 60 * 60 * 1000;
-
-  await signIn(page);
-  await page.evaluate(({ title, description, updatedAt }) => {
-    localStorage.setItem("siftq.task-draft:new", JSON.stringify({ title, description, updatedAt }));
-  }, { title, description, updatedAt });
-  await page.goto("/tasks/new?from=tasks");
-
   await expect(page.getByLabel("Title")).toHaveValue("");
   await expect(descriptionEditor(page)).toHaveText("");
   await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("siftq.task-draft:new"))).toBeNull();
 });
 
-test("restores a saved new task draft after an HTMX navigation", async ({ page }) => {
+test("does not restore a saved new task draft after an HTMX navigation", async ({ page }) => {
   const title = `E2E restored HTMX draft ${Date.now()}`;
   const description = "restored after HTMX navigation";
 
@@ -702,9 +634,9 @@ test("restores a saved new task draft after an HTMX navigation", async ({ page }
   await page.getByLabel("Title").waitFor();
   await waitForPageSettle(page);
 
-  await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(descriptionEditor(page)).toHaveText(description);
-  await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
+  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
 });
 
 test("restores a task detail draft for its task ID", async ({ page }) => {
@@ -843,18 +775,32 @@ test("discards a stale task detail draft after an HTMX navigation", async ({ pag
 });
 
 test("ignores an invalid saved task draft", async ({ page }) => {
-  await signIn(page);
-  await page.evaluate(() => localStorage.setItem("siftq.task-draft:new", "not-json"));
-  await page.goto("/tasks/new?from=tasks");
+  const title = `E2E invalid draft ${Date.now()}`;
 
-  await expect(page.getByLabel("Title")).toHaveValue("");
-  await expect(descriptionEditor(page)).toHaveText("");
-  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
+  await signIn(page);
+  await createMatrixTask(page, title);
+  await page.locator(".task-card", { hasText: title }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  const draftKey = await getTaskDraftKey(page);
+  await page.evaluate((key) => localStorage.setItem(key, "not-json"), draftKey);
+  await page.reload();
+
+  await expect(page.getByLabel("Title")).toHaveValue(title);
 });
 
 test("continues normally when localStorage draft reading fails", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
+
+  const title = `E2E storage failure ${Date.now()}`;
+  await signIn(page);
+  await createMatrixTask(page, title);
+  await page.locator(".task-card", { hasText: title }).click();
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
+  const detailUrl = page.url();
+
   await page.addInitScript(() => {
     Object.defineProperty(Storage.prototype, "getItem", {
       configurable: true,
@@ -863,13 +809,10 @@ test("continues normally when localStorage draft reading fails", async ({ page }
       },
     });
   });
+  await page.goto(detailUrl);
+  await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 
-  await signIn(page);
-  await page.goto("/tasks/new?from=tasks");
-
-  await expect(page.getByLabel("Title")).toHaveValue("");
-  await expect(descriptionEditor(page)).toHaveText("");
-  await expect(page.locator('textarea[data-description-value]')).toHaveValue("");
+  await expect(page.getByLabel("Title")).toHaveValue(title);
   expect(pageErrors).toHaveLength(0);
 });
 
@@ -1284,7 +1227,7 @@ test("persists an edit and displays a conflict from a stale editor", async ({ pa
   await expect.poll(() => hasDraft(staleEditor, staleTitle, staleDescription)).toBe(true);
 });
 
-test("keeps a new task draft when cancelling from the matrix", async ({ page }) => {
+test("does not keep a new task draft when cancelling from the matrix", async ({ page }) => {
   const title = `E2E cancel draft ${Date.now()}`;
   const description = "draft retained after cancel";
 
@@ -1298,15 +1241,15 @@ test("keeps a new task draft when cancelling from the matrix", async ({ page }) 
   await page.clock.install();
   await page.getByLabel("Title").fill(title);
   await descriptionEditor(page).fill(description);
-  await expectDraftSaved(page, title, description);
+  await expectDraftNotSaved(page, title, description);
 
   await page.getByRole("link", { name: "Cancel", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
-  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+  await expect.poll(() => hasDraft(page, title, description)).toBe(false);
 
   await page.getByRole("link", { name: "New task" }).click();
-  await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(descriptionEditor(page)).toHaveText(description);
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
 });
 
 test("cancels a new task from the task list and returns to the task list", async ({ page }) => {
@@ -1321,7 +1264,7 @@ test("cancels a new task from the task list and returns to the task list", async
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
 });
 
-test("keeps a new task draft when navigating to another screen", async ({ page }) => {
+test("does not keep a new task draft when navigating to another screen", async ({ page }) => {
   const title = `E2E navigation draft ${Date.now()}`;
   const description = "draft retained after navigation";
 
@@ -1332,13 +1275,13 @@ test("keeps a new task draft when navigating to another screen", async ({ page }
   await page.clock.install();
   await page.getByLabel("Title").fill(title);
   await descriptionEditor(page).fill(description);
-  await expectDraftSaved(page, title, description);
+  await expectDraftNotSaved(page, title, description);
 
   await page.locator('nav.nav a[href="/"]').click();
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
-  await expect.poll(() => hasDraft(page, title, description)).toBe(true);
+  await expect.poll(() => hasDraft(page, title, description)).toBe(false);
 
   await page.getByRole("link", { name: "New task" }).click();
-  await expect(page.getByLabel("Title")).toHaveValue(title);
-  await expect(descriptionEditor(page)).toHaveText(description);
+  await expect(page.getByLabel("Title")).toHaveValue("");
+  await expect(descriptionEditor(page)).toHaveText("");
 });

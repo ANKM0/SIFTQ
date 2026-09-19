@@ -118,7 +118,7 @@ export const DESCRIPTION_EDITOR_SCRIPT = [
   'document.addEventListener("DOMContentLoaded", initializeDescriptionEditors);',
   'document.addEventListener("htmx:load", initializeDescriptionEditors);',
   "function taskFormDraftKey(form) {",
-  '  if (form.getAttribute("data-task-form") === "new") return "siftq.task-draft:new";',
+  '  if (form.getAttribute("data-task-form") === "new") return null;',
   '  var action = form.getAttribute("action") || "";',
   '  var match = action.match(/\\/tasks\\/([^/?#]+)/);',
   '  if (match) return "siftq.task-draft:" + decodeURIComponent(match[1]);',
