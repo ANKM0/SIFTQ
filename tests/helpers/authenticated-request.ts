@@ -1,6 +1,6 @@
 import app from "../../src/index";
 import { SESSION_COOKIE_NAME, createSession } from "../../src/auth";
-import type { TaskRepository } from "../../src/task-repository";
+import type { TaskRepository } from "../../src/repository/task-repository";
 
 export const TEST_PASSWORD = atob("dGVzdC1wYXNzd29yZA==");
 const TEST_SECRET = "test-secret";
