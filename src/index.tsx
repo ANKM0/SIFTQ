@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { getCookie } from "hono/cookie";
 import type { JSX } from "hono/jsx/jsx-runtime";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -40,12 +40,8 @@ import {
 import { TaskMeta } from "./components/TaskMeta";
 import { OptionMenu } from "./components/OptionMenu";
 import type { NewTaskFrom, NewTaskState } from "./components/NewTaskMeta";
-import { LoginPage, safeNextPath } from "./components/LoginPage";
 import {
   SESSION_COOKIE_NAME,
-  SESSION_DURATION_MS,
-  createSession,
-  isPasswordValid,
   isValidSession,
 } from "./auth";
 import { createD1TaskRepository } from "./repository/d1-task-repository";
@@ -65,6 +61,7 @@ import { MatrixPage } from "./views/MatrixPage";
 import { pageNav } from "./views/navigation";
 import { TaskListPage } from "./views/TaskListPage";
 import { NewTaskForm, TaskDetailPage, TaskVersionInput } from "./views/TaskFormPage";
+import { registerAuthRoutes } from "./routes/auth";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
@@ -135,6 +132,8 @@ app.use("*", async (c, next) => {
 
   return unauthorizedResponse(c);
 });
+
+registerAuthRoutes(app);
 
 function repository(c: Context<AppEnv>): TaskRepository {
   if (c.env.PREVIEW_MODE === "true") return previewRepository;
@@ -329,43 +328,6 @@ function StatusMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "task
 function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks" }) {
   return <OptionMenu task={task} open="area" returnTo={returnTo} />;
 }
-
-app.get("/login", (c) => {
-  const next = c.req.query("next");
-  if (next === undefined) {
-    return c.html(<LoginPage error={c.req.query("error") === "1"} />);
-  }
-  return c.html(<LoginPage error={c.req.query("error") === "1"} next={next} />);
-});
-
-app.post("/login", async (c) => {
-  const auth = authConfig(c);
-  if (auth === null) return c.text("Authentication is not configured", 503);
-
-  const body = await c.req.parseBody();
-  const password = typeof body["password"] === "string" ? body["password"] : "";
-  const next = typeof body["next"] === "string" ? body["next"] : "/";
-
-  if (!(await isPasswordValid(password, auth.password))) {
-    return c.html(<LoginPage error next={next} />, 401);
-  }
-
-  const expires = Date.now() + SESSION_DURATION_MS;
-  const session = await createSession(auth.secret, expires);
-  setCookie(c, SESSION_COOKIE_NAME, session, {
-    httpOnly: true,
-    sameSite: "Lax",
-    secure: true,
-    path: "/",
-    expires: new Date(expires),
-  });
-  return c.redirect(safeNextPath(next));
-});
-
-app.post("/logout", (c) => {
-  deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
-  return c.redirect("/login");
-});
 
 app.get("/", async (c) => {
   const result = await repository(c).list();
