@@ -21,6 +21,7 @@ tasks:
       - task: ci:requirements
       - task: ci:architecture
       - task: ci:glossary
+      - task: ci:adr
       - task: ci:docs
       - task: ci:domain
       - task: ci:typecheck
@@ -49,6 +50,7 @@ tasks:
       - ci:requirements
       - ci:architecture
       - ci:glossary
+      - ci:adr
       - ci:docs
       - ci:domain
       - ci:typecheck
@@ -122,6 +124,11 @@ tasks:
     desc: Reject glossary term variants in documentation.
     cmds:
       - uv run python scripts/ci/check_glossary.py
+
+  ci:adr:
+    desc: Reject implementation details in newly numbered ADRs.
+    cmds:
+      - uv run python scripts/ci/check_adr_implementation_details.py
 
   ci:docs:
     desc: Require mapped documentation updates for changed paths.
