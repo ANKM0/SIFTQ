@@ -31,7 +31,7 @@ BOUNDARY_POLICY_MARKERS = (
 INTERFACE_FILES = {
     ROOT / "src/repository/task-repository.ts",
     ROOT / "src/repository/d1-task-repository.ts",
-    ROOT / "src/index.tsx",
+    ROOT / "src/app.tsx",
     ROOT / "src/preview/MemoryTaskRepository.ts",
     ROOT / "src/routes/task-api.ts",
     ROOT / "src/routes/task-screens.tsx",
