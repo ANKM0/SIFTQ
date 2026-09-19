@@ -48,6 +48,10 @@ a {
   gap: 8px;
 }
 
+.logout {
+  margin: 0 0 0 auto;
+}
+
 .nav a,
 .button {
   background: #ffffff;
