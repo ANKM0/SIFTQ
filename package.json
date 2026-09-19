@@ -4,8 +4,8 @@
   "type": "module",
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "dev": "wrangler dev -c .config/wrangler.jsonc --persist-to .config/.wrangler/state",
-    "preview:mock": "wrangler dev -c .config/wrangler.jsonc --persist-to .config/.wrangler/state --var PREVIEW_MODE:true --var AUTH_PASSWORD:preview --var SESSION_SECRET:preview-session-secret",
+    "dev": "wrangler dev -c .config/wrangler.jsonc --persist-to tmp/wrangler/state",
+    "preview:mock": "wrangler dev -c .config/wrangler.jsonc --persist-to tmp/wrangler/state --var PREVIEW_MODE:true --var AUTH_PASSWORD:preview --var SESSION_SECRET:preview-session-secret",
     "build": "tsc -p tsconfig.json && wrangler deploy --dry-run -c .config/wrangler.jsonc",
     "lint": "vp lint .",
     "test": "vp test run --passWithNoTests",

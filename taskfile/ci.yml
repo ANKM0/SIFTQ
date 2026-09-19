@@ -277,7 +277,7 @@ tasks:
           exit 0
         fi
 
-        bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to .config/.wrangler/state
+        bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to tmp/wrangler/state
         touch "$marker"
 
   ci:build:
