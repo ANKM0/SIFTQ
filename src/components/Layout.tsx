@@ -789,8 +789,8 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
             Tasks
           </a>
         </nav>
-        <form action="/logout" method="post">
-          <button type="submit">Logout</button>
+        <form action="/logout" method="post" class="logout">
+          <button type="submit" class="button">Logout</button>
         </form>
       </header>
       <main id="page">{children}</main>
