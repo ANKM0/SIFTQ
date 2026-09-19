@@ -58,6 +58,14 @@ import type { TaskRepository } from "./task-repository";
 import { STYLES_CSS } from "./styles";
 import { createMemoryTaskRepository } from "./preview/MemoryTaskRepository";
 import { PREVIEW_TASKS } from "./preview/tasks";
+import {
+  isInvalidTaskTitle,
+  parseTaskArea,
+  parseTaskVersion,
+  parseVersion,
+  readTaskFields,
+} from "./task-input";
+import type { ParsedBody } from "./task-input";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
@@ -179,13 +187,6 @@ async function readJsonRecord(c: Context<AppEnv>): Promise<Record<string, unknow
   } catch {
     return null;
   }
-}
-
-function parseVersion(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
-    return null;
-  }
-  return value;
 }
 
 function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
@@ -368,46 +369,12 @@ function TaskFormActions({ submitLabel, cancelHref }: { submitLabel: string; can
   );
 }
 
-type ParsedBody = Record<string, unknown>;
-
-function readTaskFields(body: ParsedBody): {
-  title: string;
-  description: string;
-} {
-  const title = typeof body["title"] === "string" ? body["title"].trim() : "";
-  const description = typeof body["description"] === "string" ? body["description"] : "";
-  return { title, description };
-}
-
 async function readTaskUpdateInput(c: Context<AppEnv>) {
   const body = await c.req.parseBody();
   return {
     ...readTaskFields(body),
     version: parseTaskVersion(body["version"]),
   };
-}
-
-function isInvalidTaskTitle(title: string): boolean {
-  return !isTaskTitleValid(title);
-}
-
-function parseTaskOrder(value: unknown): number | null {
-  if (typeof value !== "string" || value === "") return null;
-  const order = Number(value);
-  if (!Number.isInteger(order) || order < 0) return null;
-  return order;
-}
-
-function parseTaskVersion(value: unknown): number | null {
-  if (typeof value !== "string" || value === "") return null;
-  const version = Number(value);
-  if (!Number.isInteger(version) || version < 1) return null;
-  return version;
-}
-
-function parseTaskArea(value: unknown): Task["area"] | null {
-  const area = parseTaskOrder(value);
-  return area !== null && isTaskArea(area) ? area : null;
 }
 
 function parseNewTaskState(c: Context<AppEnv>): NewTaskState {
