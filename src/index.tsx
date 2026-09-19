@@ -56,8 +56,8 @@ import {
   isPasswordValid,
   isValidSession,
 } from "./auth";
-import { createD1TaskRepository } from "./task-repository";
-import type { TaskRepository } from "./task-repository";
+import { createD1TaskRepository } from "./repository/d1-task-repository";
+import type { TaskRepository } from "./repository/task-repository";
 import { STYLES_CSS } from "./styles";
 import { createMemoryTaskRepository } from "./preview/MemoryTaskRepository";
 import { PREVIEW_TASKS } from "./preview/tasks";

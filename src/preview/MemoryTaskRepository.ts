@@ -1,7 +1,7 @@
 import { changeTaskStatuses, err, ok } from "../task";
 import type { Result, Task, TaskStatus, TaskVersionInput } from "../task";
-import { validateBulkTasks } from "../task-repository";
-import type { RepositoryError, TaskRepository } from "../task-repository";
+import { validateBulkTasks } from "../repository/repository-validation";
+import type { RepositoryError, TaskRepository } from "../repository/task-repository";
 
 export function createMemoryTaskRepository(initialTasks: readonly Task[] = []): TaskRepository {
   const tasks = new Map(initialTasks.map((task) => [task.id, task]));

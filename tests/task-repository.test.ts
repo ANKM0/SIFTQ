@@ -2,7 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 import type { D1Database, D1PreparedStatement, D1Result } from "@cloudflare/workers-types";
 import { createMemoryTaskRepository } from "./helpers/memory-task-repository";
 import { taskFixture } from "./helpers/task-fixture";
-import { createD1TaskRepository, type TaskRepository } from "../src/task-repository";
+import { createD1TaskRepository } from "../src/repository/d1-task-repository";
+import type { TaskRepository } from "../src/repository/task-repository";
 import type { Task } from "../src/task";
 
 type Execution = { query: string; values: readonly unknown[] };

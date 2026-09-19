@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { authenticatedRequest } from "../helpers/authenticated-request";
 import { taskFixture } from "../helpers/task-fixture";
 import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
-import type { TaskRepository } from "../../src/task-repository";
+import type { TaskRepository } from "../../src/repository/task-repository";
 
 let repo: TaskRepository;
 

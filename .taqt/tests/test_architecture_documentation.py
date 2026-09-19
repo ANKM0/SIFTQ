@@ -29,7 +29,8 @@ BOUNDARY_POLICY_MARKERS = (
 )
 
 INTERFACE_FILES = {
-    ROOT / "src/task-repository.ts",
+    ROOT / "src/repository/task-repository.ts",
+    ROOT / "src/repository/d1-task-repository.ts",
     ROOT / "src/index.tsx",
     ROOT / "src/preview/MemoryTaskRepository.ts",
 }
@@ -72,6 +73,6 @@ def test_task_repository_interface_stays_at_the_side_effect_boundary() -> None:
         if "TaskRepository" in path.read_text(encoding="utf-8")
     }
 
-    assert interface_declarations == {ROOT / "src/task-repository.ts"}
+    assert interface_declarations == {ROOT / "src/repository/task-repository.ts"}
     assert usages == INTERFACE_FILES
     assert "TaskRepository" not in (ROOT / "src/task.ts").read_text(encoding="utf-8")
