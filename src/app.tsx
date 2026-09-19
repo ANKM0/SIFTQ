@@ -8,7 +8,7 @@ import {
   DESCRIPTION_EDITOR_SCRIPT,
   TASK_LIST_SELECTION_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
-} from "./components/Layout";
+} from "./client/browser-scripts";
 import { SESSION_COOKIE_NAME, isValidSession } from "./auth";
 import { createD1TaskRepository } from "./repository/d1-task-repository";
 import type { TaskRepository } from "./repository/task-repository";
