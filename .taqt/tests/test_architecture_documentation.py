@@ -33,6 +33,7 @@ INTERFACE_FILES = {
     ROOT / "src/repository/d1-task-repository.ts",
     ROOT / "src/index.tsx",
     ROOT / "src/preview/MemoryTaskRepository.ts",
+    ROOT / "src/routes/task-api.ts",
 }
 
 

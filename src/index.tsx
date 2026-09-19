@@ -2,21 +2,14 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import type { JSX } from "hono/jsx/jsx-runtime";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   changeTaskArea,
   changeTaskStatus,
   changeTaskWorking,
   createTask,
-  err,
-  isTaskArea,
   isTaskStatus,
-  isTaskTitleValid,
   is_working,
-  moveTask,
-  ok,
-  parseTaskVersionInputs,
 } from "./task";
 import {
   TASK_LIST_PAGE_SIZE,
@@ -27,7 +20,7 @@ import {
   parseTaskListQuery,
 } from "./task-list";
 import type { TaskListQuery } from "./task-list";
-import type { DomainError, Result, Task, TaskStatus } from "./task";
+import type { Task, TaskStatus } from "./task";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
   Layout,
@@ -53,7 +46,6 @@ import {
   isInvalidTaskTitle,
   parseTaskArea,
   parseTaskVersion,
-  parseVersion,
   readTaskFields,
 } from "./task-input";
 import type { ParsedBody } from "./task-input";
@@ -62,6 +54,7 @@ import { pageNav } from "./views/navigation";
 import { TaskListPage } from "./views/TaskListPage";
 import { NewTaskForm, TaskDetailPage, TaskVersionInput } from "./views/TaskFormPage";
 import { registerAuthRoutes } from "./routes/auth";
+import { registerTaskApiRoutes } from "./routes/task-api";
 
 type Env = {
   TASK_REPOSITORY?: TaskRepository;
@@ -142,6 +135,8 @@ function repository(c: Context<AppEnv>): TaskRepository {
   throw new Error("task repository is not configured");
 }
 
+registerTaskApiRoutes(app, repository);
+
 function createTaskAtBoundary({
   title,
   description,
@@ -166,84 +161,9 @@ function createTaskAtBoundary({
   });
 }
 
-function problem(c: Context<AppEnv>, status: ContentfulStatusCode, code: string) {
-  return c.json({ code }, status);
-}
-
-function bulkProblem(c: Context<AppEnv>, code: string) {
-  return problem(c, code === "NOT_FOUND" ? 404 : 409, code);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-async function readJsonRecord(c: Context<AppEnv>): Promise<Record<string, unknown> | null> {
-  try {
-    const body = await c.req.json<unknown>();
-    return isRecord(body) ? body : null;
-  } catch {
-    return null;
-  }
-}
-
-function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  const withTitle = applyTitle(body, task);
-  if (!withTitle.ok) return withTitle;
-
-  const withStatus = applyStatus(body, withTitle.value);
-  if (!withStatus.ok) return withStatus;
-
-  const withArea = applyArea(body, withStatus.value);
-  if (!withArea.ok) return withArea;
-
-  return applyWorking(body, withArea.value);
-}
-
-function applyTitle(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (typeof body["title"] !== "string" && typeof body["description"] !== "string") {
-    return ok(task);
-  }
-
-  const title = typeof body["title"] === "string" ? body["title"].trim() : task.title;
-  const description =
-    typeof body["description"] === "string" ? body["description"] : task.description;
-  if (!isTaskTitleValid(title)) return err({ code: "INVALID_TITLE" });
-  return ok({ ...task, title, description });
-}
-
-function applyStatus(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("status" in body)) return ok(task);
-  if (!isTaskStatus(body["status"])) return err({ code: "INVALID_STATUS" });
-  return changeTaskStatus(task, body["status"]);
-}
-
-function applyArea(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("area" in body)) return ok(task);
-  if (!isTaskArea(body["area"])) return err({ code: "INVALID_AREA" });
-  return changeTaskArea(task, body["area"]);
-}
-
-function applyWorking(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("working" in body)) return ok(task);
-  if (typeof body["working"] !== "boolean") return err({ code: "INVALID_WORKING" });
-  return changeTaskWorking(task, body["working"]);
-}
-
 async function findTask(c: Context<AppEnv>, id: string): Promise<Task | undefined> {
   const result = await repository(c).find(id, "local");
   return result.ok ? result.value : undefined;
-}
-
-type ApiTaskLookup =
-  | { ok: true; task: Task }
-  | { ok: false; status: ContentfulStatusCode; code: string };
-
-async function findApiTask(c: Context<AppEnv>, id: string): Promise<ApiTaskLookup> {
-  const found = await repository(c).find(id, "local");
-  if (!found.ok) return { ok: false, status: 500, code: found.error.code };
-  if (!found.value) return { ok: false, status: 404, code: "NOT_FOUND" };
-  return { ok: true, task: found.value };
 }
 
 async function persistTask(c: Context<AppEnv>, updated: Task): Promise<Task | null> {
@@ -373,133 +293,6 @@ app.get("/task-list-selection.js", (c) => {
 
 app.get("/styles.css", (c) => {
   return c.body(STYLES_CSS, 200, { "content-type": "text/css" });
-});
-
-app.get("/api/tasks", async (c) => {
-  const result = await repository(c).list();
-  if (!result.ok) return problem(c, 500, result.error.code);
-  return c.json(result.value);
-});
-
-app.get("/api/tasks/:id", async (c) => {
-  const result = await repository(c).find(c.req.param("id"), "local");
-  if (!result.ok) return problem(c, 500, result.error.code);
-  if (!result.value) return problem(c, 404, "NOT_FOUND");
-  return c.json(result.value);
-});
-
-app.post("/api/tasks", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
-  const title = typeof body["title"] === "string" ? body["title"].trim() : "";
-  const description = typeof body["description"] === "string" ? body["description"] : "";
-
-  if (!isTaskTitleValid(title)) {
-    return problem(c, 400, "INVALID_TITLE");
-  }
-
-  const created = createTaskAtBoundary({ title, description });
-  if (!created.ok) return problem(c, 400, created.error.code);
-
-  const inserted = await repository(c).insert(created.value);
-  if (!inserted.ok) return problem(c, 500, inserted.error.code);
-
-  c.header("Location", `/api/tasks/${inserted.value.id}`);
-  return c.json(inserted.value, 201);
-});
-
-app.patch("/api/tasks/bulk/status", async (c) => {
-  const body = await readJsonRecord(c);
-  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
-  const status = body["status"];
-  const inputs = parseTaskVersionInputs(body["tasks"]);
-  if (!isTaskStatus(status)) return problem(c, 400, "INVALID_STATUS");
-  if (!inputs.ok) return problem(c, 400, inputs.error.code);
-
-  const result = await repository(c).bulkUpdateStatus(inputs.value, status);
-  if (!result.ok) return bulkProblem(c, result.error.code);
-  return c.json(result.value);
-});
-
-app.delete("/api/tasks/bulk", async (c) => {
-  const body = await readJsonRecord(c);
-  if (body === null) return problem(c, 400, "INVALID_BULK_INPUT");
-  const inputs = parseTaskVersionInputs(body["tasks"]);
-  if (!inputs.ok) return problem(c, 400, inputs.error.code);
-
-  const result = await repository(c).bulkRemove(inputs.value);
-  if (!result.ok) return bulkProblem(c, result.error.code);
-  return c.body(null, 204);
-});
-
-app.patch("/api/tasks/:id", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
-  const found = await findApiTask(c, c.req.param("id"));
-  if (!found.ok) return problem(c, found.status, found.code);
-
-  const patched = applyPatch(body, found.task);
-  if (!patched.ok) return problem(c, 400, patched.error.code);
-  const task = patched.value;
-
-  const version = parseVersion(body["version"]);
-  if (version === null) {
-    return problem(c, 400, "INVALID_ORDER");
-  }
-
-  const updated = await repository(c).update({ ...task, version });
-  if (!updated.ok) return problem(c, 409, updated.error.code);
-  return c.json(updated.value);
-});
-
-app.delete("/api/tasks/:id", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
-  const version = parseVersion(body["version"]);
-  if (version === null) return problem(c, 400, "INVALID_ORDER");
-
-  const found = await findApiTask(c, c.req.param("id"));
-  if (!found.ok) return problem(c, found.status, found.code);
-
-  const removed = await repository(c).remove(found.task.id, "local", version);
-  if (!removed.ok) {
-    return removed.error.code === "CONFLICT"
-      ? problem(c, 409, removed.error.code)
-      : problem(c, 404, removed.error.code);
-  }
-
-  return c.body(null, 204);
-});
-
-app.post("/api/tasks/reorder", async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
-  const id = typeof body["id"] === "string" ? body["id"] : "";
-  const version = parseVersion(body["version"]);
-  const area = body["area"];
-  const order = body["order"];
-  if (
-    !isTaskArea(area) ||
-    typeof order !== "number" ||
-    !Number.isInteger(order) ||
-    version === null
-  ) {
-    return problem(c, 400, "INVALID_ORDER");
-  }
-
-  const listed = await repository(c).list();
-  if (!listed.ok) return problem(c, 500, listed.error.code);
-
-  const tasks = listed.value;
-  const moved = moveTask(tasks, id, area, order);
-  if (!moved.ok) return problem(c, 400, moved.error.code);
-
-  const changed = moved.value.filter((task) => {
-    const before = tasks.find((candidate) => candidate.id === task.id);
-    return before !== undefined && (before.area !== task.area || before.order !== task.order);
-  });
-  const changedWithVersion = changed.map((task) => (task.id === id ? { ...task, version } : task));
-
-  const result = await repository(c).move(changedWithVersion);
-  if (!result.ok) return problem(c, 409, result.error.code);
-
-  return c.json(result.value);
 });
 
 app.get("/tasks", async (c) => {
