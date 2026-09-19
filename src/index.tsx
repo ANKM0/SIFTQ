@@ -453,6 +453,17 @@ function MatrixPage({ tasks }: { tasks: readonly Task[] }) {
           <span>重要度</span>
         </div>
         {TASK_AREAS.map((area) => (
+          <a
+            key={`overlay-${area}`}
+            class={`matrix-create-link matrix-create-link--q${area}`}
+            href={`/tasks/new?area=${area}&from=matrix`}
+            aria-hidden="true"
+            tabindex={-1}
+          >
+            <span aria-hidden="true"></span>
+          </a>
+        ))}
+        {TASK_AREAS.map((area) => (
           <section
             key={area}
             class={`area area--quadrant area--q${area}`}

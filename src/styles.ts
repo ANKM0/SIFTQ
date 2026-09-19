@@ -176,6 +176,7 @@ a {
   color: #57606a;
   font-size: 13px;
   font-weight: 700;
+  pointer-events: none;
   position: absolute;
   z-index: 0;
 }
@@ -282,6 +283,27 @@ a {
   inset: 0;
   position: absolute;
   z-index: 0;
+}
+
+.matrix-create-link {
+  position: absolute;
+  z-index: 0;
+}
+
+.matrix-create-link--q1 {
+  inset: 0 50% 50% 0;
+}
+
+.matrix-create-link--q2 {
+  inset: 0 0 50% 50%;
+}
+
+.matrix-create-link--q3 {
+  inset: 50% 50% 0 0;
+}
+
+.matrix-create-link--q4 {
+  inset: 50% 0 0 50%;
 }
 
 .area--quadrant h2,
