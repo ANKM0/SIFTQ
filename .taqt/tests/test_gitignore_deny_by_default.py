@@ -17,7 +17,7 @@ ALLOWLISTED_PATHS = (
     "scripts/new-script.py",
     "docs/new-doc.md",
     "migrations/0004_new.sql",
-    "taskfile/new-task.yml",
+    ".config/taskfile/new-task.yml",
     ".learnings/LEARNINGS.md",
     ".agents/skills/graphify/SKILL.md",
     ".codex/rules/shared.rules",

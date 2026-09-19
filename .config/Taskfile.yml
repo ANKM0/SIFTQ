@@ -11,34 +11,34 @@ env:
 
 includes:
   setup:
-    taskfile: ../taskfile/setup.yml
+    taskfile: taskfile/setup.yml
     dir: ..
     flatten: true
   ci:
-    taskfile: ../taskfile/ci.yml
+    taskfile: taskfile/ci.yml
     dir: ..
     flatten: true
   frontend:
-    taskfile: ../taskfile/frontend.yml
+    taskfile: taskfile/frontend.yml
     dir: ..
     flatten: true
   repository:
-    taskfile: ../taskfile/repository.yml
+    taskfile: taskfile/repository.yml
     dir: ..
     flatten: true
   codex:
-    taskfile: ../taskfile/codex.yml
+    taskfile: taskfile/codex.yml
     dir: ..
     flatten: true
   release:
-    taskfile: ../taskfile/release.yml
+    taskfile: taskfile/release.yml
     dir: ..
     flatten: true
   taqt:
-    taskfile: ../taskfile/taqt.yml
+    taskfile: taskfile/taqt.yml
     dir: ..
   docs:
-    taskfile: ../taskfile/docs.yml
+    taskfile: taskfile/docs.yml
     dir: ..
 
 tasks:
