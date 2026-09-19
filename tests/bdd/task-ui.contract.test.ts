@@ -535,6 +535,70 @@ describe("Task detail and metadata menus", () => {
   });
 });
 
+describe("Description edit followed by Status operation (issue 477)", () => {
+  it("applies Status with the fresh version after saving a description edit", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3, status: "do" }));
+
+    const save = await request("/tasks/task-1?from=tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        title: "seed task",
+        description: "updated description",
+        version: "3",
+      }).toString(),
+    });
+    expect(save.status).toBe(302);
+
+    const status = await request("/tasks/task-1/status", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ status: "done", version: "4" }).toString(),
+    });
+    const statusBody = await status.text();
+
+    expect(status.status).toBe(200);
+    expect(statusBody).toContain(
+      'id="task-version" type="hidden" name="version" value="5" hx-swap-oob="true"',
+    );
+
+    const saved = await repo.find("task-1", "local");
+    expect(saved).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({
+          description: "updated description",
+          status: "done",
+          version: 5,
+        }),
+      }),
+    );
+  });
+
+  it("returns a recoverable conflict instead of hanging on a stale Status version", async () => {
+    await repo.insert(taskFixture({ id: "task-1", version: 3, status: "do" }));
+
+    await request("/tasks/task-1?from=tasks", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        title: "seed task",
+        description: "updated description",
+        version: "3",
+      }).toString(),
+    });
+
+    const stale = await request("/tasks/task-1/status", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ status: "done", version: "3" }).toString(),
+    });
+
+    expect(stale.status).toBe(409);
+    expect(await stale.text()).toContain("Load latest");
+  });
+});
+
 describe("Task detail working toggle", () => {
   it("toggles working from the detail metadata and refreshes the version", async () => {
     await repo.insert(taskFixture({ id: "task-1", version: 3, working: false }));
