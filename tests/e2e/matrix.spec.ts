@@ -291,6 +291,58 @@ test("keeps the matrix quadrant creation link working", async ({ page }) => {
   await expect(page.locator("#new-task-meta .area-badge")).toHaveText("3");
 });
 
+test("navigates to New task from matrix padding and gap bands", async ({ page }) => {
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
+
+  for (const area of [1, 2, 3, 4]) {
+    await expect(page.getByRole("link", { name: `Create task in area ${area}` })).toHaveCount(1);
+  }
+
+  async function axisPoint(fractionX: number, fractionY: number) {
+    const box = await page.locator(".matrix-axis").boundingBox();
+    if (!box) throw new Error("Matrix axis box is missing");
+    return { x: box.x + box.width * fractionX, y: box.y + box.height * fractionY, box };
+  }
+
+  async function clickAxisPoint(fractionX: number, fractionY: number) {
+    const point = await axisPoint(fractionX, fractionY);
+    await page.mouse.click(point.x, point.y);
+  }
+
+  // Top padding band belongs to the top quadrants.
+  await clickAxisPoint(0.25, 0.02);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
+  await page.goto("/");
+
+  // Bottom padding band belongs to the bottom quadrants.
+  await clickAxisPoint(0.75, 0.98);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=4&from=matrix/);
+  await page.goto("/");
+
+  // Vertical gap band: left of the center line is area 1, right is area 2.
+  const topGap = await axisPoint(0.5, 0.25);
+  await page.mouse.click(topGap.x - 10, topGap.y);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
+  await page.goto("/");
+  await page.mouse.click(topGap.x + 10, topGap.y);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=2&from=matrix/);
+  await page.goto("/");
+
+  // Horizontal gap band: above the center line is area 1, below is area 3.
+  const leftGap = await axisPoint(0.25, 0.5);
+  await page.mouse.click(leftGap.x, leftGap.y - 10);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
+  await page.goto("/");
+  await page.mouse.click(leftGap.x, leftGap.y + 10);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=3&from=matrix/);
+  await page.goto("/");
+
+  // The axis intersection itself must not be a dead zone.
+  await clickAxisPoint(0.5, 0.5);
+  await expect(page).toHaveURL(/\/tasks\/new\?area=[1-4]&from=matrix/);
+});
+
 test("keeps matrix task card navigation working", async ({ page }) => {
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
