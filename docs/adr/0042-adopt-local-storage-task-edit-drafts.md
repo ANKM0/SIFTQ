@@ -1,11 +1,13 @@
 # ADR 0042: タスク編集draftをブラウザlocalStorageに保存する
 
+> Status: Superseded by [ADR 0050](0050-adopt-local-storage-task-edit-drafts.md).
+
 ## 決定
 
-- Task detail（既存taskの編集）の未保存 title / description は、ブラウザの `localStorage` に一時draftとして保存する。New task の入力はdraftとして保存しない。
-- draftはtask IDごとに管理し、最終編集から24時間保持する。
+- New task と Task detail の未保存 title / description は、ブラウザの `localStorage` に一時draftとして保存する。
+- draftは新規taskで1件、既存taskでtask IDごとに管理し、最終編集から24時間保持する。
 - 同じtaskを複数タブで編集する場合は、task IDごとの同一キーへ保存し、最後に `localStorage` へ保存されたdraftを復元する。draftのマージやタブ間通信は行わない。
-- Save またはtask削除の成功後、対象draftを削除する。ログアウト時は現在のブラウザプロファイル内のdraftを削除する。
+- Create / Save またはtask削除の成功後、対象draftを削除する。ログアウト時は現在のブラウザプロファイル内のdraftを削除する。
 - D1はtaskの唯一の正本として維持し、draftをtaskデータの複製として扱わない。
 
 ### 決定の理由
@@ -23,8 +25,6 @@
   - title / descriptionの保存にはデータ量とAPIが過剰なため。
 - D1へのdraft保存またはtaskデータの複製
   - 正本が二重化し、draft用のschema・認可・削除処理・競合処理が必要になるため。
-- New task の入力draft保存
-  - cancel（やっぱやめた）後に新規作成し直す方が、追加時の入力を復元するより多く、前回入力が残ると毎回消す手間が発生するため。
 
 ## 補足情報
 
@@ -42,5 +42,4 @@
 ## 参考リンク
 
 - [Issue #399: 編集中のtask内容をローカルdraftとして保持する](https://github.com/ANKM0/SIFTQ/issues/399)
-- [Issue #471: 新規タスク作成時に下書きを保存しない](https://github.com/ANKM0/SIFTQ/issues/471)
 - [ADR 0007: Cloudflare D1を唯一の正本DBとして採用する](0007-adopt-cloudflare-d1-as-system-of-record.md)
