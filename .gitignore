@@ -27,8 +27,6 @@
 !/docs/**
 !/migrations/
 !/migrations/**
-!/taskfile/
-!/taskfile/**
 !/eval/
 !/eval/**
 !/.learnings/

@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - 'eval/**'
-      - 'taskfile/core.yml'
+      - '.config/taskfile/ci.yml'
       - '.github/workflows/llm-eval.yml'
   pull_request:
     paths:
       - 'eval/**'
-      - 'taskfile/core.yml'
+      - '.config/taskfile/ci.yml'
       - '.github/workflows/llm-eval.yml'
   schedule:
     - cron: '0 18 * * *'

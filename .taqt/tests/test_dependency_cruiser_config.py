@@ -25,5 +25,5 @@ def test_domain_rule_covers_presentation_and_adapters() -> None:
 
 
 def test_architecture_ci_runs_dependency_cruiser() -> None:
-    ci = (ROOT / "taskfile/ci.yml").read_text(encoding="utf-8")
+    ci = (ROOT / ".config/taskfile/ci.yml").read_text(encoding="utf-8")
     assert "vp exec depcruise src --config .config/.dependency-cruiser.cjs" in ci
