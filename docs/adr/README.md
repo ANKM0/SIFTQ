@@ -52,3 +52,4 @@
 | [ADR 0046: Track invariants with domain.md IDs and test names](0046-track-invariants-with-domain-md-ids-and-tests.md) | Accepted. | 不変条件は `domain.md` の `INV-TM-xxx` を正本とし、JSON は参照、テスト名に対応づけて検証する。 |
 | [ADR 0047: Manage release version with git tags](0047-manage-release-version-with-git-tags.md) | Accepted. | バージョンの正本を git タグとし、`package.json` の `version` を削除する。リリースは release commit を作らず SHA にタグする。 |
 | [ADR 0048: Discover aqua config in `.config/` through `.aqua/` symlinks](0048-discover-aqua-config-through-aqua-symlinks.md) | Accepted. | `.aqua/` symlink で `.config/` の aqua 設定を探索させ、bare の aqua コマンドを `AQUA_CONFIG` 無しで動かす。 |
+| [ADR 0049: Place committed tool config in `.config` and generated artifacts in `tmp`](0049-place-config-in-config-and-generated-in-tmp.md) | Accepted. | commit する設定は `.config/`、生成物は `tmp/` に分け、ルートの重複生成物を削除する。 |

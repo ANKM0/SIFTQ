@@ -17,3 +17,4 @@ package = false
 testpaths = [
   ".taqt/tests",
 ]
+cache_dir = "tmp/.pytest_cache"

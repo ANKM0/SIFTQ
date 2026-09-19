@@ -1,10 +1,14 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const e2ePassword = atob("dGVzdC1wYXNzd29yZA==");
 const e2eSecret = atob("dGVzdC1zZWNyZXQ=");
 
 export default defineConfig({
   testDir: "../tests/e2e",
+  outputDir: path.join(repoRoot, "tmp/test-results"),
   fullyParallel: true,
   // E2E files share one local D1 database and Worker process.
   workers: 1,

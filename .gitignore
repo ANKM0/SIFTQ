@@ -12,8 +12,6 @@
 !/vite.config.ts
 !/.config/
 !/.config/**
-/.config/.venv/
-/.config/.ruff_cache/
 /.config/.wrangler/
 !/.env.example
 !/.aqua/
@@ -58,13 +56,10 @@ __pycache__/
 
 # Frontend generated artifacts
 node_modules/
-dist/
 coverage/
 .wrangler/
 .dev.vars
 tmp/
-playwright-report/
-test-results/
 graphify-out/
 eval/.generated-providers.yaml
 

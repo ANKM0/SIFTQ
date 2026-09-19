@@ -17,10 +17,11 @@ without exporting `AQUA_CONFIG`. Recreate the links if they are missing:
 task -t .config/Taskfile.yml setup:aqua-links
 ```
 
-`env.sh` also redirects `.venv`, Ruff cache, Wrangler state, and Puppeteer
-cache under `.config/` or `tmp/`. The Taskfile applies the same values for
-`task`-run commands. In non-interactive shells and CI, source the same file
-explicitly to get `AQUA_CONFIG` and `AQUA_POLICY_CONFIG`:
+`env.sh` also redirects generated output into `tmp/`: the Python virtual
+environment (`.venv`), Ruff/pytest caches, Playwright results, and Wrangler
+local state. The Taskfile applies the same values for `task`-run commands. In
+non-interactive shells and CI, source the same file explicitly to get
+`AQUA_CONFIG` and `AQUA_POLICY_CONFIG`:
 
 ```bash
 . ./.config/env.sh
@@ -75,7 +76,7 @@ Open `http://127.0.0.1:8787` and sign in with password `preview`.
 Apply the local D1 migrations:
 
 ```bash
-bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to .config/.wrangler/state
+bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to tmp/wrangler/state
 ```
 
 Run the unit tests:
