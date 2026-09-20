@@ -1,7 +1,7 @@
 import type { FC } from "hono/jsx";
 import { TASK_AREAS, TASK_STATUSES } from "../task";
 import type { TaskArea, TaskStatus } from "../task";
-import { AREA_DOT_CLASSES, STATUS_DESCRIPTIONS, STATUS_DOT_CLASSES } from "./OptionMenu";
+import { AREA_DOT_CLASSES, STATUS_DESCRIPTIONS, STATUS_DOT_CLASSES } from "./task-option-data";
 
 export type NewTaskFrom = "matrix" | "tasks";
 
