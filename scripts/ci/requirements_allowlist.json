@@ -1,1 +1,97 @@
-[]
+[
+  {
+    "path": "src/app-env.ts",
+    "reason": "責務分割で抽出した実行環境定義で、既存テストが利用者向け挙動を検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/app.tsx",
+    "reason": "責務分割で抽出したapp assemblyで、既存のHTTP契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/client/browser-scripts.ts",
+    "reason": "Layoutから抽出したブラウザスクリプトで、既存のUI/E2Eテストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/components/task-option-data.ts",
+    "reason": "既存コンポーネントから抽出した静的表示データで、既存UIテストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/repository/d1-task-repository.ts",
+    "reason": "既存Repositoryから抽出した実装で、既存Repository契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/repository/repository-validation.ts",
+    "reason": "既存Repositoryから抽出した検証処理で、既存Repository契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/routes/task-api.ts",
+    "reason": "既存routeから抽出したTask APIで、既存API契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/routes/task-screens.tsx",
+    "reason": "既存routeから抽出したTask画面で、既存UI契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/styles/base.ts",
+    "reason": "既存CSSから分割した静的スタイルで、既存stylesテストが最終CSSを検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/styles/login.ts",
+    "reason": "既存CSSから分割した静的スタイルで、既存stylesテストが最終CSSを検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/styles/matrix.ts",
+    "reason": "既存CSSから分割した静的スタイルで、既存stylesテストが最終CSSを検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/styles/task-form.ts",
+    "reason": "既存CSSから分割した静的スタイルで、既存stylesテストが最終CSSを検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/styles/task-list.ts",
+    "reason": "既存CSSから分割した静的スタイルで、既存stylesテストが最終CSSを検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/task-input.ts",
+    "reason": "既存Task入力処理から抽出した処理で、既存Task契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/task-list.ts",
+    "reason": "既存Task一覧処理から抽出した処理で、既存Task契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/MatrixPage.tsx",
+    "reason": "既存viewから抽出したMatrix画面で、既存UI契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/TaskFormPage.tsx",
+    "reason": "既存viewから抽出したTask form画面で、既存UI契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/TaskListPage.tsx",
+    "reason": "既存viewから抽出したTask一覧画面で、既存UI契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/navigation.tsx",
+    "reason": "既存viewから抽出したnavigationで、既存UI契約テストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  }
+]
