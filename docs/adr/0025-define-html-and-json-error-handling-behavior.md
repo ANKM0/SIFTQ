@@ -1,5 +1,7 @@
 # ADR 0025: Define HTML and JSON error handling behavior
 
+> Status: Superseded by [ADR 0062](0062-commonize-htmx-error-display-and-status-mapping.md), [ADR 0063](0063-protect-internal-error-details-and-distinguish-auth-errors.md)
+
 ## 決定
 
 - 内部エラー型と HTTP status への変換は共通化する。

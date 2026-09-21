@@ -1,5 +1,7 @@
 # ADR 0015: 共有 Codex home とモデル profile
 
+> Status: Superseded by [ADR 0057](0057-share-codex-home-and-isolate-worktrees.md), [ADR 0058](0058-use-static-model-provider-profiles.md)
+
 ## 決定
 
 - `CODEX_HOME` は通常の taqt 実行で設定しない。Codex の既定 `/home/develop/.codex` を共有する。

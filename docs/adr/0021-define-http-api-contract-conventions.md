@@ -1,5 +1,7 @@
 # ADR 0021: Define HTTP API contract conventions
 
+> Status: Superseded by [ADR 0059](0059-define-http-route-and-method-conventions.md), [ADR 0060](0060-define-http-representation-and-success-responses.md), [ADR 0061](0061-keep-internal-api-unversioned.md)
+
 ## 決定
 
 - route は名詞・複数形・kebab-case・末尾スラッシュなしを基本とする。
