@@ -1,22 +1,23 @@
 ---
 name: adr-verification
-description: Evaluate provisional ADR claims when data is sufficient and append the result without changing the decision.
+description: Evaluate provisional ADR claims when data is sufficient, record the result, and remove completed items from the verification queue without changing the decision.
 ---
 
 # ADR Verification
 
-暫定のADR主張を、後段で任意に評価する。決定本文は変更せず、補足情報の検証履歴へ結果を追記する。
+暫定のADR主張を、後段で任意に評価する。未確認の観点はADR一覧の検証待ち表で管理し、詳細な結果と証拠は実験記録へ保存する。
 
 ## Procedure
 
-1. 対象ADRの補足情報から、状態が `暫定` または `データ不足` の検証観点を列挙する。
+1. `docs/adr/README.md` の検証待ち表から、状態が `暫定` または `データ不足` の検証観点を選ぶ。
 2. 検証観点を一つ選び、観測データ、対象範囲、比較対象、データ充足条件、完了条件、許容できない結果を確認する。
-3. データ充足条件を満たしているか確認する。満たさない場合は評価せず、`データ不足` として不足範囲と次の再評価条件を検証履歴へ追記する。
+3. データ充足条件を満たしているか確認する。満たさない場合は評価せず、READMEの該当行を `データ不足` として不足範囲と次の再評価条件を更新する。
 4. データが十分な場合は、事前に定めた完了条件と同一条件で評価する。後から完了条件を変更しない。
 5. 詳細なデータ、手順、結果、失敗、限界を実験記録へ保存する。必要に応じて `eval/results/adr/` または実行記録を使う。
-6. ADRの補足情報に、検証ID、実施日、データ範囲、結果、状態、証拠リンクを追記する。既存の履歴行は変更・削除せず、訂正は新しい履歴行として追記する。
+6. 詳細なデータ、手順、結果、失敗、限界を実験記録へ保存し、READMEの該当行に現在の状態、最終結果、証拠リンクを反映する。
 7. 完了条件を満たした場合は `確認済み`、満たさない場合は `否定`、差を判断できない場合は `判定不能` とする。
 8. `否定` または `確認済み` の結果で決定を変更する場合は、元ADRの決定・理由を編集せず、新しいADRで置き換える。
+9. `確認済み` または `否定` になった観点はREADMEの検証待ち表から削除する。`データ不足` または `判定不能` は、次の再評価条件とともに残す。
 
 ## States
 
@@ -33,5 +34,5 @@ description: Evaluate provisional ADR claims when data is sufficient and append 
 - データ不足を `否定` と判定しない。
 - 小標本から一般的な効果を主張しない。
 - 要件適合、代替案への優位性、運用効果を別の主張として扱う。
-- 検証結果は決定本文へ混ぜず、補足情報の検証履歴と証拠へ分離する。
+- 検証結果は決定本文へ混ぜず、実験記録と検証待ち表へ分離する。
 - 結果は対象範囲、限界、再評価条件と一緒に記録する。

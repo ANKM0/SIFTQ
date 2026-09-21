@@ -36,6 +36,6 @@ uv run python scripts/create_adr.py --title "..." --slug "..." --dry-run
 - Do not use one claim's verification result to justify another independent claim.
 - Distinguish requirement compliance from superiority over alternatives.
 - Mark claims that could not be verified as provisional and state when to revisit them.
-- Keep verification results append-only under supplemental information; do not rewrite the decision to record later evidence.
+- Keep the verification contract under supplemental information; manage unresolved verification points in the ADR README and store detailed results in experiment records without rewriting the decision.
 - Keep implementation details out. Do not write identifiers, configuration values, processing order, code, commands, or source paths; leave them to code or design docs.
 - To change an accepted ADR, do not rewrite its body. Add `> Status: Superseded by [ADR XXXX](...).` and record the new decision in a new ADR.

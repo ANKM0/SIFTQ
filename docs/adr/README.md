@@ -55,4 +55,16 @@
 | [ADR 0049: Place committed tool config in `.config` and generated artifacts in `tmp`](0049-place-config-in-config-and-generated-in-tmp.md) | Accepted. | commit する設定は `.config/`、生成物は `tmp/` に分け、ルートの重複生成物を削除する。 |
 | [ADR 0050: タスク編集draftをブラウザlocalStorageに保存する](0050-adopt-local-storage-task-edit-drafts.md) | Accepted. | 既存task編集の未保存title / descriptionはブラウザのlocalStorageに一時draftとして保存し、New taskの入力は保存しない。D1はtaskの正本として維持する。 |
 | [ADR 0051: ADRの判断根拠と検証記録の運用を定める](0051-define-adr-decision-verification-policy.md) | Accepted. | ADRは独立して変更でき継続参照する判断を記録し、主張ごとに根拠と検証範囲を残す。経験的な優劣・必要性は比較検証し、未検証なら暫定判断とする。 |
-| [ADR 0052: 暫定ADRの後段検証ライフサイクルを定める](0052-define-provisional-adr-verification-lifecycle.md) | Accepted. | 暫定主張にデータ充足条件と完了条件を定め、任意のタイミングで評価し、結果を検証履歴へ追記する。 |
+| [ADR 0052: 暫定ADRの後段検証ライフサイクルを定める](0052-define-provisional-adr-verification-lifecycle.md) | Accepted. | 暫定主張にデータ充足条件と完了条件を定め、未確認項目を検証待ち表で管理し、結果を記録する。 |
+
+## 検証待ち
+
+未確認の検証観点だけを管理する。`確認済み` または `否定` になった観点はこの表から削除し、詳細結果と証拠は実験記録に残す。
+
+| 検証ID | ADR | 未確認の観点 | 完了条件 | 状態 | 最終結果 | 証拠 | 再評価条件 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| V-051-001 | [ADR 0051](0051-define-adr-decision-verification-policy.md) | 新基準の運用効果を判定できるか | 新基準の再現率が旧基準を上回り、適合率80%以上 | 判定不能 | 根拠分類の追加論点を検出。主張境界は過検出があり、効果は判定不能 | [レビュー比較記録](../../eval/results/adr/0051-stage1-review-comparison.md) | 評価集合またはラベル基準を変更した時 |
+| V-051-002 | [ADR 0051](0051-define-adr-decision-verification-policy.md) | 判断の分解で検証結果の誤適用を減らせるか | 新基準の再現率が旧基準を上回り、適合率80%以上 | 暫定 | 未評価 | - | 評価集合またはラベル基準を変更した時 |
+| V-051-003 | [ADR 0051](0051-define-adr-decision-verification-policy.md) | 根拠分類で適合と優位性の混同を減らせるか | 新基準の再現率が旧基準を上回り、適合率80%以上 | 暫定 | 未評価 | - | 評価集合またはラベル基準を変更した時 |
+| V-052-001 | [ADR 0052](0052-define-provisional-adr-verification-lifecycle.md) | データ不足と否定を区別できるか | 不足例はデータ不足、充足未達例は否定になる | 暫定 | 運用データ未収集 | - | 状態運用のテスト結果が蓄積した時 |
+| V-052-002 | [ADR 0052](0052-define-provisional-adr-verification-lifecycle.md) | 検証結果の記録と決定変更を分離できるか | 結果は検証結果、新しい決定は新ADRになる | 暫定 | 運用データ未収集 | - | 運用の実例が蓄積した時 |
