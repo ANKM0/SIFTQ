@@ -4,8 +4,8 @@ import {
   changeTaskStatus,
   createTask,
   moveTask,
-  sortForMatrix,
 } from "../../src/task";
+import { sortForMatrix } from "../../src/task-list";
 import type { Task } from "../../src/task";
 import { taskFixture } from "../helpers/task-fixture";
 

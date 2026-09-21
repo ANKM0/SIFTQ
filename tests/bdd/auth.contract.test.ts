@@ -3,7 +3,7 @@ import app from "../../src/index";
 import { SESSION_COOKIE_NAME } from "../../src/auth";
 import { TEST_PASSWORD, authBindings } from "../helpers/authenticated-request";
 import { createMemoryTaskRepository } from "../helpers/memory-task-repository";
-import type { TaskRepository } from "../../src/task-repository";
+import type { TaskRepository } from "../../src/repository/task-repository";
 
 function loginRequest(repo: TaskRepository, body: string) {
   return app.request(

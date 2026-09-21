@@ -1,8 +1,8 @@
 import type { D1Database, D1PreparedStatement, D1Result } from "@cloudflare/workers-types";
-import { changeTaskStatuses, err, isTaskArea, isTaskStatus, ok } from "./task";
-import type { DomainError, Result, Task, TaskStatus, TaskVersionInput } from "./task";
-
-export type RepositoryError = DomainError;
+import { changeTaskStatuses, err, isTaskArea, isTaskStatus, ok } from "../task";
+import type { Result, Task, TaskStatus, TaskVersionInput } from "../task";
+import { validateBulkTasks } from "./repository-validation";
+import type { RepositoryError, TaskRepository } from "./task-repository";
 
 const OWNER_ID = "local";
 
@@ -45,34 +45,6 @@ function toTask(value: unknown): Task | undefined {
 
 function changes(result: D1Result): number {
   return result.meta?.changes ?? 0;
-}
-
-export interface TaskRepository {
-  list(): Promise<Result<Task[], RepositoryError>>;
-  find(id: string, owner_id: string): Promise<Result<Task | undefined, RepositoryError>>;
-  insert(task: Task): Promise<Result<Task, RepositoryError>>;
-  update(task: Task): Promise<Result<Task, RepositoryError>>;
-  remove(id: string, owner_id: string, version: number): Promise<Result<null, RepositoryError>>;
-  bulkUpdateStatus(
-    inputs: readonly TaskVersionInput[],
-    status: TaskStatus,
-  ): Promise<Result<Task[], RepositoryError>>;
-  bulkRemove(inputs: readonly TaskVersionInput[]): Promise<Result<null, RepositoryError>>;
-  move(tasks: readonly Task[]): Promise<Result<Task[], RepositoryError>>;
-}
-
-export function validateBulkTasks(
-  inputs: readonly TaskVersionInput[],
-  getTask: (id: string) => Task | undefined,
-): Result<Task[], RepositoryError> {
-  const ordered: Task[] = [];
-  for (const input of inputs) {
-    const task = getTask(input.id);
-    if (!task) return err({ code: "NOT_FOUND" });
-    if (task.version !== input.version) return err({ code: "CONFLICT" });
-    ordered.push(task);
-  }
-  return ok(ordered);
 }
 
 export function createD1TaskRepository(db: D1Database): TaskRepository {

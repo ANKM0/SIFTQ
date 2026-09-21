@@ -1,28 +1,30 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  TASK_LIST_PAGE_SIZE,
   TASK_TITLE_MAX_CODE_POINTS,
   changeTaskArea,
   changeTaskStatus,
   changeTaskWorking,
   createTask,
-  filterTasks,
-  is_do,
-  is_done,
-  is_skip,
   is_working,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
+  parseTaskVersionInputs,
+  titleCodePointLength,
+} from "../src/task";
+import {
+  TASK_LIST_PAGE_SIZE,
+  filterTasks,
+  is_do,
+  is_done,
+  is_skip,
   pageNavItems,
   paginateTasks,
   parseTaskListQuery,
   parsePageParam,
-  parseTaskVersionInputs,
   sortForMatrix,
-  titleCodePointLength,
-} from "../src/task";
+} from "../src/task-list";
 import { taskFixture } from "./helpers/task-fixture";
 
 describe("task title validation", () => {
