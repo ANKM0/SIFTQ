@@ -54,3 +54,4 @@
 | [ADR 0048: Discover aqua config in `.config/` through `.aqua/` symlinks](0048-discover-aqua-config-through-aqua-symlinks.md) | Accepted. | `.aqua/` symlink で `.config/` の aqua 設定を探索させ、bare の aqua コマンドを `AQUA_CONFIG` 無しで動かす。 |
 | [ADR 0049: Place committed tool config in `.config` and generated artifacts in `tmp`](0049-place-config-in-config-and-generated-in-tmp.md) | Accepted. | commit する設定は `.config/`、生成物は `tmp/` に分け、ルートの重複生成物を削除する。 |
 | [ADR 0050: タスク編集draftをブラウザlocalStorageに保存する](0050-adopt-local-storage-task-edit-drafts.md) | Accepted. | 既存task編集の未保存title / descriptionはブラウザのlocalStorageに一時draftとして保存し、New taskの入力は保存しない。D1はtaskの正本として維持する。 |
+| [ADR 0051: ADRの判断根拠と検証記録の運用を定める](0051-define-adr-decision-verification-policy.md) | Accepted. | ADRは独立して変更でき継続参照する判断を記録し、主張ごとに根拠と検証範囲を残す。経験的な優劣・必要性は比較検証し、未検証なら暫定判断とする。 |
