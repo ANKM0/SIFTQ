@@ -1,5 +1,7 @@
 # ADR 0049: Place committed tool config in `.config` and generated artifacts in `tmp`
 
+> Status: Superseded by [ADR 0064](0064-keep-committed-configuration-under-config.md), [ADR 0065](0065-keep-generated-artifacts-under-tmp.md)
+
 ## 決定
 
 - commit する設定は `.config/`、生成物・キャッシュ・一時ファイルは `tmp/` に置く。

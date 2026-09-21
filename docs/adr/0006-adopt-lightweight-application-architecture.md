@@ -1,5 +1,7 @@
 # ADR 0006: アーキテクチャとして、軽量アプリケーションアーキテクチャを採用する
 
+> Status: Superseded by [ADR 0053](0053-keep-domain-rules-pure-and-dependency-directed.md), [ADR 0054](0054-minimize-side-effect-boundaries.md)
+
 ## 決定
 <!-- 決定事項、採用した内容とその理由を記載 -->
 

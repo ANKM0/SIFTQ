@@ -1,5 +1,7 @@
 # ADR 0008: 更新競合には version 楽観ロックを採用する
 
+> Status: Superseded by [ADR 0055](0055-detect-update-conflicts-with-version-preconditions.md), [ADR 0056](0056-rollback-failed-optimistic-dnd-updates.md)
+
 ## 決定
 
 - task の更新競合は `version` による楽観ロックで検出する。
