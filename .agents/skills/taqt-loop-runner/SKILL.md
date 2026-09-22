@@ -53,7 +53,7 @@ task -t .config/Taskfile.yml taqt:worktree -- .taqt/tasks/ISSUE-<number>.yaml --
 4. Run the task from the worktree:
 
 ```bash
-task -t .config/Taskfile.yml taqt:run -- /absolute/path/to/.taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number>
+task -t .config/Taskfile.yml taqt:run -- /absolute/path/to/.taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number>
 ```
 
 5. Sync status to GitHub when useful:
@@ -65,22 +65,22 @@ task -t .config/Taskfile.yml taqt:sync -- .taqt/tasks/ISSUE-<number>.yaml --exec
 6. Commit, push, and open PR after a verified run:
 
 ```bash
-task -t .config/Taskfile.yml taqt:commit -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
-task -t .config/Taskfile.yml taqt:push -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
-task -t .config/Taskfile.yml taqt:pr -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
+task -t .config/Taskfile.yml taqt:commit -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
+task -t .config/Taskfile.yml taqt:push -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
+task -t .config/Taskfile.yml taqt:pr -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
 ```
 
 7. Merge and cleanup when checks, AC, and DoD are satisfied:
 
 ```bash
-task -t .config/Taskfile.yml taqt:merge -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
-task -t .config/Taskfile.yml taqt:cleanup -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --mark-done --sync-parent --delete-local-branch --force-worktree --execute
+task -t .config/Taskfile.yml taqt:merge -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
+task -t .config/Taskfile.yml taqt:cleanup -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --mark-done --sync-parent --delete-local-branch --force-worktree --execute
 ```
 
 8. Decide release/deploy after merge with a read-only plan:
 
 ```bash
-task -t .config/Taskfile.yml taqt:release-decision -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number>
+task -t .config/Taskfile.yml taqt:release-decision -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number>
 ```
 
 Classify Release-only vs Release+deploy per ADR 0034. Never push tags, apply remote
@@ -97,14 +97,14 @@ Use the worker when multiple ready tasks can run independently:
 task -t .config/Taskfile.yml taqt:worker -- --jobs 2 --limit 2 --execute
 ```
 
-Each task gets a separate worktree under `.taqt/worktrees/`. Do not run tasks in parallel when they touch the same high-conflict files unless the split explicitly allows it.
+Each task gets a separate worktree under `tmp/worktrees/`. Do not run tasks in parallel when they touch the same high-conflict files unless the split explicitly allows it.
 
 ## Auto Route
 
 Use `taqt:auto` only after the task is ready and the selected workspace is correct:
 
 ```bash
-task -t .config/Taskfile.yml taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace .taqt/worktrees/ISSUE-<number> --execute
+task -t .config/Taskfile.yml taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
 ```
 
 The default auto route includes squash merge, worktree/local branch cleanup, and a
