@@ -13,9 +13,11 @@ describe("styles", () => {
     expect(STYLES_CSS).toMatch(/\.area--quadrant \.matrix-cards\s*\{\s*flex: 1;/);
   });
 
-  it("keeps the Matrix quadrants in a 2-column equal grid", () => {
+  it("uses a single-column Matrix on narrow screens", () => {
     const matrix = STYLES_CSS.match(/(?:^|\n)\.matrix\s*\{[^}]*\}/);
-    expect(matrix?.[0]).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(matrix?.[0]).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(STYLES_CSS).toContain("@media (width >= 40rem)");
+    expect(STYLES_CSS).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
   });
 
   it("uses a dark border for Matrix cards against the light Matrix frame", () => {
@@ -37,16 +39,16 @@ describe("styles", () => {
     expect(q1?.[0]).toContain("grid-row: 1;");
 
     const q2 = STYLES_CSS.match(/(?:^|\n)\.area--q2\s*\{[^}]*\}/);
-    expect(q2?.[0]).toContain("grid-column: 2;");
-    expect(q2?.[0]).toContain("grid-row: 1;");
+    expect(q2?.[0]).toContain("grid-column: 1;");
+    expect(q2?.[0]).toContain("grid-row: 2;");
 
     const q3 = STYLES_CSS.match(/(?:^|\n)\.area--q3\s*\{[^}]*\}/);
     expect(q3?.[0]).toContain("grid-column: 1;");
-    expect(q3?.[0]).toContain("grid-row: 2;");
+    expect(q3?.[0]).toContain("grid-row: 3;");
 
     const q4 = STYLES_CSS.match(/(?:^|\n)\.area--q4\s*\{[^}]*\}/);
-    expect(q4?.[0]).toContain("grid-column: 2;");
-    expect(q4?.[0]).toContain("grid-row: 2;");
+    expect(q4?.[0]).toContain("grid-column: 1;");
+    expect(q4?.[0]).toContain("grid-row: 4;");
   });
 
   it("keeps quadrant areas as flex columns layered above the crosshair", () => {
@@ -73,13 +75,12 @@ describe("styles", () => {
 
 describe("styles regression guards", () => {
   it("keeps Matrix rows symmetric so the horizontal axis line lands on the quadrant boundary", () => {
-    const matrixAxis = STYLES_CSS.match(/(?:^|\n)\.matrix-axis\s*\{[^}]*\}/);
-    expect(matrixAxis?.[0]).toContain("grid-template-rows: repeat(2, minmax(0, 1fr));");
+    expect(STYLES_CSS).toContain("grid-template-rows: repeat(2, minmax(0, 1fr));");
   });
 
-  it("keeps overflowing quadrant cards scrollable inside each quadrant", () => {
-    const matrixCards = STYLES_CSS.match(/\.area--quadrant \.matrix-cards\s*\{[^}]*\}/);
-    expect(matrixCards?.[0]).toContain("overflow-y: auto;");
+  it("keeps mobile quadrant cards in the page flow and desktop cards scrollable", () => {
+    expect(STYLES_CSS).toContain("overflow-y: visible;");
+    expect(STYLES_CSS).toContain("overflow-y: auto;");
   });
 
   it("lets quadrant content shrink so equal rows are not stretched by card overflow", () => {
@@ -87,12 +88,19 @@ describe("styles regression guards", () => {
     expect(quadrant?.[0]).toContain("min-height: 0;");
   });
 
-  it("uses a 250px Status and Area side panel on new and detail pages", () => {
+  it("stacks the Status and Area side panel on narrow screens", () => {
     expect(STYLES_CSS).toMatch(
-      /\.detail-grid\s*\{\s*display: grid;\s*gap: 16px;\s*grid-template-columns: minmax\(0, 1fr\) 250px;/,
+      /\.detail-grid\s*\{\s*display: grid;\s*gap: 16px;\s*grid-template-columns: minmax\(0, 1fr\);/,
     );
+    expect(STYLES_CSS).toContain("@media (width >= 48rem)");
+    expect(STYLES_CSS).toContain("grid-template-columns: minmax(0, 1fr) 250px;");
     expect(STYLES_CSS).toContain(".page--new .detail-grid");
     expect(STYLES_CSS).toContain(".page--detail .detail-grid");
+  });
+
+  it("keeps popovers within a narrow viewport", () => {
+    expect(STYLES_CSS).toContain("width: min(360px, calc(100vw - 32px));");
+    expect(STYLES_CSS).toContain("@media (width < 40rem)");
   });
 });
 

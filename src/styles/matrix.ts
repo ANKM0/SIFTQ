@@ -2,22 +2,23 @@ export const MATRIX_CSS = `
 .matrix {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .matrix-axis {
   background: #ffffff;
   border: 1px solid #d0d7de;
   border-radius: 8px;
-  gap: 54px;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  min-height: 0;
-  padding: 72px 20px;
+  gap: 12px;
+  grid-template-rows: repeat(4, minmax(0, auto));
+  min-height: auto;
+  padding: 20px;
   position: relative;
 }
 
 .axis-line {
   color: #57606a;
+  display: none;
   font-size: 13px;
   font-weight: 700;
   pointer-events: none;
@@ -120,7 +121,7 @@ export const MATRIX_CSS = `
 .area--quadrant .matrix-cards {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .area-create-link {
@@ -130,6 +131,7 @@ export const MATRIX_CSS = `
 }
 
 .matrix-create-link {
+  display: none;
   position: absolute;
   z-index: 0;
 }
@@ -162,18 +164,18 @@ export const MATRIX_CSS = `
 }
 
 .area--q2 {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.area--q3 {
   grid-column: 1;
   grid-row: 2;
 }
 
+.area--q3 {
+  grid-column: 1;
+  grid-row: 3;
+}
+
 .area--q4 {
-  grid-column: 2;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 4;
 }
 
 .area h2 {
@@ -410,5 +412,42 @@ export const MATRIX_ACTIONS_CSS = `
 
 .matrix-modal-button--danger:hover {
   background: #900;
+}
+
+@media (width >= 40rem) {
+  .matrix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .matrix-axis {
+    gap: 54px;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+    padding: 72px 20px;
+  }
+
+  .axis-line,
+  .matrix-create-link {
+    display: block;
+  }
+
+  .area--q2 {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .area--q3 {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .area--q4 {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .area--quadrant .matrix-cards {
+    overflow-y: auto;
+  }
 }
 `;

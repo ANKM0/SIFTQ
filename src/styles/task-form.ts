@@ -2,7 +2,7 @@ export const TASK_FORM_CSS = `
 .detail-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .form-panel,
@@ -105,8 +105,8 @@ textarea[data-description-value] {
 .page--detail {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 63px);
-  min-height: 480px;
+  height: auto;
+  min-height: calc(100vh - 63px);
 }
 
 .page--new .detail-grid,
@@ -139,8 +139,14 @@ textarea[data-description-value] {
 
 .form-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.form-actions .button {
+  flex: 1 1 140px;
+  justify-content: center;
 }
 
 .status-menu {
@@ -163,7 +169,8 @@ textarea[data-description-value] {
   display: grid;
   gap: 0;
   margin-top: 10px;
-  min-width: 360px;
+  min-width: 0;
+  width: min(360px, calc(100vw - 32px));
   padding: 0;
   position: absolute;
   right: 0;
@@ -268,5 +275,21 @@ button.status-choice {
 
 .status-dot--skip {
   background: #d1d5db;
+}
+
+@media (width >= 48rem) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+
+  .page--new,
+  .page--detail {
+    height: calc(100vh - 63px);
+    min-height: 480px;
+  }
+
+  .form-actions .button {
+    flex: 0 0 auto;
+  }
 }
 `;

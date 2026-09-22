@@ -302,7 +302,7 @@ export const TASK_LIST_CSS = `
 `;
 
 export const TASK_LIST_RESPONSIVE_CSS = `
-@media (max-width: 640px) {
+@media (width < 40rem) {
   .task-list-toolbar {
     align-items: flex-start;
     flex-wrap: wrap;
