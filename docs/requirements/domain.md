@@ -10,7 +10,7 @@
 | 属性 | 値 | 外部仕様 |
 | --- | --- | --- |
 | `title` | `Title` 値オブジェクト | matrix、list、detail に表示する。 |
-| `description` | text | detail と new task で入力・編集する。http/https URL は編集領域内でリンクとして表示するが、保存値はプレーンテキストとする。 |
+| `description` | `Description` 値オブジェクト | detail と new task で入力・編集する。http/https URL は編集領域内でリンクとして表示するが、保存値はプレーンテキストとする。 |
 | `status` | `do` / `done` / `skip` | 進行状態。matrix 表示可否を決める。 |
 | `area` | `1` / `2` / `3` / `4` | matrix の象限。常に保持する。 |
 | `order` | number | area 内の表示順。 |
@@ -20,6 +20,14 @@
 - `title` は `Title` 値オブジェクトである。
 - 内包する値は text である。
 - `title` の長さは、Unicodeコードポイント数で1以上256以下とする。
+
+## Description
+
+- `description` は `Description` 値オブジェクトである。
+- 内包する値は text である。
+- 空文字を許可する。
+- `description` の長さは、Unicodeコードポイント数で0以上16,384以下とする。
+- 保存値はプレーンテキストとする。
 
 ## Status
 
@@ -48,6 +56,7 @@
 | INV-TM-003 | `working` は `status` と直交し、終了時も自動解除しない。 |
 | INV-TM-004 | `order` は `owner_id + area` 内で連番を保つ。 |
 | INV-TM-005 | `title` の長さはUnicodeコードポイント数で1以上256以下とする。 |
+| INV-TM-006 | `description` の長さはUnicodeコードポイント数で0以上16,384以下とする。 |
 
 ## 状態遷移ルール
 

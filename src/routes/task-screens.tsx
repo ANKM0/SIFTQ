@@ -22,6 +22,7 @@ import {
 } from "../task-list";
 import type { TaskListQuery } from "../task-list";
 import {
+  isInvalidTaskDescription,
   isInvalidTaskTitle,
   parseTaskArea,
   parseTaskVersion,
@@ -185,8 +186,11 @@ function registerTaskCreateRoute(app: Hono<AppEnv>, repository: Repository) {
     if (isInvalidTaskTitle(title)) {
       return c.html(<NewTaskForm state={state} error="Title is required and must be 256 characters or fewer." />);
     }
+    if (isInvalidTaskDescription(description)) {
+      return c.html(<NewTaskForm state={state} error="Description must be 16,384 characters or fewer." />);
+    }
     const created = createTaskAtBoundary({ title, description, status: state.status, area: state.area });
-    if (!created.ok) return c.text("Invalid title", 400);
+    if (!created.ok) return c.text(`Invalid task: ${created.error.code}`, 400);
     const inserted = await repository(c).insert(created.value);
     if (!inserted.ok) return c.text("Internal Server Error", 500);
     c.header("HX-Redirect", state.from === "matrix" ? "/" : "/tasks");
@@ -205,6 +209,11 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if (isInvalidTaskTitle(title)) {
       return c.html(
         <TaskDetailPage task={task} error="Title is required and must be 256 characters or fewer." returnTo={detailReturnTo(c)} />,
+      );
+    }
+    if (isInvalidTaskDescription(description)) {
+      return c.html(
+        <TaskDetailPage task={task} error="Description must be 16,384 characters or fewer." returnTo={detailReturnTo(c)} />,
       );
     }
     const saved = await persistTask(c, repository, { ...task, title, description, version });

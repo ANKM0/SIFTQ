@@ -1,4 +1,4 @@
-import { isTaskArea, isTaskTitleValid } from "./task";
+import { isTaskArea, isTaskDescriptionValid, isTaskTitleValid } from "./task";
 import type { Task } from "./task";
 
 export type ParsedBody = Record<string, unknown>;
@@ -38,4 +38,8 @@ export function readTaskFields(body: ParsedBody): {
 
 export function isInvalidTaskTitle(title: string): boolean {
   return !isTaskTitleValid(title);
+}
+
+export function isInvalidTaskDescription(description: string): boolean {
+  return !isTaskDescriptionValid(description);
 }

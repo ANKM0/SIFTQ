@@ -54,6 +54,28 @@ describe("BDD-TM-001: domain task creation", () => {
       error: { code: "INVALID_ORDER" },
     });
   });
+
+  it("INV-TM-006: accepts an empty description and rejects oversized descriptions", () => {
+    const empty = createTask({
+      id: "task-empty-description",
+      owner_id: "owner-1",
+      title: "Buy milk",
+      description: "",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(empty.ok).toBe(true);
+
+    const oversized = createTask({
+      id: "task-oversized-description",
+      owner_id: "owner-1",
+      title: "Buy milk",
+      description: "😀".repeat(16_385),
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    expect(oversized).toEqual({ ok: false, error: { code: "INVALID_DESCRIPTION" } });
+  });
 });
 
 describe("BDD-TM-002 / BDD-TM-003 / BDD-TM-004: matrix extraction", () => {

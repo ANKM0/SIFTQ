@@ -14,7 +14,7 @@
         "id": { "domain": "string", "pk": true },
         "owner_id": { "domain": "string" },
         "title": { "domain": "string", "note": "Unicodeコードポイント数で1以上256以下", "rules": ["INV-TM-005"] },
-        "description": { "domain": "string" },
+        "description": { "domain": "string", "note": "Unicodeコードポイント数で0以上16,384以下", "rules": ["INV-TM-006"] },
         "status": { "domain": "status", "rules": ["INV-TM-001"] },
         "area": { "domain": "area", "rules": ["INV-TM-002"] },
         "working": { "domain": "boolean", "rules": ["INV-TM-003"] },
