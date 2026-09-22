@@ -7,6 +7,7 @@ import {
   createTask,
   err,
   isTaskArea,
+  isTaskDescriptionValid,
   isTaskStatus,
   isTaskTitleValid,
   moveTask,
@@ -71,7 +72,7 @@ async function findApiTask<T extends ApiEnv>(repository: Repository<T>, c: Conte
 }
 
 function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  const withTitle = applyTitle(body, task);
+  const withTitle = applyTitleAndDescription(body, task);
   if (!withTitle.ok) return withTitle;
   const withStatus = applyStatus(body, withTitle.value);
   if (!withStatus.ok) return withStatus;
@@ -80,11 +81,12 @@ function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, Dom
   return applyWorking(body, withArea.value);
 }
 
-function applyTitle(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
+function applyTitleAndDescription(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
   if (typeof body["title"] !== "string" && typeof body["description"] !== "string") return ok(task);
   const title = typeof body["title"] === "string" ? body["title"].trim() : task.title;
   const description = typeof body["description"] === "string" ? body["description"] : task.description;
   if (!isTaskTitleValid(title)) return err({ code: "INVALID_TITLE" });
+  if (!isTaskDescriptionValid(description)) return err({ code: "INVALID_DESCRIPTION" });
   return ok({ ...task, title, description });
 }
 

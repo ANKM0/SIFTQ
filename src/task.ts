@@ -5,6 +5,7 @@ export const TASK_AREAS = [1, 2, 3, 4] as const;
 export type TaskArea = (typeof TASK_AREAS)[number];
 
 export const TASK_TITLE_MAX_CODE_POINTS = 256;
+export const TASK_DESCRIPTION_MAX_CODE_POINTS = 16_384;
 
 export type Task = {
   id: string;
@@ -22,6 +23,7 @@ export type Task = {
 
 export type DomainErrorCode =
   | "INVALID_TITLE"
+  | "INVALID_DESCRIPTION"
   | "INVALID_STATUS"
   | "INVALID_AREA"
   | "INVALID_WORKING"
@@ -116,6 +118,14 @@ export function isTaskTitleValid(title: string): boolean {
   return length >= 1 && length <= TASK_TITLE_MAX_CODE_POINTS;
 }
 
+export function descriptionCodePointLength(description: string): number {
+  return Array.from(description).length;
+}
+
+export function isTaskDescriptionValid(description: string): boolean {
+  return descriptionCodePointLength(description) <= TASK_DESCRIPTION_MAX_CODE_POINTS;
+}
+
 export type CreateTaskInput = {
   id: string;
   owner_id: string;
@@ -130,6 +140,9 @@ export type CreateTaskInput = {
 export function createTask(input: CreateTaskInput): Result<Task, DomainError> {
   if (!isTaskTitleValid(input.title)) {
     return err({ code: "INVALID_TITLE" });
+  }
+  if (!isTaskDescriptionValid(input.description)) {
+    return err({ code: "INVALID_DESCRIPTION" });
   }
 
   return ok({

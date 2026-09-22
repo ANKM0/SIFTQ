@@ -150,6 +150,21 @@ describe("BDD-TM-005 / BDD-TM-006: task update", () => {
   });
 });
 
+describe("INV-TM-006: API description validation", () => {
+  it("rejects an oversized description", async () => {
+    await repo.insert(taskFixture({ id: "task-1" }));
+
+    const response = await request("PATCH", "/api/tasks/task-1", {
+      description: "😀".repeat(16_385),
+      version: 1,
+    });
+    const body: { code?: string } = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_DESCRIPTION");
+  });
+});
+
 describe("BDD-TM-008: bulk reorder", () => {
   it("moves a task to another area and order", async () => {
     await repo.insert(taskFixture({ id: "task-1" }));

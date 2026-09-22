@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   TASK_TITLE_MAX_CODE_POINTS,
+  TASK_DESCRIPTION_MAX_CODE_POINTS,
   changeTaskArea,
   changeTaskStatus,
   changeTaskWorking,
   createTask,
+  descriptionCodePointLength,
   is_working,
   isTaskArea,
   isTaskStatus,
   isTaskTitleValid,
+  isTaskDescriptionValid,
   moveTask,
   parseTaskVersionInputs,
   titleCodePointLength,
@@ -32,7 +35,7 @@ describe("task title validation", () => {
     expect(titleCodePointLength("a😀")).toBe(2);
   });
 
-  it("accepts 1 to 256 Unicode code points", () => {
+  it("INV-TM-005: accepts 1 to 256 Unicode code points", () => {
     expect(isTaskTitleValid("a")).toBe(true);
     expect(isTaskTitleValid("a".repeat(TASK_TITLE_MAX_CODE_POINTS))).toBe(true);
     expect(isTaskTitleValid("😀".repeat(TASK_TITLE_MAX_CODE_POINTS))).toBe(true);
@@ -40,6 +43,15 @@ describe("task title validation", () => {
     expect(isTaskTitleValid("")).toBe(false);
     expect(isTaskTitleValid("a".repeat(TASK_TITLE_MAX_CODE_POINTS + 1))).toBe(false);
     expect(isTaskTitleValid("😀".repeat(TASK_TITLE_MAX_CODE_POINTS + 1))).toBe(false);
+  });
+});
+
+describe("task description validation", () => {
+  it("INV-TM-006: accepts empty text through 16,384 Unicode code points", () => {
+    expect(descriptionCodePointLength("a😀")).toBe(2);
+    expect(isTaskDescriptionValid("")).toBe(true);
+    expect(isTaskDescriptionValid("😀".repeat(TASK_DESCRIPTION_MAX_CODE_POINTS))).toBe(true);
+    expect(isTaskDescriptionValid("😀".repeat(TASK_DESCRIPTION_MAX_CODE_POINTS + 1))).toBe(false);
   });
 });
 
