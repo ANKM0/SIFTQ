@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--base", default="main")
     parser.add_argument("--merge", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--merge-strategy", choices=["squash", "merge", "rebase"], default="squash")
+    parser.add_argument("--merge-strategy", choices=["squash", "merge", "rebase"], default="merge")
     parser.add_argument("--delete-branch", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--cleanup-worktree", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--delete-local-branch", action=argparse.BooleanOptionalAction, default=True)

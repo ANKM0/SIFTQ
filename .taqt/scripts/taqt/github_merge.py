@@ -10,7 +10,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-github-merge")
     parser.add_argument("task")
     parser.add_argument("--workspace", type=Path, default=Path("."))
-    parser.add_argument("--strategy", choices=["squash", "merge", "rebase"], default="squash")
+    parser.add_argument("--strategy", choices=["squash", "merge", "rebase"], default="merge")
     parser.add_argument("--delete-branch", action="store_true")
     parser.add_argument("--auto", action="store_true")
     parser.add_argument("--watch-checks", action=argparse.BooleanOptionalAction, default=True)

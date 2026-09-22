@@ -1963,6 +1963,20 @@ def test_github_merge_is_dry_run_by_default(tmp_path: Path, capsys) -> None:
     assert "gh pr merge dev/#44_merge_flow --repo owner/repo --squash --delete-branch" in output
 
 
+def test_github_merge_defaults_to_merge_commit(tmp_path: Path, capsys) -> None:
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=45,
+        branch_summary="Merge Commit",
+        task_root=tmp_path,
+    )
+
+    assert github_merge_main([str(task_path), "--delete-branch"]) == 0
+
+    output = capsys.readouterr().out
+    assert "gh pr merge dev/#45_merge_commit --repo owner/repo --merge --delete-branch" in output
+
+
 def test_github_pr_waits_for_checks_and_falls_back_when_required_checks_are_not_configured(
     tmp_path: Path,
     monkeypatch,
@@ -2300,7 +2314,7 @@ def test_task_auto_dry_run_defaults_to_merge_and_cleanup(tmp_path: Path, capsys)
     for step in ("taqt.run", "taqt.commit", "taqt.push", "taqt.pr", "taqt.merge", "taqt.cleanup"):
         assert step in output
     assert output.index("taqt.pr") < output.index("taqt.merge") < output.index("taqt.cleanup")
-    assert "--strategy squash" in output
+    assert "--strategy merge" in output
     assert "--delete-branch" in output
     assert "--delete-local-branch" in output
     assert "--force-worktree" in output
