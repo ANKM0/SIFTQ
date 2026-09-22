@@ -3,34 +3,46 @@ direction: right
 
 task: "Task（集約ルート）" {
   shape: class
-  +title: string
-  +description: string
+  invariant_002: "INV-TM-002: status変更後もareaを保持"
+  invariant_003: "INV-TM-003: workingはstatusと独立"
+  invariant_004: "INV-TM-004: orderはowner_id + area内で連番"
+  +title: Title
+  +description: Description
+  +status: Status
+  +area: Area
   +working: boolean
   +order: number
 }
 
-status: "Status（値オブジェクト）" {
-  do: "do"
-  done: "done"
-  skip: "skip"
+title: "Title（値オブジェクト）" {
+  shape: class
+  invariant: "INV-TM-005: title の長さはUnicodeコードポイント数で1以上256以下とする"
+  +value: string
+  min_length: "1"
+  max_length: "256"
+}
 
-  do -> done: complete
-  do -> skip: skip
-  done -> do: reopen
-  skip -> do: reopen
+description: "Description（値オブジェクト）" {
+  shape: class
+  invariant: "description の長さはUnicodeコードポイント数で0以上16,384以下とする"
+  +value: string
+  min_length: "0"
+  max_length: "16,384"
+}
+
+status: "Status（値オブジェクト）" {
+  shape: class
+  invariant: "INV-TM-001: status は do / done / skip のいずれか"
+  +value: do | done | skip
 }
 
 area: "Area（値オブジェクト）" {
-  q1: "1"
-  q2: "2"
-  q3: "3"
-  q4: "4"
-}
-
-invariants: "不変条件（domain.md）\nINV-TM-001  status ∈ { do, done, skip }\nINV-TM-002  done / skip でも area を保持\nINV-TM-003  working は status と直交し、終了時も自動解除しない\nINV-TM-004  order は owner_id + area 内で連番" {
-  style: { fill: "#fff2cc" }
+  shape: class
+  invariant: "area は 1 / 2 / 3 / 4 のいずれか"
+  +value: 1 | 2 | 3 | 4
 }
 
 task -> status: status
 task -> area: area
-invariants -> task: 制約 {style: {stroke-dash: 4}}
+task -> title: title
+task -> description: description

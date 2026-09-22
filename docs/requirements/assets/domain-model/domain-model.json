@@ -13,7 +13,7 @@
       "attributes": {
         "id": { "domain": "string", "pk": true },
         "owner_id": { "domain": "string" },
-        "title": { "domain": "string", "note": "1..256 code point" },
+        "title": { "domain": "string", "note": "Unicodeコードポイント数で1以上256以下", "rules": ["INV-TM-005"] },
         "description": { "domain": "string" },
         "status": { "domain": "status", "rules": ["INV-TM-001"] },
         "area": { "domain": "area", "rules": ["INV-TM-002"] },

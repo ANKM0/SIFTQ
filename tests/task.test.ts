@@ -32,7 +32,7 @@ describe("task title validation", () => {
     expect(titleCodePointLength("a😀")).toBe(2);
   });
 
-  it("accepts 1 to 256 Unicode code points", () => {
+  it("INV-TM-005: accepts 1 to 256 Unicode code points", () => {
     expect(isTaskTitleValid("a")).toBe(true);
     expect(isTaskTitleValid("a".repeat(TASK_TITLE_MAX_CODE_POINTS))).toBe(true);
     expect(isTaskTitleValid("😀".repeat(TASK_TITLE_MAX_CODE_POINTS))).toBe(true);
