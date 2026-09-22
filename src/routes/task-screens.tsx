@@ -74,6 +74,12 @@ async function persistTask(c: Context<AppEnv>, repository: Repository, updated: 
   return result.ok ? result.value : null;
 }
 
+function taskTextError(title: string, description: string): string | undefined {
+  if (isInvalidTaskTitle(title)) return "Title is required and must be 256 characters or fewer.";
+  if (isInvalidTaskDescription(description)) return "Description must be 16,384 characters or fewer.";
+  return undefined;
+}
+
 function detailReturnTo(c: Context<AppEnv>): "matrix" | "tasks" {
   return c.req.query("from") === "matrix" ? "matrix" : "tasks";
 }
@@ -183,12 +189,8 @@ function registerTaskCreateRoute(app: Hono<AppEnv>, repository: Repository) {
       area: parseTaskArea(body["area"]) ?? 1,
       from: newTaskOrigin(c, body),
     };
-    if (isInvalidTaskTitle(title)) {
-      return c.html(<NewTaskForm state={state} error="Title is required and must be 256 characters or fewer." />);
-    }
-    if (isInvalidTaskDescription(description)) {
-      return c.html(<NewTaskForm state={state} error="Description must be 16,384 characters or fewer." />);
-    }
+    const error = taskTextError(title, description);
+    if (error !== undefined) return c.html(<NewTaskForm state={state} error={error} />);
     const created = createTaskAtBoundary({ title, description, status: state.status, area: state.area });
     if (!created.ok) return c.text(`Invalid task: ${created.error.code}`, 400);
     const inserted = await repository(c).insert(created.value);
@@ -206,16 +208,8 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     const { title, description } = readTaskFields(body);
     const version = parseTaskVersion(body["version"]);
     if (version === null) return c.text("Invalid version", 400);
-    if (isInvalidTaskTitle(title)) {
-      return c.html(
-        <TaskDetailPage task={task} error="Title is required and must be 256 characters or fewer." returnTo={detailReturnTo(c)} />,
-      );
-    }
-    if (isInvalidTaskDescription(description)) {
-      return c.html(
-        <TaskDetailPage task={task} error="Description must be 16,384 characters or fewer." returnTo={detailReturnTo(c)} />,
-      );
-    }
+    const error = taskTextError(title, description);
+    if (error !== undefined) return c.html(<TaskDetailPage task={task} error={error} returnTo={detailReturnTo(c)} />);
     const saved = await persistTask(c, repository, { ...task, title, description, version });
     if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
     const path = detailReturnTo(c) === "matrix" ? "/" : "/tasks";

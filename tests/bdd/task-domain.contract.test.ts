@@ -55,7 +55,10 @@ describe("BDD-TM-001: domain task creation", () => {
     });
   });
 
-  it("INV-TM-006: accepts an empty description and rejects oversized descriptions", () => {
+});
+
+describe("INV-TM-006: description validation", () => {
+  it("accepts empty descriptions and rejects oversized descriptions", () => {
     const empty = createTask({
       id: "task-empty-description",
       owner_id: "owner-1",
