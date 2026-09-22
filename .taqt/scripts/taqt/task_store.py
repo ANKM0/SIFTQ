@@ -7,7 +7,9 @@ from typing import Any
 from loop.schema import load_document, validate_task, write_document
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_TASK_ROOT = Path(".taqt/tasks")
+DEFAULT_WORKTREE_ROOT = REPOSITORY_ROOT / "tmp" / "worktrees"
 DEFAULT_SLICE_MINUTES = 5
 PRIORITY_ORDER = {"high": 0, "normal": 1, "low": 2}
 FEATURE_REQUIRED_SECTIONS = {

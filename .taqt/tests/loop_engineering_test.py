@@ -25,6 +25,7 @@ from taqt.task_run import main as task_run_main
 from taqt.self_improvement import self_improvement_kind
 from taqt.task_store import (
     create_issue_task,
+    DEFAULT_WORKTREE_ROOT,
     decomposition_errors,
     issue_branch,
     next_pending_task,
@@ -1941,6 +1942,7 @@ def test_git_and_pr_scripts_are_dry_run_by_default(tmp_path: Path, capsys) -> No
 
     output = capsys.readouterr().out
     assert "git worktree add -B dev/#42_add_user" in output
+    assert str(DEFAULT_WORKTREE_ROOT / "ISSUE-42") in output
     assert "git push -u origin dev/#42_add_user" in output
     assert "gh pr create" in output
     assert "--draft" in output
@@ -2162,6 +2164,23 @@ def test_task_cleanup_dry_run_prints_worktree_and_branch_cleanup(tmp_path: Path,
     assert "mark done: ISSUE-48" in output
 
 
+def test_task_cleanup_defaults_to_repository_tmp_worktrees(
+    tmp_path: Path, capsys, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    task_path, _task = create_issue_task(
+        repo="owner/repo",
+        issue_number=47,
+        branch_summary="Cleanup Default",
+        task_root=tmp_path,
+    )
+
+    assert task_cleanup_main([str(task_path), "--task-root", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert f"git worktree remove {DEFAULT_WORKTREE_ROOT / 'ISSUE-47'}" in output
+
+
 def test_task_cleanup_execute_marks_child_and_parent_done(tmp_path: Path, monkeypatch) -> None:
     parent_path, _parent, _created = upsert_issue_task(
         repo="owner/repo",
@@ -2352,8 +2371,8 @@ def test_task_worker_dry_run_plans_one_worktree_per_ready_task(tmp_path: Path, c
 
     output = capsys.readouterr().out
     assert output.count("git worktree add -B") == 2
-    assert ".taqt/worktrees/ISSUE-50" in output
-    assert ".taqt/worktrees/ISSUE-51" in output
+    assert str(DEFAULT_WORKTREE_ROOT / "ISSUE-50") in output
+    assert str(DEFAULT_WORKTREE_ROOT / "ISSUE-51") in output
     assert output.count("taqt.task_auto") == 2
 
 
@@ -2423,8 +2442,8 @@ def test_task_worker_plans_decomposed_child_tasks(tmp_path: Path, capsys) -> Non
     assert task_worker_main(["--task-root", str(tmp_path), "--jobs", "2"]) == 0
 
     output = capsys.readouterr().out
-    assert ".taqt/worktrees/ISSUE-53-01" in output
-    assert ".taqt/worktrees/ISSUE-53-02" in output
+    assert str(DEFAULT_WORKTREE_ROOT / "ISSUE-53-01") in output
+    assert str(DEFAULT_WORKTREE_ROOT / "ISSUE-53-02") in output
     assert "ISSUE-53: not decomposed enough" not in output
 
 

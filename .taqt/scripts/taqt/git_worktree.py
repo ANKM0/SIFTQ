@@ -2,14 +2,14 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from .task_store import issue_branch, load_task
+from .task_store import DEFAULT_WORKTREE_ROOT, issue_branch, load_task
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-git-worktree")
     parser.add_argument("task")
     parser.add_argument("--base", default="main")
-    parser.add_argument("--worktree-root", type=Path, default=Path(".taqt/worktrees"))
+    parser.add_argument("--worktree-root", type=Path, default=DEFAULT_WORKTREE_ROOT)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
