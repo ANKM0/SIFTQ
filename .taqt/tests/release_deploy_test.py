@@ -162,7 +162,7 @@ def test_deploy_checks_configured_d1_binding_before_worker(monkeypatch, tmp_path
 
     assert release_deploy.main() == 0
     assert calls == [
-        ["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote", "-c", ".config/wrangler.jsonc"],
+        ["bun", "x", "wrangler", "d1", "migrations", "list", "siftq", "--remote", "-c", ".config/wrangler.jsonc"],
         ["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"],
     ]
 
@@ -174,5 +174,5 @@ def test_deploy_does_not_deploy_when_migration_check_fails(monkeypatch, tmp_path
         release_deploy.main()
 
     assert calls == [
-        ["bun", "x", "wrangler", "d1", "migrations", "list", "DB", "--remote", "-c", ".config/wrangler.jsonc"]
+        ["bun", "x", "wrangler", "d1", "migrations", "list", "siftq", "--remote", "-c", ".config/wrangler.jsonc"]
     ]
