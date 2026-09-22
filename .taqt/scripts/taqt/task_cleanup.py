@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .task_store import (
     DEFAULT_TASK_ROOT,
+    DEFAULT_WORKTREE_ROOT,
     complete_parent_if_children_done,
     complete_task,
     issue_branch,
@@ -20,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-task-cleanup")
     parser.add_argument("task", nargs="?")
     parser.add_argument("--task-root", type=Path, default=DEFAULT_TASK_ROOT)
-    parser.add_argument("--worktree-root", type=Path, default=Path(".taqt/worktrees"))
+    parser.add_argument("--worktree-root", type=Path, default=DEFAULT_WORKTREE_ROOT)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--delete-local-branch", action="store_true")

@@ -7,6 +7,7 @@ from pathlib import Path
 from .github_labels import enabled_error
 from .task_store import (
     DEFAULT_TASK_ROOT,
+    DEFAULT_WORKTREE_ROOT,
     PRIORITY_ORDER,
     decomposition_errors,
     block_task,
@@ -23,7 +24,7 @@ from .self_improvement import request_self_improvement
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="taqt-task-worker")
     parser.add_argument("--task-root", type=Path, default=DEFAULT_TASK_ROOT)
-    parser.add_argument("--worktree-root", type=Path, default=Path(".taqt/worktrees"))
+    parser.add_argument("--worktree-root", type=Path, default=DEFAULT_WORKTREE_ROOT)
     parser.add_argument("--loop-root", type=Path, default=Path(".taqt/loops"))
     parser.add_argument("--runs-root", type=Path, default=Path(".taqt/runs"))
     parser.add_argument("--base", default="main")
