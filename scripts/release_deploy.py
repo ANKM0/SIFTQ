@@ -90,15 +90,16 @@ def build_plan(version: str, ref: str, base: str | None) -> ReleasePlan:
     return ReleasePlan(tag_name(version), resolved_ref, base, worker_change, migrations, "release+deploy" if worker_change else "release-only")
 
 
-def d1_binding(path: Path = Path(".config/wrangler.jsonc")) -> str:
+def d1_database_name(path: Path = Path(".config/wrangler.jsonc")) -> str:
     payload = parse_jsonc(path.read_text(encoding="utf-8"))
     databases = payload.get("d1_databases") or []
     for entry in databases:
-        if entry.get("binding") == "DB":
-            return "DB"
-    if databases and databases[0].get("binding"):
-        return str(databases[0]["binding"])
-    raise ValueError("D1 binding not found in .config/wrangler.jsonc")
+        if entry.get("binding") == "DB" and entry.get("database_name"):
+            return str(entry["database_name"])
+    for entry in databases:
+        if entry.get("database_name"):
+            return str(entry["database_name"])
+    raise ValueError("D1 database_name not found in .config/wrangler.jsonc")
 
 
 def require_execute(args: argparse.Namespace) -> None:
@@ -152,7 +153,7 @@ def main() -> int:
             if tagged != command("git", "rev-parse", "HEAD"):
                 raise ValueError("checked-out HEAD must equal the deployment tag")
             subprocess.run(
-                ["bun", "x", "wrangler", "d1", "migrations", "list", d1_binding(Path(".config/wrangler.jsonc")), "--remote", "-c", ".config/wrangler.jsonc"],
+                ["bun", "x", "wrangler", "d1", "migrations", "list", d1_database_name(Path(".config/wrangler.jsonc")), "--remote", "-c", ".config/wrangler.jsonc"],
                 check=True,
             )
             subprocess.run(["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"], check=True)
