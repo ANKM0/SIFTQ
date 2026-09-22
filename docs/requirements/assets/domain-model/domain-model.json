@@ -23,11 +23,6 @@
         "created_at": { "domain": "datetime" },
         "updated_at": { "domain": "datetime" }
       },
-      "transitions": [
-        { "on": "complete", "domain": "status", "from": "do", "to": "done" },
-        { "on": "skip", "domain": "status", "from": "do", "to": "skip" },
-        { "on": "reopen", "domain": "status", "from": ["done", "skip"], "to": "do" }
-      ],
       "rules": ["INV-TM-004"]
     }
   },
