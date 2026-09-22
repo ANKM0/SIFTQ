@@ -36,6 +36,7 @@ a {
   gap: 16px;
   justify-content: flex-start;
   padding: 14px 20px;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -153,5 +154,50 @@ a {
 .muted {
   color: #57606a;
   font-size: 13px;
+}
+
+@media (width < 40rem) {
+  .topbar {
+    padding: 12px 16px;
+  }
+
+  .nav {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .nav a {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .page {
+    padding: 16px;
+  }
+
+  .page--matrix {
+    height: auto;
+    min-height: calc(100vh - 63px);
+    padding: 16px;
+  }
+
+  .page--matrix .matrix-axis {
+    height: auto;
+  }
+
+  .page--matrix > * {
+    width: 100%;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (width >= 40rem) {
+  .topbar {
+    flex-wrap: nowrap;
+  }
 }
 `;
