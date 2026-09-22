@@ -107,7 +107,7 @@ Use `taqt:auto` only after the task is ready and the selected workspace is corre
 task -t .config/Taskfile.yml taqt:auto -- .taqt/tasks/ISSUE-<number>.yaml --workspace tmp/worktrees/ISSUE-<number> --execute
 ```
 
-The default auto route includes squash merge, worktree/local branch cleanup, and a
+The default auto route includes merge-commit merging, worktree/local branch cleanup, and a
 read-only release/deploy decision. Use the `--no-merge`, `--no-cleanup-worktree`,
 or `--no-release-decision` options when those post-PR steps must be skipped.
 
