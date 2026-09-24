@@ -484,6 +484,29 @@ def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> 
     ]
 
 
+def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
+        calls.append(command)
+        return {
+            "command": command,
+            "exit_code": 0,
+            "elapsed_seconds": 0.1,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+
+    monkeypatch.setattr("loop.verification._run_command", fake_run)
+    monkeypatch.setenv("LOOP_VERIFICATION_SKIP_E2E", "1")
+
+    result = run_verification(cwd=tmp_path)
+
+    assert result["status"] == "pass"
+    assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
+    assert "task -t .config/Taskfile.yml ci:test:unit" in calls
+
+
 @pytest.mark.parametrize(
     ("response", "changed_paths", "status"),
     [

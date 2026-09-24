@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -16,6 +17,11 @@ E2E_COMMANDS = (f"{TASKFILE} ci:test:e2e",)
 FRONTEND_DEPENDENCY_COMMAND = f"{TASKFILE} setup:frontend:ci"
 
 
+def _e2e_enabled() -> bool:
+    value = os.environ.get("LOOP_VERIFICATION_SKIP_E2E", "").strip().lower()
+    return value not in {"1", "true", "yes"}
+
+
 def run_verification(
     *,
     cwd: Path,
@@ -24,8 +30,9 @@ def run_verification(
         ("diff_check", ("git diff --check",)),
         ("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)),
         ("fast_checks", FAST_COMMANDS),
-        ("e2e_checks", E2E_COMMANDS),
     ]
+    if _e2e_enabled():
+        commands.append(("e2e_checks", E2E_COMMANDS))
     results: list[dict[str, Any]] = []
     for phase, phase_commands in commands:
         for command in phase_commands:
