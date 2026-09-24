@@ -21,8 +21,8 @@
 - `title` は Task と共有する `Title` 値オブジェクトを使う。
 - `description` は Task と共有する `Description` 値オブジェクトを使う。
 - 属性は `title`、`description`、`order`、`pinned` とする。
-- `order` の昇順でカード表示する。
-- `pinned = true` のカードを先に表示し、その中で `order` の昇順にする。
+- `order` は pinned / unpinned の各グループ内の表示順を表す。
+- `pinned = true` のカードを先に表示し、各グループ内を `order` の昇順にする。
 - `pinned` はカードの固定状態を表す。
 - Idea は作成、編集、削除、ピン留め、並べ替えを行う。
 

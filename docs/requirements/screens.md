@@ -58,14 +58,15 @@
 
 - `Idea list` (`/ideas`)
   - Task とは独立したIdeaをカード一覧で表示する。
-  - Ideaは`title`、`description`、`order`、`pinned`を持つ。
-  - `pinned = true` のカードを先に表示し、その中で`order`の昇順にする。
+  - Ideaは`title`、`description`、`order`、`pinned`を持つ。`order`はpinned / unpinned各グループ内の表示順である。
+  - `pinned = true` のカードを先に表示し、各グループ内を`order`の昇順にする。
   - カードはtitleとdescを表示する。
   - Ideaがない場合は空状態メッセージを表示する。
   - composerからtitleとdescriptionを入力してIdeaを作成する。
   - カードを開くとtitleとdescriptionを編集でき、自動保存する。
   - pin操作でカードの固定状態を切り替える。
-  - カードをdrag and dropして同じグループ内の表示順を変更する。変更は現在の表示中に反映する。
+  - カードをdrag and dropして同じグループ内の`order`を変更する。
+  - ピン留め状態を切り替えたカードは移動先グループの末尾へ移動し、グループ内の`order`を振り直す。
   - 削除操作の確認後、Ideaを一覧から除外する。
 
 - `Task detail` (`/tasks/:id`)
@@ -121,4 +122,4 @@
 
 - `bun run preview:mock` で起動する。
 - `http://127.0.0.1:8787` を開き、パスワード `preview` でログインする。
-- Matrix と Task list は固定初期データを表示する。Idea list は固定初期データにブラウザのlocalStorageで作成・編集・削除・ピン留めの変更を重ね、並べ替えは現在の表示中だけ保持する。
+- Matrix と Task list は固定初期データを表示する。Idea list は固定初期データにブラウザのlocalStorageで作成・編集・削除・ピン留め・並べ替えの変更を重ねる。localStorageを削除するとIdeaだけ初期状態に戻る。

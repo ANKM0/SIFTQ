@@ -23,6 +23,8 @@ test("creates an idea when the composer modal closes", async ({ page }) => {
   const created = page.locator(".idea-card").filter({ hasText: "新しいアイデア" });
   await expect(created).toHaveCount(1);
   await expect(created.locator(".idea-card__description")).toHaveText("試しに作成したカード");
+  expect(Number.isFinite(Number(await created.getAttribute("data-idea-order")))).toBe(true);
+  expect(await page.evaluate(() => typeof JSON.parse(localStorage.getItem("siftq.idea-created") || "[]")[0].order)).toBe("number");
   expect(await page.locator(".idea-card").count()).toBe(initialCount + 1);
 
   await page.locator(".ideas-composer__trigger").click();
@@ -54,4 +56,28 @@ test("deletes an idea through the action menu and confirmation", async ({ page }
 
   await page.reload();
   expect(await page.locator(".idea-card").count()).toBe(initialCount - 1);
+});
+
+test("persists idea pinning and same-group reorder", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/ideas");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  const unpinned = page.locator('.ideas-grid[data-idea-group="unpinned"] .idea-card');
+  const source = unpinned.nth(1);
+  const sourceId = await source.getAttribute("data-idea-id");
+  const sourceTitle = await source.locator("h2").textContent();
+  if (sourceId === null || sourceTitle === null) throw new Error("expected an idea card");
+
+  await source.dragTo(unpinned.first());
+  await expect(unpinned.first()).toHaveAttribute("data-idea-id", sourceId);
+
+  await page.locator(`.idea-card[data-idea-id="${sourceId}"] .idea-card__pin`).click();
+  await expect(page.locator(`.ideas-grid[data-idea-group="pinned"] .idea-card[data-idea-id="${sourceId}"]`)).toHaveCount(1);
+  await page.reload();
+
+  await expect(page.locator(`.ideas-grid[data-idea-group="pinned"] .idea-card[data-idea-id="${sourceId}"]`)).toHaveCount(1);
+  await expect(page.locator('.ideas-grid[data-idea-group="pinned"] .idea-card').last()).toHaveAttribute("data-idea-id", sourceId);
+  await expect(page.locator(`.idea-card[data-idea-id="${sourceId}"] h2`)).toHaveText(sourceTitle);
 });

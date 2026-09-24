@@ -18,7 +18,7 @@
         "status": { "domain": "status", "rules": ["INV-TM-001"] },
         "area": { "domain": "area", "note": "1 / 2 / 3 / 4", "rules": ["INV-TM-002", "INV-TM-007"] },
         "working": { "domain": "boolean", "rules": ["INV-TM-003"] },
-        "order": { "domain": "number" },
+        "order": { "domain": "number", "note": "pinned / unpinned各グループ内の表示順" },
         "version": { "domain": "number" },
         "created_at": { "domain": "datetime" },
         "updated_at": { "domain": "datetime" }
@@ -52,7 +52,7 @@
       "name": "アイデアを管理する",
       "actor": "user",
       "steps": [
-        { "name": "Ideaを表示する", "entity": "ideas", "when": "pinned を先にして order の昇順でカード表示" },
+        { "name": "Ideaを表示する", "entity": "ideas", "when": "pinned を先にして各グループ内を order の昇順でカード表示" },
         { "name": "Ideaを作成する", "entity": "ideas", "changes": { "title": "入力値", "description": "入力値", "order": "末尾", "pinned": false } },
         { "name": "Ideaを編集する", "entity": "ideas", "changes": { "title": "入力値", "description": "入力値" } },
         { "name": "Ideaのピン留め状態を切り替える", "entity": "ideas", "changes": { "pinned": [true, false] } },

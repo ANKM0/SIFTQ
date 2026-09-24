@@ -28,6 +28,7 @@ function IdeaCard({ idea }: { idea: IdeaCardData }) {
   return (
     <article
       class="idea-card"
+      data-idea-id={idea.order}
       data-idea-order={idea.order}
       data-order={idea.order}
       data-pinned={idea.pinned === true ? "true" : "false"}

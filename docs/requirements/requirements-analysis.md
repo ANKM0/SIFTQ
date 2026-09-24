@@ -45,7 +45,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-007 | REQ-TM-002, REQ-TM-003 | status を完了または見送りに変更しても、Task の area は保持される。 | BDD-TM-007 |
 | SPEC-TM-008 | REQ-TM-004 | Matrix 上の drag and drop は Task の area または area 内の order を変更する。 | BDD-TM-008 |
 | SPEC-TM-009 | REQ-TM-004 | Matrix 上の drag and drop の永続化が競合した場合、表示をサーバー状態へ戻し、競合を通知する。 | BDD-TM-009 |
-| SPEC-TM-010 | REQ-TM-005 | モック BE プレビューはログイン後に固定初期データを表示し、変更はプレビューの実行中だけ保持する。 | BDD-TM-010 |
+| SPEC-TM-010 | REQ-TM-005 | モック BE プレビューはログイン後にMatrixとTask listの固定初期データを表示する。Idea listの作成・編集・削除・ピン留め・並べ替えはブラウザのlocalStorageに保持する。 | BDD-TM-010 |
 | SPEC-TM-011 | REQ-TM-002, REQ-TM-006 | Matrix の task card を右クリックすると、`delete`、`skip`、`done` の順で選択できる。 | BDD-TM-011 |
 | SPEC-TM-012 | REQ-TM-006 | `done` または `skip` を選択すると、task は Matrix から外れ、Task list には残る。 | BDD-TM-012, BDD-TM-013 |
 | SPEC-TM-013 | REQ-TM-006 | `delete` を選択すると確認ダイアログを表示し、確認後に task を完全削除する。 | BDD-TM-014, BDD-TM-015 |
@@ -55,8 +55,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-017 | REQ-TM-003 | New task と Task detail の description 編集領域では http/https URL をリンクとして表示し、通常クリックは同じタブ、Ctrl/Command クリックは別タブで開く。保存値はプレーンテキストとする。 | BDD-TM-017 |
 | SPEC-TM-018 | REQ-TM-003 | description に http/https URL を貼り付けると編集領域内でリンクとして表示する。Markdown、HTML、その他のリッチテキスト記法は解釈しない。 | BDD-TM-018 |
 | SPEC-TM-019 | REQ-TM-007 | Task list は status 絞り込み後の件数を25件単位でページ分割し、ページ番号と前へ/次へで移動する。不正なページ指定は1ページ目へ、範囲超過は最終ページへ寄せる。 | BDD-TM-019 |
-| SPEC-TM-020 | REQ-TM-008 | Idea は title、description、order、pinned を持ち、pinned を先にして order の昇順で表示する。 | BDD-TM-020 |
-| SPEC-TM-021 | REQ-TM-008 | ユーザーは Idea の作成、編集、並べ替えを行える。作成・編集はブラウザの再読み込み後も保持し、並べ替えは表示中に反映する。 | BDD-TM-021 |
+| SPEC-TM-020 | REQ-TM-008 | Idea は title、description、order、pinned を持ち、pinned を先にして各グループ内を order の昇順で表示する。 | BDD-TM-020 |
+| SPEC-TM-021 | REQ-TM-008 | ユーザーは Idea の作成、編集、並べ替えを行え、変更はブラウザの再読み込み後も保持する。 | BDD-TM-021 |
 | SPEC-TM-022 | REQ-TM-009 | ユーザーは Idea のピン留め切り替えと削除を行え、削除前に確認する。 | BDD-TM-022 |
 
 ## BDD 候補
@@ -83,7 +83,7 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-018 | SPEC-TM-018 | description に貼り付けた http/https URL はリンクになり、保存時は `<a>` などのHTMLタグを含まないプレーンテキストになる。 |
 | BDD-TM-019 | SPEC-TM-019 | Task list は25件ごとにページを分け、番号と前へ/次へで移動できる。不正指定と範囲超過は矛盾のないページに寄せる。 |
 | BDD-TM-020 | SPEC-TM-020 | Idea list はピン留めしたIdeaを先に、各グループ内をorder順に表示する。 |
-| BDD-TM-021 | SPEC-TM-021 | Ideaを作成・編集・並べ替えすると表示中の一覧に反映され、作成・編集は再読み込み後も確認できる。 |
+| BDD-TM-021 | SPEC-TM-021 | Ideaを作成・編集・並べ替えすると表示中の一覧に反映され、再読み込み後も変更後の一覧を確認できる。 |
 | BDD-TM-022 | SPEC-TM-022 | Ideaのピン留めを切り替え、削除確認を経て一覧から削除できる。 |
 
 ## 未決事項
