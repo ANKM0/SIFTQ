@@ -3,12 +3,12 @@ import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
-  MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
-  DESCRIPTION_EDITOR_SCRIPT,
-  TASK_LIST_SELECTION_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
 } from "./client/browser-scripts";
+import { MATRIX_DND_SCRIPT } from "./client/matrix-scripts";
+import { DESCRIPTION_EDITOR_SCRIPT } from "./client/task-form-scripts";
+import { TASK_LIST_SELECTION_SCRIPT } from "./client/task-list-scripts";
 import { IDEA_DETAIL_SCRIPT, IDEAS_DND_SCRIPT } from "./client/idea-scripts";
 import { SESSION_COOKIE_NAME, isValidSession } from "./auth";
 import { createD1TaskRepository } from "./repository/d1-task-repository";
