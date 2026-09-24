@@ -1,0 +1,41 @@
+{
+  "total": 201,
+  "done": 100,
+  "human": 92,
+  "failed": 9,
+  "closure_rate": 0.4975,
+  "human_rate": 0.4577,
+  "human_causes": {
+    "routing": 73,
+    "verification": 8,
+    "review": 6,
+    "spec_product": 2,
+    "permission": 2,
+    "model_infra": 1
+  },
+  "monthly": {
+    "2026-08": {
+      "total": 87,
+      "done": 41,
+      "human": 42,
+      "failed": 4,
+      "human_causes": {
+        "routing": 38,
+        "permission": 2,
+        "spec_product": 2
+      }
+    },
+    "2026-09": {
+      "total": 114,
+      "done": 59,
+      "human": 50,
+      "failed": 5,
+      "human_causes": {
+        "routing": 35,
+        "verification": 8,
+        "review": 6,
+        "model_infra": 1
+      }
+    }
+  }
+}
