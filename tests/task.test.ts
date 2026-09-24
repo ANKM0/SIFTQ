@@ -56,7 +56,7 @@ describe("task description validation", () => {
 });
 
 describe("task enums", () => {
-  it("INV-TM-001: recognizes valid status and area values", () => {
+  it("INV-TM-001 / INV-TM-007: recognizes valid status and area values", () => {
     expect(isTaskStatus("do")).toBe(true);
     expect(isTaskStatus("done")).toBe(true);
     expect(isTaskStatus("skip")).toBe(true);

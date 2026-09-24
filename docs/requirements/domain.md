@@ -1,4 +1,4 @@
-# Task Management Domain
+# Task and Idea Management Domain
 
 ## 目的
 
@@ -15,15 +15,26 @@
 | `area` | `1` / `2` / `3` / `4` | matrix の象限。常に保持する。 |
 | `order` | number | area 内の表示順。 |
 
+## Idea
+
+- `Idea` は `Task` と独立したエンティティである。
+- `title` は Task と共有する `Title` 値オブジェクトを使う。
+- `description` は Task と共有する `Description` 値オブジェクトを使う。
+- 属性は `title`、`description`、`order`、`pinned` とする。
+- `order` は pinned / unpinned の各グループ内の表示順を表す。
+- `pinned = true` のカードを先に表示し、各グループ内を `order` の昇順にする。
+- `pinned` はカードの固定状態を表す。
+- Idea は作成、編集、削除、ピン留め、並べ替えを行う。
+
 ## Title
 
-- `title` は `Title` 値オブジェクトである。
+- `title` は Task と Idea が共有する `Title` 値オブジェクトである。
 - 内包する値は text である。
 - `title` の長さは、Unicodeコードポイント数で1以上256以下とする。
 
 ## Description
 
-- `description` は `Description` 値オブジェクトである。
+- Task と Idea の `description` は、同じ `Description` 値オブジェクトである。
 - 内包する値は text である。
 - 空文字を許可する。
 - `description` の長さは、Unicodeコードポイント数で0以上16,384以下とする。
@@ -39,7 +50,7 @@
 
 ## Area
 
-- `area` は `1 / 2 / 3 / 4` のいずれかである。
+- `area` は `1 / 2 / 3 / 4` のいずれかである（INV-TM-007）。
 - `area` は nullable にしない。
 - `area` は matrix の象限を表す。
 - `done` / `skip` の task も `area` を保持する。
@@ -57,6 +68,7 @@
 | INV-TM-004 | `order` は `owner_id + area` 内で連番を保つ。 |
 | INV-TM-005 | `title` の長さはUnicodeコードポイント数で1以上256以下とする。 |
 | INV-TM-006 | `description` の長さはUnicodeコードポイント数で0以上16,384以下とする。 |
+| INV-TM-007 | `area` は `1 / 2 / 3 / 4` のいずれかである。 |
 
 ## 状態遷移ルール
 

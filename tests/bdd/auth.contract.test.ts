@@ -43,7 +43,7 @@ describe("authentication contract", () => {
     );
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/");
+    expect(response.headers.get("location")).toBe("/ideas");
     expect(response.headers.get("set-cookie")).toContain(`${SESSION_COOKIE_NAME}=`);
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
   });

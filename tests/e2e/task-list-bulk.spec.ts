@@ -7,7 +7,7 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => url.pathname === "/");
+  await page.waitForURL((url) => url.pathname === "/ideas");
 }
 
 async function createTask(page: Page, title: string) {

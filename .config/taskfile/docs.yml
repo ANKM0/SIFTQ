@@ -5,7 +5,7 @@ tasks:
     desc: Validate the domain model and generate its diagrams (domain / logical / physical / flow / nav).
     cmds:
       - bun scripts/domain-model/generate.ts
-      - d2 --pad 10 docs/requirements/assets/domain-model/domain-model.d2 docs/requirements/assets/domain-model/generated/domain-model.svg
+      - d2 --layout=elk --pad 10 docs/requirements/assets/domain-model/domain-model.d2 docs/requirements/assets/domain-model/generated/domain-model.svg
       - |
         for name in logical physical flow nav; do
           d2 --pad 10 "docs/requirements/assets/domain-model/generated/${name}.d2" "docs/requirements/assets/domain-model/generated/${name}.svg"

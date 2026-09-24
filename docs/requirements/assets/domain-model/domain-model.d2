@@ -1,7 +1,7 @@
 # ドメインモデル図。正本の補助。正本は domain.md と domain-model.json。
-direction: right
+direction: down
 
-task: "Task（集約ルート）" {
+task: "Task（エンティティ）" {
   shape: class
   invariant_002: "INV-TM-002: status変更後もareaを保持"
   invariant_003: "INV-TM-003: workingはstatusと独立"
@@ -16,7 +16,7 @@ task: "Task（集約ルート）" {
 
 title: "Title（値オブジェクト）" {
   shape: class
-  invariant: "INV-TM-005: title の長さはUnicodeコードポイント数で1以上256以下とする"
+  invariant_005: "INV-TM-005: title の長さはUnicodeコードポイント数で1以上256以下とする"
   +value: string
   min_length: "1"
   max_length: "256"
@@ -24,7 +24,7 @@ title: "Title（値オブジェクト）" {
 
 description: "Description（値オブジェクト）" {
   shape: class
-  invariant: "INV-TM-006: description の長さはUnicodeコードポイント数で0以上16,384以下とする"
+  invariant_006: "INV-TM-006: description の長さはUnicodeコードポイント数で0以上16,384以下とする"
   +value: string
   min_length: "0"
   max_length: "16,384"
@@ -32,13 +32,13 @@ description: "Description（値オブジェクト）" {
 
 status: "Status（値オブジェクト）" {
   shape: class
-  invariant: "INV-TM-001: status は do / done / skip のいずれか"
+  invariant_001: "INV-TM-001: status は do / done / skip のいずれか"
   +value: do | done | skip
 }
 
 area: "Area（値オブジェクト）" {
   shape: class
-  invariant: "area は 1 / 2 / 3 / 4 のいずれか"
+  invariant_007: "INV-TM-007: area は 1 / 2 / 3 / 4 のいずれか"
   +value: 1 | 2 | 3 | 4
 }
 
@@ -46,3 +46,14 @@ task -> status: status
 task -> area: area
 task -> title: title
 task -> description: description
+
+idea: "Idea（エンティティ）" {
+  shape: class
+  +title: Title
+  +description: Description
+  +order: number
+  +pinned: boolean
+}
+
+idea -> title: title
+idea -> description: description

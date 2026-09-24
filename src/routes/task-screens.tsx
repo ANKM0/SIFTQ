@@ -7,6 +7,8 @@ import { OptionMenu } from "../components/OptionMenu";
 import { TaskMeta } from "../components/TaskMeta";
 import type { NewTaskFrom, NewTaskState } from "../components/NewTaskMeta";
 import { MatrixPage } from "../views/MatrixPage";
+import { IdeasPage } from "../views/IdeasPage";
+import { IdeaDetailPage } from "../views/IdeaDetailPage";
 import { TaskListPage } from "../views/TaskListPage";
 import { NewTaskForm, TaskDetailPage, TaskVersionInput } from "../views/TaskFormPage";
 import { pageNav } from "../views/navigation";
@@ -31,13 +33,20 @@ import {
 import type { ParsedBody } from "../task-input";
 import type { AppEnv } from "../app-env";
 import type { TaskRepository } from "../repository/task-repository";
+import type { IdeaRepository } from "../repository/idea-repository";
 
 type Repository = (c: Context<AppEnv>) => TaskRepository;
+type IdeaRepositoryFactory = (c: Context<AppEnv>) => IdeaRepository;
+
+function activePage(path: string): "ideas" | "matrix" | "tasks" {
+  if (path === "/matrix") return "matrix";
+  if (path === "/ideas" || path.startsWith("/ideas/")) return "ideas";
+  return "tasks";
+}
 
 function renderPage(c: Context<AppEnv>, content: JSX.Element) {
   if (c.req.header("HX-Request")) return c.html(content);
-  const active = c.req.path === "/" ? "matrix" : "tasks";
-  return c.html(<Layout active={active}>{content}</Layout>);
+  return c.html(<Layout active={activePage(c.req.path)}>{content}</Layout>);
 }
 
 function createTaskAtBoundary({
@@ -115,11 +124,25 @@ function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks"
   return <OptionMenu task={task} open="area" returnTo={returnTo} />;
 }
 
-function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository) {
-  app.get("/", async (c) => {
+function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
+  app.get("/", (c) => c.redirect("/ideas"));
+
+  app.get("/matrix", async (c) => {
     const result = await repository(c).list();
     if (!result.ok) return c.text("Internal Server Error", 500);
     return renderPage(c, <MatrixPage tasks={result.value} />);
+  });
+
+  app.get("/ideas", async (c) => {
+    const result = await ideaRepository(c).list("local");
+    if (!result.ok) return c.text("Internal Server Error", 500);
+    return renderPage(c, <IdeasPage ideas={result.value} />);
+  });
+
+  app.get("/ideas/:id", async (c) => {
+    const result = await ideaRepository(c).find(c.req.param("id"), "local");
+    if (!result.ok) return c.text("Internal Server Error", 500);
+    return result.value === undefined ? c.notFound() : renderPage(c, <IdeaDetailPage idea={result.value} />);
   });
 
   app.get("/tasks", async (c) => {
@@ -195,7 +218,7 @@ function registerTaskCreateRoute(app: Hono<AppEnv>, repository: Repository) {
     if (!created.ok) return c.text(`Invalid task: ${created.error.code}`, 400);
     const inserted = await repository(c).insert(created.value);
     if (!inserted.ok) return c.text("Internal Server Error", 500);
-    c.header("HX-Redirect", state.from === "matrix" ? "/" : "/tasks");
+    c.header("HX-Redirect", state.from === "matrix" ? "/matrix" : "/tasks");
     return c.body(null, 201);
   });
 }
@@ -212,7 +235,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if (error !== undefined) return c.html(<TaskDetailPage task={task} error={error} returnTo={detailReturnTo(c)} />);
     const saved = await persistTask(c, repository, { ...task, title, description, version });
     if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-    const path = detailReturnTo(c) === "matrix" ? "/" : "/tasks";
+    const path = detailReturnTo(c) === "matrix" ? "/matrix" : "/tasks";
     if (c.req.header("HX-Request")) {
       c.header("HX-Redirect", path);
       return c.body(null);
@@ -257,8 +280,8 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
   });
 }
 
-export function registerTaskScreenRoutes(app: Hono<AppEnv>, repository: Repository) {
-  registerTaskListRoutes(app, repository);
+export function registerTaskScreenRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
+  registerTaskListRoutes(app, repository, ideaRepository);
   registerTaskDetailRoutes(app, repository);
   registerTaskCreateRoute(app, repository);
   registerTaskEditRoutes(app, repository);

@@ -7,7 +7,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/ideas$/);
+  await page.goto("/matrix");
 }
 
 function descriptionEditor(page: Page) {
@@ -22,7 +23,7 @@ async function createMatrixTask(page: Page, title: string) {
 }
 
 async function openDetail(page: Page, title: string) {
-  await page.goto("/");
+  await page.goto("/matrix");
   await page.locator(".task-card", { hasText: title }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 }

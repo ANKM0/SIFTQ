@@ -17,10 +17,11 @@
 | P05 | Status popover | 新規作成・詳細画面内のステータス選択パネル |
 | P06 | Area popover | 新規作成・詳細画面内のエリア選択パネル |
 | P07 | Delete confirmation dialog | Matrix 上の task を完全削除する確認ダイアログ |
+| P08 | Idea list | Ideaをカード一覧で管理する画面 |
 
 ## 画面詳細
 
-- `Matrix` (`/`)
+- `Matrix` (`/matrix`)
   - `status = do` の task だけを表示する。
   - task は `area = 1 / 2 / 3 / 4` の象限に分けて表示する。
   - 縦軸は `重要度`、横軸は `緊急度` とする。
@@ -54,6 +55,19 @@
   - 選択時は status 切り替えを隠し、`Mark as`（`do`、`done`、`skip`）、`Labels`、`delete` を表示する。
   - bulk 操作は選択中のtaskへ適用し、delete前には選択件数を含む確認ダイアログを表示する。
   - bulk 操作で競合または通信エラーが発生した場合は一覧上にエラーを表示し、競合時は再読み込みを促す。
+
+- `Idea list` (`/ideas`)
+  - Task とは独立したIdeaをカード一覧で表示する。
+  - Ideaは`title`、`description`、`order`、`pinned`を持つ。`order`はpinned / unpinned各グループ内の表示順である。
+  - `pinned = true` のカードを先に表示し、各グループ内を`order`の昇順にする。
+  - カードはtitleとdescを表示する。
+  - Ideaがない場合は空状態メッセージを表示する。
+  - composerからtitleとdescriptionを入力してIdeaを作成する。
+  - カードを開くとtitleとdescriptionを編集でき、自動保存する。
+  - pin操作でカードの固定状態を切り替える。
+  - カードをdrag and dropして同じグループ内の`order`を変更する。
+  - ピン留め状態を切り替えたカードは移動先グループの末尾へ移動し、グループ内の`order`を振り直す。
+  - 削除操作の確認後、Ideaを一覧から除外する。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。
@@ -108,4 +122,4 @@
 
 - `bun run preview:mock` で起動する。
 - `http://127.0.0.1:8787` を開き、パスワード `preview` でログインする。
-- Matrix と Task list は固定初期データを表示する。作成・編集・並び替えは実行中だけ保持し、プレビューの再起動後は初期データに戻る。
+- Matrix と Task list は固定初期データを表示する。Idea list は固定初期データにブラウザのlocalStorageで作成・編集・削除・ピン留め・並べ替えの変更を重ねる。localStorageを削除するとIdeaだけ初期状態に戻る。

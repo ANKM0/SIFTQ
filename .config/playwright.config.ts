@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const e2ePassword = atob("dGVzdC1wYXNzd29yZA==");
 const e2eSecret = atob("dGVzdC1zZWNyZXQ=");
+const e2ePort = Number(process.env["E2E_PORT"] ?? 4173);
 
 export default defineConfig({
   testDir: "../tests/e2e",
@@ -14,13 +15,13 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: `http://127.0.0.1:${e2ePort}`,
     trace: "on-first-retry",
     viewport: { width: 1440, height: 960 },
   },
   webServer: {
-    command: `bun run dev --local --ip 127.0.0.1 --port 4173 --var AUTH_PASSWORD:${e2ePassword} --var SESSION_SECRET:${e2eSecret}`,
-    port: 4173,
+    command: `bun run dev --local --ip 127.0.0.1 --port ${e2ePort} --var AUTH_PASSWORD:${e2ePassword} --var SESSION_SECRET:${e2eSecret}`,
+    port: e2ePort,
     reuseExistingServer: !process.env["CI"],
   },
   projects: [

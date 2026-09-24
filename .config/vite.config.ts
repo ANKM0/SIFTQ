@@ -429,6 +429,7 @@ export default defineConfig({
       "**/dist/**",
       "**/tests/e2e/**",
       "**/.taqt/**",
+      "**/tmp/**",
     ],
   },
 });
