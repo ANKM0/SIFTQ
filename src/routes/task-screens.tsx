@@ -33,9 +33,10 @@ import {
 import type { ParsedBody } from "../task-input";
 import type { AppEnv } from "../app-env";
 import type { TaskRepository } from "../repository/task-repository";
-import { PREVIEW_IDEAS } from "../preview/ideas";
+import type { IdeaRepository } from "../repository/idea-repository";
 
 type Repository = (c: Context<AppEnv>) => TaskRepository;
+type IdeaRepositoryFactory = (c: Context<AppEnv>) => IdeaRepository;
 
 function activePage(path: string): "ideas" | "matrix" | "tasks" {
   if (path === "/matrix") return "matrix";
@@ -123,7 +124,7 @@ function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks"
   return <OptionMenu task={task} open="area" returnTo={returnTo} />;
 }
 
-function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository) {
+function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
   app.get("/", (c) => c.redirect("/ideas"));
 
   app.get("/matrix", async (c) => {
@@ -133,15 +134,15 @@ function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository) {
   });
 
   app.get("/ideas", async (c) => {
-    const ideas = c.env.PREVIEW_MODE === "true" ? PREVIEW_IDEAS : [];
-    return renderPage(c, <IdeasPage ideas={ideas} />);
+    const result = await ideaRepository(c).list("local");
+    if (!result.ok) return c.text("Internal Server Error", 500);
+    return renderPage(c, <IdeasPage ideas={result.value} />);
   });
 
-  app.get("/ideas/:order", (c) => {
-    if (c.env.PREVIEW_MODE !== "true") return c.notFound();
-    const order = Number(c.req.param("order"));
-    const idea = PREVIEW_IDEAS.find((candidate) => candidate.order === order);
-    return idea === undefined ? c.notFound() : renderPage(c, <IdeaDetailPage idea={idea} />);
+  app.get("/ideas/:id", async (c) => {
+    const result = await ideaRepository(c).find(c.req.param("id"), "local");
+    if (!result.ok) return c.text("Internal Server Error", 500);
+    return result.value === undefined ? c.notFound() : renderPage(c, <IdeaDetailPage idea={result.value} />);
   });
 
   app.get("/tasks", async (c) => {
@@ -279,8 +280,8 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
   });
 }
 
-export function registerTaskScreenRoutes(app: Hono<AppEnv>, repository: Repository) {
-  registerTaskListRoutes(app, repository);
+export function registerTaskScreenRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
+  registerTaskListRoutes(app, repository, ideaRepository);
   registerTaskDetailRoutes(app, repository);
   registerTaskCreateRoute(app, repository);
   registerTaskEditRoutes(app, repository);

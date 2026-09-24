@@ -3,27 +3,32 @@ import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
-  IDEA_DETAIL_SCRIPT,
-  IDEAS_DND_SCRIPT,
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
   DESCRIPTION_EDITOR_SCRIPT,
   TASK_LIST_SELECTION_SCRIPT,
   TASK_FORM_SHORTCUT_SCRIPT,
 } from "./client/browser-scripts";
+import { IDEA_DETAIL_SCRIPT, IDEAS_DND_SCRIPT } from "./client/idea-scripts";
 import { SESSION_COOKIE_NAME, isValidSession } from "./auth";
 import { createD1TaskRepository } from "./repository/d1-task-repository";
 import type { TaskRepository } from "./repository/task-repository";
+import { createD1IdeaRepository } from "./repository/d1-idea-repository";
+import type { IdeaRepository } from "./repository/idea-repository";
 import { STYLES_CSS } from "./styles";
 import { createMemoryTaskRepository } from "./preview/MemoryTaskRepository";
+import { createMemoryIdeaRepository } from "./preview/MemoryIdeaRepository";
 import { PREVIEW_TASKS } from "./preview/tasks";
+import { PREVIEW_IDEAS } from "./preview/ideas";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerTaskApiRoutes } from "./routes/task-api";
+import { registerIdeaApiRoutes } from "./routes/idea-api";
 import { registerTaskScreenRoutes } from "./routes/task-screens";
 import type { AppEnv } from "./app-env";
 
 const app = new Hono<AppEnv>();
 const previewRepository = createMemoryTaskRepository(PREVIEW_TASKS);
+const previewIdeaRepository = createMemoryIdeaRepository(PREVIEW_IDEAS);
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -85,8 +90,16 @@ function repository(c: Context<AppEnv>): TaskRepository {
   throw new Error("task repository is not configured");
 }
 
+function ideaRepository(c: Context<AppEnv>): IdeaRepository {
+  if (c.env.PREVIEW_MODE === "true") return previewIdeaRepository;
+  if (c.env.IDEA_REPOSITORY) return c.env.IDEA_REPOSITORY;
+  if (c.env.DB) return createD1IdeaRepository(c.env.DB);
+  throw new Error("idea repository is not configured");
+}
+
 registerTaskApiRoutes(app, repository);
-registerTaskScreenRoutes(app, repository);
+registerIdeaApiRoutes(app, ideaRepository);
+registerTaskScreenRoutes(app, repository, ideaRepository);
 
 app.get("/matrix-dnd.js", (c) => {
   return c.body(MATRIX_DND_SCRIPT, 200, { "content-type": "application/javascript" });

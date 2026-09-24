@@ -29,8 +29,8 @@ describe("styles", () => {
 
   it("does not override the cursor on draggable Matrix cards", () => {
     expect(STYLES_CSS).not.toContain('.task-card[draggable="true"]');
-    expect(STYLES_CSS).not.toContain("cursor: grab;");
-    expect(STYLES_CSS).not.toContain("cursor: grabbing;");
+    const taskCardRules = STYLES_CSS.match(/(?:^|\n)\.task-card[^{]*{[^}]*}/g) ?? [];
+    expect(taskCardRules.some((rule) => /cursor:\s*(grab|grabbing)/.test(rule))).toBe(false);
   });
 
   it("places the four quadrant areas in their Matrix grid cells", () => {

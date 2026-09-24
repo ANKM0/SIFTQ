@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, installHtmxRoute, test } from "./fixtures";
+import { e2eBaseUrl, expect, installHtmxRoute, test } from "./fixtures";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
@@ -9,7 +9,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/ideas$/);
+  await page.goto("/matrix");
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
@@ -569,8 +570,8 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
 });
 
 test("clears only the current browser profile drafts on logout", async ({ browser }) => {
-  const currentContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
-  const otherContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
+  const currentContext = await browser.newContext({ baseURL: e2eBaseUrl });
+  const otherContext = await browser.newContext({ baseURL: e2eBaseUrl });
   const currentPage = await currentContext.newPage();
   const otherPage = await otherContext.newPage();
   await installHtmxRoute(currentContext);
@@ -870,7 +871,7 @@ test("continues normally when localStorage draft reading fails", async ({ page }
 
 test("opens description URLs with native link behavior", async ({ page }) => {
   const taskTitle = `E2E description links ${Date.now()}`;
-  const taskUrl = "http://127.0.0.1:4173/tasks";
+  const taskUrl = `${e2eBaseUrl}/tasks`;
 
   await signIn(page);
   await page.getByRole("link", { name: "New task" }).click();
@@ -895,7 +896,7 @@ test("opens description URLs with native link behavior", async ({ page }) => {
 
 test("linkifies pasted URLs and submits plain text", async ({ page }) => {
   const taskTitle = `E2E pasted description URL ${Date.now()}`;
-  const taskUrl = "http://127.0.0.1:4173/tasks";
+  const taskUrl = `${e2eBaseUrl}/tasks`;
   const description = `Pasted ${taskUrl}`;
 
   await signIn(page);

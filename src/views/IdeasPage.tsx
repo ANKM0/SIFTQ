@@ -28,13 +28,13 @@ function IdeaCard({ idea }: { idea: IdeaCardData }) {
   return (
     <article
       class="idea-card"
-      data-idea-id={idea.order}
+      data-idea-id={idea.id}
       data-idea-order={idea.order}
       data-order={idea.order}
       data-pinned={idea.pinned === true ? "true" : "false"}
       draggable="true"
     >
-      <a class="idea-card__link" href={`/ideas/${idea.order}`}>
+      <a class="idea-card__link" href={`/ideas/${idea.id}`}>
         <svg
           class="idea-card__pin"
           role="img"

@@ -8,11 +8,34 @@ async function signIn(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
+async function clearIdeas(page: import("@playwright/test").Page) {
+  const ideas = await page.evaluate(async () => {
+    const response = await fetch("/api/ideas");
+    return response.json();
+  });
+  for (const idea of ideas) {
+    await page.evaluate(async (id) => {
+      await fetch(`/api/ideas/${id}`, { method: "DELETE" });
+    }, idea.id);
+  }
+}
+
+async function createIdea(page: import("@playwright/test").Page, title: string, description = "") {
+  const status = await page.evaluate(async ({ title: ideaTitle, description: ideaDescription }) => {
+    const response = await fetch("/api/ideas", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: ideaTitle, description: ideaDescription }),
+    });
+    return response.status;
+  }, { title, description });
+  expect(status).toBe(201);
+}
+
 test("creates an idea when the composer modal closes", async ({ page }) => {
   await signIn(page);
+  await clearIdeas(page);
   await page.goto("/ideas");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
 
   const initialCount = await page.locator(".idea-card").count();
   await page.locator(".ideas-composer__trigger").click();
@@ -24,7 +47,6 @@ test("creates an idea when the composer modal closes", async ({ page }) => {
   await expect(created).toHaveCount(1);
   await expect(created.locator(".idea-card__description")).toHaveText("試しに作成したカード");
   expect(Number.isFinite(Number(await created.getAttribute("data-idea-order")))).toBe(true);
-  expect(await page.evaluate(() => typeof JSON.parse(localStorage.getItem("siftq.idea-created") || "[]")[0].order)).toBe("number");
   expect(await page.locator(".idea-card").count()).toBe(initialCount + 1);
 
   await page.locator(".ideas-composer__trigger").click();
@@ -35,9 +57,9 @@ test("creates an idea when the composer modal closes", async ({ page }) => {
 
 test("deletes an idea through the action menu and confirmation", async ({ page }) => {
   await signIn(page);
+  await clearIdeas(page);
+  await createIdea(page, "削除対象");
   await page.goto("/ideas");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
 
   const initialCount = await page.locator(".idea-card").count();
   const card = page.locator(".idea-card").first();
@@ -60,9 +82,11 @@ test("deletes an idea through the action menu and confirmation", async ({ page }
 
 test("persists idea pinning and same-group reorder", async ({ page }) => {
   await signIn(page);
+  await clearIdeas(page);
+  await createIdea(page, "並べ替え1");
+  await createIdea(page, "並べ替え2");
+  await createIdea(page, "並べ替え3");
   await page.goto("/ideas");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
 
   const unpinned = page.locator('.ideas-grid[data-idea-group="unpinned"] .idea-card');
   const source = unpinned.nth(1);

@@ -7,7 +7,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/ideas$/);
+  await page.goto("/matrix");
 }
 
 function descriptionEditor(page: Page) {
