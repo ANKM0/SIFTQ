@@ -1,0 +1,62 @@
+{
+  "name": "t3-pilot",
+  "date": "2026-09-24",
+  "harness": "loop_eval.replay",
+  "config": {
+    "repetitions": 1,
+    "skip_e2e": true,
+    "arm_a": "eval/baselines/loop/main_loop_eval.yaml",
+    "arm_b": "eval/baselines/loop/main_loop_minimal.yaml"
+  },
+  "results": {
+    "ISSUE-264-01": {
+      "A": {
+        "status": "human",
+        "escaped": false,
+        "cost": 0.018929
+      },
+      "B": {
+        "status": "human",
+        "escaped": false,
+        "cost": 0.020357
+      }
+    },
+    "ISSUE-293": {
+      "A": {
+        "status": "human",
+        "escaped": false,
+        "cost": 0.024706
+      },
+      "B": {
+        "status": "human",
+        "escaped": false,
+        "cost": 0.032954
+      }
+    },
+    "ISSUE-369": {
+      "note": "timeout after 20 min (iteration 7, fix step); no result"
+    }
+  },
+  "summary": {
+    "A": {
+      "total": 2,
+      "done": 0,
+      "human": 2,
+      "failed": 0,
+      "escaped": 0,
+      "cost": 0.043635,
+      "closure_rate": 0.0,
+      "human_rate": 1.0
+    },
+    "B": {
+      "total": 2,
+      "done": 0,
+      "human": 2,
+      "failed": 0,
+      "escaped": 0,
+      "cost": 0.053311,
+      "closure_rate": 0.0,
+      "human_rate": 1.0
+    }
+  }
+}
