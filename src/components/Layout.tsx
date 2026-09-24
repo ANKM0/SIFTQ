@@ -31,11 +31,11 @@ export const Layout: FC<{ active: "ideas" | "matrix" | "tasks"; children?: JSX.E
           <a class={active === "ideas" ? "active" : undefined} href="/ideas">
             Ideas
           </a>
-          <a class={active === "tasks" ? "active" : undefined} href="/tasks">
-            Tasks
-          </a>
           <a class={active === "matrix" ? "active" : undefined} href="/matrix">
             Matrix
+          </a>
+          <a class={active === "tasks" ? "active" : undefined} href="/tasks">
+            Tasks
           </a>
         </nav>
         <form action="/logout" method="post" class="logout">
