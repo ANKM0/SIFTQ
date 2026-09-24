@@ -15,7 +15,7 @@
 | [ADR 0009: Hono / HTMX による HTML 駆動 UI を採用する](0009-adopt-hono-htmx-html-driven-ui.md) | Accepted. | Hono JSX と HTMX を通常の UI、SortableJS を DnD に採用する。 |
 | [ADR 0010: Vite+ と Bun を初期開発ツールチェーンとして採用する](0010-adopt-vite-plus-and-bun-toolchain.md) | Accepted. | Vite+ を開発ツールチェーン、Bun をパッケージマネージャに採用する。 |
 | [ADR 0011: Resolve loop reasoning effort in Codex adapter](0011-resolve-loop-reasoning-effort-in-codex-adapter.md) | Accepted. | reasoning effort は step、agent、環境変数の順で解決し、指定時だけ Codex の config override に渡す。 |
-| [ADR 0012: taqt 中心の loop engineering 実行方針](0012-adopt-taqt-centered-loop-engineering-policy.md) | Superseded by ADR 0043. | Issue を要求の正本、taqt run を実行記録とし、外部連携を script adapter に分離する。 |
+| [ADR 0012: taqt 中心の loop engineering 実行方針](0012-adopt-taqt-centered-loop-engineering-policy.md) | Superseded by ADR 0043, 0067. | Issue を要求の正本、taqt run を実行記録とし、外部連携を script adapter に分離する。 |
 | [ADR 0013: worktree ごとの graphify 更新 Task](0013-worktree-scoped-graphify-update-task.md) | Accepted. | `task graphify:update` は worktree root を更新し、runtime 不在時は導入方法を含むエラーで止める。 |
 | [ADR 0014: `repo:pull-main` の pull と graphify 更新](0014-repo-pull-main-guards.md) | Accepted. | main 以外または dirty worktree では pull せず、pull が成功して HEAD が更新された場合だけ graphify を更新する。 |
 | [ADR 0015: 共有 Codex home とモデル profile](0015-worktree-scoped-codex-home.md) | Superseded by ADR 0057, 0058. | Codex home/worktree分離とモデルprofileを分割した。 |
@@ -46,7 +46,7 @@
 | [ADR 0040: 実施中を直交boolean workingで表す](0040-represent-working-as-orthogonal-boolean.md) | Accepted. | 実施中はstatusと直交するboolean `working`で表し、終了時も自動解除しない。 |
 | [ADR 0041: Git の untracked ファイルを deny-by-default の path allowlist で管理する](0041-adopt-git-path-allowlist.md) | Accepted. | Git の untracked ファイルは path allowlist で明示的に許可し、生成物・作業状態・秘密情報は既定で拒否する。 |
 | [ADR 0042: タスク編集draftをブラウザlocalStorageに保存する](0042-adopt-local-storage-task-edit-drafts.md) | Superseded by ADR 0050. | 未保存のtitle / descriptionはブラウザのlocalStorageに一時draftとして保存し、D1はtaskの正本として維持していた。 |
-| [ADR 0043: taqt loop を単一構造へ変更する](0043-unify-taqt-loop-execution-policy.md) | Accepted. | taqt loop を `implement → verification → checker` の単一構造に統一し、limit 検知は human へエスカレーションする。 |
+| [ADR 0043: taqt loop を単一構造へ変更する](0043-unify-taqt-loop-execution-policy.md) | Partially superseded by ADR 0067. | taqt loop を `implement → verification → checker` の単一構造に統一し、limit 検知は human へエスカレーションする。 |
 | [ADR 0044: Adopt single-source domain model JSON with generated diagrams](0044-adopt-single-source-domain-model-json.md) | Accepted. | ドメイン/データモデルの正本を `domain-model.json` に一本化し、D2 で図を生成する。`concept.d2` は廃止。 |
 | [ADR 0045: Place logical-to-physical mapping in the generator](0045-place-logical-to-physical-mapping-in-generator.md) | Accepted. | 論理→物理の mapping は生成器のコードに置き、`migrations` を物理の正本として一致検証する。 |
 | [ADR 0046: Track invariants with domain.md IDs and test names](0046-track-invariants-with-domain-md-ids-and-tests.md) | Accepted. | 不変条件は `domain.md` の `INV-TM-xxx` を正本とし、JSON は参照、テスト名に対応づけて検証する。 |
@@ -70,6 +70,7 @@
 | [ADR 0064: commit対象の設定をconfig配下に置く](0064-keep-committed-configuration-under-config.md) | Accepted. | commit対象の設定を`.config/`へ集約する。 |
 | [ADR 0065: 生成物をtmp配下へ集約する](0065-keep-generated-artifacts-under-tmp.md) | Accepted. | 生成物、cache、一時ファイルを`tmp/`へ集約する。 |
 | [ADR 0066: レスポンシブ対応のブレークポイントを定める](0066-define-responsive-breakpoints.md) | Accepted. | モバイルファーストで`640 / 768 / 1024 / 1280px`の閾値を採用する。 |
+| [ADR 0067: design step と design_notes を廃止する](0067-remove-design-step-and-design-notes.md) | Accepted. | design step と design_notes を廃止し、design artifact の生成と表示を削除する。 |
 
 ## 検証待ち
 

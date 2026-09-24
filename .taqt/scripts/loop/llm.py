@@ -31,16 +31,6 @@ def run_agent(
         "context": context,
         "prompt": _build_prompt(task=task, step=step, agent=agent, context=context),
     }
-    if adapter == "codex" and not command:
-        return _run_codex(
-            payload=payload,
-            agent_id=agent_id,
-            agent=agent,
-            step=step,
-            cwd=cwd,
-            timeout_seconds=timeout_seconds,
-            child_environment=child_environment,
-        )
     if adapter == "opencode" and not command:
         return _run_opencode(
             payload=payload,
@@ -87,97 +77,6 @@ def run_agent(
         response.update(parsed)
         if completed.returncode != 0:
             response["status"] = "failure"
-    return response
-
-
-def _run_codex(
-    *,
-    payload: dict[str, Any],
-    agent_id: object,
-    agent: dict[str, Any],
-    step: dict[str, Any],
-    cwd: Path,
-    timeout_seconds: int,
-    child_environment: Mapping[str, str] | None,
-) -> dict[str, Any]:
-    workspace = cwd.resolve()
-    command = [
-        "codex",
-        "exec",
-        "--approve-for-me",
-        "--cd",
-        str(workspace),
-    ]
-    model = step.get("model") or agent.get("model") or os.environ.get("LOOP_CODEX_MODEL")
-    if model:
-        command.extend(["--model", str(model)])
-    reasoning_effort = (
-        step.get("reasoning_effort")
-        or agent.get("reasoning_effort")
-        or os.environ.get("LOOP_CODEX_REASONING_EFFORT")
-    )
-    if reasoning_effort:
-        command.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
-    profile = step.get("profile") or agent.get("profile") or os.environ.get("LOOP_CODEX_PROFILE")
-    if profile:
-        command.extend(["--profile", str(profile)])
-    extra_args = os.environ.get("LOOP_CODEX_EXTRA_ARGS")
-    if extra_args:
-        command.extend(shlex.split(extra_args))
-    command.append("-")
-
-    try:
-        completed = subprocess.run(
-            command,
-            input=str(payload["prompt"]),
-            cwd=workspace,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env={**os.environ, **(child_environment or {})},
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except FileNotFoundError:
-        return {
-            "status": "failure",
-            "mode": "codex",
-            "agent": agent_id,
-            "command": " ".join(command),
-            "feedback": "unknown",
-            "stderr": "codex executable was not found",
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "status": "failure",
-            "mode": "codex",
-            "agent": agent_id,
-            "command": " ".join(command),
-            "feedback": "timeout",
-            "stderr": f"codex timed out after {timeout_seconds}s",
-        }
-
-    parsed = _parse_stdout(completed.stdout)
-    response = {
-        "status": "success" if completed.returncode == 0 else "failure",
-        "mode": "codex",
-        "agent": agent_id,
-        "command": " ".join(command),
-        "exit_code": completed.returncode,
-        "stdout": completed.stdout,
-        "stderr": completed.stderr,
-        "parsed_json": bool(parsed),
-    }
-    if parsed:
-        response.update(parsed)
-        if completed.returncode != 0:
-            response["status"] = "failure"
-    if response["status"] != "success":
-        response["feedback"] = response.get("feedback") or (
-            "model_limit"
-            if is_usage_limit_error(completed.stdout, completed.stderr)
-            else "unknown"
-        )
     return response
 
 
@@ -276,11 +175,6 @@ def _run_opencode(
             else "unknown"
         )
     return response
-
-
-def is_usage_limit_error(stdout: str, stderr: str) -> bool:
-    text = f"{stdout}\n{stderr}".lower()
-    return any(token in text for token in ("you've hit your usage limit", "usage limit", "usage_limit_reached", "rate_limit_reached"))
 
 
 def is_opencode_fallback_error(stdout: str, stderr: str) -> bool:

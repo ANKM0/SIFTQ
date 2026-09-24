@@ -54,14 +54,8 @@ def resolve_profile(loop_root: Path, requested: str | None = None) -> str:
     return profile
 
 
-def resolve_codex_home(
-    profile_spec: dict[str, Any],
-    workspace: Path,
-    *,
-    profile: str,
-    override: Path | None = None,
-) -> Path:
-    """Return an explicit debugging override, if provided.
+def resolve_codex_home(override: Path | None = None) -> Path:
+    """Return an explicit Codex home override, else the shared default.
 
     Normal taqt runs inherit Codex's default ``~/.codex`` instead of setting
     ``CODEX_HOME``.  The override remains available for isolated diagnostics.

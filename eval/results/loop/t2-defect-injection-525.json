@@ -1,0 +1,41 @@
+{
+  "name": "t2-defect-injection-525",
+  "date": "2026-09-24",
+  "harness": "loop_eval.defect_injection",
+  "mutant_root": "eval/gold/loop-mutants",
+  "mutant_count": 1,
+  "skipped_mutants": [
+    "matrix-menu-order-swapped",
+    "type-error-in-task-title-limit"
+  ],
+  "skipped_reason": "patch does not apply to the current tree; the fixtures are stale on main too",
+  "records": [
+    {
+      "mutant": "broken-is-task-status",
+      "expected_catch": true,
+      "arms": {
+        "A": true,
+        "B": true
+      }
+    }
+  ],
+  "summary": {
+    "arms": {
+      "A": {
+        "caught": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "B": {
+        "caught": 1,
+        "total": 1,
+        "rate": 1.0
+      }
+    },
+    "mcnemar": {
+      "both_caught": 1,
+      "a_caught_b_missed": 0,
+      "a_missed_b_caught": 0
+    }
+  }
+}

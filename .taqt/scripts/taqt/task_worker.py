@@ -4,21 +4,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .git_worktree import build_worktree_command
 from .github_labels import enabled_error
+from .self_improvement import request_self_improvement
+from .task_preflight import preflight_task
 from .task_store import (
     DEFAULT_TASK_ROOT,
     DEFAULT_WORKTREE_ROOT,
     PRIORITY_ORDER,
-    decomposition_errors,
     block_task,
-    issue_branch,
     list_tasks,
-    readiness_errors,
     readiness_warnings,
     save_task,
-    triage_task,
 )
-from .self_improvement import request_self_improvement
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -64,33 +62,22 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{task['id']}: {label_error}")
                 block_task(task_path, task, label_error)
                 continue
-        errors = readiness_errors(task, workspace=Path("."))
+        errors = preflight_task(
+            task_path,
+            task,
+            workspace=Path("."),
+            runs_root=args.runs_root,
+            execute=args.execute,
+        )
         if errors:
-            reason = "; ".join(errors)
-            print(f"{task['id']}: not ready: {reason}")
-            if args.execute:
-                triage_task(task_path, task, reason)
-                request_self_improvement(
-                    task_path=task_path,
-                    task=task,
-                    reason=reason,
-                    event="readiness_failed",
-                    runs_root=args.runs_root,
-                    workspace=Path("."),
-                )
-                save_task(task_path, task)
-            continue
-        errors = decomposition_errors(task, workspace=Path("."))
-        if errors:
-            reason = "; ".join(errors)
-            print(f"{task['id']}: not decomposed enough: {reason}")
-            if args.execute and task.get("phase") != "decomposed":
-                triage_task(task_path, task, reason)
+            print(f"{task['id']}: not ready: {'; '.join(errors)}")
             continue
         for warning in readiness_warnings(task, workspace=Path(".")):
             print(f"{task['id']}: readiness warning: {warning}")
 
-        worktree_command = ["git", "worktree", "add", "-B", issue_branch(task), str(worktree), args.base]
+        worktree_command = build_worktree_command(
+            task, base=args.base, worktree_root=args.worktree_root
+        )
         auto_command = _auto_command(
             task_path=task_path,
             worktree=worktree,

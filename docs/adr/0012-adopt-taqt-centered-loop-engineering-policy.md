@@ -1,6 +1,6 @@
 # ADR 0012: taqt 中心の loop engineering 実行方針
 
-> Status: Superseded by [ADR 0043](0043-unify-taqt-loop-execution-policy.md).
+> Status: Superseded by [ADR 0043](0043-unify-taqt-loop-execution-policy.md), [ADR 0067](0067-remove-design-step-and-design-notes.md).
 
 ## 決定
 

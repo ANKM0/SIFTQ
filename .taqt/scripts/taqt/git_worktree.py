@@ -1,8 +1,20 @@
 import argparse
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from .task_store import DEFAULT_WORKTREE_ROOT, issue_branch, load_task
+
+
+def build_worktree_command(
+    task: dict[str, Any],
+    *,
+    base: str = "main",
+    worktree_root: Path = DEFAULT_WORKTREE_ROOT,
+) -> list[str]:
+    branch = issue_branch(task)
+    worktree = worktree_root / str(task["id"])
+    return ["git", "worktree", "add", "-B", branch, str(worktree), base]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,13 +26,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _path, task = load_task(args.task)
-    branch = issue_branch(task)
-    worktree = args.worktree_root / task["id"]
-    command = ["git", "worktree", "add", "-B", branch, str(worktree), args.base]
+    command = build_worktree_command(task, base=args.base, worktree_root=args.worktree_root)
     print(" ".join(command))
     if not args.execute:
         return 0
-    worktree.parent.mkdir(parents=True, exist_ok=True)
+    worktree_root = args.worktree_root
+    (worktree_root / str(task["id"])).parent.mkdir(parents=True, exist_ok=True)
     return subprocess.run(command, check=False).returncode
 
 
