@@ -17,6 +17,17 @@
 - `verification_fix` で human へ落ちた run は 9/9。決定論的 verification 失敗が全件 human に流れ、自動 fix の機会が無かった。
 - これは LLM リプレイ不要で routing 修正の効果を直接示す。closure の回復量は LLM 依存のため未測定。
 
+## T2: 欠陥注入（#525, 2026-09-24）
+
+- 実施日: 2026-09-24
+- 目的: #525 の `decide` 畳み込み（loop 定義変更）の回帰確認
+- ハーネス: `loop_eval.defect_injection`
+- 結果: `t2-defect-injection-525.json`
+- mutant 数: 1（`broken-is-task-status`）。`matrix-menu-order-swapped` と `type-error-in-task-title-limit` は patch が現行 tree に適用不可（fixture 陳腐化、main でも同じ）。
+- 集計: arm A 1/1、arm B 1/1。`a_missed_b_caught=0`、`a_caught_b_missed=0`、clean 誤検知なし。
+- 採用基準: 満たす（arm B が arm A 以上）。
+- 注: 本変更は verification の判定を変えないため検証力は不変。
+
 ## T3: paired replay（保留）
 
 保留。理由:
