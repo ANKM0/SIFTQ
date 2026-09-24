@@ -15,7 +15,6 @@ from loop.llm import (
     is_opencode_fallback_error,
     run_agent,
 )
-from loop.observe import run_commands
 from loop.runner import _run_step, _write_design_decision_artifact, run_loop
 from loop.schema import load_document, validate_loop_definition
 from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
@@ -134,79 +133,6 @@ def test_issue_branch_prefers_normalized_branch_summary(tmp_path: Path) -> None:
 
     assert issue_branch(task) == "dev/#8_add_user_profile"
     assert load_document(path)["branch_summary"] == "Add User Profile!"
-
-
-def test_observe_classifies_failed_test_command(tmp_path: Path) -> None:
-    result = run_commands(["python -c 'import sys; sys.exit(1)' # test"], cwd=tmp_path)
-
-    assert result["status"] == "failure"
-    assert result["feedback"] == "test_feedback"
-    assert result["commands"][0]["exit_code"] == 1
-
-
-def test_loop_runner_completes_command_loop(tmp_path: Path) -> None:
-    loop_path = tmp_path / "loop.yaml"
-    task_path = tmp_path / "task.yaml"
-    runs_root = tmp_path / "runs"
-    loop_path.write_text(
-        """
-version: 1
-id: smoke
-limits:
-  max_iterations: 5
-steps:
-  - id: observe
-    kind: commands
-    run:
-      - python -c 'print("ok")'
-    on_success: done
-    on_failure: decide
-  - id: decide
-    kind: policy
-    routes:
-      - when: unknown
-        next: human
-  - id: done
-    kind: terminal
-  - id: human
-    kind: terminal
-""",
-        encoding="utf-8",
-    )
-    task_path.write_text(
-        """
-id: ISSUE-1
-source:
-  type: github_issue
-  repo: owner/repo
-  issue_number: 1
-status: pending
-phase: spec
-priority: normal
-loop: smoke
-input: {}
-run:
-  id: null
-  state_path: null
-  events_path: null
-worker:
-  id: null
-  heartbeat_at: null
-blocked_reason: null
-""",
-        encoding="utf-8",
-    )
-
-    result = run_loop(
-        loop_path=loop_path,
-        task_path=task_path,
-        workspace=tmp_path,
-        runs_root=runs_root,
-    )
-
-    assert result["status"] == "done"
-    state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
-    assert state["status"] == "done"
 
 
 def test_load_profiles_reads_loop_and_deepseek_settings(tmp_path: Path) -> None:
@@ -512,11 +438,9 @@ def test_loop_schema_rejects_unknown_step_reference() -> None:
                 "id": "bad",
                 "steps": [
                     {
-                        "id": "observe",
-                        "kind": "commands",
-                        "run": ["python -c 'print(1)'"],
-                        "on_success": "missing",
-                        "on_failure": "human",
+                        "id": "implement",
+                        "kind": "llm",
+                        "next": "missing",
                     },
                     {"id": "human", "kind": "terminal"},
                 ],
@@ -539,14 +463,14 @@ id: configured-agent
 agents:
   implement:
     role: implementation
-    adapter: codex
-    model: gpt-5.6-luna
+    adapter: opencode
+    model: opencode/muse-spark-1.3-contributor-free
     reasoning_effort: xhigh
 steps:
   - id: implement
     kind: llm
     agent: implement
-    model: gpt-5.6-sol
+    model: opencode/gpt-5.6-sol
     reasoning_effort: high
     next: done
   - id: done
@@ -558,9 +482,9 @@ steps:
     loop = load_document(loop_path)
     validate_loop_definition(loop)
 
-    assert loop["agents"]["implement"]["model"] == "gpt-5.6-luna"
+    assert loop["agents"]["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
     assert loop["agents"]["implement"]["reasoning_effort"] == "xhigh"
-    assert loop["steps"][0]["model"] == "gpt-5.6-sol"
+    assert loop["steps"][0]["model"] == "opencode/gpt-5.6-sol"
     assert loop["steps"][0]["reasoning_effort"] == "high"
 
 
@@ -862,7 +786,6 @@ def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps()
         "id": "invalid-agent-effort",
         "agents": {
             "implement": {
-                "adapter": "codex",
                 "reasoning_effort": "fast",
             }
         },
@@ -886,7 +809,6 @@ def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps()
         "id": "invalid-agent-effort-type",
         "agents": {
             "implement": {
-                "adapter": "codex",
                 "reasoning_effort": 1,
             }
         },
@@ -908,7 +830,7 @@ def test_loop_schema_rejects_invalid_reasoning_effort_for_agents_and_llm_steps()
     invalid_agent_null = {
         "version": 1,
         "id": "invalid-agent-effort-null",
-        "agents": {"implement": {"adapter": "codex", "reasoning_effort": None}},
+        "agents": {"implement": {"reasoning_effort": None}},
         "steps": [{"id": "done", "kind": "terminal"}],
     }
     invalid_step_null = {
@@ -1068,130 +990,6 @@ def test_loop_guard_only_blocks_readonly_agents() -> None:
     validate_write_path({"writes": ["tests/"]}, Path("src/index.tsx"))
     with pytest.raises(ValueError, match="readonly agent cannot write"):
         validate_write_path({"readonly": True}, Path("src/index.tsx"))
-
-
-def test_codex_agent_adapter_invokes_codex_exec(tmp_path: Path, monkeypatch) -> None:
-    calls = []
-
-    class Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def fake_run(command, **kwargs):
-        calls.append((command, kwargs))
-        return Completed()
-
-    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
-
-    response = run_agent(
-        loop_definition={
-            "agents": {
-                "implement": {
-                    "role": "implementation",
-                    "adapter": "codex",
-                    "reasoning_effort": "high",
-                }
-            }
-        },
-        task={"id": "ISSUE-1"},
-        step={"id": "implement", "agent": "implement"},
-        context={"files": {}},
-        cwd=tmp_path,
-        child_environment={"DEEPSEEK_API_KEY": "secret", "CODEX_HOME": "/tmp/deepseek"},
-    )
-
-    assert response["status"] == "success"
-    command, kwargs = calls[0]
-    assert command[:2] == ["codex", "exec"]
-    assert "--cd" in command
-    assert command[command.index("--cd") + 1] == str(tmp_path.resolve())
-    assert "--approve-for-me" in command
-    assert "--sandbox" not in command
-    assert command[command.index("-c") + 1] == "model_reasoning_effort=high"
-    assert "--ask-for-approval" not in command
-    assert kwargs["input"].startswith("Role: implementation")
-    assert kwargs["env"]["DEEPSEEK_API_KEY"] == "secret"
-    assert kwargs["env"]["CODEX_HOME"] == "/tmp/deepseek"
-
-
-def test_codex_agent_adapter_resolves_reasoning_effort(tmp_path: Path, monkeypatch) -> None:
-    calls = []
-
-    class Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def fake_run(command, **kwargs):
-        calls.append(command)
-        return Completed()
-
-    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
-    monkeypatch.setenv("LOOP_CODEX_REASONING_EFFORT", "low")
-
-    cases = [
-        ({"reasoning_effort": "high"}, {"reasoning_effort": "xhigh"}, "high"),
-        ({}, {"reasoning_effort": "xhigh"}, "xhigh"),
-        ({}, {}, "low"),
-    ]
-    for step_overrides, agent_overrides, expected_effort in cases:
-        run_agent(
-            loop_definition={
-                "agents": {
-                    "implement": {
-                        "role": "implementation",
-                        "adapter": "codex",
-                        **agent_overrides,
-                    }
-                }
-            },
-            task={"id": "ISSUE-1"},
-            step={"id": "implement", "agent": "implement", **step_overrides},
-            context={},
-            cwd=tmp_path,
-        )
-        command = calls[-1]
-        assert command[command.index("-c") + 1] == f"model_reasoning_effort={expected_effort}"
-
-
-def test_codex_agent_adapter_uses_codex_default_reasoning_effort_when_unspecified(
-    tmp_path: Path, monkeypatch
-) -> None:
-    calls = []
-
-    class Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def fake_run(command, **kwargs):
-        calls.append(command)
-        return Completed()
-
-    monkeypatch.setattr("loop.llm.subprocess.run", fake_run)
-    monkeypatch.delenv("LOOP_CODEX_REASONING_EFFORT", raising=False)
-    monkeypatch.delenv("LOOP_CODEX_EXTRA_ARGS", raising=False)
-
-    response = run_agent(
-        loop_definition={
-            "agents": {
-                "implement": {
-                    "role": "implementation",
-                    "adapter": "codex",
-                }
-            }
-        },
-        task={"id": "ISSUE-1"},
-        step={"id": "implement", "agent": "implement"},
-        context={},
-        cwd=tmp_path,
-    )
-
-    assert response["status"] == "success"
-    command = calls[0]
-    assert "-c" not in command
-    assert not any(argument.startswith("model_reasoning_effort=") for argument in command)
 
 
 def test_opencode_agent_adapter_invokes_opencode_run(tmp_path: Path, monkeypatch) -> None:
@@ -1455,7 +1253,7 @@ def test_build_context_compacts_large_events(tmp_path: Path) -> None:
     assert compacted["summary"].endswith("…")
 
 
-def test_policy_respects_max_fix_attempts(tmp_path: Path) -> None:
+def test_policy_respects_max_fix_attempts(tmp_path: Path, monkeypatch) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
     runs_root = tmp_path / "runs"
@@ -1466,18 +1264,20 @@ id: retry
 limits:
   max_iterations: 10
   max_fix_attempts: 1
+agents:
+  implement:
+    role: implementation
 steps:
-  - id: observe
-    kind: commands
-    run:
-      - "python -c 'import sys; sys.exit(1)' # test"
-    on_success: done
+  - id: implement
+    kind: llm
+    agent: implement
+    next: done
     on_failure: decide
   - id: decide
     kind: policy
     routes:
-      - when: test_feedback
-        next: observe
+      - when: implementation_feedback
+        next: implement
       - when: unknown
         next: human
   - id: done
@@ -1497,7 +1297,6 @@ source:
 status: pending
 phase: spec
 priority: normal
-loop: retry
 input: {}
 run:
   id: null
@@ -1510,6 +1309,10 @@ blocked_reason: null
 """,
         encoding="utf-8",
     )
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {"status": "failure", "feedback": "implementation_feedback"},
+    )
 
     result = run_loop(
         loop_path=loop_path,
@@ -1520,7 +1323,7 @@ blocked_reason: null
 
     assert result["status"] == "human"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
-    assert state["feedback_attempts"]["test_feedback"] == 2
+    assert state["feedback_attempts"]["implementation_feedback"] == 2
 
 
 def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> None:

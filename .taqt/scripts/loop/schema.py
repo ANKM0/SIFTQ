@@ -49,7 +49,7 @@ def validate_loop_definition(loop: dict[str, Any]) -> None:
             raise ValueError(f"duplicate step id: {step_id}")
         seen.add(step_id)
         kind = step.get("kind")
-        if kind not in {"commands", "policy", "llm", "verification", "post_review", "terminal"}:
+        if kind not in {"policy", "llm", "verification", "post_review", "terminal"}:
             raise ValueError(f"step {step_id} has unsupported kind: {kind}")
 
     step_ids = set(seen)
@@ -103,7 +103,7 @@ def _validate_agents(value: Any) -> set[str]:
             raise ValueError(f"agent {agent_id}.readonly must be a boolean")
         if "command" in agent and not isinstance(agent["command"], str):
             raise ValueError(f"agent {agent_id}.command must be a string")
-        for key in ("adapter", "model", "profile", "sandbox", "approval"):
+        for key in ("adapter", "model", "profile"):
             if key in agent and not isinstance(agent[key], str):
                 raise ValueError(f"agent {agent_id}.{key} must be a string")
         _validate_reasoning_effort(agent, f"agent {agent_id}")
@@ -114,16 +114,6 @@ def _validate_agents(value: Any) -> set[str]:
 def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: set[str]) -> None:
     step_id = step["id"]
     kind = step["kind"]
-    if kind == "commands":
-        commands = step.get("run")
-        if not isinstance(commands, list) or not commands:
-            raise ValueError(f"commands step {step_id} requires a non-empty run list")
-        if any(not isinstance(command, str) or not command for command in commands):
-            raise ValueError(f"commands step {step_id}.run must contain strings")
-        _validate_step_ref(step, "on_success", step_ids)
-        _validate_step_ref(step, "on_failure", step_ids)
-        return
-
     if kind == "policy":
         routes = step.get("routes")
         if not isinstance(routes, list) or not routes:
@@ -142,7 +132,7 @@ def _validate_step_contract(step: dict[str, Any], step_ids: set[str], agents: se
             raise ValueError(f"llm step {step_id} references unknown agent: {agent}")
         if "command" in step and not isinstance(step["command"], str):
             raise ValueError(f"llm step {step_id}.command must be a string")
-        for key in ("adapter", "model", "profile", "sandbox", "approval"):
+        for key in ("adapter", "model", "profile"):
             if key in step and not isinstance(step[key], str):
                 raise ValueError(f"llm step {step_id}.{key} must be a string")
         _validate_reasoning_effort(step, f"llm step {step_id}")
@@ -196,8 +186,6 @@ def _has_terminal_path(steps: list[dict[str, Any]], step_ids: set[str]) -> bool:
 
 def _next_steps(step: dict[str, Any]) -> list[str]:
     kind = step["kind"]
-    if kind == "commands":
-        return [step["on_success"], step["on_failure"]]
     if kind == "policy":
         return [route["next"] for route in step["routes"] if isinstance(route, dict)]
     if kind == "llm":

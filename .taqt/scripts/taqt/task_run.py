@@ -9,16 +9,14 @@ from loop.state import utc_now
 from .github_labels import enabled_error
 from .profiles import load_profiles, resolve_codex_home, resolve_profile
 from .self_improvement import request_self_improvement
+from .task_preflight import preflight_task
 from .task_store import (
     DEFAULT_TASK_ROOT,
     block_task,
-    decomposition_errors,
     load_task,
     next_pending_task,
-    readiness_errors,
     readiness_warnings,
     save_task,
-    triage_task,
 )
 
 TERMINAL_STATUSES = {"blocked", "done", "failed"}
@@ -70,31 +68,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Task {task['id']} is blocked: {label_error}")
         return 2
     if not args.skip_readiness_check and task.get("status") != "running":
-        errors = readiness_errors(task, workspace=args.workspace)
+        errors = preflight_task(
+            task_path,
+            task,
+            workspace=args.workspace,
+            runs_root=args.runs_root,
+        )
         if errors:
-            reason = "; ".join(errors)
-            triage_task(task_path, task, reason)
-            request = request_self_improvement(
-                task_path=task_path,
-                task=task,
-                reason=reason,
-                event="readiness_failed",
-                runs_root=args.runs_root,
-                workspace=args.workspace,
-            )
-            save_task(task_path, task)
-            print(f"Task {task['id']} is not ready: {reason}")
-            print(f"Self-improvement requested: {request['request_path']}")
+            print(f"Task {task['id']} is not ready: {'; '.join(errors)}")
+            request_path = (task.get("self_improvement") or {}).get("request_path")
+            if request_path:
+                print(f"Self-improvement requested: {request_path}")
             return 2
-        errors = decomposition_errors(task, workspace=args.workspace)
-        if errors:
-            reason = "; ".join(errors)
-            if task.get("phase") != "decomposed":
-                triage_task(task_path, task, reason)
-            print(f"Task {task['id']} is not decomposed enough: {reason}")
-            return 2
-        warnings = readiness_warnings(task, workspace=args.workspace)
-        for warning in warnings:
+        for warning in readiness_warnings(task, workspace=args.workspace):
             print(f"Task {task['id']} readiness warning: {warning}")
 
     loop_name = str(profile_spec["loop"])

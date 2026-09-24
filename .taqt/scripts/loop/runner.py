@@ -7,7 +7,6 @@ from typing import Any, Mapping
 from .context import build_context
 from .guard import changed_paths, validate_agent_changes, workspace_snapshot
 from .llm import run_agent
-from .observe import run_commands
 from .policy import route_next_step
 from .schema import load_document, validate_loop_definition, validate_task
 from .state import (
@@ -134,16 +133,6 @@ def _run_step(
     child_environment: Mapping[str, str] | None = None,
 ) -> str:
     kind = step["kind"]
-    if kind == "commands":
-        observation = run_commands(
-            list(step.get("run") or []),
-            cwd=workspace,
-            timeout_seconds=int(step.get("timeout_seconds", 900)),
-        )
-        state["last_feedback"] = observation.get("feedback")
-        append_event(run_dir, {"type": "observation", "step": step["id"], "observation": observation})
-        return str(step.get("on_success" if observation["status"] == "success" else "on_failure"))
-
     if kind == "policy":
         next_step = route_next_step(step, state.get("last_feedback"))
         feedback = state.get("last_feedback") or "unknown"
