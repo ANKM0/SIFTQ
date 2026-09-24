@@ -37,6 +37,14 @@
 - 採用基準: 満たす（arm B が arm A 以上）。
 - 注: 本変更は verification の判定を変えないため検証力は不変。
 
+## 段階3 パイロット（2026-09-24, ブロック）
+
+- 目的: gold UI 3 件（ISSUE-264-01 / 293 / 369）を R=1、`LOOP_VERIFICATION_SKIP_E2E=1` で疎通確認。
+- 結果: **ブロック**。arm A の implement step で opencode が `opencode/muse-spark-1.3-contributor-free` を呼び、`stream error` の後ハング（15 分超で応答なし、イベントは `step_started` のみ）。
+- 原因: opencode provider のモデル利用不可（rate limit / insufficient funds）。ERR-20260924-002 と同型。
+- 対応: 実行前に loop のモデルを利用可能な provider（例: opencode-go/*）へ切り替える必要がある。本 PR は harness / spec の準備まで。
+- 準備済み: `LOOP_VERIFICATION_SKIP_E2E`、replay の `--repetitions`、12 件の checks 更新。
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。

@@ -230,10 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workspace", type=Path, default=Path("."))
     parser.add_argument("--runs-root", type=Path, default=Path(".taqt/runs"))
     parser.add_argument("--repo", type=Path)
+    parser.add_argument("--repetitions", type=int)
     args = parser.parse_args(argv)
 
     spec = load_replay_spec(args.spec)
     repo = args.repo or args.workspace
+    repetitions = args.repetitions or spec["repetitions"]
     result = run_replay(
         task_path=args.task,
         arms=spec["arms"],
@@ -241,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
         runs_root=args.runs_root,
         checks=spec["checks"],
         base_commit=spec["base_commit"],
-        repetitions=spec["repetitions"],
+        repetitions=repetitions,
         repo=repo if spec["base_commit"] else None,
     )
     result["name"] = spec["name"]
