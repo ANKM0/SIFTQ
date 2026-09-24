@@ -1,6 +1,6 @@
 name: ISSUE-264-01
 arms:
-  A: .taqt/loops/main_loop.yaml
+  A: eval/baselines/loop/main_loop_eval.yaml
   B: eval/baselines/loop/main_loop_minimal.yaml
 checks:
 - task -t .config/Taskfile.yml ci:typecheck

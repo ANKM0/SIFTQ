@@ -1,7 +1,8 @@
-# Baseline: minimal loop for paired replay (arm B). Not used at runtime.
-# Current main_loop without the checker / post_review review structure. fix is kept.
+# Eval copy of the current main_loop for paired replay (arm A). Not used at runtime.
+# Same structure as .taqt/loops/main_loop.yaml, with opencode-go provider models so
+# the replay can run when the opencode provider is unavailable.
 version: 1
-id: main_loop_minimal
+id: main_loop_eval
 
 limits:
   max_iterations: 12
@@ -18,6 +19,12 @@ agents:
     adapter: opencode
     model: opencode-go/muse-spark-1.3-contributor
     reasoning_effort: high
+  checker:
+    role: checker
+    adapter: opencode
+    model: opencode-go/gpt-5.6-luna
+    reasoning_effort: xhigh
+    readonly: true
 
 steps:
   - id: implement
@@ -26,7 +33,7 @@ steps:
     next: verification
   - id: verification
     kind: verification
-    on_pass: done
+    on_pass: checker
     on_fix: fix
     on_human: human
   - id: fix
@@ -34,6 +41,15 @@ steps:
     agent: fix
     next: verification
     on_failure: human
+  - id: checker
+    kind: llm
+    agent: checker
+    next: post_review
+  - id: post_review
+    kind: post_review
+    on_pass: done
+    on_fix: fix
+    on_human: human
   - id: done
     kind: terminal
   - id: human

@@ -37,13 +37,18 @@
 - 採用基準: 満たす（arm B が arm A 以上）。
 - 注: 本変更は verification の判定を変えないため検証力は不変。
 
-## 段階3 パイロット（2026-09-24, ブロック）
+## 段階3 パイロット（2026-09-24）
 
-- 目的: gold UI 3 件（ISSUE-264-01 / 293 / 369）を R=1、`LOOP_VERIFICATION_SKIP_E2E=1` で疎通確認。
-- 結果: **ブロック**。arm A の implement step で opencode が `opencode/muse-spark-1.3-contributor-free` を呼び、`stream error` の後ハング（15 分超で応答なし、イベントは `step_started` のみ）。
-- 原因: opencode provider のモデル利用不可（rate limit / insufficient funds）。ERR-20260924-002 と同型。
-- 対応: 実行前に loop のモデルを利用可能な provider（例: opencode-go/*）へ切り替える必要がある。本 PR は harness / spec の準備まで。
-- 準備済み: `LOOP_VERIFICATION_SKIP_E2E`、replay の `--repetitions`、12 件の checks 更新。
+- 目的: gold UI 3 件を R=1、`LOOP_VERIFICATION_SKIP_E2E=1` で疎通と粗い差を確認。
+- 構成: arm A=`eval/baselines/loop/main_loop_eval.yaml`（opencode-go モデルの現行構造）/ arm B=`eval/baselines/loop/main_loop_minimal.yaml`（checker / post_review を外した構造）。両 arm 同一モデル。
+- 結果: `t3-pilot.json`
+  - `ISSUE-264-01`: A=human、B=human
+  - `ISSUE-293`: A=human、B=human
+  - `ISSUE-369`: 20 分でタイムアウト（iteration 7 / fix step で進行中、ハングではない）
+- 集計（完了 2 件）: A=closure 0.0 / human 1.0 / cost $0.0436、B=closure 0.0 / human 1.0 / cost $0.0533。
+- 読み: 両 arm とも closure 0（human 100%）で **差 0pt（±10pt 以内）**。判定ゲートでは「不明瞭 → A（12 件、R=3）へ拡大」に該当。ただし UI 3 件・R=1 の粗い信号で、両 arm とも閉じられない傾向。
+- 補足: `opencode-go/muse-spark-1.3-contributor` で実行（`opencode/muse-spark-1.3-contributor-free` の `stream error` ハングを回避）。usage（tokens / cost）は harness が記録できた。
+- 残: A（12 件、R=3、e2e 込み、並列 2〜4）の実行。72 run 規模のため未実施。
 
 ## T3: paired replay（#528 で有効化）
 
