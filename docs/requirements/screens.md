@@ -18,6 +18,7 @@
 | P06 | Area popover | 新規作成・詳細画面内のエリア選択パネル |
 | P07 | Delete confirmation dialog | Matrix 上の task を完全削除する確認ダイアログ |
 | P08 | Idea list | Ideaをカード一覧で管理する画面 |
+| P09 | Idea detail | Idea詳細画面 title、description、pinned を確認・編集する |
 
 ## 画面詳細
 
@@ -68,6 +69,13 @@
   - カードをdrag and dropして同じグループ内の`order`を変更する。
   - ピン留め状態を切り替えたカードは移動先グループの末尾へ移動し、グループ内の`order`を振り直す。
   - 削除操作の確認後、Ideaを一覧から除外する。
+
+- `Idea detail` (`/ideas/:id` と Ideas 一覧から開く詳細モーダル)
+  - title と description を編集し、自動保存する。
+  - description 内の http/https URL は編集領域内でリンクとして表示する。
+  - URL の通常クリックは同じタブ、Ctrl クリック / Command クリックは別タブで開く。
+  - URL を貼り付けた場合もリンクとして表示し、保存する description はプレーンテキストとする。
+  - 一覧カード内の title / description はリンク化の対象外とする。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。

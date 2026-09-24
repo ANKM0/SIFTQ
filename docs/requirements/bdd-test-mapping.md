@@ -21,6 +21,8 @@
 | BDD-TM-015 | `tests/e2e/matrix.spec.ts` / `tests/bdd/task-api.contract.test.ts` | delete確定後のtask除外 |
 | BDD-TM-016 | `tests/bdd/task-ui.contract.test.ts` / `tests/e2e/matrix.spec.ts` | Task listのstatus filter、初期値、空状態、再読み込み後の選択状態 |
 | BDD-TM-019 | `tests/task.test.ts` / `tests/bdd/task-ui.contract.test.ts` / `tests/e2e/tasks-pagination.spec.ts` | Task listの25件ページ分割、番号・前へ/次へ移動、中間省略、不正・超過時の寄せ |
+| BDD-TM-023 | `tests/IdeaDetailFields.test.tsx` / `tests/e2e/ideas-description-url.spec.ts` | Idea詳細のdescription URL表示、通常/Ctrlクリックの遷移、保存後のリンク維持 |
+| BDD-TM-024 | `tests/e2e/ideas-description-url.spec.ts` | Idea descriptionへのURL貼り付けリンク化とプレーンテキスト保存 |
 
 repository 契約は `tests/bdd/task-repository.contract.test.ts` で
 `TaskRepository` の in-memory double を使い、insert / list / find / update /
