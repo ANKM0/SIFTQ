@@ -87,12 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     loop_path = args.loop_root / f"{loop_name}.yaml"
     child_environment: dict[str, str] = {}
     if args.codex_home is not None:
-        codex_home = resolve_codex_home(
-            profile_spec,
-            args.workspace,
-            profile=profile,
-            override=args.codex_home,
-        )
+        codex_home = resolve_codex_home(args.codex_home)
         child_environment["CODEX_HOME"] = str(codex_home)
     env_keys = profile_spec.get("env_keys", [])
     if not isinstance(env_keys, list) or not all(isinstance(key, str) and key for key in env_keys):

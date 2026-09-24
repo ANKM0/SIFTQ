@@ -166,6 +166,22 @@ def _run_step(
         result = run_verification(cwd=workspace)
         state["last_feedback"] = result.get("feedback")
         append_event(run_dir, {"type": "verification", "step": step["id"], "result": result})
+        if result["status"] == "fix":
+            feedback = str(result.get("feedback") or "unknown")
+            attempts = state.setdefault("feedback_attempts", {})
+            attempts[feedback] = int(attempts.get(feedback, 0)) + 1
+            if attempts[feedback] > max_fix_attempts:
+                append_event(
+                    run_dir,
+                    {
+                        "type": "decision",
+                        "step": step["id"],
+                        "feedback": feedback,
+                        "next": "human",
+                        "reason": "max_fix_attempts exceeded",
+                    },
+                )
+                return "human"
         return str(step[f"on_{result['status']}"])
 
     if kind == "post_review":

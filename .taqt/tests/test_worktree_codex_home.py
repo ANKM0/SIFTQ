@@ -54,13 +54,13 @@ def test_main_loop_selects_luna_reviewer_and_muse_implementer() -> None:
 def test_resolve_codex_home_uses_shared_default(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert resolve_codex_home({}, Path("/repo"), profile="deepseek") == tmp_path / ".codex"
+    assert resolve_codex_home() == tmp_path / ".codex"
 
 
 def test_resolve_codex_home_preserves_explicit_override(tmp_path: Path) -> None:
     override = tmp_path / "isolated-codex"
 
-    assert resolve_codex_home({}, tmp_path, profile="deepseek", override=override) == override
+    assert resolve_codex_home(override) == override
 
 
 def test_task_run_inherits_shared_home_and_passes_deepseek_keys(

@@ -533,15 +533,8 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert steps_by_id["fix"]["kind"] == "llm"
     assert steps_by_id["fix"]["agent"] == "fix"
 
-    decide = steps_by_id["decide"]
-    assert decide["kind"] == "policy"
-    routes = {route["when"]: route["next"] for route in decide["routes"]}
-    assert routes["implementation_feedback"] == "fix"
-    assert routes["test_feedback"] == "fix"
-    assert routes["local_design_feedback"] == "human"
-    assert routes["specification_feedback"] == "human"
-    assert routes["product_feedback"] == "human"
-    assert routes["unknown"] == "human"
+    assert "decide" not in steps_by_id
+    assert steps_by_id["verification"]["on_fix"] == "fix"
 
 
 def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
@@ -1324,6 +1317,68 @@ blocked_reason: null
     assert result["status"] == "human"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
     assert state["feedback_attempts"]["implementation_feedback"] == 2
+
+
+def test_verification_respects_max_fix_attempts(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: verification-cap
+limits:
+  max_iterations: 10
+  max_fix_attempts: 1
+steps:
+  - id: verification
+    kind: verification
+    on_pass: done
+    on_fix: fix
+    on_human: human
+  - id: fix
+    kind: llm
+    next: verification
+    on_failure: human
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-3
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 3
+status: pending
+phase: spec
+priority: normal
+input: {}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "loop.runner.run_verification",
+        lambda **_kwargs: {"status": "fix", "feedback": "verification_fix", "commands": []},
+    )
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {"status": "success", "parsed_json": True},
+    )
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+    )
+
+    assert result["status"] == "human"
+    state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
+    assert state["feedback_attempts"]["verification_fix"] == 2
 
 
 def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> None:
