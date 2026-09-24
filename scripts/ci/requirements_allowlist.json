@@ -15,6 +15,21 @@
     "removal": "ファイル単位のテストを追加したとき。"
   },
   {
+    "path": "src/client/task-form-scripts.ts",
+    "reason": "Taskフォーム用のブラウザスクリプトで、既存のUI/E2Eテストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/client/task-list-scripts.ts",
+    "reason": "Task一覧用のブラウザスクリプトで、既存のUI/E2Eテストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/client/matrix-scripts.ts",
+    "reason": "Matrix用のブラウザスクリプトで、既存のMatrix E2Eテストが検証するため。",
+    "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
     "path": "src/components/task-option-data.ts",
     "reason": "既存コンポーネントから抽出した静的表示データで、既存UIテストが検証するため。",
     "removal": "ファイル単位のテストを追加したとき。"

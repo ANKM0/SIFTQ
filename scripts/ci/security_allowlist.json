@@ -6,7 +6,7 @@
     "removal": "スクリプトを外部 bundle に移し、dangerouslySetInnerHTML を廃止する。"
   },
   {
-    "path": "src/client/browser-scripts.ts",
+    "path": "src/client/task-form-scripts.ts",
     "pattern": "window.open",
     "reason": "contenteditable 内の http/https リンクで Ctrl/Command クリックを新タブへ遷移させるため。リンクURLはURL検出処理で http/https に限定している。",
     "removal": "contenteditable を使わず、ブラウザ標準の修飾キー付きリンク遷移を直接利用できるUIへ移行する。"
