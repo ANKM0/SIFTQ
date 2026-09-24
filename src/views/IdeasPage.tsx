@@ -84,18 +84,17 @@ export function IdeasPage({ ideas: sourceIdeas }: { ideas: readonly IdeaCardData
   const unpinnedIdeas = ideas.filter((idea) => idea.pinned !== true);
 
   return (
-    <div class="page page--ideas" data-state="normal">
+    <div class={`page page--ideas${ideas.length === 0 ? " page--ideas-empty" : ""}`} data-state="normal">
       <IdeaComposer />
       {ideas.length === 0 && (
         <div class="ideas-empty" data-ideas-empty>
-          <h2>No ideas yet</h2>
-          <p class="muted">Ideas will appear here.</p>
+          <h2>メモ: 0件</h2>
         </div>
       )}
       <IdeaCardGroup ideas={pinnedIdeas} group="pinned" />
       <div class="ideas-group-gap" data-idea-group-gap aria-hidden="true" hidden={unpinnedIdeas.length === 0} />
       <IdeaCardGroup ideas={unpinnedIdeas} group="unpinned" />
       <IdeaDetailModal />
-     </div>
+    </div>
   );
 }
