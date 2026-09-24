@@ -1,0 +1,45 @@
+id: ISSUE-331-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 331
+  parent_task: ISSUE-331
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Matrix の表示過多 area をソート可能にする / slice 01: Matrix の任意の area に表示領域を超える数の `do`
+      タスクがある場合、ユーザーがソートして全タスクを確認できる。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: Matrix の任意の area に表示領域を超える数の `do` タスクがある場合、ユーザーがソートして全タスクを確認できる。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: Matrix の任意の area に表示領域を超える数の `do` タスクがある場合、ユーザーがソートして全タスクを確認できる。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: Matrix の表示過多 area をソート可能にする
+    body: "## 背景\n\nMatrix の area にタスクが多く表示領域を超えると、カードが見切れて確認できない。\n\n## 概要\n\narea\
+      \ 内のタスク数が表示可能な件数を超えた場合に、タスクをソートして表示できるようにする。\n\n## Scope\n\n- やること:\n  - Matrix\
+      \ の各 area で、タスクが表示領域を超える場合のソート方法を提供する。\n  - ソート後も area 内のタスクを確認・操作できるようにする。\n\
+      \  - 表示件数超過時の挙動をテストする。\n- やらないこと:\n  - Task list の並び替え仕様変更。\n  - タスクの永続順序モデル変更。\n\
+      \n## AC\n\n- [ ] Matrix の任意の area に表示領域を超える数の `do` タスクがある場合、ユーザーがソートして全タスクを確認できる。\n\
+      - [ ] ソートしても、各タスクは元の area に表示され、カードの遷移と drag and drop が利用できる。\n- [ ] 表示領域を超えない\
+      \ area の既存表示は変わらない。\n\n## DoD\n\n- [ ] 実装と対象テストを追加・更新する。\n- [ ] 変更範囲に対応する検証コマンドが成功する。\n\
+      - [ ] Matrix の表示仕様を必要に応じて更新する。\n\n## 補足情報\n\n- 現行の Matrix は `order` に従って area\
+      \ 内カードを表示する。ソートは画面上の表示操作として扱い、永続順序は変更しない。\n"
+    labels: *id001

@@ -1,0 +1,91 @@
+id: ISSUE-323-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 323
+  parent_task: ISSUE-323
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'taqt worktree の frontend 依存を導入 / slice 01: `src/` または `tests/` を変更した taqt
+      検証は、`task ci:test` より前に `task setup:frontend:ci` を実行すること'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `src/` または `tests/` を変更した taqt 検証は、`task ci:test` より前に `task setup:frontend:ci`
+      を実行すること
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `src/` または `tests/` を変更した taqt 検証は、`task
+      ci:test` より前に `task setup:frontend:ci` を実行すること
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: taqt worktree の frontend 依存を導入
+    body: '## 概要
+
+
+      taqt が新規 worktree で `task ci:test` を実行すると、frontend 依存関係が未導入のため Playwright が見つからず停止する。通常の
+      `task ci` は `setup:frontend:ci` を先行させるが、taqt の relevant test 経路には同じ準備がない。
+
+
+      ## 再現手順
+
+
+      1. `node_modules` が存在しない新規 taqt worktree を作成する。
+
+      2. `src/` または `tests/` を変更した taqt タスクを検証する。
+
+      3. taqt が relevant test として `task ci:test` を実行する。
+
+      4. Vitest は成功するが、E2E 起動時に Playwright の実行ファイルが見つからず失敗する。
+
+
+      ## 原因
+
+
+      `.taqt/scripts/loop/verification.py` は TypeScript 変更時に `task ci:test` を直接実行する。一方、frontend
+      依存関係を lockfile から導入する `task setup:frontend:ci` は `task ci` にしか含まれない。そのため、独立した
+      git worktree では `node_modules` がないまま E2E に進む。
+
+
+      ## 修正案
+
+
+      taqt の検証開始前に `task setup:frontend:ci` を実行し、CI と同じ frontend 依存セットを worktree ごとに準備する。実行順序をテストで固定する。
+
+
+      ## AC
+
+
+      - `src/` または `tests/` を変更した taqt 検証は、`task ci:test` より前に `task setup:frontend:ci`
+      を実行すること
+
+      - frontend 依存関係がない新規 worktree でも、Playwright 検証の開始前に lockfile 固定の依存導入が行われること
+
+      - frontend に無関係な taqt 検証には不要な frontend 導入を追加しないこと
+
+
+      ## DoD
+
+
+      - 検証コマンドの順序を確認する `.taqt/tests` のテストが追加または更新されていること
+
+      - `.taqt/tests` が成功すること
+
+      - `task ci:test` が正常に開始できること
+
+      '
+    labels: *id001

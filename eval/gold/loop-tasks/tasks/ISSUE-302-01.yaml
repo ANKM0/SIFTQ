@@ -1,0 +1,59 @@
+id: ISSUE-302-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 302
+  parent_task: ISSUE-302
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'taqt の既定経路で merge と cleanup を実行する / slice 01: `task taqt:auto -- <task>
+      --workspace <worktree> --execute` は、明示フラグなしで run、commit、push、PR、squash merge、cleanup
+      を順に実行する。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `task taqt:auto -- <task> --workspace <worktree> --execute` は、明示フラグなしで
+      run、commit、push、PR、squash merge、cleanup を順に実行する。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `task taqt:auto -- <task> --workspace <worktree>
+      --execute` は、明示フラグなしで run、commit、push、PR、squash merge、cleanup を順に実行する。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: taqt の既定経路で merge と cleanup を実行する
+    body: "## 背景\n\ntaqt の標準経路は、PR 作成後の merge と worktree / branch の cleanup を明示フラグに依存している。そのため、通常実行でも作業用リソースが残り、完了までの運用が一貫しない。\n\
+      \n## 概要\n\n`taqt:auto` と `taqt:worker` の標準経路で、検証済み PR の merge、対応する worktree\
+      \ の削除、ローカル branch の削除を既定で実行する。GitHub 上の source branch も merge 時に削除する。\n\n##\
+      \ Scope\n\n- やること:\n  - `taqt:auto` の既定手順に squash merge と cleanup を含める。\n  -\
+      \ `taqt:worker` の既定経路も同じ post-PR 処理へ渡す。\n  - merge 前に既存の PR draft・GitHub checks\
+      \ の検証を継続する。\n  - merge 後に worktree とローカル source branch を削除し、GitHub source branch\
+      \ は merge 処理で削除する。\n  - merge / cleanup を意図的に省略するための明示的な opt-out を提供する。\n  -\
+      \ 既定値、opt-out、失敗時の停止条件を Taskfile・Skill・テストで更新する。\n- やらないこと:\n  - リリースまたは Worker\
+      \ デプロイの自動化。\n  - GitHub branch protection、merge queue、required checks の設定変更。\n\
+      \  - main branch または repository root worktree の削除。\n\n## AC\n\n- [ ] `task taqt:auto\
+      \ -- <task> --workspace <worktree> --execute` は、明示フラグなしで run、commit、push、PR、squash\
+      \ merge、cleanup を順に実行する。\n- [ ] `task taqt:worker -- --execute` は、明示フラグなしで各\
+      \ task の merge と cleanup を含む経路を起動する。\n- [ ] merge は draft PR、失敗した GitHub checks、PR\
+      \ 未検出の場合に実行されず、cleanup も実行されない。\n- [ ] 成功した merge では GitHub source branch、対応\
+      \ worktree、ローカル source branch が削除される。\n- [ ] merge または cleanup を省略する明示的 opt-out\
+      \ があり、dry-run 出力に実行予定の手順が正確に表示される。\n- [ ] repository root を worktree として削除しない既存の安全策を維持する。\n\
+      \n## DoD\n\n- [ ] `task_auto.py`、`task_worker.py`、merge / cleanup 呼び出しと関連 Taskfile・Skill\
+      \ の既定値を整合させる。\n- [ ] 既定経路、opt-out、merge 失敗時の cleanup 非実行、worktree / branch 削除を自動テストでカバーする。\n\
+      - [ ] 変更範囲の最小の意味ある検証を実行し、結果を PR に記録する。\n\n## 補足情報\n\n- リリース・デプロイは `release:*`\
+      \ / `deploy:*` の独立した判断・実行フローに残す。\n- `taqt:auto-merge` label を merge 許可条件にするかは本\
+      \ Issue の対象外。現行実装の明示フラグ依存を既定経路へ変更する。\n"
+    labels: *id001

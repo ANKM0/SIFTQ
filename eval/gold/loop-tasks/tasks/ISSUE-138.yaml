@@ -1,0 +1,28 @@
+id: ISSUE-138
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 138
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: taqt loop engineering ポリシーを skill に統合
+    body: "## 背景\n`docs/loop-engineering.md` は taqt loop runner skill の運用ポリシーだが、`docs/`\
+      \ 直下にあり、一般ドキュメントとしての置き場所が適切ではない。\n\n## 概要\n`docs/loop-engineering.md` の内容を `.agents/skills/taqt-loop-runner/SKILL.md`\
+      \ に統合し、外部ファイル参照をなくす。統合後、不要になった `docs/loop-engineering.md` を削除する。\n\n## Scope\n\
+      - やること:\n  - `.agents/skills/taqt-loop-runner/SKILL.md` に `docs/loop-engineering.md`\
+      \ の Policy / Readiness Rules / Operating Notes を統合する。\n  - `docs/loop-engineering.md`\
+      \ への参照を削除または更新する。\n  - `docs/loop-engineering.md` を削除する。\n  - Markdown 検証を実行する。\n\
+      - やらないこと:\n  - `docs/design/#134.md` の設計内容は変更しない。\n  - taqt 実装コードや Taskfile\
+      \ の挙動は変更しない。\n\n## AC\n- [ ] `.agents/skills/taqt-loop-runner/SKILL.md` だけで\
+      \ taqt loop runner の運用ポリシーと標準フローを読める。\n- [ ] `docs/loop-engineering.md` が削除されている。\n\
+      - [ ] リポジトリ内に `docs/loop-engineering.md` への参照が残っていない。\n- [ ] `docs/design/#134.md`\
+      \ は loop engineering の設計方針の参照先として残っている。\n\n## DoD\n- [ ] 変更範囲が `.agents/skills/taqt-loop-runner/SKILL.md`\
+      \ と `docs/loop-engineering.md` の削除、および必要な参照修正に限定されている。\n- [ ] `task ci:markdown`\
+      \ が成功している。\n\n## 補足情報\nユーザー判断では選択肢 2「`SKILL.md` に `docs/loop-engineering.md`\
+      \ の内容を記載」が望ましい。\n"
+    labels:
+    - documentation
+    - enhancement

@@ -1,0 +1,100 @@
+id: ISSUE-391-03
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 391
+  parent_task: ISSUE-391
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Matrixのスクロール時の上下DnD判定領域を広げる / slice 03: `.matrix-cards` の矩形外にある象限上部・下部の余白では、drop
+      targetとして反応しない、または反応範囲が狭く見える。'
+    body: '## Slice
+
+      - Source section: 概要
+
+      - Target: `.matrix-cards` の矩形外にある象限上部・下部の余白では、drop targetとして反応しない、または反応範囲が狭く見える。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `.matrix-cards` の矩形外にある象限上部・下部の余白では、drop
+      targetとして反応しない、または反応範囲が狭く見える。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: Matrixのスクロール時の上下DnD判定領域を広げる
+    body: '## 概要
+
+
+      Matrixの象限内にタスクカードが増えて縦スクロールが発生すると、カードをドラッグして象限の上端・下端付近へ移動した際に、見た目の象限全体ではなく `.matrix-cards`
+      の表示領域だけが当たり判定になる。
+
+
+      期待結果:
+
+
+      - スクロールが発生している象限でも、見た目の象限内の上下を含む適切な範囲でdragover/dropを検出できる。
+
+      - 既存のカードクリック、象限内の並べ替え、象限間の移動、カード一覧のスクロールは維持される。
+
+
+      実際の結果:
+
+
+      - `.matrix-cards` の矩形外にある象限上部・下部の余白では、drop targetとして反応しない、または反応範囲が狭く見える。
+
+      - カード数が少なくスクロールが発生しない場合は問題を確認しにくい。
+
+
+      ## 再現手順
+
+
+      1. Matrixページを開く。
+
+      2. 同じ象限に、象限内で縦スクロールが発生する数のタスクを作成する。
+
+      3. タスクカードをドラッグする。
+
+      4. 同じ象限または別の象限の上端・下端付近へカードを移動する。
+
+      5. 見た目の象限内であるにもかかわらず、drop targetの表示やdrop処理が反応しない範囲があることを確認する。
+
+
+      ## 原因(Optional)
+
+
+      Matrixのdragover/drop処理が、象限の`section.area--quadrant`ではなく、イベント発生元から取得した`.matrix-cards[data-dnd-group="matrix"]`だけを判定対象にしている。
+
+
+      - `src/components/Layout.tsx`の`MATRIX_DND_SCRIPT`では、dragover/dropの対象を`event.target.closest(".matrix-cards[data-dnd-group]")`で取得している。
+
+      - `src/styles.ts`では`.matrix-cards`に`flex: 1`、`min-height: 0`、`overflow-y: auto`が指定されている。
+
+      - そのためカードが多い場合、`.matrix-cards`は固定された表示領域を持つスクロールコンテナになり、象限全体の上下余白とDnDの判定矩形が一致しない。
+
+      - 既存の`.area-create-link`は`section`全体に配置されているが、作成クリック用の要素であり、MATRIX_DND_SCRIPTのdragover/drop判定対象を広げていない。
+
+
+      ## 修正案(Optional)
+
+
+      - 象限全体、または専用のDnD判定用`div`を`.matrix-cards`とは別に設け、見た目の象限とdragover/dropの判定範囲を一致させる。
+
+      - 判定用要素を追加する場合も、カードの`a`要素へのクリック・右クリック、`.matrix-cards`のスクロール、カード位置からの挿入位置計算を妨げない構造にする。
+
+      - `matrixDropIndex`の既存のカード順序計算と、象限間移動・並べ替えの挙動は維持する。
+
+      - スクロールコンテナの外側を判定対象に含める実装方式は、DOM構造またはイベント委譲のどちらを採用するかを実装時に決定する。
+
+      '
+    labels: *id001

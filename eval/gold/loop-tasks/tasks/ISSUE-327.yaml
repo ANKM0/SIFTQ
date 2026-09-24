@@ -1,0 +1,21 @@
+id: ISSUE-327
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 327
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: JSXテストの文字列化警告を解消
+    body: "## 背景\n\n`vp lint` が、JSX 要素を `String(...)` で変換する単体テスト10件に警告を出している。\n\n\
+      ## 概要\n\nテストの HTML 描画を Hono の SSR API `renderToString()` に統一する。\n\n## Scope\n\
+      \n- やること:\n  - 警告対象のテストを `renderToString()` に置換する。\n  - `vp lint .` と `vp lint\
+      \ src tests` で該当警告が出ないことを確認する。\n- やらないこと:\n  - プロダクションの JSX 実装や lint ルールの無効化。\n\
+      \n## AC\n\n- [ ] `String(<... />)` による JSX の文字列化警告10件が解消される。\n- [ ] 各テストの既存アサーションが維持される。\n\
+      \n## DoD\n\n- [ ] 関連する単体テストが成功する。\n- [ ] `vp lint .` と `vp lint src tests` が当該警告なしで成功する。\n\
+      \n## 補足情報\n\n- #326 の taqt プロバイダー統一とは独立したテスト基盤の改善として扱う。\n"
+    labels:
+    - enhancement
+    - taqt:enabled

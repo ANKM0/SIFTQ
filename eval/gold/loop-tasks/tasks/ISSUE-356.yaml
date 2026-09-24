@@ -1,0 +1,25 @@
+id: ISSUE-356
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 356
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: Ctrl+Enterでタスクを作成・保存する
+    body: "## 背景\nタスクの入力中にマウスへ持ち替えず、キーボードだけで作成・保存を完了できるようにする。\n\n## 概要\nタスクの新規作成画面と詳細編集画面で\
+      \ `Ctrl+Enter` を押したとき、フォームを送信できるようにする。\n\n## Scope\n- やること:\n  - `New task`\
+      \ 画面で `Ctrl+Enter` を `Create` と同じ送信操作として扱う。\n  - `Task detail` 画面で `Ctrl+Enter`\
+      \ を `Save` と同じ送信操作として扱う。\n  - 既存の入力バリデーション、HTMX の遷移、保存競合時の処理を維持する。\n  - ショートカットによる二重送信を防ぐ。\n\
+      - やらないこと:\n  - 通常の `Enter` による送信仕様の変更。\n  - ログインなど、タスクの作成・編集以外のフォームへの適用。\n \
+      \ - `Cmd+Enter` など他のキーボードショートカットへの拡張。\n\n## AC\n- [ ] `New task` 画面のタイトルまたは説明欄にフォーカスした状態で\
+      \ `Ctrl+Enter` を押すと、`Create` と同じ処理が一度だけ実行される。\n- [ ] `Task detail` 画面のタイトルまたは説明欄にフォーカスした状態で\
+      \ `Ctrl+Enter` を押すと、`Save` と同じ処理が一度だけ実行される。\n- [ ] タイトル未入力など既存のバリデーションエラーがある場合、`Ctrl+Enter`\
+      \ でも既存と同じエラー表示になる。\n- [ ] 保存成功後の遷移先、保存競合時の表示、通常のボタン送信が変わらない。\n- [ ] タスクフォーム以外では\
+      \ `Ctrl+Enter` が送信操作として働かない。\n\n## DoD\n- [ ] 新規作成・詳細編集のキーボード操作を実装する。\n- [ ]\
+      \ 新規作成・詳細編集それぞれの `Ctrl+Enter` 動作をテストで確認する。\n- [ ] lint、typecheck、テストが通る。\n\n\
+      ## 補足情報\n- 対象フォームは `src/index.tsx` の `NewTaskForm` と `DetailPage`。\n"
+    labels:
+    - taqt:enabled

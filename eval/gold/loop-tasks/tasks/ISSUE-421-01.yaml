@@ -1,0 +1,51 @@
+id: ISSUE-421-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 421
+  parent_task: ISSUE-421
+status: pending
+phase: spec
+priority: normal
+input:
+  issue:
+    title: 'loop変更issueの効果測定をAC/DoDに組み込む / slice 01: `scripts/ci/loop_change_paths.py`
+      が loop 対象パスを判定し、テストで検証されている。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `scripts/ci/loop_change_paths.py` が loop 対象パスを判定し、テストで検証されている。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `scripts/ci/loop_change_paths.py` が loop
+      対象パスを判定し、テストで検証されている。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: loop変更issueの効果測定をAC/DoDに組み込む
+    body: "## 背景\n\nloop / verification / guard / agent prompt の変更時に効果測定が実施されないことがある。計測ハーネス（`loop_eval`\
+      \ の T2 欠陥注入 / T3 ペアリプレイ）と gold data は用意済みだが、起票時に測定が AC/DoD へ組み込まれておらず、実施が属人的になっている。\n\
+      \n## 概要\n\nloop 変更を含む issue の AC/DoD に効果測定を組み込む。常時ロードされる指示は増やさず、オンデマンド skill\
+      \ と起票時の条件付きルールで実現する。\n\n## Scope\n\n- やること:\n  - `.agents/skills/loop-effect-measurement/SKILL.md`\
+      \ を追加する。description のみ常時ロードされ、本文は loop 変更時にロードされる。\n  - `.agents/skills/issue-creator/SKILL.md`\
+      \ に、loop 変更 issue では AC/DoD に効果測定を入れるルールを追加する。\n  - `scripts/ci/loop_change_paths.py`\
+      \ に loop 対象パスを判定する純関数を追加する。\n- やらないこと:\n  - AGENTS.md への常時ルール追加。\n  - CI の必須ゲート化（PR\
+      \ 時の fail）。\n  - 既存 `loop_eval` ハーネスと gold data の変更。\n\n## AC\n\n- [ ] `scripts/ci/loop_change_paths.py`\
+      \ が loop 対象パスを判定し、テストで検証されている。\n- [ ] `.agents/skills/loop-effect-measurement/SKILL.md`\
+      \ が追加され、ハーネス実行コマンドと採用基準を含む。\n- [ ] `.agents/skills/issue-creator/SKILL.md` が、loop\
+      \ 変更 issue で AC/DoD に効果測定を入れるルールを含む。\n\n## DoD\n\n- [ ] 変更が issue に紐づく branch\
+      \ に commit されている。\n- [ ] PR が作成されている。\n- [ ] PR body に変更概要と検証結果が記載されている。\n-\
+      \ [ ] 判定対象パスと採用基準が skill 本文に self-contained で記載されている。\n\n## 補足情報\n\n- 判定対象は\
+      \ `.taqt/loops/` と `.taqt/scripts/loop/` 配下（loop 定義・verification・guard・agent\
+      \ prompt を含む）とする。\n- `refacta_loop.md` は gitignore 済みで他環境に存在しないため参照しない。\n"
+    labels: *id001

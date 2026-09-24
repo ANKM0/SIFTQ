@@ -1,0 +1,47 @@
+id: ISSUE-243-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 243
+  parent_task: ISSUE-243
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'md2idx を導入する / slice 01: リポジトリの開発環境で md2idx を実行できる'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: リポジトリの開発環境で md2idx を実行できる
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: リポジトリの開発環境で md2idx を実行できる
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - documentation
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: md2idx を導入する
+    body: "## 背景\nエージェントが長いMarkdown文書を読む際、必要なセクションが数個でもファイル全体をコンテキストへ読み込み、トークンと注意を浪費する。\n\
+      \n## 概要\n`md2idx` を導入し、Markdownを見出し単位で index と sections に分割して、必要なセクションだけを読めるようにする。\n\
+      \n## Scope\n- やること:\n  - md2idx をリポジトリの開発環境で実行可能にする（導入方法は aqua / npm / npx 等から選定）\n\
+      \  - 「大きなMarkdownは index を取得してから該当sectionだけ読む」手順を skill または AGENTS.md に追加する\n\
+      \  - md2idx が使えない場合の fallback（grep + offset/limit）も手順に含める\n- やらないこと:\n  - 既存Markdownの一括変換\n\
+      \  - graphify の置き換え\n  - スキル全体の再設計\n\n## AC\n- [ ] リポジトリの開発環境で md2idx を実行できる\n\
+      - [ ] Markdown を index と sections に分割し、該当sectionだけ取得できる\n- [ ] 長いMarkdownを読む際の利用手順（発火条件・fallback含む）が文書化されている\n\
+      - [ ] 既存の graphify や docs 運用と併用できる\n\n## DoD\n- [ ] 導入方法が Taskfile または setup\
+      \ 手順に反映されている\n- [ ] 利用手順が skill / AGENTS.md / docs のいずれかに追加されている\n- [ ] 最小の意味ある検証を実行し、結果をPRに記載する\n\
+      \n## 補足情報\n- 参照: https://zenn.dev/oubakiou/articles/b9db61885cd7be\n- 分類メモ:\
+      \ kennsyou-torisha.md の「md2idx の導入」に対応\n"
+    labels: *id001

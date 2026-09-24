@@ -1,0 +1,69 @@
+id: ISSUE-267
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 267
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: Status・Areaダイアログを外側押下で閉じる
+    body: '## 概要
+
+
+      Status または Area のダイアログを開いた状態でダイアログ外を押下しても、ダイアログが閉じない。
+
+
+      ## 再現手順
+
+
+      1. 新規作成画面またはタスク詳細画面を開く。
+
+      2. Status もしくは Area を押下してダイアログを開く。
+
+      3. ダイアログおよび Status / Area サイドパネルの外側を押下する。
+
+      4. ダイアログが開いたままになる。
+
+
+      ## 原因(Optional)
+
+
+      外側押下時の閉じる処理は存在するが、実際の画面操作で閉じることを保証する E2E テストがない。
+
+
+      ## 修正案(Optional)
+
+
+      外側押下を検出し、現在の Status / Area 選択を保持した通常表示へ戻す。ダイアログ内および起点となるサイドパネルの操作は維持する。
+
+
+      ## AC
+
+
+      - [ ] 新規作成画面で Status ダイアログを開き、外側を押下するとダイアログが閉じる。
+
+      - [ ] 新規作成画面で Area ダイアログを開き、外側を押下するとダイアログが閉じる。
+
+      - [ ] タスク詳細画面でも Status / Area ダイアログを外側押下で閉じられる。
+
+      - [ ] ダイアログ内の選択、Cancel、Status / Area サイドパネルの既存操作を維持する。
+
+      - [ ] Playwright E2E テストが外側押下による閉じる挙動を検証する。
+
+      - [ ] requirements docs と画面遷移図に、外側押下で現在の選択を保持して通常表示へ戻る仕様を反映する。
+
+
+      ## DoD
+
+
+      - [ ] 修正と変更範囲のテストが完了している。
+
+      - [ ] `docs/requirements/screens.md` と画面遷移図のソースを更新し、生成 SVG がある場合は再生成する。
+
+      - [ ] 関連するテストコマンドが成功する。
+
+      '
+    labels:
+    - taqt:enabled

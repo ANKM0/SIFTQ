@@ -1,0 +1,73 @@
+id: ISSUE-395
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 395
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: deploy:releaseのD1 migration確認をbinding参照へ修正
+    body: '## 概要
+
+
+      `task deploy:release -- --tag v0.13.2 --execute` のD1 migration確認が、Workerデプロイ前に失敗する。
+
+
+      `scripts/release_deploy.py` は `wrangler d1 migrations list app --remote` を実行するが、D1は
+      `DB` bindingで設定されている。`wrangler d1 migrations list DB --remote` では同じremote D1の確認に成功し、`No
+      migrations to apply` になる。
+
+
+      ## 再現手順
+
+
+      1. Release tagをcheckoutしたclean worktreeで `task deploy:release -- --tag vX.Y.Z
+      --execute` を実行する。
+
+      2. D1 migration確認でCloudflare APIエラーが発生し、Workerデプロイまで到達しない。
+
+      3. 同じworktreeで `bun x wrangler d1 migrations list DB --remote` を実行するとremote
+      migration確認に成功する。
+
+
+      ## 原因
+
+
+      `scripts/release_deploy.py` のmigration確認対象が、D1 bindingではなくデータベース名 `app` にハードコードされている。remote
+      D1の表示名は `siftq` であり、リポジトリのD1 binding `DB`を使った確認と一致していない。
+
+
+      ## 修正案
+
+
+      - migration確認でハードコードされたデータベース名を使わず、`wrangler.jsonc`のD1 binding `DB`を参照する。
+
+      - migration確認のコマンド組み立てと、確認失敗時にデプロイを停止する挙動をテストする。
+
+
+      ## 受け入れ条件
+
+
+      - `task deploy:release -- --tag vX.Y.Z --execute` がremote D1 migration確認を通過できる。
+
+      - D1データベース名が変更されても、binding設定との不一致で失敗しない。
+
+      - migration確認が失敗した場合は、Workerデプロイを実行せず終了する。
+
+      - migrationがない場合に `No migrations to apply` を確認してからデプロイへ進む。
+
+
+      ## 完了条件
+
+
+      - `scripts/release_deploy.py` と関連テストを更新する。
+
+      - release/deployment関連のCIまたはローカル検証を実行する。
+
+      - `task deploy:release` の実行経路で、migration確認からWorkerデプロイまで成功することを確認する。
+
+      '
+    labels:
+    - taqt:enabled

@@ -1,0 +1,21 @@
+id: ISSUE-349
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 349
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: Matrixカードのdoバッジを廃止し、枠線で視認性を改善する
+    body: "## 背景\n\nMatrixに表示されるタスクは`do`のみのため、カード内の`do`バッジは重複した情報になっている。\n\nまた、Matrix全体とカードの背景色が同じため、カードの境界を視認しづらい。\n\
+      \n## 概要\n\nMatrixカードから`do`バッジを廃止する。\n\n背景色は変更せず、カードに黒系の枠線を追加して、Matrix全体とカードを区別しやすくする。\n\
+      \n## Scope\n\n- やること:\n  - Matrixカードから`do`バッジを削除する\n  - Matrixカードに黒系の枠線を追加する\n\
+      \  - 既存のカード操作、DnD、ホバー表示を維持する\n- やらないこと:\n  - Matrix外側やMatrix全体の背景色変更\n  - Task一覧や詳細画面のstatus表示変更\n\
+      \  - statusの仕様変更\n\n## AC\n\n- [ ] Matrixカードに`do`バッジが表示されない\n- [ ] Matrix全体とカードを枠線で視覚的に区別できる\n\
+      - [ ] カードのタイトルが読みやすい\n- [ ] カードのクリック、DnD、ホバー表示が従来どおり動作する\n- [ ] デスクトップとモバイルの両方で視認性を確認する\n\
+      \n## DoD\n\n- [ ] Matrixカードの表示を修正する\n- [ ] 表示テストを更新する\n- [ ] ローカルサーバーでUI確認を完了する\n"
+    labels:
+    - enhancement
+    - taqt:enabled

@@ -1,0 +1,60 @@
+id: ISSUE-390
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 390
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: ブラウザバック後のタスク詳細保存を復旧する
+    body: '## 概要
+
+      Matrixからタスク詳細へ移動し、Ctrl+Enterで保存してMatrixへ戻った後、ブラウザバックで詳細へ戻ると再度Ctrl+Enterを押しても反応しない。その状態でSaveを押すと、`Task
+      was updated elsewhere.` の競合エラーになる。
+
+
+      ## 再現手順
+
+      1. Matrix画面でarea 3のタスクを押下してタスク詳細へ遷移する。
+
+      2. Ctrl+Enterを押下して保存し、Matrixへ戻る。
+
+      3. ブラウザバックでタスク詳細へ戻る。
+
+      4. 再度Ctrl+Enterを押下する（何も起きない）。
+
+      5. Saveを押下する。
+
+      6. `Task was updated elsewhere.` が表示される。
+
+
+      ## 原因
+
+      - `src/components/Layout.tsx` の `TASK_FORM_SHORTCUT_SCRIPT` は、Ctrl+Enter時に `form.dataset.shortcutSubmitting
+      = "true"` を設定する。この属性を解除する処理がないため、BFCacheで復元された詳細フォームでは次のCtrl+Enterがガードにより無視される。
+
+      - BFCacheで復元される詳細フォームには、初回保存前の古い `version` も残る。初回のCtrl+Enterでサーバー側のversionは更新済みだが、復元されたフォームは古いversionのままになる。
+
+      - Saveは古いversionを `POST /tasks/:id` に送信する。`D1TaskRepository.update` は `WHERE
+      ... AND version = ?` で更新するため、version不一致時は `CONFLICT` を返す。
+
+      - `src/index.tsx` の詳細更新処理はこの競合をHTTP 409で返し、`HTMX_CONFLICT_SWAP_SCRIPT` により `Task
+      was updated elsewhere.` を表示する。
+
+      - 429を返すアプリケーションコードやCloudflareのrate limit設定は確認できず、Networkログ付きのローカル再現でも該当リクエストはHTTP
+      409だった。今回のエラーは429ではなく、BFCache復元による古いversionの競合である。
+
+
+      ## 修正案
+
+      - `pageshow` 等の履歴復元時に、詳細フォームを最新タスクの状態へ再取得するか、少なくとも送信抑止状態をリセットして古いversionのままSaveできないようにする。
+
+      - Ctrl+Enterの二重送信防止は維持する。
+
+      - ブラウザバック後のCtrl+EnterとSaveを含むE2E回帰テストを追加し、Networkログで古いversionによる409が発生しないことを確認する。
+
+      '
+    labels:
+    - taqt:enabled

@@ -1,0 +1,29 @@
+id: ISSUE-368
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 368
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: taqtマージ後にリリース・デプロイ判断を追加
+    body: "## 背景\ntaqt loop（`task taqt:auto`）は run・commit・push・PR・squash merge・cleanup\
+      \ で終了する。リリース・デプロイ判断（ADR 0034、`docs/contributing/release.md`、`docs/contributing/deployment.md`）はループ外の手動判断になっており、マージ後の判断漏れが起きる。\n\
+      \n## 概要\ntaqt のマージ後にリリース・デプロイ判断を行うステップを追加する。既定は読み取り専用の `task release:plan` による分類とし、タグ\
+      \ push・Worker デプロイは明示承認なしに実行しない。\n\n## Scope\n- やること:\n  - マージ直後に `task release:plan`\
+      \ で Release-only／Release＋Worker デプロイを分類する流れを定義する\n  - ADR 0034 基準（Worker 成果物・D1\
+      \ migration・本番設定変更の有無）での判断と Release Notes 記録方針を決める\n  - `task taqt:auto`／taqt\
+      \ skill／関連文書の更新範囲を決める\n- やらないこと:\n  - タグ push・Worker デプロイの自動実行（明示承認は維持する）\n\
+      \  - リリース手順自体の変更（`taskfile/release.yml` の既存動作変更は含めない）\n\n## AC\n- [ ] マージ後に\
+      \ `task release:plan -- --version vX.Y.Z --ref <sha> --base <tag>` による分類が行われる\n\
+      - [ ] ADR 0034 基準で Release-only／デプロイ要否が判断される\n- [ ] タグ push・remote migration・Worker\
+      \ デプロイは明示承認なしに実行されない\n- [ ] 判断結果（対象 SHA・デプロイ有無・migration 確認方針）が Release Notes\
+      \ 記録方針に沿う\n\n## DoD\n- [ ] `task taqt:auto` のマージ後フローと skill（taqt-loop-runner）に判断ステップが記載される\n\
+      - [ ] Release-only の場合は Worker をデプロイしないことが明示される\n- [ ] 最小の意味ある検証（`task release:plan`\
+      \ の dry-run 分類確認）が行われる\n\n## 補足情報\n- ADR 0034: `docs/adr/0034-separate-release-and-worker-deployment.md`\n\
+      - Release: `docs/contributing/release.md`、`taskfile/release.yml`\n- Deploy:\
+      \ `docs/contributing/deployment.md`\n- taqt: `taskfile/taqt.yml`、`.agents/skills/taqt-loop-runner/SKILL.md`\n"
+    labels:
+    - taqt:enabled
