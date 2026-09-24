@@ -163,6 +163,7 @@ def _run_opencode(
         "stdout": completed.stdout,
         "stderr": completed.stderr,
         "parsed_json": bool(parsed),
+        "usage": _sum_opencode_usage(completed.stdout),
     }
     if parsed:
         response.update(parsed)
@@ -192,6 +193,44 @@ def is_opencode_fallback_error(stdout: str, stderr: str) -> bool:
             "overloaded",
         )
     )
+
+
+def _sum_opencode_usage(stdout: str) -> dict[str, Any]:
+    totals = {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "total": 0,
+    }
+    cost = 0.0
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        part = event.get("part")
+        if not isinstance(part, dict):
+            continue
+        tokens = part.get("tokens")
+        if isinstance(tokens, dict):
+            totals["total"] += int(tokens.get("total") or 0)
+            totals["input"] += int(tokens.get("input") or 0)
+            totals["output"] += int(tokens.get("output") or 0)
+            totals["reasoning"] += int(tokens.get("reasoning") or 0)
+            cache = tokens.get("cache") if isinstance(tokens.get("cache"), dict) else {}
+            totals["cache_read"] += int(cache.get("read") or 0)
+            totals["cache_write"] += int(cache.get("write") or 0)
+        value = part.get("cost")
+        if isinstance(value, (int, float)):
+            cost += float(value)
+    return {"tokens": totals, "cost": round(cost, 6)}
 
 
 def _parse_opencode_stdout(stdout: str) -> dict[str, Any]:

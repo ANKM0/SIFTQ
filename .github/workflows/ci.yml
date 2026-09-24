@@ -27,6 +27,21 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
           python scripts/ci/check_commit_messages.py "$base" "$head"
 
+  loop-effect-measurement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Warn when loop changes lack effect-measurement evidence
+        shell: bash
+        run: |
+          python scripts/ci/check_loop_effect_measurement.py \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
   fast:
     needs: [changes]
     runs-on: ubuntu-latest

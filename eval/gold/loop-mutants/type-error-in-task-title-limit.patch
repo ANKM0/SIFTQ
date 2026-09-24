@@ -1,5 +1,5 @@
 diff --git a/src/task.ts b/src/task.ts
-index f11353b..df4700b 100644
+index a3cbfcb..4e17b6e 100644
 --- a/src/task.ts
 +++ b/src/task.ts
 @@ -4,7 +4,7 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -8,6 +8,6 @@ index f11353b..df4700b 100644
  
 -export const TASK_TITLE_MAX_CODE_POINTS = 256;
 +export const TASK_TITLE_MAX_CODE_POINTS: string = 256;
+ export const TASK_DESCRIPTION_MAX_CODE_POINTS = 16_384;
  
  export type Task = {
-   id: string;

@@ -26,11 +26,22 @@ def test_summarize_records_computes_closure_and_escaped_rates() -> None:
         "human": 1,
         "failed": 1,
         "escaped": 1,
+        "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+            "total": 0,
+        },
+        "cost": 0.0,
         "closure_rate": 0.5,
         "escaped_rate": 0.25,
+        "human_rate": 0.25,
     }
     assert summary["arms"]["B"]["closure_rate"] == 1.0
     assert summary["arms"]["B"]["escaped_rate"] == 0.0
+    assert summary["arms"]["B"]["human_rate"] == 0.0
 
 
 def test_run_replay_runs_each_arm_without_github(tmp_path: Path) -> None:
@@ -151,3 +162,67 @@ def test_load_replay_spec_rejects_invalid_specs(tmp_path: Path, body: str) -> No
 
     with pytest.raises(ValueError):
         load_replay_spec(spec)
+
+
+def test_load_replay_spec_reads_base_commit_and_repetitions(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        "name: ISSUE-1\narms:\n  A: a.yaml\nchecks: []\nbase_commit: abc123\nrepetitions: 3\n",
+        encoding="utf-8",
+    )
+
+    payload = load_replay_spec(spec)
+
+    assert payload["base_commit"] == "abc123"
+    assert payload["repetitions"] == 3
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "name: ISSUE-1\narms:\n  A: a.yaml\nbase_commit: ''\n",
+        "name: ISSUE-1\narms:\n  A: a.yaml\nrepetitions: 0\n",
+        "name: ISSUE-1\narms:\n  A: a.yaml\nrepetitions: two\n",
+    ],
+)
+def test_load_replay_spec_rejects_invalid_base_commit_and_repetitions(
+    tmp_path: Path, body: str
+) -> None:
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(body, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_replay_spec(spec)
+
+
+def test_run_replay_isolates_workspace_per_arm_and_repetition(tmp_path: Path) -> None:
+    from contextlib import contextmanager
+
+    seen: list[tuple[str, int, str]] = []
+
+    @contextmanager
+    def factory(arm: str, rep: int, base_commit: str, repo: Path):
+        isolated = tmp_path / f"ws-{arm}-{rep}"
+        isolated.mkdir(exist_ok=True)
+        seen.append((arm, rep, base_commit))
+        yield isolated
+
+    def run_loop_fn(**kwargs: object) -> dict[str, object]:
+        return {"status": "done"}
+
+    result = run_replay(
+        task_path=tmp_path / "task.yaml",
+        arms={"A": tmp_path / "a.yaml", "B": tmp_path / "b.yaml"},
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+        checks=[],
+        base_commit="abc123",
+        repetitions=2,
+        repo=tmp_path,
+        worktree_factory=factory,
+        run_loop_fn=run_loop_fn,
+    )
+
+    assert seen == [("A", 0, "abc123"), ("A", 1, "abc123"), ("B", 0, "abc123"), ("B", 1, "abc123")]
+    assert len(result["records"]) == 4
+    assert [record["rep"] for record in result["records"]] == [0, 1, 0, 1]

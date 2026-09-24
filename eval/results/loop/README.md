@@ -17,6 +17,15 @@
 - `verification_fix` で human へ落ちた run は 9/9。決定論的 verification 失敗が全件 human に流れ、自動 fix の機会が無かった。
 - これは LLM リプレイ不要で routing 修正の効果を直接示す。closure の回復量は LLM 依存のため未測定。
 
+## 段階1: human 率（#528, 2026-09-24）
+
+- ハーネス: `loop_eval.human_rate`
+- 結果: `human-rate.json`
+- 集計（run 単位、全期間累積）: total 201、done 100（closure 49.75%）、human 92（human 率 45.77%）、failed 9。
+- human 原因（中粒度 6）: routing 73、verification 8、review 6、spec_product 2、permission 2、model_infra 1。
+- 月次: 2026-08 total 87 / human 42、2026-09 total 114 / human 50。
+- 注: `unknown` feedback は routing に一括（下位分解は未実施）。blocked_reason はほぼ None のため feedback と permission マーカーで分類。
+
 ## T2: 欠陥注入（#525, 2026-09-24）
 
 - 実施日: 2026-09-24
@@ -28,16 +37,17 @@
 - 採用基準: 満たす（arm B が arm A 以上）。
 - 注: 本変更は verification の判定を変えないため検証力は不変。
 
-## T3: paired replay（保留）
+## T3: paired replay（#528 で有効化）
 
-保留。理由:
+ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。
 
-- #427 の主眼である routing 修正は上記で決定論的に検証済み。T3 の追加対象は loop 構造（design/test 廃止）の closure 効果のみで、refacta も従属証拠・ノイズ大と位置づける。
+残作業:
+
+1. gold タスクを `eval/gold/loop-tasks/` に 30+ 件コミットする（base commit = 正解 PR の first parent）。
+2. パイロット（3〜5 件、fast のみ）→ 全量（e2e 込み、並列 2〜4）で実行し、arm (a) 現行 / (b) 最小 loop を比較する。
+3. 結果を `eval/results/loop/` に記録し、維持 / 簡素化 / 改修を判定する。
+
+旧メモ（#427 時点）:
+
 - gold が 1 件のみ、対象タスクは既に main に取り込まれており base commit を切っていない（汚染）。
-- `loop_eval.replay` は arm 間で workspace をリセットせず、R>=3 集計も外部。フル実施は数時間規模の LLM 費用。
-
-T3 は「loop を継続的に変更する時の回帰ガード」として、次の loop 変更時に有効化する。有効化に必要な作業:
-
-1. gold に base commit / 期待 checks を持たせる（10〜20 件）。
-2. arm ごとに `git worktree add <ws> <base_commit>` した隔離 workspace を使う（単一 arm spec で実行すればハーネス改修なしで持ち越しを排除できる）。
-3. R>=3 で closure / escaped / human 率 / 自動復帰率 / コストを集計する。
+- フル実施は数時間規模の LLM 費用。
