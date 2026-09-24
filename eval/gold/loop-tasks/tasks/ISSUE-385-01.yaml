@@ -1,0 +1,53 @@
+id: ISSUE-385-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 385
+  parent_task: ISSUE-385
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: '.gitignoreをdeny-by-defaultのpath allowlistへ変更 / slice 01: `.gitignore`
+      の既定動作が deny-by-default になっている'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `.gitignore` の既定動作が deny-by-default になっている
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `.gitignore` の既定動作が deny-by-default になっている
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: .gitignoreをdeny-by-defaultのpath allowlistへ変更
+    body: "## 背景\n\n現在の `.gitignore` は、生成物やローカル状態を個別に追加する deny-list 方式で管理している。未知のローカルファイル、エージェント用一時成果物、環境変数ファイルなどを追加し忘れると、意図しないファイルをコミットできる。\n\
+      \nGit の untracked ファイルを deny-by-default にする path allowlist 方式へ変更し、明示的に許可したプロジェクト成果物だけを通常の\
+      \ Git 操作で追加できるようにする。\n\n## 概要\n\n`.gitignore` の既定動作を deny-by-default に変更する。`src/`、`tests/`、`scripts/`、`docs/`、`migrations/`、`taskfile/`\
+      \ などのソース・文書・設定を明示的に許可し、`.learnings/`、`.agents/`、`.codex/` などの共有成果物も許可する。\n\n\
+      一方、`graphify-out/`、`tmp/`、`.taqt/runs/`、`.taqt/worktrees/`、`.taqt/config/active.yaml`、依存関係・ビルド生成物、環境変数ファイルは明示的に拒否する。\n\
+      \n## Scope\n\n- やること:\n  - path allowlist 型の `.gitignore` へ変更する\n  - 共有成果物とローカル生成物の許可・拒否境界を明文化する\n\
+      \  - 主要な許可・拒否パスを検証するテストを追加または更新する\n  - ADR 0041 を作成し、判断理由と制約を記録する\n- やらないこと:\n\
+      \  - 既に Git 追跡済みのファイルや履歴の整理\n  - `git add -f` の利用禁止など、Git の強制操作の制御\n  - グローバル\
+      \ Git excludes の変更\n  - `.learnings/`、`.agents/`、`.codex/` の共有運用変更\n\n## AC\n\
+      \n- [ ] `.gitignore` の既定動作が deny-by-default になっている\n- [ ] 既存のソース、テスト、文書、設定、マイグレーションを新規追加できる\n\
+      - [ ] `.learnings/`、`.agents/`、`.codex/` の共有成果物が ignore されない\n- [ ] `graphify-out/`、`tmp/`、`.taqt/runs/`、`.taqt/worktrees/`\
+      \ が ignore される\n- [ ] `.dev.vars`、`.env` 系ファイル、秘密鍵などが ignore される\n- [ ] `git\
+      \ check-ignore -v` で許可・拒否理由を確認できる\n- [ ] 既存の Git 追跡ファイルに意図しない差分が発生しない\n\n##\
+      \ DoD\n\n- [ ] ADR 0041 が `docs/adr/` と一覧に追加されている\n- [ ] `.gitignore` の境界を検証するテストが追加または更新されている\n\
+      - [ ] 変更範囲に対応する CI 検証が成功している\n- [ ] Issue の AC がすべて確認されている\n\n## 補足情報\n\n- 記事:\
+      \ https://packagemain.tech/p/gitignore-everything-by-default\n- 関連 ADR: `docs/adr/0013-worktree-scoped-graphify-update-task.md`\n\
+      - 関連 ADR: `docs/adr/0017-keep-learnings-tracked-as-shared-artifacts.md`\n- `.gitignore`\
+      \ は追跡済みファイルや `git add -f` を制御するセキュリティ境界ではないため、事故防止のための Git 運用ガードとして扱う。\n"
+    labels: *id001

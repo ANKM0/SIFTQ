@@ -1,0 +1,64 @@
+id: ISSUE-293
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 293
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 新規タスク作成時の入力内容を保持
+    body: '## 概要
+
+
+      新規タスク作成画面で title または description を入力後、Status または Area を押下すると画面遷移により入力内容が消える。
+
+
+      ## 再現手順
+
+
+      1. 新規タスク作成画面を開く。
+
+      2. Title と Description を入力する。
+
+      3. Status または Area を押下する。
+
+      4. 入力済みの Title と Description が空になる。
+
+
+      ## 原因(Optional)
+
+
+      Status/Area の操作が通常のリンク遷移で、URL に含まれる選択値だけを基にフォームを再描画している。未送信の入力値は URL やフォーム状態へ引き継がれない。
+
+
+      ## 修正案(Optional)
+
+
+      新規タスク画面の Status/Area 操作をフォーム遷移なしのポップオーバー表示にし、選択時も title と description を保持する。Status/Area
+      の変更値は作成フォームの hidden input に反映する。
+
+
+      ## AC
+
+
+      - title と description を入力後に Status を開閉・変更しても、両方の入力値が保持される。
+
+      - title と description を入力後に Area を開閉・変更しても、両方の入力値が保持される。
+
+      - 変更した status と area でタスクを作成できる。
+
+      - 回帰を防ぐ UI/E2E テストがある。
+
+
+      ## DoD
+
+
+      - 実装とテストが完了している。
+
+      - 変更範囲の検証コマンドが成功している。
+
+      '
+    labels:
+    - taqt:enabled

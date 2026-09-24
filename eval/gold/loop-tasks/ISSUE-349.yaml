@@ -1,9 +1,9 @@
-name: ISSUE-140-01
+name: ISSUE-349
 arms:
   A: .taqt/loops/main_loop.yaml
   B: eval/baselines/loop/main_loop_minimal.yaml
 checks:
 - task -t .config/Taskfile.yml ci:typecheck
 - task -t .config/Taskfile.yml ci:test:unit
-base_commit: 8c508c0c800cf5b1f49ce885f2849cb63170cb4b
+base_commit: 21681a2a86dfe77c91a3171e4541442152c72f5f
 repetitions: 3

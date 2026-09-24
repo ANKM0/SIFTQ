@@ -1,0 +1,68 @@
+id: ISSUE-300
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 300
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 変更後の保存で競合を防止
+    body: '## 概要
+
+
+      タスク詳細画面で Status または Area を変更した後に Save を押下すると、変更前の version を送信して競合扱いとなり、`Task
+      was updated elsewhere.` と `Load latest` が表示される。
+
+
+      ## 再現手順
+
+
+      1. タスク詳細画面を開く。
+
+      2. Status を変更する。
+
+      3. Title または Description を編集して Save を押下する。
+
+      4. `Task was updated elsewhere.` が表示される。
+
+      5. Area の変更後も同様に確認する。
+
+
+      ## 原因(Optional)
+
+
+      Status/Area 更新は task の version を増やすが、詳細フォームの hidden version input は初期表示時の値のまま残る。続く
+      Save が古い version を送信するため楽観ロックが競合になる。
+
+
+      ## 修正案(Optional)
+
+
+      Status/Area 更新の HTMX レスポンスで、詳細フォームの hidden version input も更新する。Status と Area
+      の各変更後に Save できる E2E 回帰テストを追加する。
+
+
+      ## AC
+
+
+      - Status を変更後に Save しても競合表示にならず、編集内容が保存される。
+
+      - Area を変更後に Save しても競合表示にならず、編集内容が保存される。
+
+      - 実際に別の更新が先行した場合は、従来どおり競合表示になる。
+
+      - 回帰を防ぐ UI/E2E テストがある。
+
+
+      ## DoD
+
+
+      - 実装とテストが完了している。
+
+      - 変更範囲の検証コマンドが成功している。
+
+      '
+    labels:
+    - taqt:enabled

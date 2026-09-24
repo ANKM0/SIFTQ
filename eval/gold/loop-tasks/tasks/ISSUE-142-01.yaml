@@ -1,0 +1,54 @@
+id: ISSUE-142-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 142
+  parent_task: ISSUE-142
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'required check 未設定でも taqt merge を進める / slice 01: `gh pr checks --required`
+      が `no required checks reported` で失敗した場合、`gh pr checks` を再実行して成功すれば merge へ進む。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `gh pr checks --required` が `no required checks reported` で失敗した場合、`gh
+      pr checks` を再実行して成功すれば merge へ進む。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `gh pr checks --required` が `no required
+      checks reported` で失敗した場合、`gh pr checks` を再実行して成功すれば merge へ進む。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - bug
+    - taqt:pending
+    - taqt:phase:triage
+  parent_issue:
+    title: required check 未設定でも taqt merge を進める
+    body: "## 概要\n`task taqt:merge` が `gh pr checks --required` をデフォルトで実行するため、branch\
+      \ protection の required check が未設定のリポジトリで merge が止まる。\n通常 checks が成功していて PR\
+      \ が mergeable でも、`no required checks reported` により `taqt:merge` が失敗する。\n\n##\
+      \ 再現手順\n- required check が設定されていないリポジトリで、checks 成功済みの PR を用意する。\n- `task taqt:merge\
+      \ -- <task> --workspace <worktree> --delete-branch --execute` を実行する。\n- `gh\
+      \ pr checks --required` が `no required checks reported` を返し、merge が実行されない。\n\
+      \n## 期待する動作\nrequired check が未設定で `gh pr checks --required` が `no required checks\
+      \ reported` を返した場合は、通常 checks の確認に fallback して merge を継続する。\n\n## 実際の動作\nchecks\
+      \ は成功済みでも `taqt:merge` が終了コード 1 で止まる。\n\n## Scope\n- やること:\n  - `taqt.github_merge`\
+      \ が required check 未設定時に通常 checks へ fallback するようにする。\n  - fallback 挙動の pytest\
+      \ を追加する。\n- やらないこと:\n  - GitHub branch protection 設定を変更する。\n  - `taqt:auto`\
+      \ の CLI オプション体系を変更する。\n\n## AC\n- [ ] `gh pr checks --required` が `no required\
+      \ checks reported` で失敗した場合、`gh pr checks` を再実行して成功すれば merge へ進む。\n- [ ] required\
+      \ check 以外の checks 失敗は従来どおり merge を止める。\n- [ ] `task pytest` が成功する。\n\n## DoD\n\
+      - [ ] issue branch に修正がコミットされている。\n- [ ] PR に検証結果が記録されている。\n"
+    labels: *id001

@@ -1,0 +1,22 @@
+id: ISSUE-265
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 265
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: Status・Area欄を250pxにする
+    body: "## 背景\n\n新規作成画面とタスク詳細画面の Status / Area を表示するサイドパネルが、現在のレイアウトでは 280px 幅になっている。\n\
+      \n## 概要\n\nStatus / Area サイドパネルの列幅を 250px に統一する。\n\n## Scope\n\n- やること:\n  -\
+      \ 新規作成画面とタスク詳細画面で共用する Status / Area サイドパネルの幅を 250px に変更する。\n  - 250px 幅で Status\
+      \ / Area の操作とポップオーバーが表示・操作できることを確認する。\n- やらないこと:\n  - Status / Area の値、操作フロー、ポップオーバーの内容を変更しない。\n\
+      \  - フォーム本体や Matrix 画面のレイアウトを変更しない。\n\n## AC\n\n- [ ] 新規作成画面の Status / Area\
+      \ サイドパネルが 250px 幅で表示される。\n- [ ] タスク詳細画面の Status / Area サイドパネルが 250px 幅で表示される。\n\
+      - [ ] Status / Area の選択操作とポップオーバーの表示を維持する。\n- [ ] 変更範囲の UI テストまたはレイアウト検証が追加・更新される。\n\
+      \n## DoD\n\n- [ ] 実装と変更範囲のテストが完了している。\n- [ ] 関連するテストコマンドが成功する。\n\n## 補足情報\n\n\
+      - 対象は `.detail-grid` の Status / Area サイドパネル列である。\n"
+    labels:
+    - taqt:enabled

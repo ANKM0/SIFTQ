@@ -1,0 +1,52 @@
+id: ISSUE-140-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 140
+  parent_task: ISSUE-140
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Graphify を導入する / slice 01: `.codex/skills/graphify/` に Codex から参照できる Graphify
+      skill が追加されている。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `.codex/skills/graphify/` に Codex から参照できる Graphify skill が追加されている。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `.codex/skills/graphify/` に Codex から参照できる
+      Graphify skill が追加されている。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:pending
+    - taqt:phase:triage
+  parent_issue:
+    title: Graphify を導入する
+    body: "## 背景\nGraphify を Codex から使えるようにし、リポジトリのコード、文書、設計記録を知識 graph として参照できる状態にする。\n\
+      \n## 概要\nGraphify の project-scoped Codex skill をリポジトリに追加し、Graphify 実行時の生成物が通常の\
+      \ git 差分に混ざらないようにする。\n\n## Scope\n- やること:\n  - Graphify の Codex 向け project-scoped\
+      \ skill を追加する。\n  - Graphify 実行で生成される出力ディレクトリを git 管理対象外にする。\n  - 追加した skill\
+      \ の存在とリポジトリ検証が通ることを確認する。\n- やらないこと:\n  - Graphify の graph 生成結果をコミットする。\n  -\
+      \ Graphify MCP、hook、外部DB連携を設定する。\n  - 既存の taqt event schema や exporter を変更する。\n\
+      \n## AC\n- [ ] `.codex/skills/graphify/` に Codex から参照できる Graphify skill が追加されている。\n\
+      - [ ] Graphify の標準出力先 `graphify-out/` が `.gitignore` に追加されている。\n- [ ] Graphify\
+      \ 導入後も `task ci:markdown` と `task pytest` が成功する。\n\n## DoD\n- [ ] taqt task\
+      \ が issue から作成され、実装差分が issue branch にコミットされている。\n- [ ] 変更範囲に対する検証結果が PR または作業報告に記録されている。\n\
+      \n## 補足情報\n- 2026-08-09 時点の Graphify 公式 docs は、PyPI package `graphifyy` をインストールし、CLI\
+      \ command `graphify install --project --platform codex` で project-scoped Codex\
+      \ skill を追加する手順を示している。\n- この issue は Graphify 導入の最小単位とし、taqt event の graph exporter\
+      \ は後続 issue に分ける。\n"
+    labels: *id001

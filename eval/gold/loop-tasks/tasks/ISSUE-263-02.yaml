@@ -1,0 +1,46 @@
+id: ISSUE-263-02
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 263
+  parent_task: ISSUE-263
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Matrixエリア全体から新規作成できるようにする / slice 02: 遷移先の新規作成画面で、対象 area が選択済みとして表示される。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: 遷移先の新規作成画面で、対象 area が選択済みとして表示される。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: 遷移先の新規作成画面で、対象 area が選択済みとして表示される。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: Matrixエリア全体から新規作成できるようにする
+    body: "## 背景\n\nMatrix の各エリアには右上の小さな新規作成リンクだけがあり、エリアの空白部分を押しても新規タスクを作成できない。\n\n\
+      ## 概要\n\nMatrix の各エリア（`#page` 配下の各 `section.area--quadrant`）を押下すると、そのエリアを選択済みとして新規タスク作成画面へ遷移できるようにする。\n\
+      \n## Scope\n\n- やること:\n  - エリア 1〜4 の非インタラクティブ領域を押下すると、対応する `area` をクエリに含む `/tasks/new`\
+      \ へ遷移させる。\n  - 既存のタスクカードおよび新規作成リンクの操作を妨げない。\n  - E2E テストで各エリアからの遷移と選択済み area\
+      \ を確認する。\n  - `docs/requirements/screens.md` と画面遷移図の Mermaid 正本を更新し、SVG を再生成する。\n\
+      - やらないこと:\n  - Matrix のレイアウト、タスク作成フォーム、area の定義を変更しない。\n  - タスクカード押下時の遷移・ドラッグ操作を変更しない。\n\
+      \n## AC\n\n- [ ] Matrix のエリア 1〜4 の空白部分を押下すると、`/tasks/new?area=<対象エリア>` に遷移する。\n\
+      - [ ] 遷移先の新規作成画面で、対象 area が選択済みとして表示される。\n- [ ] 既存の新規作成リンクとタスクカードの操作を維持する。\n\
+      - [ ] Playwright E2E テストが上記の操作を検証する。\n- [ ] 画面仕様と画面遷移図に、Matrix の area 押下による新規作成遷移と\
+      \ area の引き継ぎが記載されている。\n\n## DoD\n\n- [ ] 実装、ドキュメント、変更範囲のテストが完了している。\n- [ ] `pnpm\
+      \ test:e2e` が成功する。\n- [ ] `bun run docs:screen-flow:svg` により画面遷移図 SVG が再生成されている。\n\
+      \n## 補足情報\n\n- 対象は各 Matrix quadrant の `section` 要素全体である。\n"
+    labels: *id001

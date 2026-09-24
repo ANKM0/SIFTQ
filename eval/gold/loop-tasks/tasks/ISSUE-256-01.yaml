@@ -1,0 +1,53 @@
+id: ISSUE-256-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 256
+  parent_task: ISSUE-256
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Codex プロファイル切替タスクを追加 / slice 01: `task codex:codex -- --help` が main/OpenAI
+      プロファイルの `CODEX_HOME` で Codex を起動する。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `task codex:codex -- --help` が main/OpenAI プロファイルの `CODEX_HOME` で
+      Codex を起動する。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `task codex:codex -- --help` が main/OpenAI
+      プロファイルの `CODEX_HOME` で Codex を起動する。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: Codex プロファイル切替タスクを追加
+    body: "## 背景\n\nCodex を main/OpenAI と DeepSeek の 2 プロファイルで使い分けられるようにする。現状はプロファイル切替スクリプト\
+      \ `scripts/switch_codex_profile.py` を都度手動実行する必要がある。\n\n## 概要\n\n`taskfile/core.yml`\
+      \ に以下 2 タスクを追加する。\n\n```yaml\n  codex:codex:\n    desc: Run Codex using the\
+      \ main/OpenAI profile.\n    cmds:\n      - |\n        CODEX_HOME=\"$(uv run\
+      \ python scripts/switch_codex_profile.py path main)\" \\\n          codex {{.CLI_ARGS}}\n\
+      \n  codex:deepseek:\n    desc: Run Codex using the DeepSeek profile.\n    cmds:\n\
+      \      - |\n        CODEX_HOME=\"$(uv run python scripts/switch_codex_profile.py\
+      \ path deepseek)\" \\\n          codex {{.CLI_ARGS}}\n```\n\n## Scope\n\n- やること:\n\
+      \  - `taskfile/core.yml` に `codex:codex` と `codex:deepseek` を追加する。\n- やらないこと:\n\
+      \  - `scripts/switch_codex_profile.py` 自体の変更。\n  - taqt / CI への組み込み。\n\n## AC\n\
+      \n- [ ] `task codex:codex -- --help` が main/OpenAI プロファイルの `CODEX_HOME` で Codex\
+      \ を起動する。\n- [ ] `task codex:deepseek -- --help` が DeepSeek プロファイルの `CODEX_HOME`\
+      \ で Codex を起動する。\n- [ ] `{{.CLI_ARGS}}` が Codex へ追加引数として渡る。\n\n## DoD\n\n- [\
+      \ ] `taskfile/core.yml` に上記 2 タスクが追加されている。\n- [ ] `task --list` に `codex:codex`\
+      \ と `codex:deepseek` が表示される。\n\n## 補足情報\n\nなし。\n"
+    labels: *id001

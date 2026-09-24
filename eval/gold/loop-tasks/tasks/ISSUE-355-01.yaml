@@ -1,0 +1,92 @@
+id: ISSUE-355-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 355
+  parent_task: ISSUE-355
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'Matrixタスクカードのホバー時にカーソルを変更しない / slice 01: Matrix画面でタスクカードにマウスを重ねても、カーソルが白く変化しない。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: Matrix画面でタスクカードにマウスを重ねても、カーソルが白く変化しない。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: Matrix画面でタスクカードにマウスを重ねても、カーソルが白く変化しない。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: Matrixタスクカードのホバー時にカーソルを変更しない
+    body: '## 概要
+
+
+      Matrix画面でタスクカードにマウスを重ねると、カーソルの表示が通常時から変化する。
+
+
+      タスクカード上でもカーソルが白く変化せず、通常の表示を維持するように修正する。
+
+
+      ## 再現手順
+
+
+      1. Matrix画面を開く。
+
+      2. 表示されているタスクカードにマウスを重ねる。
+
+      3. カーソルの表示を確認する。
+
+
+      タスクカードにマウスを重ねたとき、カーソルが白く変化する。
+
+
+      ## 原因(Optional)
+
+
+      `.task-card[draggable="true"]` に `cursor: grab` が指定されているため、タスクカード上でカーソルが通常と異なる表示になる。
+
+
+      ## 修正案(Optional)
+
+
+      Matrixのタスクカードに対するカーソルの明示的な変更を取り除き、ホバー時も通常のカーソル表示を維持する。タスクカードのクリックおよびDnD操作は維持する。
+
+
+      ## AC
+
+
+      - [ ] Matrix画面でタスクカードにマウスを重ねても、カーソルが白く変化しない。
+
+      - [ ] タスクカードのホバー表示が従来どおり動作する。
+
+      - [ ] タスクカードのクリックによる詳細画面への遷移が動作する。
+
+      - [ ] タスクカードのDnD操作が動作する。
+
+      - [ ] デスクトップとモバイルの表示に回帰がない。
+
+
+      ## DoD
+
+
+      - [ ] カーソル表示を修正する。
+
+      - [ ] 関連する表示またはE2Eテストを更新する。
+
+      - [ ] 関連するテストコマンドが成功する。
+
+      '
+    labels: *id001

@@ -1,0 +1,45 @@
+id: ISSUE-334-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 334
+  parent_task: ISSUE-334
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'create画面のstatus/areaダイアログに閉じる手段を追加 / slice 01: statusダイアログ外押下でダイアログが閉じる'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: statusダイアログ外押下でダイアログが閉じる
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: statusダイアログ外押下でダイアログが閉じる
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: create画面のstatus/areaダイアログに閉じる手段を追加
+    body: "## 背景\ncreate画面（`src/components/NewTaskMeta.tsx`）のstatus/areaダイアログは、選択肢押下で閉じる以外の閉じる手段がない。一方detail画面（`src/components/OptionMenu.tsx`＋`src/components/TaskMeta.tsx`）はCancelリンクと外側押下による\
+      \ close（`data-popover-close-href`）を持つため、操作感に差がある。\n\n## 概要\ncreate画面のstatus/areaダイアログに、detailと同等の閉じる手段を追加する。\n\
+      \n## Scope\n- やること:\n  - ダイアログ外押下でダイアログを閉じる\n  - Cancelボタンを追加し、押下でダイアログを閉じる（選択内容は反映しない）\n\
+      \  - status/area選択押下で閉じる動作は維持する\n- やらないこと:\n  - detailとcreateの表示共通化は任意（できれば別issue化も可。本issueでは必須としない）\n\
+      \n## AC\n- [ ] statusダイアログ外押下でダイアログが閉じる\n- [ ] areaダイアログ外押下でダイアログが閉じる\n- [ ]\
+      \ statusダイアログのCancel押下でダイアログが閉じる（選択内容は変更されない）\n- [ ] areaダイアログのCancel押下でダイアログが閉じる（選択内容は変更されない）\n\
+      - [ ] status/area選択押下でダイアログが閉じる（既存動作の維持）\n\n## DoD\n- [ ] 関連テストが更新・追加され成功する\n\
+      - [ ] 手動でcreate画面の各閉じる手段を確認する\n\n## 補足情報\n- 参考実装: detail側 `src/components/OptionMenu.tsx:105-123`（Cancelリンク付きpopover）、`src/components/TaskMeta.tsx:29-33`（`data-popover-close-href`）\n\
+      - 対象: `src/components/NewTaskMeta.tsx:38-63`（`<details>`ベースのpopover、Cancelなし）\n\
+      - optional: detailのstatus/area表示とcreateの表示が重複しているため、共通コンポーネント化を検討する。規模が大きければ後続issueに分割する。"
+    labels: *id001

@@ -1,0 +1,84 @@
+id: ISSUE-264-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 264
+  parent_task: ISSUE-264
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'タスク詳細画面で保存できるようにする / slice 01: `?from=tasks` を付けたタスク詳細画面で Save ボタンを押下できる。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `?from=tasks` を付けたタスク詳細画面で Save ボタンを押下できる。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `?from=tasks` を付けたタスク詳細画面で Save ボタンを押下できる。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - bug
+    - taqt:enabled
+  parent_issue:
+    title: タスク詳細画面で保存できるようにする
+    body: '## 概要
+
+
+      タスク詳細画面で Save ボタンを押下しても、編集内容を保存できない。
+
+
+      対象 URL: `http://127.0.0.1:8787/tasks/preview-task?from=tasks`
+
+
+      ## 再現手順
+
+
+      1. 上記 URL を開く。
+
+      2. タスクのタイトルまたは説明を編集する。
+
+      3. Save を押下する。
+
+
+      ## 原因(Optional)
+
+
+      未調査。詳細画面のフォーム送信、HTMX のイベント処理、プレビュー環境のルーティングを確認する。
+
+
+      ## 修正案(Optional)
+
+
+      Save 操作で編集内容を保存できるようにし、対象 URL を含む回帰テストを追加する。
+
+
+      ## Acceptance Criteria
+
+
+      - `?from=tasks` を付けたタスク詳細画面で Save ボタンを押下できる。
+
+      - タイトルまたは説明の変更が保存後も表示される。
+
+      - 保存後もタスク一覧へ戻る導線が維持される。
+
+
+      ## Definition of Done
+
+
+      - 原因を修正し、回帰テストを追加または更新する。
+
+      - 変更範囲に対する既存の検証を実行する。
+
+      '
+    labels: *id001

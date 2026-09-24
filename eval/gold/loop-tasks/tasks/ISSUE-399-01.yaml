@@ -1,0 +1,56 @@
+id: ISSUE-399-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 399
+  parent_task: ISSUE-399
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: '編集中のtask内容をローカルdraftとして保持する / slice 01: New taskとTask detailでtitle / descriptionの編集内容が入力停止後500msでlocalStorageへ保存される'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: New taskとTask detailでtitle / descriptionの編集内容が入力停止後500msでlocalStorageへ保存される
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: New taskとTask detailでtitle / descriptionの編集内容が入力停止後500msでlocalStorageへ保存される
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: 編集中のtask内容をローカルdraftとして保持する
+    body: "## 背景\n\nNew task / Task detailでtitleやdescriptionを編集中に、誤操作や画面遷移などで入力内容が失われる。ブラウザを再起動した後も未保存内容を復元できるようにする。\n\
+      \n## 概要\n\n編集中のtitle / descriptionをブラウザのlocalStorageへdraftとして自動保存する。draftは最後の編集から24時間保持し、Create\
+      \ / Saveのサーバー保存成功後に削除する。\n\n## Scope\n\n- やること:\n  - New taskとTask detailのtitle\
+      \ / descriptionをdraft保存する\n  - 入力停止後500msで自動保存する\n  - ブラウザ再起動後もdraftを自動復元する\n\
+      \  - 最終編集から24時間経過したdraftを、次回アプリ表示時に削除する\n  - Create / Save成功後、対象draftを削除する\n\
+      \  - Cancelや別画面への移動ではdraftを保持する\n  - status / area変更時はdraftを保持し、成功した最新versionへ更新する\n\
+      \  - サーバー側との競合時はサーバーを正とし、draftを破棄する\n  - task削除成功後、対象taskのdraftを削除する\n  - ログアウト時、現在のブラウザプロファイル内のアプリdraftをすべて削除する\n\
+      \  - 同じtaskを複数タブで編集した場合は、最後に保存されたdraftを採用する\n  - localStorageが使用できない場合も警告せず、通常の入力・送信を継続する\n\
+      \  - 採用方式と判断理由を新規ADRへ記録する\n- やらないこと:\n  - D1へのdraft保存やtaskデータの複製\n  - IndexedDBの導入\n\
+      \  - 複数端末間でのdraft同期\n  - 機密情報向けの暗号化ストレージ\n\n## AC\n\n- [ ] New taskとTask detailでtitle\
+      \ / descriptionの編集内容が入力停止後500msでlocalStorageへ保存される\n- [ ] 保存済みdraftがある場合、画面表示時に確認なしで自動復元される\n\
+      - [ ] draftはブラウザの再起動後も復元される\n- [ ] draftは最後の編集から24時間経過後、次回アプリ表示時に削除される\n- [\
+      \ ] Create / Saveのサーバー保存成功後に対象draftが削除される\n- [ ] 入力エラー、通信失敗、保存競合が発生した場合はdraftが削除されない\n\
+      - [ ] Cancelや別画面への移動ではdraftが削除されない\n- [ ] status / area変更成功後もtitle / descriptionのdraftが保持され、最新versionを基準に保存できる\n\
+      - [ ] サーバー側のversionがdraftの基準versionと異なる場合、サーバー値を表示しdraftを削除する\n- [ ] task削除成功後に対象taskのdraftが削除される\n\
+      - [ ] ログアウト時に現在のブラウザプロファイル内のdraftが削除され、他端末のdraftは削除されない\n- [ ] 同じtaskを複数タブで編集した場合、最後に保存されたdraftが次回表示時に復元される\n\
+      - [ ] localStorageが使用できない場合も、通常の入力・Create・Save操作が可能である\n- [ ] 保存値・復元値は既存仕様どおりプレーンテキストとして扱われる\n\
+      \n## DoD\n\n- [ ] 実装が完了している\n- [ ] draft保存、復元、期限切れ削除、成功時削除、競合時破棄のテストが追加・更新されている\n\
+      - [ ] New task / Task detailのブラウザ再起動相当のE2E確認が完了している\n- [ ] セキュリティと性能の観点を含む新規ADRを作成している\n\
+      - [ ] typecheck、lint、テストが成功している\n- [ ] 関連ドキュメントが更新されている\n\n## 補足情報\n\n- D1はtaskの唯一の正本とし、draftはブラウザ内の一時データとして扱う。\n\
+      - localStorageは同一オリジンのJavaScriptから読み取れるため、通常のtask情報のみを対象とする。パスワードやAPIキー等の機密情報は対象外とする。\n\
+      - localStorageには標準のTTLがないため、ブラウザを閉じている間の即時削除ではなく、次回アプリ表示時に期限を判定する。\n"
+    labels: *id001

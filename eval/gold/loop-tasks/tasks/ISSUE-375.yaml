@@ -1,0 +1,35 @@
+id: ISSUE-375
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 375
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: siftq表記を排除する
+    body: "## 背景\n`siftq` 表記が残ると移行時の改名・置換作業の障害になるため、現状を調査の上で排除する。\n\n現状調査（2026-09-07、対象:\
+      \ tracked + `graphify-out/**`・`.git/**` 除外）:\n- パスに含む（`git ls-files | rg -i\
+      \ siftq`）: 1件\n  - `.codex/rules/siftq.rules`（参照: `taskfile/ci.yml:179`、ADR\
+      \ 0013/0014、`scripts/codex_rule_coverage.py:29`）\n  - `.taqt/worktrees/*/…/siftq.rules`\
+      \ は作業ツリー生成物のため対象外\n  - ファイル名ヒットなし（`rg --files` では検出なし＝gitignore 扱いの可能性あり、要確認）\n\
+      - 内容に含む（`rg -i -l siftq` 30件）:\n  - 設定・識別子: `wrangler.jsonc`（name/database_name\
+      \ `siftq`）、`pyproject.toml`、`package.json`（name）、`src/auth.ts`（`siftq_session`）、`taskfile/ci.yml`（参照＋D1名）、`scripts/ci/glossary.csv`（`SIFTQ,siftq`\
+      \ 禁止ルール自体）、`scripts/create_issue.py`（REPO・`/tmp/siftq-issues`）、`scripts/release_deploy.py`・`create_adr.py`・`codex_rule_coverage.py`、`uv.lock`・`bun.lock`（派生）\n\
+      \  - UI表示: `src/components/Layout.tsx`・`LoginPage.tsx`・`docs/components/index.html`（ブランド\
+      \ `SIFTQ`）、`README.md`（見出し・clone先・tar名・WSL名・D1名 計10件）\n  - 文書: `docs/contributing/deployment.md`（D1名\
+      \ 4件）、`docs/adr/*.md` 13件＋`docs/adr/README.md`（歴史的記述・Issue/PRリンク）\n\n## 概要\n\
+      移行障害になる `siftq` 表記を排除（改名・置換）する。置換先名と ADR 歴史記述の扱いを確定し、参照元を一括更新する。\n\n## Scope\n\
+      - やること:\n  - 置換先名の確定（例: Yoriwake）\n  - tracked パス `.codex/rules/siftq.rules`\
+      \ の改名と参照更新（`taskfile/ci.yml`、scripts、ADR の現行参照）\n  - 設定・識別子の改名（wrangler名・D1名、package名、Cookie名、スクリプト内既定値、glossary）\n\
+      \  - UIブランド・README・deployment.md の表記更新\n  - ADR 歴史記述の扱い確定（改変しない／注記追加／置換のいずれか）\n\
+      - やらないこと:\n  - GitHub リポジトリ名・既存 Release・`siftq-base.tar` 過去資産の改名\n  - `.taqt/worktrees/`・`graphify-out/`\
+      \ 生成物の手修正\n  - D1 実データ・デプロイ済み Worker の移行実行（別 issue）\n\n## AC\n- [ ] `git ls-files\
+      \ | rg -i siftq` が 0件\n- [ ] `rg -i siftq` の残存が Scope で合意した範囲のみ（ADR履歴・過去資産リンク等、残存リスト付き）\n\
+      - [ ] 改名後の最小検証（ビルド・lint・D1 local）が通る\n\n## DoD\n- [ ] `ci:lint:codex-task-perms`\
+      \ 相当を含む CI が通る\n- [ ] glossary・CI の期待値が新名称に更新される\n- [ ] 残存表記の一覧と理由が本 issue に記録される\n\
+      \n## 補足情報\n- 置換先候補: Yoriwake（要確定）\n- 注意: `uv.lock`・`bun.lock` は package 名由来で再生成が必要な可能性あり\n\
+      - 注意: Cookie 名・D1 名・Worker 名の変更は既存環境へ影響するため、移行手順は別 issue に分割する\n"
+    labels:
+    - taqt:enabled

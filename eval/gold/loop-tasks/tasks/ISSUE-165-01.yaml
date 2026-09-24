@@ -1,0 +1,59 @@
+id: ISSUE-165-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 165
+  parent_task: ISSUE-165
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'feat(taqt): loop YAMLでロール別モデルとreasoning effortを指定可能にする / slice 01: YAML
+      の agent と llm step で `model` と `reasoning_effort` を指定できる。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: YAML の agent と llm step で `model` と `reasoning_effort` を指定できる。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: YAML の agent と llm step で `model` と `reasoning_effort`
+      を指定できる。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:pending
+    - taqt:phase:triage
+  parent_issue:
+    title: 'feat(taqt): loop YAMLでロール別モデルとreasoning effortを指定可能にする'
+    body: "## 概要\n\ntaqt の loop YAML から agent / step ごとに Codex のモデルと reasoning effort\
+      \ を指定できるようにする。あわせて、`development_feedback_loop` を Luna 編成の最小対応へ更新する。\n\n## 背景\n\
+      \n現在は `model` を YAML に書けるが、`reasoning_effort` は schema で許可されず、Codex 起動コマンドにも渡されない。そのため、ロール別に\
+      \ Luna (`xhigh`) と Sol (`high`) を使い分けられない。\n\n## 対応内容\n\n- `reasoning_effort`\
+      \ を agent と llm step の YAML 属性として追加する。\n- agent / step / 環境変数 / Codex既定値の優先順で実効値を解決する。\n\
+      \  - `step.reasoning_effort`\n  - `agent.reasoning_effort`\n  - `LOOP_CODEX_REASONING_EFFORT`\n\
+      \  - Codex の既定値\n- Codex adapter が `-c model_reasoning_effort=\"<value>\"` を渡すようにする。\n\
+      - 有効値を `none`, `low`, `medium`, `high`, `xhigh`, `max` に限定し、不正なYAML値は検証時に失敗させる。\n\
+      - `development_feedback_loop.yaml` を次の最小Luna編成に更新する。\n  - design: `gpt-5.6-sol`\
+      \ / `high`\n  - test: `gpt-5.6-luna` / `xhigh`\n  - implement: `gpt-5.6-luna`\
+      \ / `xhigh`\n  - checker: `gpt-5.6-sol` / `high`\n- Codex adapter のコマンド組立・優先順位・不正値をカバーするテストを追加する。\n\
+      \n## AC\n\n- [ ] YAML の agent と llm step で `model` と `reasoning_effort` を指定できる。\n\
+      - [ ] `reasoning_effort` が Codex 実行時の `model_reasoning_effort` config override\
+      \ として渡る。\n- [ ] step 指定が agent 指定より優先される。\n- [ ] agent 指定が `LOOP_CODEX_REASONING_EFFORT`\
+      \ より優先される。\n- [ ] 指定がない場合は既存どおり Codex の既定値を利用する。\n- [ ] 不正な effort 値は loop 定義の検証で拒否される。\n\
+      - [ ] development feedback loop が上記のモデル・effort対応になっている。\n\n## DoD\n\n- [ ] 対象\
+      \ pytest が通る。\n- [ ] `task ci:test` が通る。\n- [ ] 設定例またはコメントで優先順位を確認できる。\n\n##\
+      \ 対象外\n\n- 独立したレビュー反復・補佐ロールの追加。\n- TAQT 記事の構成を完全再現するための workflow 再設計。\n\n##\
+      \ 参考\n\n- Luna編成の参考記事: https://zenn.dev/nrs/articles/b920540a64e1a1\n- OpenAI\
+      \ Docs — GPT-5.6 model guidance: https://developers.openai.com/api/docs/guides/latest-model\n\
+      - 現行 loop: `.taqt/loops/development_feedback_loop.yaml`\n- 現行 Codex adapter:\
+      \ `.taqt/scripts/loop/llm.py`\n"
+    labels: *id001

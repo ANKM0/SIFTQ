@@ -1,0 +1,63 @@
+id: ISSUE-172-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 172
+  parent_task: ISSUE-172
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'ADR 0009 に沿って React SPA を Hono JSX / HTMX / SortableJS へ移行する / slice 01:
+      Cloudflare Worker 上の Hono JSX が初期画面を返し、React の client-side root を必要としない。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: Cloudflare Worker 上の Hono JSX が初期画面を返し、React の client-side root を必要としない。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: Cloudflare Worker 上の Hono JSX が初期画面を返し、React
+      の client-side root を必要としない。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: ADR 0009 に沿って React SPA を Hono JSX / HTMX / SortableJS へ移行する
+    body: "## 背景\n\n現在の MVP は React / Vite / dnd-kit と browser storage を使う SPA であり、README、依存関係、実装がこの構成を前提にしている。一方、[ADR\
+      \ 0009](docs/adr/0009-adopt-hono-htmx-html-driven-ui.md) は Hono JSX、HTMX、SortableJS\
+      \ を採用し、React と dnd-kit を初期採用しないと決定している。現行実装を ADR 0009 と [ADR 0007](docs/adr/0007-adopt-cloudflare-d1-as-system-of-record.md)・[ADR\
+      \ 0008](docs/adr/0008-adopt-version-optimistic-locking.md) に整合させる。\n\n## 概要\n\
+      \nReact / Vite SPA を、Cloudflare Worker 上の Hono JSX が HTML を生成する UI へ移行する。通常操作は\
+      \ HTMX の部分更新、ドラッグ&ドロップは SortableJS に限定し、確定操作を Hono API 経由で D1 に永続化する。\n\n##\
+      \ Scope\n\n- やること:\n  - Cloudflare Worker と Hono JSX のアプリケーション入口、HTML layout、route\
+      \ を実装する。\n  - Matrix、task 作成・編集、status / area 更新、一覧・詳細の画面を Hono JSX と HTMX の部分更新で実装する。\n\
+      \  - SortableJS で matrix 内・matrix 間の DnD を即時反映し、ドロップ確定時に Hono endpoint へ更新を送る。\n\
+      \  - D1 を task の唯一の正本として接続し、更新には ADR 0008 の version 楽観ロックを適用する。\n  - React、React\
+      \ DOM、dnd-kit、React 向け Vite 設定・テストを削除し、Hono/HTMX/SortableJS と Worker 向け構成へ置き換える。\n\
+      \  - README、開発・検証手順、アーキテクチャ文書を現行構成へ更新する。\n  - route、D1 repository、競合応答、HTMX\
+      \ 部分更新、DnD 永続化をテストする。\n- やらないこと:\n  - 認証、課金、オフライン同期、複数人共同編集を実装すること。\n  - run\
+      \ artifact や taqt の実行設計を変更すること。\n  - ADR 0009 の決定を変更すること。\n\n## AC\n\n- [ ]\
+      \ Cloudflare Worker 上の Hono JSX が初期画面を返し、React の client-side root を必要としない。\n\
+      - [ ] Matrix、task 作成・編集、status / area の変更、一覧・詳細が HTMX による部分更新で操作できる。\n- [ ]\
+      \ SortableJS により matrix 内・matrix 間の DnD ができ、ドロップ確定時の更新は Hono endpoint を経由する。\n\
+      - [ ] task の読書きは Worker 経由で D1 に保存され、更新競合は version により `409 Conflict` として扱われる。\n\
+      - [ ] React、React DOM、dnd-kit、React 向け Vite plugin と関連ソース・テストが production dependency\
+      \ および実行経路から除去されている。\n- [ ] README と開発・検証手順が Hono / HTMX / SortableJS / Worker\
+      \ の構成を示し、React SPA と説明しない。\n- [ ] ADR 0009、ADR 0007、ADR 0008 と実装・文書が矛盾しない。\n\
+      \n## DoD\n\n- [ ] Hono route、D1 repository、楽観ロック競合、HTMX fragment、DnD 更新のテストを追加・更新する。\n\
+      - [ ] typecheck、lint、unit / integration test、build、Markdown CI が通る。\n- [ ] Worker\
+      \ 環境で Matrix の作成・更新・DnD・競合表示を確認する E2E または同等の統合検証を実行する。\n- [ ] `git diff` で既存の未コミット変更を変更・削除していないことを確認する。\n\
+      \n## 補足情報\n\n- React / dnd-kit を再採用する判断が必要になった場合は、実装を進めず ADR 0009 を supersede\
+      \ する新 ADR を先に作成する。\n- 参照: ADR 0007、ADR 0008、ADR 0009、ADR 0004（Superseded）。"
+    labels: *id001

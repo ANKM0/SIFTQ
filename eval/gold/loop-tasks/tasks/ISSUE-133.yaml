@@ -1,0 +1,37 @@
+id: ISSUE-133
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 133
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: taqtベースのループエンジニアリング実装と整理
+    body: "## 背景\n\nループエンジニアリングの実装方針を、CoDD / sympohy 前提から taqt 中心の Issue feedback\
+      \ loop に整理する。\nGitHub Issue を管理単位にし、YAML で定義した loop を runner が実行し、agent 呼び出し、検証、観測、判断、再試行、停止を管理する。\n\
+      \n## 概要\n\nこの issue では、現在の差分として進めている以下を追跡する。\n\n- CoDD を廃止する。\n- sympohy 前提の\
+      \ automation / docs / skills を削除または taqt 前提に修正する。\n- taqt を workflow の中心に置き、GitHub\
+      \ 監視や同期は script adapter として扱う。\n- ループエンジニアリング方針を `docs/loop-engineering.md`\
+      \ に整理する。\n- `.taqt/` 配下に loop 定義、runner、task 管理、GitHub/Git adapter、pytest を実装する。\n\
+      - Taskfile から taqt の主要操作を呼び出せるようにする。\n- TS / Puppeteer / Vitest などの設定を整理する。\n\
+      - issue 作成 skill を、デフォルトでは taqt 対象化せず、明示依頼または label 付与時のみ taqt 対象にする方針へ更新する。\n\
+      \n## Scope\n\n- やること:\n  - フローと agent の役割・責務を markdown に整理する。\n  - 設計書の扱いを整理する。\n\
+      \  - コード / テスト / 設計書の関係を graph として扱う方針を検討する。\n  - artgraph-spec-code-drift の考え方を参考に、仕様・実装・テストの\
+      \ drift を検出可能にする方向性を残す。\n  - CoDD / sympohy 前提を削除または taqt 前提へ置き換える。\n  - taqt\
+      \ の基本実装を完了する。\n  - skills を taqt 前提へ整理する。\n  - commit / push / PR 作成の taqt script\
+      \ も commit 規約に従うように整理する。\n- やらないこと:\n  - taqt 自動実行 label を新規 issue にデフォルト付与すること。\n\
+      \  - full architecture の最終決定。\n  - loop engineering 実装言語の最終決定。\n\n## AC\n\n\
+      - [ ] CoDD 関連の active config / docs / CI 参照が削除されている。\n- [ ] sympohy 前提の active\
+      \ config / docs / skills / scripts が削除または taqt 前提に修正されている。\n- [ ] taqt loop\
+      \ 定義と runner が `.taqt/` 配下に実装されている。\n- [ ] Issue 単位の taqt task 作成・実行・sync・worktree・commit・push・PR\
+      \ の script entrypoint がある。\n- [ ] Taskfile から taqt の主要コマンドを呼び出せる。\n- [ ] `docs/loop-engineering.md`\
+      \ に lifespan と実装方針が記載されている。\n- [ ] issue 作成 skill は、明示依頼または taqt label 付与時だけ\
+      \ taqt 対象にする方針になっている。\n- [ ] Markdown / lint / pytest の最小検証が通る。\n\n## DoD\n\n\
+      - [ ] 変更が issue に紐づく branch に commit されている。\n- [ ] PR が作成されている。\n- [ ] PR body\
+      \ に変更概要、未実施項目、検証結果が記載されている。\n- [ ] 今後の検討事項として architecture と使用技術の論点が残っている。\n\
+      \n## 補足情報\n\n- 参考: https://zenn.dev/mrmtsntr/articles/artgraph-spec-code-drift\n\
+      - taqt automation labels are not added by default. This issue is for manual\
+      \ tracking of the current implementation branch.\n"
+    labels: []

@@ -1,0 +1,71 @@
+id: ISSUE-174-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 174
+  parent_task: ISSUE-174
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'worktree ごとに Codex と graphify を分離する / slice 01: `task graphify:update`
+      は実行対象 worktree の root を対象に graphify を更新し、runtime が利用不能な場合は導入方法を含む明確なエラーを返す。'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: `task graphify:update` は実行対象 worktree の root を対象に graphify を更新し、runtime
+      が利用不能な場合は導入方法を含む明確なエラーを返す。
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: `task graphify:update` は実行対象 worktree の
+      root を対象に graphify を更新し、runtime が利用不能な場合は導入方法を含む明確なエラーを返す。
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - taqt:enabled
+  parent_issue:
+    title: worktree ごとに Codex と graphify を分離する
+    body: "## 背景\n\nGit worktree はコードを分離するが、Codex の既定設定は `~/.codex/config.toml` を共有する。`/model`\
+      \ による変更が他の worktree へ波及しないよう、worktree ごとに Codex 設定を分離したい。\n\ngraphify の出力は worktree\
+      \ ごとに生成するローカル成果物であり、Git 管理しない。main の更新後には最新コードに対して graphify を更新する必要がある。\n\n\
+      ## 概要\n\nrepository script と Taskfile を正本として、worktree ごとの Codex 起動、graphify\
+      \ 更新、main pull 後の graphify 更新を提供する。Yoriwake の shell 補助では `git pull` を `task\
+      \ repo:pull-main` に振り分け、素の Git は `command git pull` で実行する。\n\n## Scope\n\n-\
+      \ やること:\n  - worktree ごとの `CODEX_HOME` と model / reasoning effort の解決規則を定め、Codex\
+      \ 起動 Task を提供する。\n  - `graphify:update` を提供し、各 worktree の `graphify-out/` を更新する。\n\
+      \  - `repo:pull-main` を提供し、main・clean worktree・fast-forward only を検証して pull\
+      \ し、HEAD 更新時だけ `graphify:update` を実行する。\n  - Yoriwake の worktree 内でのみ `git pull`\
+      \ を `repo:pull-main` に振り分ける shell function と導入手順を提供する。\n  - `command git pull\
+      \ [args...]` が素の Git を実行することを文書化する。\n  - `.learnings/*.md` は追跡済みの共有成果物として維持し、`graphify-out/`\
+      \ は ignore を維持する。\n  - ADR 0001 と ADR 0011 に整合する ADR / 運用文書を追加または更新する。\n- やらないこと:\n\
+      \  - Docker / devcontainer の導入。\n  - `graphify-out/` の PR への追加、graph JSON のマージ。\n\
+      \  - Git の全コマンドを置き換える wrapper。\n  - 任意の Git repository に影響するグローバルな `git pull`\
+      \ の置き換え。\n\n## AC\n\n- [ ] `task graphify:update` は実行対象 worktree の root を対象に\
+      \ graphify を更新し、runtime が利用不能な場合は導入方法を含む明確なエラーを返す。\n- [ ] `task repo:pull-main`\
+      \ は main 以外または dirty worktree では pull せず失敗する。\n- [ ] `task repo:pull-main` は\
+      \ `git pull --ff-only` に成功し HEAD が更新された場合だけ graphify 更新を実行する。pull 後の graphify\
+      \ 更新失敗は、pull を巻き戻さず非0終了で通知する。\n- [ ] `task repo:pull-main` は HEAD に変更がない場合、graphify\
+      \ 更新を実行しない。\n- [ ] main と各 taqt worktree に安定した別々の `CODEX_HOME` を割り当て、各 Codex\
+      \ 起動 Task は対応する設定を使う。\n- [ ] shell function は Yoriwake の Git worktree 内でのみ `git\
+      \ pull` を `task repo:pull-main` へ振り分ける。\n- [ ] `command git pull` は wrapper\
+      \ を迂回して素の Git を実行し、`git commit`、`git status`、`git push`、`git switch`、`git fetch`\
+      \ の挙動を変更しない。\n- [ ] `.learnings/LEARNINGS.md`、`ERRORS.md`、`FEATURE_REQUESTS.md`\
+      \ は PR でレビュー・マージ可能な追跡対象のままである。\n- [ ] `graphify-out/` は引き続き Git の追跡対象外である。\n\
+      \n## DoD\n\n- [ ] repository script と Taskfile task を実装し、正常系と主要な失敗分岐の自動テストを追加する。\n\
+      - [ ] shell function の導入・解除・素の `command git pull` の利用手順を文書化する。\n- [ ] Codex\
+      \ 設定の worktree ごとの保存先、model / reasoning effort の優先順位、認証設定の扱いを文書化する。\n- [ ] ADR\
+      \ 0001 / ADR 0011 との整合を ADR または運用文書で記録する。\n- [ ] `task` に定義された最小の関連検証を実行し、結果を\
+      \ PR に記載する。\n\n## 補足情報\n\n- `git pull` の置き換えは shell function のみで行う。Git alias\
+      \ は組み込みの `pull` を置き換えられない。\n- `-o` は Git 自身のオプションと衝突するため escape hatch に使わない。\n\
+      - repository script が再現可能な操作を担い、Skill は実行判断・orchestration を担う（ADR 0001）。reasoning\
+      \ effort は指定時だけ Codex 起動設定へ渡す（ADR 0011）。\n"
+    labels: *id001

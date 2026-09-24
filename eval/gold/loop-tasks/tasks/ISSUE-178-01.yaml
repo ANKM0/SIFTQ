@@ -1,0 +1,57 @@
+id: ISSUE-178-01
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 178
+  parent_task: ISSUE-178
+status: pending
+phase: spec
+priority: high
+input:
+  issue:
+    title: 'DeepSeek taqt loop の推論コストを削減 / slice 01: DeepSeek loop の slice タスク実行で
+      `decompose` / `orchestrate` / `judge` を呼ばない'
+    body: '## Slice
+
+      - Source section: AC
+
+      - Target: DeepSeek loop の slice タスク実行で `decompose` / `orchestrate` / `judge`
+      を呼ばない
+
+
+      ## AC
+
+      - Complete only this 5-minute slice: DeepSeek loop の slice タスク実行で `decompose`
+      / `orchestrate` / `judge` を呼ばない
+
+
+      ## DoD
+
+      - The slice result is implemented or explicitly reported as blocked.
+
+      - The smallest meaningful validation for this slice is run or recorded.'
+    labels: &id001
+    - enhancement
+    - taqt:enabled
+  parent_issue:
+    title: DeepSeek taqt loop の推論コストを削減
+    body: "## 背景\n\n`ISSUE-175-04` を DeepSeek profile で実行したところ、LLM token が合計約 370,000、約\
+      \ 2 ドルを消費した。\n\n| step | model | tokens |\n|---|---:|---:|\n| design | deepseek-v4-pro\
+      \ | 73,107 |\n| decompose | deepseek-v4-pro | 80,985 |\n| orchestrate | deepseek-v4-pro\
+      \ | 55,708 |\n| test | deepseek-v4-flash | 46,010 |\n| implement | deepseek-v4-flash\
+      \ | 54,358 |\n| checker | deepseek-v4-pro | 35,347 |\n| judge | deepseek-v4-pro\
+      \ | 24,486 |\n\n- pro が全体の 72.9%\n- decompose + orchestrate だけで 36.9%\n- judge\
+      \ を加えると 43.6%\n\n現状、DeepSeek loop は全 LLM step が `reasoning_effort: high` であり、slice\
+      \ タスクで不要な計画・編成・最終判定 step が重なっている。\n\n## 概要\n\nDeepSeek loop の不要な LLM step を削除または統合し、role\
+      \ ごとの model と reasoning effort を調整してコストを削減する。\n\n## Scope\n\n- やること:\n  - slice\
+      \ タスクで `decompose` / `orchestrate` を外す\n  - `judge` を `checker` に統合する\n  - role\
+      \ ごとの `reasoning_effort` を `high` から `medium` / `low` へ変更する\n  - loop 定義と関連テストを更新する\n\
+      - やらないこと:\n  - main / OpenAI loop の変更\n  - Codex から DeepSeek への自動切替\n  - API\
+      \ キー・課金管理の変更\n\n## AC\n\n- [ ] DeepSeek loop の slice タスク実行で `decompose` / `orchestrate`\
+      \ / `judge` を呼ばない\n- [ ] `design` と `checker` が `deepseek-v4-pro` / `medium`\
+      \ になる\n- [ ] `test` / `implement` / `fix` が `deepseek-v4-flash` / `low` または\
+      \ `medium` になる\n- [ ] `observe` / `decide` がモデル不使用のままである\n- [ ] loop 変更に合わせて関連テストが更新されている\n\
+      \n## DoD\n\n- [ ] `.taqt/tests` が全て通過する\n- [ ] `task ci:markdown` / `task ci:lint:task-refs`\
+      \ / `task ci:lint:codex-task-perms` が通過する\n- [ ] 同じ slice タスクの token 数とコストが改善案適用前より削減されている\n\
+      \n## 補足情報\n\n- 参考 run: `.taqt/runs/ISSUE-175-04/20260822T115910Z`\n"
+    labels: *id001
