@@ -20,6 +20,36 @@ Entry format: see the self-improvement skill's "Error Entry" section. IDs use `E
 
 ---
 
+## [ERR-20260924-001] taqt_e2e_persistent_d1_between_retries
+
+**Logged**: 2026-09-24T19:08:00+09:00
+**Priority**: medium
+**Status**: pending
+**Area**: taqt
+
+### Summary
+taqt の verification retry 間でローカル D1 の E2E データが蓄積し、変更と無関係な一覧テストが失敗した。
+
+### Error
+```
+Task was not found in the do task list
+```
+
+### Context
+- Issue #517 の slice 04 と 05 で `task -t .config/Taskfile.yml ci:test:e2e` を繰り返すと再現した。
+- 対象の Ideas E2E 6件は成功したが、蓄積データによって Task 一覧のページングを使う既存テストが失敗し、slice 05 は max iterations に到達した。
+- `tmp/wrangler/state/v3/d1` を退避して fresh DB で実行すると全 E2E 69件が成功した。
+
+### Suggested Fix
+taqt の E2E verification ごとに専用の D1 persist path を使うか、開始前にテスト DB を初期化する。
+
+### Metadata
+- Reproducible: yes
+- Related Files: .taqt/scripts/loop/verification.py, .config/playwright.config.ts, .config/taskfile/ci.yml
+- See Also: ERR-20260906-002
+
+---
+
 ## [ERR-20260904-002] taqt_opencode_recursive_schema
 
 **Logged**: 2026-09-04T22:00:00+09:00

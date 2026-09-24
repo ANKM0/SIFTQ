@@ -281,3 +281,30 @@ slice の PR を開く前またはマージ前に、worktree で `task ci`（ま
 - Last-Seen: 2026-08-23
 
 ---
+
+## [LRN-20260924-001] best_practice
+
+**Logged**: 2026-09-24T09:40:00+00:00
+**Priority**: high
+**Status**: pending
+**Area**: taqt
+
+### Summary
+ローカルの taqt verification は `task ci:test:e2e` を実行し、Playwright は非 CI では `reuseExistingServer: true` のため、port 4173 が他プロセスに占有されていると既存サーバーを再利用して全 E2E が 404 になる。
+
+### Details
+ISSUE-515 の taqt run で、port 4173 を無関係な `python3 -m http.server`（docs/requirements/assets/domain-model 配信）が使用していた。Playwright はそれを再利用し、`/login` が 404 のため全 spec が `getByLabel("Password")` でタイムアウト。verification が `verification_fix` を返し続け、修正不要なのに max_iterations(12) を消費して failed になった。E2E_PORT=4273 を指定して再実行すると verification は pass し、checker も approve した。
+
+### Suggested Action
+ローカルで taqt を実行する前に空きポートを確認し、占有があれば `E2E_PORT=<free>` を付けて `taqt:run`/`taqt:resume` を実行する。恒久対応は Playwright の webServer を `reuseExistingServer: false` にするか、taqt verification で E2E_PORT を空きポートへ自動割当すること。
+
+### Metadata
+- Source: error
+- Related Files: .config/playwright.config.ts, .taqt/scripts/loop/verification.py
+- Tags: taqt, e2e, playwright, port-conflict, max-iterations
+- Pattern-Key: taqt.e2e_port_conflict
+- Recurrence-Count: 1
+- First-Seen: 2026-09-24
+- Last-Seen: 2026-09-24
+
+---

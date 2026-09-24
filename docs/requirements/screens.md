@@ -116,6 +116,7 @@
 
 ## 画面遷移
 
+共通ナビゲーションは左から `Ideas`、`Matrix`、`Tasks` の順に表示する。一覧、詳細、モバイル表示で同じ順序とする。
 画面遷移は `domain-model.json` の `navigation` を正本とする。`task docs:domain:svg` で図（`nav.svg`）を生成する。
 
 ## モック BE プレビュー

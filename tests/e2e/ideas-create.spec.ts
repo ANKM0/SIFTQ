@@ -55,6 +55,59 @@ test("creates an idea when the composer modal closes", async ({ page }) => {
   await expect(page.locator(".idea-card").filter({ hasText: "無題" })).toHaveCount(1);
 });
 
+test("creates an idea with Ctrl+Enter from the composer", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await page.goto("/ideas");
+
+  const title = `E2E ctrl+enter ${Date.now()}`;
+  const description = "created via ctrl+enter";
+  await page.locator(".ideas-composer__trigger").click();
+  await page.locator('.ideas-composer input[name="title"]').fill(title);
+  await page.locator('.ideas-composer textarea[name="description"]').fill(description);
+  await page.locator('.ideas-composer textarea[name="description"]').press("Control+Enter");
+
+  const created = page.locator(".idea-card").filter({ hasText: title });
+  await expect(created).toHaveCount(1);
+  await expect(created.locator(".idea-card__description")).toHaveText(description);
+  await expect(page.locator(".ideas-composer")).toHaveAttribute("data-idea-composer-open", "false");
+  await expect(page.locator('.ideas-composer input[name="title"]')).toHaveValue("");
+  await expect(page.locator('.ideas-composer textarea[name="description"]')).toHaveValue("");
+});
+
+test("does not create an idea on plain Enter in the memo field", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await page.goto("/ideas");
+
+  await page.locator(".ideas-composer__trigger").click();
+  const description = page.locator('.ideas-composer textarea[name="description"]');
+  await description.fill("line1");
+  await description.press("Enter");
+  await description.press("l");
+  await description.press("i");
+  await description.press("n");
+  await description.press("e");
+  await description.press("2");
+
+  await expect(description).toHaveValue("line1\nline2");
+  await expect(page.locator(".idea-card")).toHaveCount(0);
+  await expect(page.locator(".ideas-composer")).toHaveAttribute("data-idea-composer-open", "true");
+});
+
+test("does not create an idea with Ctrl+Enter when input is empty", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await page.goto("/ideas");
+
+  await page.locator(".ideas-composer__trigger").click();
+  await expect(page.locator('.ideas-composer input[name="title"]')).toHaveValue("");
+  await expect(page.locator('.ideas-composer textarea[name="description"]')).toHaveValue("");
+  await page.locator('.ideas-composer input[name="title"]').press("Control+Enter");
+
+  await expect(page.locator(".idea-card")).toHaveCount(0);
+});
+
 test("deletes an idea through the action menu and confirmation", async ({ page }) => {
   await signIn(page);
   await clearIdeas(page);
@@ -78,6 +131,21 @@ test("deletes an idea through the action menu and confirmation", async ({ page }
 
   await page.reload();
   expect(await page.locator(".idea-card").count()).toBe(initialCount - 1);
+});
+
+test("closes the idea detail modal with the close button", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await createIdea(page, "詳細モーダル");
+  await page.goto("/ideas");
+
+  const card = page.locator(".idea-card").first();
+  await card.locator("h2").click();
+  const modal = page.locator("[data-idea-modal]");
+  await expect(modal).toBeVisible();
+
+  await modal.getByRole("button", { name: "閉じる" }).click();
+  await expect(modal).toBeHidden();
 });
 
 test("persists idea pinning and same-group reorder", async ({ page }) => {
