@@ -29,14 +29,14 @@ describe("Matrix page", () => {
   it("renders the full page and an HTMX fragment", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
-    const full = await request("/");
+    const full = await request("/matrix");
     const fullBody = await full.text();
     expect(full.status).toBe(200);
     expect(fullBody).toContain("<html");
     expect(fullBody).toContain("Matrix");
     expect(fullBody).toContain('data-task-id="task-1"');
 
-    const fragment = await request("/", {
+    const fragment = await request("/matrix", {
       headers: { "HX-Request": "true" },
     });
     const fragmentBody = await fragment.text();
@@ -48,7 +48,7 @@ describe("Matrix page", () => {
   it("renders four quadrants with area creation links and compact status cards", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
-    const body = await (await request("/")).text();
+    const body = await (await request("/matrix")).text();
 
     expect(body).toContain('class="area area--quadrant area--q1"');
     expect(body).toContain('class="area area--quadrant area--q4"');
@@ -321,7 +321,7 @@ describe("Task creation", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(response.headers.get("hx-redirect")).toBe("/");
+    expect(response.headers.get("hx-redirect")).toBe("/matrix");
 
     const listed = await repo.list();
     if (!listed.ok) throw new Error("expected task list");
@@ -371,7 +371,7 @@ describe("Task creation origin tracking", () => {
   it("renders cancel returning to the matrix from a matrix origin", async () => {
     const body = await (await request("/tasks/new?from=matrix&area=2&status=do")).text();
 
-    expect(body).toContain('href="/"');
+    expect(body).toContain('href="/matrix"');
     expect(body).toContain("New task");
     expect(body).toContain("Cancel");
   });
@@ -391,7 +391,7 @@ describe("Task creation origin tracking", () => {
   it("renders area creation links from the matrix with the matrix origin", async () => {
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
-    const body = await (await request("/")).text();
+    const body = await (await request("/matrix")).text();
 
     expect(body).toContain('href="/tasks/new?area=1&amp;from=matrix"');
     expect(body).toContain('href="/tasks/new?area=2&amp;from=matrix"');
@@ -474,7 +474,7 @@ describe("Task detail Save form", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("hx-redirect")).toBe("/");
+    expect(response.headers.get("hx-redirect")).toBe("/matrix");
   });
 });
 
@@ -487,7 +487,7 @@ describe("Task detail and metadata menus", () => {
     expect(await detail.text()).toContain("seed task");
 
     const matrixDetail = await request("/tasks/task-1?from=matrix");
-    expect(await matrixDetail.text()).toContain('href="/"');
+    expect(await matrixDetail.text()).toContain('href="/matrix"');
 
     const statusMenu = await request("/tasks/task-1/status/menu");
     const statusBody = await statusMenu.text();

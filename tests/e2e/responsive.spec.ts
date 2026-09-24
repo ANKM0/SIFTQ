@@ -18,7 +18,7 @@ test("keeps Matrix and task forms usable at the responsive widths", async ({ pag
 
   for (const width of [320, 360, 390, 412]) {
     await page.setViewportSize({ width, height: 960 });
-    await page.goto("/");
+    await page.goto("/matrix");
     await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect.poll(() => page.locator(".matrix").evaluate((element) =>

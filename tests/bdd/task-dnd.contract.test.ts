@@ -8,7 +8,7 @@ describe("Matrix drag and drop", () => {
     const repo = createMemoryTaskRepository();
     await repo.insert(taskFixture({ id: "task-1", status: "do", area: 1 }));
 
-    const response = await authenticatedRequest("/", repo);
+    const response = await authenticatedRequest("/matrix", repo);
     const body = await response.text();
 
     expect(response.status).toBe(200);

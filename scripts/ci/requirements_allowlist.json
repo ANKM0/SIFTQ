@@ -93,5 +93,45 @@
     "path": "src/views/navigation.tsx",
     "reason": "既存viewから抽出したnavigationで、既存UI契約テストが検証するため。",
     "removal": "ファイル単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/client/idea-scripts.ts",
+    "reason": "Ideasのブラウザ操作はIdea E2Eが実際の画面挙動を検証するため。",
+    "removal": "ブラウザスクリプト単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/preview/MemoryIdeaRepository.ts",
+    "reason": "preview用repositoryはIdea API契約テストとpreview E2Eが検証するため。",
+    "removal": "repository単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/preview/ideas.ts",
+    "reason": "preview固定データはpreview画面契約テストが検証するため。",
+    "removal": "previewデータ単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/repository/d1-idea-repository.ts",
+    "reason": "D1 repositoryはIdea API契約テストとローカルD1 E2Eが検証するため。",
+    "removal": "D1 repository単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/repository/idea-repository.ts",
+    "reason": "repository interfaceはmemory/D1実装とIdea API契約テストが利用するため。",
+    "removal": "interface単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/IdeaDetailPage.tsx",
+    "reason": "Idea detail viewはIdea E2Eとpreview画面契約テストが検証するため。",
+    "removal": "view単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/IdeasPage.tsx",
+    "reason": "Ideas list viewはIdea E2Eとpreview画面契約テストが検証するため。",
+    "removal": "view単位のテストを追加したとき。"
+  },
+  {
+    "path": "src/views/IdeaDetailFields.tsx",
+    "reason": "Idea detail fieldsはIdeas/detail両viewとIdea E2Eが検証するため。",
+    "removal": "view部品単位のテストを追加したとき。"
   }
 ]

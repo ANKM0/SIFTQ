@@ -34,6 +34,8 @@ export async function installHtmxRoute(target: Page | BrowserContext): Promise<v
   await target.route(HTMX_URL, (route) => route.fulfill({ contentType: "application/javascript", body: source }));
 }
 
+export const e2eBaseUrl = `http://127.0.0.1:${process.env["E2E_PORT"] ?? "4173"}`;
+
 export const test = base.extend({
   context: async ({ context }, use) => {
     await installHtmxRoute(context);

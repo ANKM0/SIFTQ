@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, installHtmxRoute, test } from "./fixtures";
+import { e2eBaseUrl, expect, installHtmxRoute, test } from "./fixtures";
 
 const password = atob("dGVzdC1wYXNzd29yZA==");
 
@@ -9,7 +9,8 @@ async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/ideas$/);
+  await page.goto("/matrix");
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 }
@@ -150,7 +151,7 @@ test("navigates to a new task from a matrix quadrant blank area", async ({ page 
     await expect(page).toHaveURL(new RegExp(`/tasks/new\\?area=${area}&from=matrix`));
     await expect(page.locator("#new-task-meta .area-badge")).toHaveText(String(area));
 
-    if (area < 4) await page.goto("/");
+    if (area < 4) await page.goto("/matrix");
   }
 });
 
@@ -162,7 +163,7 @@ test("keeps the page interactive after dragging and dropping a matrix card", asy
   const secondTitle = `E2E dnd second ${suffix}`;
   await createMatrixTask(page, firstTitle);
   await createMatrixTask(page, secondTitle);
-  await page.goto("/");
+  await page.goto("/matrix");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   const firstCard = page.locator(".task-card", { hasText: firstTitle });
@@ -193,7 +194,7 @@ test("moves a matrix card between quadrants with a pointer drag", async ({ page 
 
   const title = `E2E cross quadrant ${Date.now()}`;
   await createMatrixTask(page, title);
-  await page.goto("/");
+  await page.goto("/matrix");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   const card = page.locator(".task-card", { hasText: title });
@@ -213,7 +214,7 @@ test("shows a drag ghost and insertion placeholder during a pointer drag", async
 
   const title = `E2E drag feedback ${Date.now()}`;
   await createMatrixTask(page, title);
-  await page.goto("/");
+  await page.goto("/matrix");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   const card = page.locator(".task-card", { hasText: title });
@@ -252,7 +253,7 @@ test("clears the drag ghost and placeholder when the pointer is cancelled", asyn
 
   const title = `E2E drag cancel ${Date.now()}`;
   await createMatrixTask(page, title);
-  await page.goto("/");
+  await page.goto("/matrix");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
   await page.evaluate(() => {
@@ -313,30 +314,30 @@ test("navigates to New task from matrix padding and gap bands", async ({ page })
   // Top padding band belongs to the top quadrants.
   await clickAxisPoint(0.25, 0.02);
   await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
 
   // Bottom padding band belongs to the bottom quadrants.
   await clickAxisPoint(0.75, 0.98);
   await expect(page).toHaveURL(/\/tasks\/new\?area=4&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
 
   // Vertical gap band: left of the center line is area 1, right is area 2.
   const topGap = await axisPoint(0.5, 0.25);
   await page.mouse.click(topGap.x - 10, topGap.y);
   await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
   await page.mouse.click(topGap.x + 10, topGap.y);
   await expect(page).toHaveURL(/\/tasks\/new\?area=2&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
 
   // Horizontal gap band: above the center line is area 1, below is area 3.
   const leftGap = await axisPoint(0.25, 0.5);
   await page.mouse.click(leftGap.x, leftGap.y - 10);
   await expect(page).toHaveURL(/\/tasks\/new\?area=1&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
   await page.mouse.click(leftGap.x, leftGap.y + 10);
   await expect(page).toHaveURL(/\/tasks\/new\?area=3&from=matrix/);
-  await page.goto("/");
+  await page.goto("/matrix");
 
   // The axis intersection itself must not be a dead zone.
   await clickAxisPoint(0.5, 0.5);
@@ -353,7 +354,7 @@ test("keeps matrix task card navigation working", async ({ page }) => {
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
 
-  await page.goto("/");
+  await page.goto("/matrix");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
   await page.locator(".task-card", { hasText: title }).click();
 
@@ -569,8 +570,8 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
 });
 
 test("clears only the current browser profile drafts on logout", async ({ browser }) => {
-  const currentContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
-  const otherContext = await browser.newContext({ baseURL: "http://127.0.0.1:4173" });
+  const currentContext = await browser.newContext({ baseURL: e2eBaseUrl });
+  const otherContext = await browser.newContext({ baseURL: e2eBaseUrl });
   const currentPage = await currentContext.newPage();
   const otherPage = await otherContext.newPage();
   await installHtmxRoute(currentContext);
@@ -870,7 +871,7 @@ test("continues normally when localStorage draft reading fails", async ({ page }
 
 test("opens description URLs with native link behavior", async ({ page }) => {
   const taskTitle = `E2E description links ${Date.now()}`;
-  const taskUrl = "http://127.0.0.1:4173/tasks";
+  const taskUrl = `${e2eBaseUrl}/tasks`;
 
   await signIn(page);
   await page.getByRole("link", { name: "New task" }).click();
@@ -895,7 +896,7 @@ test("opens description URLs with native link behavior", async ({ page }) => {
 
 test("linkifies pasted URLs and submits plain text", async ({ page }) => {
   const taskTitle = `E2E pasted description URL ${Date.now()}`;
-  const taskUrl = "http://127.0.0.1:4173/tasks";
+  const taskUrl = `${e2eBaseUrl}/tasks`;
   const description = `Pasted ${taskUrl}`;
 
   await signIn(page);
@@ -1092,7 +1093,7 @@ test("filters the task list by status and retains it after reload", async ({ pag
   await expect(page).toHaveURL(/\/tasks\?status=done$/);
   await expectTaskVisibleInList(page, `E2E filter done ${suffix}`, "done");
 
-  await page.goto("/");
+  await page.goto("/matrix");
   await page.locator('nav.nav a[href="/tasks"]').click();
   await expect(page).toHaveURL(/\/tasks$/);
   await expect(page.locator('a[href="/tasks?status=do"][aria-current="true"]')).toBeVisible();
@@ -1329,7 +1330,7 @@ test("does not keep a new task draft when navigating to another screen", async (
   await descriptionEditor(page).fill(description);
   await expectDraftNotSaved(page, title, description);
 
-  await page.locator('nav.nav a[href="/"]').click();
+  await page.locator('nav.nav a[href="/matrix"]').click();
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
   await expect.poll(() => hasDraft(page, title, description)).toBe(false);
 
