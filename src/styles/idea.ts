@@ -7,6 +7,11 @@ export const IDEAS_CSS = `
   padding: 48px 16px;
 }
 
+.page--ideas-empty {
+  display: flex;
+  flex-direction: column;
+}
+
 .ideas-header {
 }
 
@@ -287,16 +292,26 @@ export const IDEAS_CSS = `
 }
 
 .ideas-empty {
-  background: #ffffff;
-  border: 1px dashed #d0d7de;
+  background: #dfe3e8;
+  border: 1px dashed #8b949e;
   border-radius: 6px;
+  box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
+  color: #24292f;
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 auto;
+  min-height: 240px;
   padding: 56px 24px;
   text-align: center;
+  width: min(100%, 1008px);
 }
 
 .ideas-empty h2 {
   font-size: 18px;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .ideas-empty p {
