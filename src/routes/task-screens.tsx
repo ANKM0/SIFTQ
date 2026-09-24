@@ -38,7 +38,7 @@ import { PREVIEW_IDEAS } from "../preview/ideas";
 type Repository = (c: Context<AppEnv>) => TaskRepository;
 
 function activePage(path: string): "ideas" | "matrix" | "tasks" {
-  if (path === "/") return "matrix";
+  if (path === "/matrix") return "matrix";
   if (path === "/ideas" || path.startsWith("/ideas/")) return "ideas";
   return "tasks";
 }
@@ -124,7 +124,9 @@ function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks"
 }
 
 function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository) {
-  app.get("/", async (c) => {
+  app.get("/", (c) => c.redirect("/ideas"));
+
+  app.get("/matrix", async (c) => {
     const result = await repository(c).list();
     if (!result.ok) return c.text("Internal Server Error", 500);
     return renderPage(c, <MatrixPage tasks={result.value} />);
@@ -215,7 +217,7 @@ function registerTaskCreateRoute(app: Hono<AppEnv>, repository: Repository) {
     if (!created.ok) return c.text(`Invalid task: ${created.error.code}`, 400);
     const inserted = await repository(c).insert(created.value);
     if (!inserted.ok) return c.text("Internal Server Error", 500);
-    c.header("HX-Redirect", state.from === "matrix" ? "/" : "/tasks");
+    c.header("HX-Redirect", state.from === "matrix" ? "/matrix" : "/tasks");
     return c.body(null, 201);
   });
 }
@@ -232,7 +234,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if (error !== undefined) return c.html(<TaskDetailPage task={task} error={error} returnTo={detailReturnTo(c)} />);
     const saved = await persistTask(c, repository, { ...task, title, description, version });
     if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
-    const path = detailReturnTo(c) === "matrix" ? "/" : "/tasks";
+    const path = detailReturnTo(c) === "matrix" ? "/matrix" : "/tasks";
     if (c.req.header("HX-Request")) {
       c.header("HX-Redirect", path);
       return c.body(null);

@@ -70,7 +70,7 @@
       };
       const show = (view) => {
         userZoomed = false;
-        image.src = SOURCES[view];
+        image.src = SOURCES[view] + "?v=" + Date.now();
         image.alt = view;
       };
 

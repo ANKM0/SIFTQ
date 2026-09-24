@@ -29,6 +29,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | REQ-TM-005 | 開発者は、固定データを使って本番 UI の操作をローカルで確認したい。 | screens.md |
 | REQ-TM-006 | ユーザーは、Matrix 上からタスクを完了、見送り、削除したい。 | domain.md, screens.md |
 | REQ-TM-007 | ユーザーは、Task list で確認したい status のタスクだけを表示したい。 | domain.md, screens.md |
+| REQ-TM-008 | ユーザーは、Taskとは独立したIdeaを記録・整理したい。 | domain.md, screens.md |
+| REQ-TM-009 | ユーザーは、重要なIdeaを固定し、不要なIdeaを削除したい。 | domain.md, screens.md |
 
 ## 仕様
 
@@ -53,6 +55,9 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-017 | REQ-TM-003 | New task と Task detail の description 編集領域では http/https URL をリンクとして表示し、通常クリックは同じタブ、Ctrl/Command クリックは別タブで開く。保存値はプレーンテキストとする。 | BDD-TM-017 |
 | SPEC-TM-018 | REQ-TM-003 | description に http/https URL を貼り付けると編集領域内でリンクとして表示する。Markdown、HTML、その他のリッチテキスト記法は解釈しない。 | BDD-TM-018 |
 | SPEC-TM-019 | REQ-TM-007 | Task list は status 絞り込み後の件数を25件単位でページ分割し、ページ番号と前へ/次へで移動する。不正なページ指定は1ページ目へ、範囲超過は最終ページへ寄せる。 | BDD-TM-019 |
+| SPEC-TM-020 | REQ-TM-008 | Idea は title、description、order、pinned を持ち、pinned を先にして order の昇順で表示する。 | BDD-TM-020 |
+| SPEC-TM-021 | REQ-TM-008 | ユーザーは Idea の作成、編集、並べ替えを行える。作成・編集はブラウザの再読み込み後も保持し、並べ替えは表示中に反映する。 | BDD-TM-021 |
+| SPEC-TM-022 | REQ-TM-009 | ユーザーは Idea のピン留め切り替えと削除を行え、削除前に確認する。 | BDD-TM-022 |
 
 ## BDD 候補
 
@@ -77,6 +82,9 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-017 | SPEC-TM-017 | description のURLを通常クリックすると同じタブで開き、Ctrl/Command クリックでは別タブで開く。保存後もリンク表示が維持される。 |
 | BDD-TM-018 | SPEC-TM-018 | description に貼り付けた http/https URL はリンクになり、保存時は `<a>` などのHTMLタグを含まないプレーンテキストになる。 |
 | BDD-TM-019 | SPEC-TM-019 | Task list は25件ごとにページを分け、番号と前へ/次へで移動できる。不正指定と範囲超過は矛盾のないページに寄せる。 |
+| BDD-TM-020 | SPEC-TM-020 | Idea list はピン留めしたIdeaを先に、各グループ内をorder順に表示する。 |
+| BDD-TM-021 | SPEC-TM-021 | Ideaを作成・編集・並べ替えすると表示中の一覧に反映され、作成・編集は再読み込み後も確認できる。 |
+| BDD-TM-022 | SPEC-TM-022 | Ideaのピン留めを切り替え、削除確認を経て一覧から削除できる。 |
 
 ## 未決事項
 

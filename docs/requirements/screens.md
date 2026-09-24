@@ -17,11 +17,11 @@
 | P05 | Status popover | 新規作成・詳細画面内のステータス選択パネル |
 | P06 | Area popover | 新規作成・詳細画面内のエリア選択パネル |
 | P07 | Delete confirmation dialog | Matrix 上の task を完全削除する確認ダイアログ |
-| P08 | Idea list | Matrix の do task をカード一覧で表示する読み取り専用画面 |
+| P08 | Idea list | Ideaをカード一覧で管理する画面 |
 
 ## 画面詳細
 
-- `Matrix` (`/`)
+- `Matrix` (`/matrix`)
   - `status = do` の task だけを表示する。
   - task は `area = 1 / 2 / 3 / 4` の象限に分けて表示する。
   - 縦軸は `重要度`、横軸は `緊急度` とする。
@@ -58,11 +58,15 @@
 
 - `Idea list` (`/ideas`)
   - Task とは独立したIdeaをカード一覧で表示する。
-  - Ideaは`title`、`description`、`order`だけを持つ。
-  - `order`の昇順でカードを表示する。
+  - Ideaは`title`、`description`、`order`、`pinned`を持つ。
+  - `pinned = true` のカードを先に表示し、その中で`order`の昇順にする。
   - カードはtitleとdescを表示する。
   - Ideaがない場合は空状態メッセージを表示する。
-  - 作成、編集、削除、並べ替えは行わないモック画面とする。
+  - composerからtitleとdescriptionを入力してIdeaを作成する。
+  - カードを開くとtitleとdescriptionを編集でき、自動保存する。
+  - pin操作でカードの固定状態を切り替える。
+  - カードをdrag and dropして同じグループ内の表示順を変更する。変更は現在の表示中に反映する。
+  - 削除操作の確認後、Ideaを一覧から除外する。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。
@@ -117,4 +121,4 @@
 
 - `bun run preview:mock` で起動する。
 - `http://127.0.0.1:8787` を開き、パスワード `preview` でログインする。
-- Matrix、Ideas、Task list は固定初期データを表示する。作成・編集・並び替えは実行中だけ保持し、プレビューの再起動後は初期データに戻る。
+- Matrix と Task list は固定初期データを表示する。Idea list は固定初期データにブラウザのlocalStorageで作成・編集・削除・ピン留めの変更を重ね、並べ替えは現在の表示中だけ保持する。

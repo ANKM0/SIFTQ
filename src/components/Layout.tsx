@@ -26,7 +26,7 @@ export const Layout: FC<{ active: "ideas" | "matrix" | "tasks"; children?: JSX.E
     </head>
     <body>
       <header class="topbar">
-        <a class="brand" href="/">{BRAND_NAME}</a>
+        <a class="brand" href="/ideas">{BRAND_NAME}</a>
         <nav class="nav" aria-label="Primary">
           <a class={active === "ideas" ? "active" : undefined} href="/ideas">
             Ideas
@@ -34,7 +34,7 @@ export const Layout: FC<{ active: "ideas" | "matrix" | "tasks"; children?: JSX.E
           <a class={active === "tasks" ? "active" : undefined} href="/tasks">
             Tasks
           </a>
-          <a class={active === "matrix" ? "active" : undefined} href="/">
+          <a class={active === "matrix" ? "active" : undefined} href="/matrix">
             Matrix
           </a>
         </nav>

@@ -4,8 +4,8 @@ import { authenticatedRequest } from "./helpers/authenticated-request";
 import { createMemoryTaskRepository } from "./helpers/memory-task-repository";
 
 describe("smoke", () => {
-  it("renders the Matrix root route", async () => {
-    const response = await authenticatedRequest("/", createMemoryTaskRepository());
+  it("renders the Matrix route", async () => {
+    const response = await authenticatedRequest("/matrix", createMemoryTaskRepository());
 
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Matrix");

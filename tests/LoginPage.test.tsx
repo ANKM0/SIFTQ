@@ -24,8 +24,8 @@ describe("safeNextPath", () => {
   });
 
   it("falls back for empty or external values", () => {
-    expect(safeNextPath(undefined)).toBe("/");
-    expect(safeNextPath("https://example.com")).toBe("/");
-    expect(safeNextPath("//example.com")).toBe("/");
+    expect(safeNextPath(undefined)).toBe("/ideas");
+    expect(safeNextPath("https://example.com")).toBe("/ideas");
+    expect(safeNextPath("//example.com")).toBe("/ideas");
   });
 });

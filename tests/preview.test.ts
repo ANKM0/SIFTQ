@@ -19,7 +19,7 @@ async function previewRequest(path: string): Promise<Response> {
 
 describe("mock backend preview", () => {
   it("renders the production Matrix, Ideas, and Task list with fixed scenario data", async () => {
-    const matrix = await previewRequest("/");
+    const matrix = await previewRequest("/matrix");
     const ideas = await previewRequest("/ideas");
     const ideasDnd = await previewRequest("/ideas-dnd.js");
     const ideaDetail = await previewRequest("/ideas/1");
@@ -61,5 +61,12 @@ describe("mock backend preview", () => {
     const listBody = await list.text();
     expect(listBody).toContain("完了したタスクの表示を確認する");
     expect(listBody).toContain("working");
+  });
+
+  it("redirects the old root path to Ideas", async () => {
+    const response = await previewRequest("/");
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/ideas");
   });
 });

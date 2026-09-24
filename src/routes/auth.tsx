@@ -33,7 +33,7 @@ export function registerAuthRoutes<T extends AuthEnv>(app: Hono<T>) {
 
     const body = await c.req.parseBody();
     const submittedPassword = typeof body["password"] === "string" ? body["password"] : "";
-    const next = typeof body["next"] === "string" ? body["next"] : "/";
+    const next = typeof body["next"] === "string" ? body["next"] : "/ideas";
 
     if (!(await isPasswordValid(submittedPassword, password))) {
       return c.html(<LoginPage error next={next} />, 401);

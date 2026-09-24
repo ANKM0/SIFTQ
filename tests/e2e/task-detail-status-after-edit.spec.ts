@@ -22,7 +22,7 @@ async function createMatrixTask(page: Page, title: string) {
 }
 
 async function openDetail(page: Page, title: string) {
-  await page.goto("/");
+  await page.goto("/matrix");
   await page.locator(".task-card", { hasText: title }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
 }

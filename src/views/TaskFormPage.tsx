@@ -82,7 +82,7 @@ export function NewTaskForm({ state, error }: { state: NewTaskState; error?: str
           <input type="hidden" name="from" value={state.from} />
           {error ? <p class="error">{error}</p> : null}
           <DescriptionField />
-          <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/" : "/tasks"} />
+          <TaskFormActions submitLabel="Create" cancelHref={state.from === "matrix" ? "/matrix" : "/tasks"} />
         </div>
         <NewTaskMeta state={state} />
       </form>
@@ -99,7 +99,7 @@ export function TaskDetailPage({
   error?: string;
   returnTo?: "matrix" | "tasks";
 }) {
-  const cancelHref = returnTo === "matrix" ? "/" : "/tasks";
+  const cancelHref = returnTo === "matrix" ? "/matrix" : "/tasks";
 
   return (
     <div class="page page--detail" data-state="normal">
