@@ -80,6 +80,21 @@ test("deletes an idea through the action menu and confirmation", async ({ page }
   expect(await page.locator(".idea-card").count()).toBe(initialCount - 1);
 });
 
+test("closes the idea detail modal with the close button", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await createIdea(page, "詳細モーダル");
+  await page.goto("/ideas");
+
+  const card = page.locator(".idea-card").first();
+  await card.locator("h2").click();
+  const modal = page.locator("[data-idea-modal]");
+  await expect(modal).toBeVisible();
+
+  await modal.getByRole("button", { name: "閉じる" }).click();
+  await expect(modal).toBeHidden();
+});
+
 test("persists idea pinning and same-group reorder", async ({ page }) => {
   await signIn(page);
   await clearIdeas(page);
