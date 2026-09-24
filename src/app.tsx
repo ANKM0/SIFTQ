@@ -3,6 +3,8 @@ import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import {
   HTMX_CONFLICT_SWAP_SCRIPT,
+  IDEA_DETAIL_SCRIPT,
+  IDEAS_DND_SCRIPT,
   MATRIX_DND_SCRIPT,
   POPOVER_DISMISS_SCRIPT,
   DESCRIPTION_EDITOR_SCRIPT,
@@ -30,6 +32,8 @@ const PUBLIC_PATHS = new Set([
   "/popover-dismiss.js",
   "/task-form-shortcut.js",
   "/matrix-dnd.js",
+  "/ideas-dnd.js",
+  "/idea-detail.js",
   "/task-list-selection.js",
 ]);
 
@@ -86,6 +90,14 @@ registerTaskScreenRoutes(app, repository);
 
 app.get("/matrix-dnd.js", (c) => {
   return c.body(MATRIX_DND_SCRIPT, 200, { "content-type": "application/javascript" });
+});
+
+app.get("/ideas-dnd.js", (c) => {
+  return c.body(IDEAS_DND_SCRIPT, 200, { "content-type": "application/javascript" });
+});
+
+app.get("/idea-detail.js", (c) => {
+  return c.body(IDEA_DETAIL_SCRIPT, 200, { "content-type": "application/javascript" });
 });
 
 app.get("/htmx-conflict.js", (c) => {

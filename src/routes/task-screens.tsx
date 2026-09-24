@@ -7,6 +7,8 @@ import { OptionMenu } from "../components/OptionMenu";
 import { TaskMeta } from "../components/TaskMeta";
 import type { NewTaskFrom, NewTaskState } from "../components/NewTaskMeta";
 import { MatrixPage } from "../views/MatrixPage";
+import { IdeasPage } from "../views/IdeasPage";
+import { IdeaDetailPage } from "../views/IdeaDetailPage";
 import { TaskListPage } from "../views/TaskListPage";
 import { NewTaskForm, TaskDetailPage, TaskVersionInput } from "../views/TaskFormPage";
 import { pageNav } from "../views/navigation";
@@ -31,13 +33,19 @@ import {
 import type { ParsedBody } from "../task-input";
 import type { AppEnv } from "../app-env";
 import type { TaskRepository } from "../repository/task-repository";
+import { PREVIEW_IDEAS } from "../preview/ideas";
 
 type Repository = (c: Context<AppEnv>) => TaskRepository;
 
+function activePage(path: string): "ideas" | "matrix" | "tasks" {
+  if (path === "/") return "matrix";
+  if (path === "/ideas" || path.startsWith("/ideas/")) return "ideas";
+  return "tasks";
+}
+
 function renderPage(c: Context<AppEnv>, content: JSX.Element) {
   if (c.req.header("HX-Request")) return c.html(content);
-  const active = c.req.path === "/" ? "matrix" : "tasks";
-  return c.html(<Layout active={active}>{content}</Layout>);
+  return c.html(<Layout active={activePage(c.req.path)}>{content}</Layout>);
 }
 
 function createTaskAtBoundary({
@@ -120,6 +128,18 @@ function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository) {
     const result = await repository(c).list();
     if (!result.ok) return c.text("Internal Server Error", 500);
     return renderPage(c, <MatrixPage tasks={result.value} />);
+  });
+
+  app.get("/ideas", async (c) => {
+    const ideas = c.env.PREVIEW_MODE === "true" ? PREVIEW_IDEAS : [];
+    return renderPage(c, <IdeasPage ideas={ideas} />);
+  });
+
+  app.get("/ideas/:order", (c) => {
+    if (c.env.PREVIEW_MODE !== "true") return c.notFound();
+    const order = Number(c.req.param("order"));
+    const idea = PREVIEW_IDEAS.find((candidate) => candidate.order === order);
+    return idea === undefined ? c.notFound() : renderPage(c, <IdeaDetailPage idea={idea} />);
   });
 
   app.get("/tasks", async (c) => {

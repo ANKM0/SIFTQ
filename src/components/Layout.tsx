@@ -4,7 +4,7 @@ import { BRAND_NAME } from "../brand";
 
 const HTMX_SCRIPT = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
 
-export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> = ({
+export const Layout: FC<{ active: "ideas" | "matrix" | "tasks"; children?: JSX.Element }> = ({
   active,
   children,
 }) => (
@@ -19,18 +19,23 @@ export const Layout: FC<{ active: "matrix" | "tasks"; children?: JSX.Element }> 
       <script src="/popover-dismiss.js" defer></script>
       <script src="/task-form-shortcut.js" defer></script>
       <script src="/description-editor.js" defer></script>
-      <script src="/matrix-dnd.js" defer></script>
+        <script src="/matrix-dnd.js" defer></script>
+        <script src="/ideas-dnd.js" defer></script>
+        <script src="/idea-detail.js" defer></script>
       <script src="/task-list-selection.js" defer></script>
     </head>
     <body>
       <header class="topbar">
         <a class="brand" href="/">{BRAND_NAME}</a>
         <nav class="nav" aria-label="Primary">
-          <a class={active === "matrix" ? "active" : undefined} href="/">
-            Matrix
+          <a class={active === "ideas" ? "active" : undefined} href="/ideas">
+            Ideas
           </a>
           <a class={active === "tasks" ? "active" : undefined} href="/tasks">
             Tasks
+          </a>
+          <a class={active === "matrix" ? "active" : undefined} href="/">
+            Matrix
           </a>
         </nav>
         <form action="/logout" method="post" class="logout">
