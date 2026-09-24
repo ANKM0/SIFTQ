@@ -28,6 +28,8 @@
     "ideas": {
       "description": "タスクとは独立したアイデア。カード一覧で表示する。",
       "attributes": {
+        "id": { "domain": "string", "pk": true },
+        "owner_id": { "domain": "string" },
         "title": { "domain": "string", "note": "Title 値オブジェクト。Unicodeコードポイント数で1以上256以下", "rules": ["INV-TM-005"] },
         "description": { "domain": "string", "note": "Description 値オブジェクト。Unicodeコードポイント数で0以上16,384以下", "rules": ["INV-TM-006"] },
         "order": { "domain": "number" },

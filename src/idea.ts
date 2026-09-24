@@ -13,6 +13,10 @@ export type IdeaError = {
   code: "INVALID_TITLE" | "INVALID_DESCRIPTION" | "INVALID_ORDER" | "NOT_FOUND" | "CONFLICT";
 };
 
+export function isIdeaRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export function isIdeaTitleValid(title: string): boolean {
   return isTaskTitleValid(title);
 }

@@ -756,6 +756,9 @@ export const MATRIX_DND_SCRIPT = [
   "}, true);",
 ].join("\n");
 
+/* Legacy Idea localStorage scripts were replaced by src/client/idea-scripts.ts.
+   Keep this block out of the Worker bundle until the old source is removed. */
+/*
 export const IDEAS_DND_SCRIPT = [
   "var ideasDraggingCard = null;",
   "function ideasCardFromEvent(event) {",
@@ -800,7 +803,6 @@ export const IDEAS_DND_SCRIPT = [
   'document.addEventListener("DOMContentLoaded", clearIdeasDrag);',
   'document.addEventListener("htmx:load", clearIdeasDrag);',
 ].join("\n");
-
 export const IDEA_DETAIL_SCRIPT = [
   "function ideaDraftKey(form) {",
   '  var id = form.getAttribute("data-idea-id");',
@@ -1330,3 +1332,4 @@ export const IDEA_DETAIL_SCRIPT = [
   '  openIdeaModal(card);',
   "});",
 ].join("\n");
+*/

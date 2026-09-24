@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { err, ok } from "../task";
 import {
   isIdeaDescriptionValid,
+  isIdeaRecord,
   isIdeaOrderValid,
   isIdeaTitleValid,
   type Idea,
@@ -17,14 +18,10 @@ function problem(c: Context<AppEnv>, status: ContentfulStatusCode, code: string)
   return c.json({ code }, status);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 async function readJsonRecord(c: Context<AppEnv>): Promise<Record<string, unknown> | null> {
   try {
     const value = await c.req.json<unknown>();
-    return isRecord(value) ? value : null;
+    return isIdeaRecord(value) ? value : null;
   } catch {
     return null;
   }
@@ -63,7 +60,7 @@ export function registerIdeaApiRoutes(app: Hono<AppEnv>, repository: Repository)
   app.get("/api/ideas", async (c) => {
     const result = await repository(c).list(OWNER_ID);
     if (!result.ok) return problem(c, 500, result.error.code);
-    return c.json(result.value);
+    return c.json(result.value, 200);
   });
 
   app.post("/api/ideas", async (c) => {
@@ -91,7 +88,7 @@ export function registerIdeaApiRoutes(app: Hono<AppEnv>, repository: Repository)
     if (!Array.isArray(rawIdeas) || rawIdeas.length === 0) return problem(c, 400, "INVALID_INPUT");
     const updates: IdeaOrderUpdate[] = [];
     for (const rawIdea of rawIdeas) {
-      if (!isRecord(rawIdea) || typeof rawIdea["id"] !== "string") return problem(c, 400, "INVALID_INPUT");
+      if (!isIdeaRecord(rawIdea) || typeof rawIdea["id"] !== "string") return problem(c, 400, "INVALID_INPUT");
       const order = readOrder(rawIdea["order"]);
       if (order === null) return problem(c, 400, "INVALID_ORDER");
       updates.push({ id: rawIdea["id"], order });

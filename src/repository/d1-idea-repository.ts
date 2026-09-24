@@ -1,12 +1,12 @@
 import type { D1Database, D1Result } from "@cloudflare/workers-types";
 import { err, ok } from "../task";
 import type { Result } from "../task";
+import { isIdeaRecord } from "../idea";
 import type { Idea } from "../idea";
 import type { IdeaOrderUpdate, IdeaRepository, IdeaRepositoryError } from "./idea-repository";
 
 function toIdea(value: unknown): Idea | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  if (!isRecord(value)) return undefined;
+  if (!isIdeaRecord(value)) return undefined;
   const row = value;
   if (
     typeof row["id"] !== "string" ||
@@ -24,10 +24,6 @@ function toIdea(value: unknown): Idea | undefined {
     order: row["order"],
     pinned: row["pinned"] === 1,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function changes(result: D1Result): number {
@@ -49,7 +45,7 @@ export function createD1IdeaRepository(db: D1Database): IdeaRepository {
 
 async function listIdeas(db: D1Database, owner_id: string): Promise<Result<Idea[], IdeaRepositoryError>> {
   const result = await db
-    .prepare(`${SELECT} WHERE owner_id = ? ORDER BY pinned DESC, "order" ASC, id ASC`)
+    .prepare(`${SELECT} WHERE owner_id = ? ORDER BY pinned DESC, "order" ASC, id ASC LIMIT 100`)
     .bind(owner_id)
     .all<Record<string, unknown>>();
   return ok(result.results.map(toIdea).filter((idea): idea is Idea => idea !== undefined));
