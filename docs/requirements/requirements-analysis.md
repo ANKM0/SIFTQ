@@ -58,6 +58,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | SPEC-TM-020 | REQ-TM-008 | Idea は title、description、order、pinned を持ち、pinned を先にして各グループ内を order の昇順で表示する。 | BDD-TM-020 |
 | SPEC-TM-021 | REQ-TM-008 | ユーザーは Idea の作成、編集、並べ替えを行え、変更はブラウザの再読み込み後も保持する。 | BDD-TM-021 |
 | SPEC-TM-022 | REQ-TM-009 | ユーザーは Idea のピン留め切り替えと削除を行え、削除前に確認する。 | BDD-TM-022 |
+| SPEC-TM-023 | REQ-TM-008 | Idea 詳細（詳細モーダルと `/ideas/:id`）の description 編集領域では http/https URL をリンクとして表示し、通常クリックは同じタブ、Ctrl/Command クリックは別タブで開く。保存値はプレーンテキストとする。 | BDD-TM-023 |
+| SPEC-TM-024 | REQ-TM-008 | Idea の description に http/https URL を貼り付けると編集領域内でリンクとして表示する。Markdown、HTML、その他のリッチテキスト記法は解釈しない。 | BDD-TM-024 |
 
 ## BDD 候補
 
@@ -85,6 +87,8 @@ Task Management MVP の振る舞いを、要求 ID、仕様 ID、BDD ID で追�
 | BDD-TM-020 | SPEC-TM-020 | Idea list はピン留めしたIdeaを先に、各グループ内をorder順に表示する。 |
 | BDD-TM-021 | SPEC-TM-021 | Ideaを作成・編集・並べ替えすると表示中の一覧に反映され、再読み込み後も変更後の一覧を確認できる。 |
 | BDD-TM-022 | SPEC-TM-022 | Ideaのピン留めを切り替え、削除確認を経て一覧から削除できる。 |
+| BDD-TM-023 | SPEC-TM-023 | Idea 詳細の description のURLを通常クリックすると同じタブで開き、Ctrl/Command クリックでは別タブで開く。保存後もリンク表示が維持される。 |
+| BDD-TM-024 | SPEC-TM-024 | Idea の description に貼り付けた http/https URL はリンクになり、保存時は `<a>` などのHTMLタグを含まないプレーンテキストになる。 |
 
 ## 未決事項
 

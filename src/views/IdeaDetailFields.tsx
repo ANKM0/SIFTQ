@@ -1,3 +1,5 @@
+import { splitDescription } from "../description";
+
 export function IdeaDetailFields({
   title,
   description = "",
@@ -17,7 +19,27 @@ export function IdeaDetailFields({
           </svg>
         </button>
       </header>
-      <textarea class="idea-detail__description" name="description" aria-label="Idea description" rows={1}>{description}</textarea>
+      <div
+        class="idea-detail__description"
+        contenteditable={true}
+        data-description-editor
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Idea description"
+      >
+        {splitDescription(description).map((segment, index) =>
+          segment.href ? (
+            <a key={index} href={segment.href}>
+              {segment.text}
+            </a>
+          ) : (
+            segment.text
+          ),
+        )}
+      </div>
+      <textarea name="description" data-description-value hidden>
+        {description}
+      </textarea>
     </>
   );
 }

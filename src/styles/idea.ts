@@ -450,8 +450,13 @@ export const IDEAS_CSS = `
   outline: 0;
   overflow-y: auto;
   padding: 0;
-  resize: none;
   white-space: pre-wrap;
+  width: 100%;
+}
+
+.idea-detail__description a {
+  color: #0969da;
+  text-decoration: underline;
 }
 
 @media (width < 40rem) {

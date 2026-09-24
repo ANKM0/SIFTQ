@@ -67,12 +67,6 @@ function updateIdeaPinButton(form) {
   var button = form.querySelector("[data-idea-pin]");
   if (button) { button.setAttribute("aria-pressed", ideaFormPinned(form) ? "true" : "false"); button.setAttribute("aria-label", ideaFormPinned(form) ? "Unpin idea" : "Pin idea"); }
 }
-function resizeIdeaDescription(form) {
-  var description = form.querySelector(".idea-detail__description");
-  if (!description) return;
-  description.style.height = "auto";
-  description.style.height = description.scrollHeight + "px";
-}
 function layoutIdeaMasonryGrid(grid) {
   var cards = Array.prototype.slice.call(grid.querySelectorAll(":scope > .idea-card"));
   grid.classList.remove("masonry-ready");
@@ -239,11 +233,11 @@ function openIdeaModal(card) {
   var modalForm = document.querySelector("[data-idea-modal] form[data-idea-form]");
   if (!modalForm) return;
   modalForm.setAttribute("data-idea-id", ideaCardId(card)); modalForm.setAttribute("data-idea-order", card.getAttribute("data-idea-order") || ""); modalForm.setAttribute("data-idea-pinned", card.getAttribute("data-pinned") === "true" ? "true" : "false");
-  var fields = ideaFields(modalForm); var title = card.querySelector("h2"); var description = card.querySelector(".idea-card__description"); if (fields.title) fields.title.value = title ? title.textContent || "" : ""; if (fields.description) fields.description.value = description ? description.textContent || "" : ""; updateIdeaPinButton(modalForm); resizeIdeaDescription(modalForm); var dialog = document.querySelector("[data-idea-modal]"); if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+  var fields = ideaFields(modalForm); var title = card.querySelector("h2"); var description = card.querySelector(".idea-card__description"); var descriptionText = description ? description.textContent || "" : ""; if (fields.title) fields.title.value = title ? title.textContent || "" : ""; if (fields.description) fields.description.value = descriptionText; var editor = modalForm.querySelector("[data-description-editor]"); if (editor) { editor.textContent = descriptionText; if (typeof linkifyDescriptionEditor === "function") linkifyDescriptionEditor(editor); } updateIdeaPinButton(modalForm); var dialog = document.querySelector("[data-idea-modal]"); if (dialog && typeof dialog.showModal === "function") dialog.showModal();
 }
 function initializeIdeaDetails() {
   document.querySelectorAll("[data-idea-composer]").forEach(function (composer) { if (composer.dataset.ideaComposerInitialized === "true") return; composer.dataset.ideaComposerInitialized = "true"; setIdeaComposerOpen(composer, false); var trigger = composer.querySelector("[data-idea-composer-trigger]"); var close = composer.querySelector("[data-idea-composer-close]"); if (trigger) trigger.addEventListener("click", function () { setIdeaComposerOpen(composer, true); }); if (close) close.addEventListener("click", function () { finishIdeaComposer(composer); }); composer.addEventListener("keydown", function (event) { if (!event.ctrlKey || event.key !== "Enter") return; var target = event.target; if (!target || !target.closest || !target.closest(".ideas-composer__title, .ideas-composer__description")) return; event.preventDefault(); finishIdeaComposer(composer); }); document.addEventListener("click", function (event) { if (composer.getAttribute("data-idea-composer-open") === "true" && !event.target.closest("[data-idea-composer]")) finishIdeaComposer(composer); }); });
-  document.querySelectorAll("form[data-idea-form]").forEach(function (form) { if (form.dataset.ideaDetailInitialized === "true") return; form.dataset.ideaDetailInitialized = "true"; updateIdeaPinButton(form); resizeIdeaDescription(form); form.addEventListener("input", function () { resizeIdeaDescription(form); scheduleIdeaDraftSave(form); }); var pin = form.querySelector("[data-idea-pin]"); if (pin) pin.addEventListener("click", function () { setIdeaPinned(form, !ideaFormPinned(form)); }); var close = form.querySelector("[data-idea-close]"); if (close) close.addEventListener("click", function () { saveIdeaDraft(form); var dialog = form.closest ? form.closest("[data-idea-modal]") : null; if (dialog && typeof dialog.close === "function") dialog.close(); }); });
+  document.querySelectorAll("form[data-idea-form]").forEach(function (form) { if (form.dataset.ideaDetailInitialized === "true") return; form.dataset.ideaDetailInitialized = "true"; updateIdeaPinButton(form); form.addEventListener("input", function () { scheduleIdeaDraftSave(form); }); var pin = form.querySelector("[data-idea-pin]"); if (pin) pin.addEventListener("click", function () { setIdeaPinned(form, !ideaFormPinned(form)); }); var close = form.querySelector("[data-idea-close]"); if (close) close.addEventListener("click", function () { saveIdeaDraft(form); var dialog = form.closest ? form.closest("[data-idea-modal]") : null; if (dialog && typeof dialog.close === "function") dialog.close(); }); });
 }
 document.addEventListener("DOMContentLoaded", initializeIdeaDetails);
 document.addEventListener("htmx:load", initializeIdeaDetails);
