@@ -16,7 +16,7 @@
         "title": { "domain": "string", "note": "Unicodeコードポイント数で1以上256以下", "rules": ["INV-TM-005"] },
         "description": { "domain": "string", "note": "Unicodeコードポイント数で0以上16,384以下", "rules": ["INV-TM-006"] },
         "status": { "domain": "status", "rules": ["INV-TM-001"] },
-        "area": { "domain": "area", "rules": ["INV-TM-002"] },
+        "area": { "domain": "area", "note": "1 / 2 / 3 / 4", "rules": ["INV-TM-002", "INV-TM-007"] },
         "working": { "domain": "boolean", "rules": ["INV-TM-003"] },
         "order": { "domain": "number" },
         "version": { "domain": "number" },
@@ -24,6 +24,14 @@
         "updated_at": { "domain": "datetime" }
       },
       "rules": ["INV-TM-004"]
+    },
+    "ideas": {
+      "description": "タスクとは独立したアイデア。カード一覧で表示する。",
+      "attributes": {
+        "title": { "domain": "string", "note": "Title 値オブジェクト。Unicodeコードポイント数で1以上256以下", "rules": ["INV-TM-005"] },
+        "description": { "domain": "string", "note": "Description 値オブジェクト。Unicodeコードポイント数で0以上16,384以下", "rules": ["INV-TM-006"] },
+        "order": { "domain": "number" }
+      }
     }
   },
   "relations": [],
@@ -38,6 +46,13 @@
         { "name": "完了または見送りにする", "entity": "tasks", "changes": { "status": ["done", "skip"] } },
         { "name": "一覧で振り返る", "entity": "tasks" }
       ]
+    },
+    "idea_browsing": {
+      "name": "アイデアを一覧で確認する",
+      "actor": "user",
+      "steps": [
+        { "name": "Ideaをorder順に表示する", "entity": "ideas", "when": "order の昇順でカード表示" }
+      ]
     }
   },
   "screens": {
@@ -48,12 +63,17 @@
     "P04": { "name": "New task", "entities": ["tasks"], "actions": ["create", "cancel"] },
     "P05": { "name": "Status popover", "entities": ["tasks"], "actions": ["select-status"] },
     "P06": { "name": "Area popover", "entities": ["tasks"], "actions": ["select-area"] },
-    "P07": { "name": "Delete confirmation dialog", "entities": ["tasks"], "actions": ["confirm-delete", "cancel"] }
+    "P07": { "name": "Delete confirmation dialog", "entities": ["tasks"], "actions": ["confirm-delete", "cancel"] },
+    "P08": { "name": "Idea list", "entities": ["ideas"], "actions": [] }
   },
   "navigation": [
     { "from": "P00", "on": "ログイン成功", "to": "P01" },
     { "from": "P01", "on": "Tasks 押下", "to": "P02" },
+    { "from": "P01", "on": "Ideas 押下", "to": "P08" },
     { "from": "P02", "on": "Matrix 押下", "to": "P01" },
+    { "from": "P02", "on": "Ideas 押下", "to": "P08" },
+    { "from": "P08", "on": "Tasks 押下", "to": "P02" },
+    { "from": "P08", "on": "Matrix 押下", "to": "P01" },
     { "from": "P01", "on": "New task / area 空白押下", "to": "P04" },
     { "from": "P02", "on": "New task 押下", "to": "P04" },
     { "from": "P04", "on": "Create 押下", "to": "P03" },

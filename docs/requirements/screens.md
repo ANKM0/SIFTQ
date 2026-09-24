@@ -17,6 +17,7 @@
 | P05 | Status popover | 新規作成・詳細画面内のステータス選択パネル |
 | P06 | Area popover | 新規作成・詳細画面内のエリア選択パネル |
 | P07 | Delete confirmation dialog | Matrix 上の task を完全削除する確認ダイアログ |
+| P08 | Idea list | Matrix の do task をカード一覧で表示する読み取り専用画面 |
 
 ## 画面詳細
 
@@ -54,6 +55,14 @@
   - 選択時は status 切り替えを隠し、`Mark as`（`do`、`done`、`skip`）、`Labels`、`delete` を表示する。
   - bulk 操作は選択中のtaskへ適用し、delete前には選択件数を含む確認ダイアログを表示する。
   - bulk 操作で競合または通信エラーが発生した場合は一覧上にエラーを表示し、競合時は再読み込みを促す。
+
+- `Idea list` (`/ideas`)
+  - Task とは独立したIdeaをカード一覧で表示する。
+  - Ideaは`title`、`description`、`order`だけを持つ。
+  - `order`の昇順でカードを表示する。
+  - カードはtitleとdescを表示する。
+  - Ideaがない場合は空状態メッセージを表示する。
+  - 作成、編集、削除、並べ替えは行わないモック画面とする。
 
 - `Task detail` (`/tasks/:id`)
   - title と description を編集する。
@@ -108,4 +117,4 @@
 
 - `bun run preview:mock` で起動する。
 - `http://127.0.0.1:8787` を開き、パスワード `preview` でログインする。
-- Matrix と Task list は固定初期データを表示する。作成・編集・並び替えは実行中だけ保持し、プレビューの再起動後は初期データに戻る。
+- Matrix、Ideas、Task list は固定初期データを表示する。作成・編集・並び替えは実行中だけ保持し、プレビューの再起動後は初期データに戻る。
