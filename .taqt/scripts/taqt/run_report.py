@@ -59,13 +59,6 @@ def _event_line(event: dict[str, Any]) -> str:
         if isinstance(log, dict) and log.get("format") == "success-summary-v1":
             lines.extend(_success_log_lines(response, log))
         return "\n".join(lines)
-    if event_type == "design_artifact":
-        artifact_path = event.get("artifact_path")
-        return (
-            f"- design artifact `{event.get('step')}`: "
-            f"[{artifact_path}]({artifact_path}) "
-            f"({event.get('status')}) / {event.get('summary')}"
-        )
     if event_type == "terminal":
         return f"- terminal `{event.get('step')}`"
     return f"- {event_type}: `{event.get('step') or event.get('reason')}`"
@@ -80,9 +73,6 @@ def _success_log_lines(response: dict[str, Any], log: dict[str, Any]) -> list[st
         changed_line += f" — {paths}"
 
     lines = [changed_line]
-    artifact_path = response.get("artifact_path")
-    if isinstance(artifact_path, str):
-        lines.append(f"  - artifact: `{artifact_path}`")
     lines.append(f"  - validation: {log.get('validation', 'pending')}")
     lines.append(f"  - next: `{log.get('next_step', 'done')}`")
     lines.append(f"  - omitted: {_log_size(log, 'stdout')}; {_log_size(log, 'stderr')}")

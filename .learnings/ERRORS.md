@@ -135,3 +135,62 @@ taqtのverificationで変更と無関係な既知のベースライン失敗を�
 - See Also: ERR-20260904-001
 
 ---
+
+## [ERR-20260924-002] taqt_loop_free_model_unavailable_hang
+
+**Logged**: 2026-09-24T22:10:00+09:00
+**Priority**: high
+**Status**: pending
+**Area**: taqt
+
+### Summary
+main_loop の `opencode/muse-spark-1.3-contributor-free` が rate limit、`opencode` provider が insufficient funds となり、implement step が進まずハングした。
+
+### Error
+```
+AI_APICallError: Rate limit exceeded. Please try again later.
+AI_APICallError: Upstream request failed: Insufficient account funds
+```
+
+### Context
+- Issue #518 の taqt run で、`opencode run` が CPU をほぼ消費せず 20 分以上停止した。
+- `~/.local/share/opencode/log/opencode.log` に上記エラーが記録され、その後 progress しなかった。
+- 同じ環境で `opencode-go/*` provider のモデルは動作した。
+
+### Suggested Fix
+ループのモデルを `opencode-go/*` に切り替えて実行する。tracked file を変更せず、temp の loop/config を `--loop-root` で指定すると安全。
+
+### Metadata
+- Reproducible: yes
+- Related Files: .taqt/loops/main_loop.yaml, .taqt/config/profiles.yaml, .taqt/scripts/loop/llm.py
+
+---
+
+## [ERR-20260924-003] taqt_checker_missing_verdict_escalation
+
+**Logged**: 2026-09-24T22:10:00+09:00
+**Priority**: medium
+**Status**: pending
+**Area**: taqt
+
+### Summary
+checker が verdict を含まない JSON を返し、post_review が human へエスカレーションした。指摘内容自体は妥当だった。
+
+### Error
+```
+post_review result: feedback=review_human, findings=["review response was not a JSON object"]
+```
+
+### Context
+- Issue #518 の checker は `status=failure` と `feedback` 配列 (findings) を返したが `verdict` が無かった。
+- `validate_review` は verdict を必須とするため human にルーティングした。
+- findings を手動反映し、`taqt:commit --allow-unverified-run` で commit した。
+
+### Suggested Fix
+checker の契約で `verdict` を必須化するか、findings のみの応答を `changes_requested` として扱う。
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .taqt/loops/main_loop.yaml, .taqt/scripts/loop/verification.py, .taqt/scripts/loop/llm.py
+
+---

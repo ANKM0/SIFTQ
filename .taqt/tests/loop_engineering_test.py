@@ -15,7 +15,7 @@ from loop.llm import (
     is_opencode_fallback_error,
     run_agent,
 )
-from loop.runner import _run_step, _write_design_decision_artifact, run_loop
+from loop.runner import _run_step, run_loop
 from loop.schema import load_document, validate_loop_definition
 from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
 from loop.verification import run_verification, validate_review
@@ -270,164 +270,6 @@ blocked_reason: null
         resume_dir=Path(first["run_dir"]),
     )
     assert resumed["status"] == "done"
-
-
-def test_loop_runner_writes_design_decision_artifact_after_success(tmp_path: Path) -> None:
-    loop_path = tmp_path / "loop.yaml"
-    task_path = tmp_path / "task.yaml"
-    runs_root = tmp_path / "runs"
-    loop_path.write_text(
-        """
-version: 1
-id: design-artifact
-agents:
-  design:
-    role: design
-steps:
-  - id: design
-    kind: llm
-    agent: design
-    command: >-
-      python -c 'import json; print(json.dumps({"status": "success", "summary": "Use the run artifact"}))'
-    next: done
-  - id: done
-    kind: terminal
-""",
-        encoding="utf-8",
-    )
-    task_path.write_text(
-        """
-id: ISSUE-166-01
-source:
-  type: github_issue
-  repo: owner/repo
-  issue_number: 166
-status: pending
-phase: spec
-priority: high
-loop: design-artifact
-input: {}
-""",
-        encoding="utf-8",
-    )
-
-    result = run_loop(
-        loop_path=loop_path,
-        task_path=task_path,
-        workspace=tmp_path,
-        runs_root=runs_root,
-    )
-
-    artifact = Path(result["run_dir"]) / "artifacts" / "design-decision.md"
-    assert result["status"] == "done"
-    content = artifact.read_text(encoding="utf-8")
-    assert content
-    assert "Use the run artifact" in content
-    assert "## 課題・制約" in content
-    assert "## 採用案と理由" in content
-    assert "## 却下案と理由" in content
-    assert "## 影響範囲・検証結果" in content
-    assert "## 未決事項または人間へのエスカレーション" in content
-
-    events = [
-        json.loads(line)
-        for line in (artifact.parent.parent / "events.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
-    artifact_event = next(event for event in events if event["type"] == "design_artifact")
-    assert artifact_event["artifact_path"] == "artifacts/design-decision.md"
-    assert artifact_event["summary"] == "Use the run artifact"
-    assert artifact_event["status"] == "created"
-    response_event = next(event for event in events if event["type"] == "agent_response")
-    response = response_event["response"]
-    assert "stdout" not in response
-    assert response["log"]["next_step"] == "done"
-    assert response["log"]["stdout"]["characters"] > 0
-
-
-def test_loop_runner_does_not_record_created_event_when_artifact_write_fails(
-    tmp_path: Path, monkeypatch
-) -> None:
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-
-    def fail_write(*args, **kwargs):
-        raise OSError("artifact unavailable")
-
-    monkeypatch.setattr("loop.runner._write_design_decision_artifact", fail_write)
-
-    next_step = _run_step(
-        loop_definition={"agents": {"design": {"role": "design"}}},
-        task={"id": "ISSUE-166-03"},
-        step={"id": "design", "kind": "llm", "agent": "design", "on_failure": "human"},
-        state={},
-        run_dir=run_dir,
-        workspace=tmp_path,
-        max_fix_attempts=3,
-    )
-
-    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
-    assert next_step == "human"
-    assert not any(event["type"] == "design_artifact" for event in events)
-    response_event = next(event for event in events if event["type"] == "agent_response")
-    assert response_event["response"]["status"] == "failure"
-    assert response_event["response"]["artifact_error"] == "artifact unavailable"
-
-
-def test_design_decision_artifact_renders_structured_response_fields(tmp_path: Path) -> None:
-    _write_design_decision_artifact(
-        tmp_path,
-        task={"id": "ISSUE-166-02"},
-        step={"id": "design"},
-        response={
-            "problem": "Missing decision structure",
-            "constraints": "Keep the run self-contained",
-            "selected_option": "Use Markdown sections",
-            "rationale": "Readable in reports",
-            "rejected_options": ["Only JSON"],
-            "rejected_rationale": "Harder to review",
-            "impact_scope": "Run artifacts",
-            "validation_result": "Integration test",
-            "open_items": "None",
-            "human_escalation": "None",
-        },
-    )
-
-    content = (tmp_path / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
-    assert "Missing decision structure" in content
-    assert "Use Markdown sections" in content
-    assert "Only JSON" in content
-    assert "Integration test" in content
-    assert "None" in content
-
-
-def test_implement_design_notes_create_design_decision_artifact(tmp_path: Path, monkeypatch) -> None:
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-
-    monkeypatch.setattr(
-        "loop.runner.run_agent",
-        lambda **_kwargs: {
-            "status": "success",
-            "parsed_json": True,
-            "design_notes": {"summary": "Use Hono JSX", "rationale": "Matches the stack"},
-        },
-    )
-
-    next_step = _run_step(
-        loop_definition={"agents": {"implement": {"role": "implementation"}}},
-        task={"id": "ISSUE-427"},
-        step={"id": "implement", "kind": "llm", "agent": "implement"},
-        state={},
-        run_dir=run_dir,
-        workspace=tmp_path,
-        max_fix_attempts=3,
-    )
-
-    assert next_step == "done"
-    content = (run_dir / "artifacts" / "design-decision.md").read_text(encoding="utf-8")
-    assert "Use Hono JSX" in content
-    events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()]
-    assert any(event["type"] == "design_artifact" for event in events)
 
 
 def test_loop_schema_rejects_unknown_step_reference() -> None:
@@ -2425,30 +2267,6 @@ def test_run_report_renders_recent_events() -> None:
     assert "implementation_feedback -> human" in report
 
 
-def test_run_report_renders_design_artifact_reference() -> None:
-    report = render_report(
-        {
-            "task_id": "ISSUE-166",
-            "status": "done",
-            "current_step": "done",
-            "iteration": 1,
-            "last_feedback": None,
-        },
-        [
-            {
-                "type": "design_artifact",
-                "step": "design",
-                "artifact_path": "artifacts/design-decision.md",
-                "summary": "Use the run artifact",
-                "status": "created",
-            }
-        ],
-    )
-
-    assert "[artifacts/design-decision.md](artifacts/design-decision.md)" in report
-    assert "(created) / Use the run artifact" in report
-
-
 def test_run_report_renders_success_log_summary() -> None:
     report = render_report(
         {
@@ -2466,7 +2284,6 @@ def test_run_report_renders_success_log_summary() -> None:
                     "status": "success",
                     "mode": "codex",
                     "changed_paths": ["src/example.py"],
-                    "artifact_path": "artifacts/result.md",
                     "log": {
                         "format": "success-summary-v1",
                         "validation": "pending",
@@ -2480,7 +2297,6 @@ def test_run_report_renders_success_log_summary() -> None:
     )
 
     assert "changed: 1 — `src/example.py`" in report
-    assert "artifact: `artifacts/result.md`" in report
     assert "validation: pending" in report
     assert "next: `observe`" in report
     assert "omitted: stdout 120 chars; stderr 340 chars" in report

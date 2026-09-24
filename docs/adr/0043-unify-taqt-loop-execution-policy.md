@@ -1,5 +1,7 @@
 # ADR 0043: taqt loop を単一構造へ変更する
 
+> Status: Partially superseded by [ADR 0067](0067-remove-design-step-and-design-notes.md).
+
 ## 決定
 
 - taqt loop を `implement → verification → checker` の単一構造に統一し、design / test step を廃止する。

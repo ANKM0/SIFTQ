@@ -1,22 +1,13 @@
-# Baseline: pre-#427 main loop (design -> test -> implement -> verification -> checker).
-# arm A for paired replay (T3). Not used at runtime.
+# Baseline: test-first loop (test -> implement -> verification -> checker).
+# arm A for paired replay (T3). Not used at runtime. design step is removed.
 version: 1
 id: main_loop_full_structure
-
-fallback:
-  model: opencode-go/muse-spark-1.3-contributor-free
-  reasoning_effort: high
 
 limits:
   max_iterations: 12
   max_fix_attempts: 3
 
 agents:
-  design:
-    role: design
-    adapter: opencode
-    model: openai/gpt-5.6-luna
-    reasoning_effort: xhigh
   test:
     role: test_author
     adapter: opencode
@@ -40,10 +31,6 @@ agents:
     readonly: true
 
 steps:
-  - id: design
-    kind: llm
-    agent: design
-    next: test
   - id: test
     kind: llm
     agent: test
@@ -69,8 +56,6 @@ steps:
         next: fix
       - when: test_feedback
         next: fix
-      - when: local_design_feedback
-        next: design
       - when: specification_feedback
         next: human
       - when: product_feedback
