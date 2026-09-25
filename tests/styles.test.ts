@@ -104,6 +104,16 @@ describe("styles regression guards", () => {
   });
 });
 
+describe("Idea card description divider", () => {
+  it("draws a top border above the description but not on empty cards", () => {
+    const description = STYLES_CSS.match(/(?:^|\n)\.idea-card__description\s*\{[^}]*\}/);
+    expect(description?.[0]).toContain("border-top: 1px solid #8b949e;");
+
+    const empty = STYLES_CSS.match(/(?:^|\n)\.idea-card__description--empty\s*\{[^}]*\}/);
+    expect(empty?.[0]).toContain("border-top: 0;");
+  });
+});
+
 describe("Matrix drag feedback styles", () => {
   it("floats the Matrix drag ghost without capturing pointer events", () => {
     const ghost = STYLES_CSS.match(/(?:^|\n)\.matrix-drag-ghost\s*\{[^}]*\}/);
