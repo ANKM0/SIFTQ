@@ -120,30 +120,6 @@ function ConflictPage({ taskId }: { taskId: string }) {
   );
 }
 
-function StatusMenu({
-  task,
-  returnTo,
-  listStatus,
-}: {
-  task: Task;
-  returnTo: "matrix" | "tasks";
-  listStatus: TaskStatus;
-}) {
-  return <OptionMenu task={task} open="status" returnTo={returnTo} listStatus={listStatus} />;
-}
-
-function AreaMenu({
-  task,
-  returnTo,
-  listStatus,
-}: {
-  task: Task;
-  returnTo: "matrix" | "tasks";
-  listStatus: TaskStatus;
-}) {
-  return <OptionMenu task={task} open="area" returnTo={returnTo} listStatus={listStatus} />;
-}
-
 function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
   app.get("/", (c) => c.redirect("/ideas"));
 
@@ -206,26 +182,19 @@ function registerTaskDetailRoutes(app: Hono<AppEnv>, repository: Repository) {
   app.get("/tasks/:id", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return renderPage(
-      c,
-      <TaskDetailPage task={task} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />,
-    );
+    return renderPage(c, <TaskDetailPage task={task} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 
   app.get("/tasks/:id/status/menu", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return c.html(
-      <StatusMenu task={task} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />,
-    );
+    return c.html(<OptionMenu task={task} open="status" returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 
   app.get("/tasks/:id/area/menu", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return c.html(
-      <AreaMenu task={task} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />,
-    );
+    return c.html(<OptionMenu task={task} open="area" returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 }
 
