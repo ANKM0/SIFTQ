@@ -20,4 +20,12 @@ describe("IdeaDetailFields", () => {
     );
     expect(html).not.toContain("<a ");
   });
+
+  it("adds the empty modifier only when the description is blank", () => {
+    const emptyHtml = renderToString(<IdeaDetailFields title="メモ" description="" />);
+    expect(emptyHtml).toContain("idea-detail__description--empty");
+
+    const filledHtml = renderToString(<IdeaDetailFields title="メモ" description="本文" />);
+    expect(filledHtml).not.toContain("idea-detail__description--empty");
+  });
 });
