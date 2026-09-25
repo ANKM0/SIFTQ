@@ -28,6 +28,7 @@ steps:
     kind: llm
     agent: implement
     next: verification
+    on_failure: fix
   - id: verification
     kind: verification
     on_pass: checker
@@ -37,7 +38,7 @@ steps:
     kind: llm
     agent: fix
     next: verification
-    on_failure: human
+    on_failure: fix
   - id: checker
     kind: llm
     agent: checker

@@ -63,6 +63,14 @@
   3. 最低ライン: 両 arm とも done ≥60% / human ≤30% を大きく未達 → **改修**。
 - 結論: **改修**。レビュー構造（checker / post_review）の有無で closure はほぼ変わらない（差 ±10pt 以内）。両 arm とも閉じられない（closure 0〜2.8%、human 97〜100%）ため、verification / routing を先に改修する。段階4（commodity 委譲）は実行しない（簡素化の結論ではないため）。
 
+## 改修: llm 失敗 routing（#534, 2026-09-25）
+
+- 変更: llm step（implement / fix）の失敗を `max_fix_attempts` まで**再試行**する（runner で feedback 別に cap、`main_loop` と eval クローンの `on_failure` を `fix` に）。
+- 目的: provider / tool の一時失敗（`feedback=unknown`、空出力で非0）が 1 iteration で human 直行するのを防ぐ（段階1 の human 原因 routing の主因）。
+- before（#528 pilot）: 一時失敗で iteration 1 の human 直行が発生。
+- after（再実行: pilot 3 件、R=1、`LOOP_VERIFICATION_SKIP_E2E=1`）: 全 run が verification cap（iteration 8）まで再試行。**closure は 0 のまま**（タスク / モデル能力律速）。
+- 結果: `t3-pilot-routing-fix.json`
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。

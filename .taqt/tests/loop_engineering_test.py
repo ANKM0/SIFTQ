@@ -1246,6 +1246,63 @@ input: {}
     assert state["feedback_attempts"]["verification_fix"] == 2
 
 
+def test_llm_failure_retries_until_max_fix_attempts(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: llm-retry
+limits:
+  max_iterations: 10
+  max_fix_attempts: 1
+agents:
+  implement:
+    role: implementation
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    next: done
+    on_failure: implement
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-4
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 4
+status: pending
+phase: spec
+priority: normal
+input: {}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {"status": "failure", "feedback": "unknown"},
+    )
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+    )
+
+    assert result["status"] == "human"
+    state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
+    assert state["feedback_attempts"]["unknown"] == 2
+
+
 def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> None:
     loop_root = tmp_path / "loops"
     task_root = tmp_path / "tasks"
