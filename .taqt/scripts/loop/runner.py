@@ -229,8 +229,23 @@ def _run_step(
         if agent.get("readonly"):
             return next_step
         if response["status"] != "success":
-            state["last_feedback"] = response.get("feedback") or "unknown"
+            feedback = str(response.get("feedback") or "unknown")
+            state["last_feedback"] = feedback
             state["last_failed_step"] = step["id"]
+            attempts = state.setdefault("feedback_attempts", {})
+            attempts[feedback] = int(attempts.get(feedback, 0)) + 1
+            if attempts[feedback] > max_fix_attempts:
+                append_event(
+                    run_dir,
+                    {
+                        "type": "decision",
+                        "step": step["id"],
+                        "feedback": feedback,
+                        "next": "human",
+                        "reason": "max_fix_attempts exceeded",
+                    },
+                )
+                return "human"
             return str(step.get("on_failure", "human"))
         return next_step
 
