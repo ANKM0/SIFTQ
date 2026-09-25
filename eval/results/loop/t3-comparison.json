@@ -1,0 +1,243 @@
+{
+  "name": "t3-a",
+  "date": "2026-09-25",
+  "specs": [
+    "ISSUE-264-01",
+    "ISSUE-267",
+    "ISSUE-293",
+    "ISSUE-300",
+    "ISSUE-331-01",
+    "ISSUE-369",
+    "ISSUE-390",
+    "ISSUE-133",
+    "ISSUE-165-01",
+    "ISSUE-323-01",
+    "ISSUE-243-01",
+    "ISSUE-386-01"
+  ],
+  "summary": {
+    "A": {
+      "total": 36,
+      "done": 0,
+      "human": 36,
+      "failed": 0,
+      "escaped": 0,
+      "cost": 0.9041,
+      "tokens": {
+        "total": 107861461
+      },
+      "closure_rate": 0.0,
+      "human_rate": 1.0,
+      "escaped_rate": 0.0
+    },
+    "B": {
+      "total": 36,
+      "done": 1,
+      "human": 35,
+      "failed": 0,
+      "escaped": 0,
+      "cost": 0.7625,
+      "tokens": {
+        "total": 86719014
+      },
+      "closure_rate": 0.0278,
+      "human_rate": 0.9722,
+      "escaped_rate": 0.0
+    }
+  },
+  "per_task": {
+    "ISSUE-264-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0576
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.054
+      }
+    },
+    "ISSUE-267": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.1053
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0256
+      }
+    },
+    "ISSUE-293": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.1023
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0382
+      }
+    },
+    "ISSUE-300": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0544
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0495
+      }
+    },
+    "ISSUE-331-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0711
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0762
+      }
+    },
+    "ISSUE-369": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.113
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.1525
+      }
+    },
+    "ISSUE-390": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.062
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0716
+      }
+    },
+    "ISSUE-133": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.17
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0998
+      }
+    },
+    "ISSUE-165-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0463
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0501
+      }
+    },
+    "ISSUE-323-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0636
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0679
+      }
+    },
+    "ISSUE-243-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0249
+      },
+      "B": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0287
+      }
+    },
+    "ISSUE-386-01": {
+      "A": {
+        "status": {
+          "human": 3
+        },
+        "escaped": 0,
+        "cost": 0.0336
+      },
+      "B": {
+        "status": {
+          "human": 2,
+          "done": 1
+        },
+        "escaped": 0,
+        "cost": 0.0483
+      }
+    }
+  }
+}
