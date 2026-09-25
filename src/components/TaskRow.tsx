@@ -1,8 +1,8 @@
 import type { FC } from "hono/jsx";
 import { is_working } from "../task";
-import type { Task } from "../task";
+import type { Task, TaskStatus } from "../task";
 
-export const TaskRow: FC<{ task: Task }> = ({ task }) => (
+export const TaskRow: FC<{ task: Task; listStatus?: TaskStatus }> = ({ task, listStatus = "do" }) => (
   <div
     class={is_working(task) ? "task-row task-row--working" : "task-row"}
     data-task-row={task.id}
@@ -12,7 +12,7 @@ export const TaskRow: FC<{ task: Task }> = ({ task }) => (
     <label class="task-row-selection">
       <input type="checkbox" value={task.id} aria-label="Select task" data-task-select />
     </label>
-    <a class="task-row-link" href={`/tasks/${task.id}?from=tasks`}>
+    <a class="task-row-link" href={`/tasks/${task.id}?from=tasks&status=${listStatus}`}>
       <span class="task-row-main">
         <span class="task-row-title">
           <strong>{task.title}</strong>

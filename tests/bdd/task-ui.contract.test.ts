@@ -424,7 +424,7 @@ describe("Task detail Save form", () => {
     expect(body).toContain('id="task-version" type="hidden" name="version" value="3"');
     expect(body).toContain('data-task-form="edit"');
     expect(body).toContain('<button class="button primary" type="submit">Save</button>');
-    expect(body).toContain('href="/tasks"');
+    expect(body).toContain('class="button" href="/tasks?status=do"');
   });
 
   it("saves edits and redirects to the task list from the task-list detail form", async () => {
@@ -473,6 +473,38 @@ describe("Task detail Save form", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("hx-redirect")).toBe("/matrix");
+  });
+});
+
+describe("Task detail Cancel destination (issue 546)", () => {
+  it.each([
+    ["do", "/tasks?status=do"],
+    ["done", "/tasks?status=done"],
+    ["skip", "/tasks?status=skip"],
+  ] as const)("returns to the %s list when Cancel is pressed", async (status, expected) => {
+    await repo.insert(taskFixture({ id: "task-1", status }));
+
+    const listBody = await (await request(`/tasks?status=${status}`)).text();
+    expect(listBody).toContain(`href="/tasks/task-1?from=tasks&amp;status=${status}"`);
+
+    const detailBody = await (await request(`/tasks/task-1?from=tasks&status=${status}`)).text();
+    expect(detailBody).toContain(`class="button" href="${expected}"`);
+  });
+
+  it("keeps Cancel on /matrix for a matrix-origin detail", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do" }));
+
+    const body = await (await request("/tasks/task-1?from=matrix&status=done")).text();
+    expect(body).toContain('class="button" href="/matrix"');
+  });
+
+  it("keeps the origin status after opening a menu", async () => {
+    await repo.insert(taskFixture({ id: "task-1", status: "do" }));
+
+    const menuBody = await (
+      await request("/tasks/task-1/status/menu?from=tasks&status=done")
+    ).text();
+    expect(menuBody).toContain('href="/tasks/task-1?from=tasks&amp;status=done"');
   });
 });
 
