@@ -3,11 +3,15 @@ import type { Result, Task, TaskStatus, TaskVersionInput } from "../task";
 import { validateBulkTasks } from "../repository/repository-validation";
 import type { RepositoryError, TaskRepository } from "../repository/task-repository";
 
+function byMostRecentlyUpdated(left: Task, right: Task): number {
+  return right.updated_at.localeCompare(left.updated_at) || left.id.localeCompare(right.id);
+}
+
 export function createMemoryTaskRepository(initialTasks: readonly Task[] = []): TaskRepository {
   const tasks = new Map(initialTasks.map((task) => [task.id, task]));
 
   async function list(): Promise<Result<Task[], RepositoryError>> {
-    return ok<Task[], RepositoryError>([...tasks.values()]);
+    return ok<Task[], RepositoryError>([...tasks.values()].sort(byMostRecentlyUpdated));
   }
 
   async function find(id: string, _ownerId: string): Promise<Result<Task | undefined, RepositoryError>> {

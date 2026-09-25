@@ -118,7 +118,7 @@ describe("Task list page", () => {
     const body = await (await request("/tasks")).text();
 
     expect(body).toContain('class="task-row"');
-    expect(body).toContain("#1");
+    expect(body).not.toContain("issue-number");
     expect(body).toContain("seed task");
     expect(body).toContain("status area-badge");
     expect(body).toContain("status--do");
@@ -223,7 +223,6 @@ describe("Task list pagination", () => {
     expect(firstBody).toContain("seed-001");
     expect(firstBody).toContain("seed-025");
     expect(firstBody).not.toContain("seed-026");
-    expect(firstBody).toContain("#25");
     expect(firstBody).toContain('href="/tasks?status=do&amp;page=2"');
     expect(firstBody).toContain('aria-current="page"');
     expect(firstBody).toContain('aria-disabled="true"');
@@ -231,14 +230,13 @@ describe("Task list pagination", () => {
     expect(firstBody).toContain("次へ");
   });
 
-  it("shows the remaining tasks on page 2 with continuing issue numbers", async () => {
+  it("shows the remaining tasks on page 2", async () => {
     await seedDoTasks(26);
 
     const secondBody = await (await request("/tasks?status=do&page=2")).text();
     expect(countTaskRows(secondBody)).toBe(1);
     expect(secondBody).toContain("seed-026");
     expect(secondBody).not.toContain("seed-001");
-    expect(secondBody).toContain("#26");
     expect(secondBody).toContain('href="/tasks?status=do&amp;page=1"');
   });
 

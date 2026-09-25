@@ -84,7 +84,7 @@ async function bulkUpdateStatus(
 async function listTasks(db: D1Database): Promise<Result<Task[], RepositoryError>> {
   const result = await db
     .prepare(
-      'SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? ORDER BY id',
+      'SELECT id, owner_id, title, description, status, working, area, "order", version, created_at, updated_at FROM tasks WHERE owner_id = ? ORDER BY updated_at DESC, id ASC',
     )
     .bind(OWNER_ID)
     .all<Record<string, unknown>>();

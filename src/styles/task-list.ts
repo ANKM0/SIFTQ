@@ -68,12 +68,6 @@ export const TASK_LIST_CSS = `
   row-gap: 6px;
 }
 
-.issue-number {
-  color: #57606a;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .task-row:last-child {
   border-bottom: 0;
 }
