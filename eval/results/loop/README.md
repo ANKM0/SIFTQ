@@ -71,6 +71,13 @@
 - after（再実行: pilot 3 件、R=1、`LOOP_VERIFICATION_SKIP_E2E=1`）: 全 run が verification cap（iteration 8）まで再試行。**closure は 0 のまま**（タスク / モデル能力律速）。
 - 結果: `t3-pilot-routing-fix.json`
 
+## loop 改良と smoke（#552, 2026-09-26）
+
+- 実装: worktree 衝突の根絶（prune + パス削除 + 再試行）、smoke タスク（`eval/smoke/`）、gold preflight、provider/tool エラーの同一 step 再試行、fix への `last_verification`、verification の全失敗集約、runner の終端優先、write-scope guard（allowed paths）、escalation 分類（`provider_error` / `scope_violation`）。
+- smoke（改良前後）: A/B とも done（closure 1.0）。回帰なし。`smoke.json`
+- モデル比較: 同一タスク `ISSUE-369` で strong（`opencode-go/deepseek-v4.1-flash`）= done / weak（`opencode-go/muse-spark-1.3-contributor`）= human。**モデル能力が closure に効く**（n=1）。`model-compare.json`
+- 7（checker / post_review の要否）: **決定は保留**。部分結果（A3 で B > A）と smoke（A=B）では結論に不足。13 件 A/B の完走後に判断。
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。

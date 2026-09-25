@@ -379,7 +379,7 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert steps_by_id["verification"]["on_fix"] == "fix"
 
 
-def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch) -> None:
+def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
@@ -397,7 +397,14 @@ def test_verification_stops_at_first_failed_command(tmp_path: Path, monkeypatch)
 
     assert result["status"] == "fix"
     assert result["feedback"] == "verification_fix"
-    assert calls == ["git diff --check", "task -t .config/Taskfile.yml setup:frontend:ci", "task -t .config/Taskfile.yml ci:lint"]
+    assert calls == [
+        "git diff --check",
+        "task -t .config/Taskfile.yml setup:frontend:ci",
+        "task -t .config/Taskfile.yml ci:lint",
+        "task -t .config/Taskfile.yml ci:lint:python",
+        "task -t .config/Taskfile.yml ci:typecheck",
+        "task -t .config/Taskfile.yml ci:test:unit",
+    ]
 
 
 def test_verification_installs_frontend_dependencies_before_checks_for_frontend_changes(
@@ -426,6 +433,7 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
         "task -t .config/Taskfile.yml ci:lint",
         "task -t .config/Taskfile.yml ci:lint:python",
         "task -t .config/Taskfile.yml ci:typecheck",
+        "task -t .config/Taskfile.yml ci:test:unit",
     ]
 
 
@@ -453,6 +461,7 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
         "task -t .config/Taskfile.yml ci:lint",
         "task -t .config/Taskfile.yml ci:lint:python",
         "task -t .config/Taskfile.yml ci:typecheck",
+        "task -t .config/Taskfile.yml ci:test:unit",
     ]
 
 
@@ -845,7 +854,9 @@ blocked_reason: null
 
 def test_loop_guard_only_blocks_readonly_agents() -> None:
     validate_write_path({}, Path("src/index.tsx"))
-    validate_write_path({"writes": ["tests/"]}, Path("src/index.tsx"))
+    validate_write_path({"writes": ["src/"]}, Path("src/index.tsx"))
+    with pytest.raises(ValueError, match="outside allowed paths"):
+        validate_write_path({"writes": ["tests/"]}, Path("src/index.tsx"))
     with pytest.raises(ValueError, match="readonly agent cannot write"):
         validate_write_path({"readonly": True}, Path("src/index.tsx"))
 
@@ -1301,6 +1312,129 @@ input: {}
     assert result["status"] == "human"
     state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
     assert state["feedback_attempts"]["unknown"] == 2
+
+
+def test_terminal_step_takes_priority_over_max_iterations(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: terminal-priority
+limits:
+  max_iterations: 1
+agents:
+  implement:
+    role: implementation
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    next: human
+  - id: human
+    kind: terminal
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-5
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 5
+status: pending
+phase: spec
+priority: normal
+input: {}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "loop.runner.run_agent",
+        lambda **_kwargs: {"status": "success", "parsed_json": True},
+    )
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+    )
+
+    assert result["status"] == "human"
+    assert result["phase"] == "human"
+
+
+def test_provider_error_retries_same_step(tmp_path: Path, monkeypatch) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    loop_path.write_text(
+        """
+version: 1
+id: provider-retry
+limits:
+  max_iterations: 10
+  provider_retries: 1
+agents:
+  implement:
+    role: implementation
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    next: done
+    on_failure: human
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-6
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 6
+status: pending
+phase: spec
+priority: normal
+input: {}
+""",
+        encoding="utf-8",
+    )
+    calls: list[int] = []
+
+    def fake_agent(**_kwargs: object) -> dict[str, object]:
+        calls.append(1)
+        return {"status": "failure", "feedback": "provider_error"}
+
+    monkeypatch.setattr("loop.runner.run_agent", fake_agent)
+    monkeypatch.setattr("loop.runner.time.sleep", lambda _seconds: None)
+
+    result = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+    )
+
+    assert result["status"] == "human"
+    assert len(calls) == 2
+    state = json.loads((Path(result["run_dir"]) / "state.json").read_text(encoding="utf-8"))
+    assert state["provider_attempts"]["implement"] == 2
+
+
+def test_write_scope_guard_blocks_paths_outside_writes() -> None:
+    validate_write_path({"writes": ["src/"]}, Path("src/index.tsx"))
+    with pytest.raises(ValueError, match="outside allowed paths"):
+        validate_write_path({"writes": ["src/"]}, Path("docs/guide.md"))
+    validate_write_path({"writes": ["src/"]}, Path("src"))
 
 
 def test_taqt_task_run_maps_human_terminal_to_blocked_task(tmp_path: Path) -> None:

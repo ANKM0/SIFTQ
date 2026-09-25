@@ -1,0 +1,18 @@
+id: SMOKE-1
+source:
+  type: github_issue
+  repo: ANKM0/SIFTQ
+  issue_number: 1
+status: pending
+phase: spec
+priority: normal
+input:
+  issue:
+    title: 'smoke: fizzbuzz を実装する'
+    body: '## AC
+
+      - `fizzbuzz.py` を作成し、`fizz(n)` を実装する（3 の倍数は Fizz、5 の倍数は Buzz、15 の倍数は FizzBuzz、それ以外は数値の文字列）。
+
+      ## DoD
+
+      - `python -c "import fizzbuzz; ..."` の検証が通る。'

@@ -1,0 +1,56 @@
+# Eval copy of main_loop with a stronger model, for model comparison. Not used at runtime.
+version: 1
+id: main_loop_eval_strong
+
+limits:
+  max_iterations: 12
+  max_fix_attempts: 3
+  provider_retries: 3
+
+agents:
+  implement:
+    role: implementation
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+    reasoning_effort: high
+  fix:
+    role: implementation_fixer
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+    reasoning_effort: high
+  checker:
+    role: checker
+    adapter: opencode
+    model: opencode-go/gpt-5.6-luna
+    reasoning_effort: xhigh
+    readonly: true
+
+steps:
+  - id: implement
+    kind: llm
+    agent: implement
+    next: verification
+    on_failure: fix
+  - id: verification
+    kind: verification
+    on_pass: checker
+    on_fix: fix
+    on_human: human
+  - id: fix
+    kind: llm
+    agent: fix
+    next: verification
+    on_failure: fix
+  - id: checker
+    kind: llm
+    agent: checker
+    next: post_review
+  - id: post_review
+    kind: post_review
+    on_pass: done
+    on_fix: fix
+    on_human: human
+  - id: done
+    kind: terminal
+  - id: human
+    kind: terminal

@@ -1,0 +1,9 @@
+name: model-compare
+arms:
+  strong: eval/baselines/loop/main_loop_eval_strong.yaml
+  weak: eval/baselines/loop/main_loop_eval.yaml
+checks:
+- '{taskfile} ci:typecheck'
+- '{taskfile} ci:test:unit'
+base_commit: 21e97b54df15221a3430bf89f2dbd082765a1fc6
+repetitions: 1
