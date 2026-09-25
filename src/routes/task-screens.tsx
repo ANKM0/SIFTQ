@@ -15,7 +15,6 @@ import { pageNav } from "../views/navigation";
 import { changeTaskArea, changeTaskStatus, changeTaskWorking, createTask, isTaskStatus, is_working } from "../task";
 import type { Task, TaskStatus } from "../task";
 import {
-  TASK_LIST_PAGE_SIZE,
   TASK_STATUS_FILTERS,
   filterTasks,
   paginateTasks,
@@ -174,7 +173,6 @@ function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository, ideaR
         query={query}
         currentPage={currentPage}
         totalPages={totalPages}
-        pageOffset={(currentPage - 1) * TASK_LIST_PAGE_SIZE}
         queryInUrl={rawQuery}
       />,
     );

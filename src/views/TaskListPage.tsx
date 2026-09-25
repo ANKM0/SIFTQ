@@ -269,15 +269,13 @@ function TaskListToolbar({
   );
 }
 
-function TaskListRows({ tasks, pageOffset }: { tasks: readonly Task[]; pageOffset: number }) {
+function TaskListRows({ tasks }: { tasks: readonly Task[] }) {
   return (
     <div class="list" aria-label="Task list">
       {tasks.length === 0 ? (
         <p class="task-list-empty">該当するtaskはありません。</p>
       ) : (
-        tasks.map((task, index) => (
-          <TaskRow key={task.id} task={task} issueNumber={pageOffset + index + 1} />
-        ))
+        tasks.map((task) => <TaskRow key={task.id} task={task} />)
       )}
     </div>
   );
@@ -290,7 +288,6 @@ export function TaskListPage({
   query,
   currentPage,
   totalPages,
-  pageOffset,
   queryInUrl,
 }: {
   tasks: readonly Task[];
@@ -299,7 +296,6 @@ export function TaskListPage({
   query: string;
   currentPage: number;
   totalPages: number;
-  pageOffset: number;
   queryInUrl: string | undefined;
 }) {
   return (
@@ -319,7 +315,7 @@ export function TaskListPage({
           workingOnly={workingOnly}
           query={queryInUrl}
         />
-        <TaskListRows tasks={tasks} pageOffset={pageOffset} />
+        <TaskListRows tasks={tasks} />
       </div>
       <PageNav
         status={status}

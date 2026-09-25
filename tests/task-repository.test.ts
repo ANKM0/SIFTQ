@@ -56,7 +56,8 @@ class RecordingPreparedStatement implements D1PreparedStatement {
   }
 
   all<T = Record<string, unknown>>(): Promise<D1Result<T>> {
-    return Promise.reject(new Error("all is not implemented in this test double"));
+    this.recordExecution();
+    return Promise.resolve(successResult<T>([], this.recorder.nextChanges()));
   }
 
   raw<T = unknown[]>(
@@ -217,5 +218,30 @@ describe("TaskRepository contract", () => {
     expect(moved).toEqual({ ok: false, error: { code: "CONFLICT" } });
     expect(moveDatabase.executions).toHaveLength(2);
     expect(moveDatabase.executions.every(({ query }) => query.includes("UPDATE tasks SET area"))).toBe(true);
+  });
+});
+
+describe("Task list ordering by updated_at", () => {
+  it("lists the most recently updated task first through the in-memory double", async () => {
+    const repository = createMemoryTaskRepository();
+    await repository.insert(taskFixture({ id: "old", updated_at: "2026-01-01T00:00:00.000Z" }));
+    await repository.insert(taskFixture({ id: "new", updated_at: "2026-03-01T00:00:00.000Z" }));
+    await repository.insert(taskFixture({ id: "mid", updated_at: "2026-02-01T00:00:00.000Z" }));
+
+    const listed = await repository.list();
+
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    expect(listed.value.map((task) => task.id)).toEqual(["new", "mid", "old"]);
+  });
+
+  it("orders the D1 task list query by updated_at descending", async () => {
+    const database = new RecordingD1Database([1]);
+    const repository = createD1TaskRepository(database);
+
+    const listed = await repository.list();
+
+    expect(listed.ok).toBe(true);
+    expect(database.executions[0]?.query).toContain("ORDER BY updated_at DESC");
   });
 });

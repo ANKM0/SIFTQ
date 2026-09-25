@@ -42,7 +42,8 @@
   - 選択した status は `/tasks?status=<status>` で保持し、再読み込み後も維持する。
   - Task list 以外の画面から `/tasks` へ遷移した場合は `do` を選択する。
   - 選択した status と一致する task だけを表示する。該当 task がない場合は空状態メッセージを表示する。
-  - 各行は `#番号`、title、area badge、status badge を表示する。
+  - 並びは `updated_at` の降順（新しい順）とする。
+  - 各行は title、area badge、status badge を表示する。
   - area badge は `1 / 2 / 3 / 4` を表示する。
   - status badge は `do / done / skip` を表示する。
   - status 絞り込み後の件数を25件単位でページ分割し、一覧下にページナビを表示する。
