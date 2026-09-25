@@ -90,7 +90,11 @@ def run_replay(
                 status = str(result.get("status"))
                 escaped = False
                 if status == "done" and checks:
-                    escaped = _checks_failed(checks, cwd=run_workspace, runner=check_runner)
+                    escaped = _checks_failed(
+                        _resolve_checks(checks, run_workspace),
+                        cwd=run_workspace,
+                        runner=check_runner,
+                    )
                 record: dict[str, Any] = {"arm": arm, "status": status, "escaped": escaped}
                 if repetitions > 1:
                     record["rep"] = rep
@@ -217,6 +221,19 @@ def summarize_records(records: Sequence[dict[str, Any]]) -> dict[str, Any]:
 
 def _checks_failed(commands: Sequence[str], *, cwd: Path, runner: CommandRunner) -> bool:
     return any(runner(command, cwd) != 0 for command in commands)
+
+
+def _task_command(workspace: Path) -> str:
+    if (workspace / ".config" / "Taskfile.yml").is_file():
+        return "task -t .config/Taskfile.yml"
+    if (workspace / "Taskfile.yml").is_file():
+        return "task -t Taskfile.yml"
+    return "task -t .config/Taskfile.yml"
+
+
+def _resolve_checks(checks: Sequence[str], workspace: Path) -> list[str]:
+    task_command = _task_command(workspace)
+    return [command.replace("{taskfile}", task_command) for command in checks]
 
 
 def _spec_paths(root: Path) -> list[Path]:

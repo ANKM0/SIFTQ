@@ -21,8 +21,8 @@ ARMS = {
     "B": "eval/baselines/loop/main_loop_minimal.yaml",
 }
 CHECKS = (
-    "task -t .config/Taskfile.yml ci:typecheck",
-    "task -t .config/Taskfile.yml ci:test:unit",
+    "{taskfile} ci:typecheck",
+    "{taskfile} ci:test:unit",
 )
 
 

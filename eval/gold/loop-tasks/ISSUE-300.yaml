@@ -3,7 +3,7 @@ arms:
   A: eval/baselines/loop/main_loop_eval.yaml
   B: eval/baselines/loop/main_loop_minimal.yaml
 checks:
-- task -t .config/Taskfile.yml ci:typecheck
-- task -t .config/Taskfile.yml ci:test:unit
+- '{taskfile} ci:typecheck'
+- '{taskfile} ci:test:unit'
 base_commit: eefeaf3935a3b5e95d0ca7e8371b0ac7632e4dc6
 repetitions: 3

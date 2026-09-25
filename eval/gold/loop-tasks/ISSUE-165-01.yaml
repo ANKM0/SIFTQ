@@ -3,7 +3,7 @@ arms:
   A: eval/baselines/loop/main_loop_eval.yaml
   B: eval/baselines/loop/main_loop_minimal.yaml
 checks:
-- task -t .config/Taskfile.yml ci:typecheck
+- '{taskfile} ci:typecheck'
 - PYTHONPATH=.taqt/scripts uv run python -m pytest .taqt/tests -q
 base_commit: fda3fac55a225ef2be31b2135bfb54a64a0c167e
 repetitions: 3
