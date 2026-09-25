@@ -115,6 +115,33 @@ test("linkifies pasted URLs and saves plain text in the modal", async ({ page })
   await expect(page.locator("[data-idea-modal] textarea[data-description-value]")).toHaveValue(description);
 });
 
+test("shows the description divider in the modal only when the description is not empty", async ({ page }) => {
+  await signIn(page);
+  await clearIdeas(page);
+  await createIdea(page, "区切り線あり", "本文あり");
+  await createIdea(page, "区切り線なし");
+  await page.goto("/ideas");
+
+  await openIdeaModal(page, "区切り線あり");
+  const filled = page.locator("[data-idea-modal] [data-description-editor]");
+  await expect(filled).not.toHaveClass(/idea-detail__description--empty/);
+  await expect(filled).toHaveCSS("border-top-width", "1px");
+
+  await page.locator("[data-idea-modal] [data-idea-close]").click();
+  await expect(page.locator("[data-idea-modal]")).toBeHidden();
+
+  await openIdeaModal(page, "区切り線なし");
+  const empty = page.locator("[data-idea-modal] [data-description-editor]");
+  await expect(empty).toHaveClass(/idea-detail__description--empty/);
+  await expect(empty).toHaveCSS("border-top-width", "0px");
+  await expect(empty).not.toContainText("No description yet.");
+
+  await empty.click();
+  await page.keyboard.type("追記");
+  await expect(empty).not.toHaveClass(/idea-detail__description--empty/);
+  await expect(empty).toHaveCSS("border-top-width", "1px");
+});
+
 test("linkifies description URLs on the idea detail page", async ({ page }) => {
   const url = `${e2eBaseUrl}/ideas`;
   await signIn(page);
