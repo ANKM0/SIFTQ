@@ -45,7 +45,7 @@ export const TASK_LIST_CSS = `
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 
