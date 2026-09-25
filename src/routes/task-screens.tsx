@@ -92,6 +92,11 @@ function detailReturnTo(c: Context<AppEnv>): "matrix" | "tasks" {
   return c.req.query("from") === "matrix" ? "matrix" : "tasks";
 }
 
+function detailListStatus(c: Context<AppEnv>): TaskStatus {
+  const status = c.req.query("status");
+  return isTaskStatus(status) ? status : "do";
+}
+
 function parseNewTaskState(c: Context<AppEnv>): NewTaskState {
   const status = c.req.query("status");
   const area = parseTaskArea(c.req.query("area"));
@@ -113,14 +118,6 @@ function ConflictPage({ taskId }: { taskId: string }) {
       <a {...pageNav(`/tasks/${taskId}`)}>Load latest</a>
     </div>
   );
-}
-
-function StatusMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks" }) {
-  return <OptionMenu task={task} open="status" returnTo={returnTo} />;
-}
-
-function AreaMenu({ task, returnTo }: { task: Task; returnTo: "matrix" | "tasks" }) {
-  return <OptionMenu task={task} open="area" returnTo={returnTo} />;
 }
 
 function registerTaskListRoutes(app: Hono<AppEnv>, repository: Repository, ideaRepository: IdeaRepositoryFactory) {
@@ -185,19 +182,19 @@ function registerTaskDetailRoutes(app: Hono<AppEnv>, repository: Repository) {
   app.get("/tasks/:id", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return renderPage(c, <TaskDetailPage task={task} returnTo={detailReturnTo(c)} />);
+    return renderPage(c, <TaskDetailPage task={task} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 
   app.get("/tasks/:id/status/menu", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return c.html(<StatusMenu task={task} returnTo={detailReturnTo(c)} />);
+    return c.html(<OptionMenu task={task} open="status" returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 
   app.get("/tasks/:id/area/menu", async (c) => {
     const task = await findTask(c, repository, c.req.param("id"));
     if (!task) return c.notFound();
-    return c.html(<AreaMenu task={task} returnTo={detailReturnTo(c)} />);
+    return c.html(<OptionMenu task={task} open="area" returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
   });
 }
 
@@ -230,7 +227,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     const version = parseTaskVersion(body["version"]);
     if (version === null) return c.text("Invalid version", 400);
     const error = taskTextError(title, description);
-    if (error !== undefined) return c.html(<TaskDetailPage task={task} error={error} returnTo={detailReturnTo(c)} />);
+    if (error !== undefined) return c.html(<TaskDetailPage task={task} error={error} returnTo={detailReturnTo(c)} listStatus={detailListStatus(c)} />);
     const saved = await persistTask(c, repository, { ...task, title, description, version });
     if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
     const path = detailReturnTo(c) === "matrix" ? "/matrix" : "/tasks";
@@ -250,7 +247,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if (!isTaskStatus(status) || version === null) return c.text("Invalid status", 400);
     const changed = changeTaskStatus(task, status);
     if (!changed.ok) return c.text("Invalid status", 400);
-    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c));
+    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c), detailListStatus(c));
   });
 
   app.post("/tasks/:id/area", async (c) => {
@@ -262,7 +259,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if (area === null || version === null) return c.text("Invalid area", 400);
     const changed = changeTaskArea(task, area);
     if (!changed.ok) return c.text("Invalid area", 400);
-    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c));
+    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c), detailListStatus(c));
   });
 
   app.post("/tasks/:id/working", async (c) => {
@@ -274,7 +271,7 @@ function registerTaskEditRoutes(app: Hono<AppEnv>, repository: Repository) {
     if ((rawWorking !== "true" && rawWorking !== "false") || version === null) return c.text("Invalid working", 400);
     const changed = changeTaskWorking(task, rawWorking === "true");
     if (!changed.ok) return c.text("Invalid working", 400);
-    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c));
+    return updateTaskMeta(c, repository, task, { ...changed.value, version }, detailReturnTo(c), detailListStatus(c));
   });
 }
 
@@ -291,12 +288,13 @@ async function updateTaskMeta(
   task: Task,
   updated: Task,
   returnTo: "matrix" | "tasks",
+  listStatus: TaskStatus,
 ) {
   const saved = await persistTask(c, repository, updated);
   if (saved === null) return c.html(<ConflictPage taskId={task.id} />, 409);
   return c.html(
     <>
-      <TaskMeta task={saved} returnTo={returnTo} />
+      <TaskMeta task={saved} returnTo={returnTo} listStatus={listStatus} />
       <TaskVersionInput version={saved.version} outOfBand />
     </>,
   );

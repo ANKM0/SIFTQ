@@ -269,13 +269,13 @@ function TaskListToolbar({
   );
 }
 
-function TaskListRows({ tasks }: { tasks: readonly Task[] }) {
+function TaskListRows({ tasks, status }: { tasks: readonly Task[]; status: TaskStatus }) {
   return (
     <div class="list" aria-label="Task list">
       {tasks.length === 0 ? (
         <p class="task-list-empty">該当するtaskはありません。</p>
       ) : (
-        tasks.map((task) => <TaskRow key={task.id} task={task} />)
+        tasks.map((task) => <TaskRow key={task.id} task={task} listStatus={status} />)
       )}
     </div>
   );
@@ -315,7 +315,7 @@ export function TaskListPage({
           workingOnly={workingOnly}
           query={queryInUrl}
         />
-        <TaskListRows tasks={tasks} />
+        <TaskListRows tasks={tasks} status={status} />
       </div>
       <PageNav
         status={status}
