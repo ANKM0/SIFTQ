@@ -5,7 +5,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from loop_eval.replay import load_replay_spec, run_replay, summarize_records
+from loop_eval.replay import (
+    _resolve_checks,
+    _task_command,
+    load_replay_spec,
+    run_replay,
+    summarize_records,
+)
 
 
 def test_summarize_records_computes_closure_and_escaped_rates() -> None:
@@ -162,6 +168,20 @@ def test_load_replay_spec_rejects_invalid_specs(tmp_path: Path, body: str) -> No
 
     with pytest.raises(ValueError):
         load_replay_spec(spec)
+
+
+def test_task_command_prefers_config_then_root(tmp_path: Path) -> None:
+    assert _task_command(tmp_path) == "task -t .config/Taskfile.yml"
+
+    (tmp_path / "Taskfile.yml").write_text("version: '3'\n", encoding="utf-8")
+    assert _task_command(tmp_path) == "task -t Taskfile.yml"
+
+    (tmp_path / ".config").mkdir()
+    (tmp_path / ".config" / "Taskfile.yml").write_text("version: '3'\n", encoding="utf-8")
+    assert _task_command(tmp_path) == "task -t .config/Taskfile.yml"
+    assert _resolve_checks(["{taskfile} ci:test:unit"], tmp_path) == [
+        "task -t .config/Taskfile.yml ci:test:unit"
+    ]
 
 
 def test_load_replay_spec_reads_base_commit_and_repetitions(tmp_path: Path) -> None:

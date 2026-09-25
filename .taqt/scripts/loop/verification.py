@@ -22,17 +22,32 @@ def _e2e_enabled() -> bool:
     return value not in {"1", "true", "yes"}
 
 
+def _task_command(cwd: Path) -> str:
+    if (cwd / ".config" / "Taskfile.yml").is_file():
+        return "task -t .config/Taskfile.yml"
+    if (cwd / "Taskfile.yml").is_file():
+        return "task -t Taskfile.yml"
+    return TASKFILE
+
+
 def run_verification(
     *,
     cwd: Path,
 ) -> dict[str, Any]:
+    task_command = _task_command(cwd)
+    fast_commands = (
+        f"{task_command} ci:lint",
+        f"{task_command} ci:lint:python",
+        f"{task_command} ci:typecheck",
+        f"{task_command} ci:test:unit",
+    )
     commands: list[tuple[str, tuple[str, ...]]] = [
         ("diff_check", ("git diff --check",)),
-        ("frontend_dependencies", (FRONTEND_DEPENDENCY_COMMAND,)),
-        ("fast_checks", FAST_COMMANDS),
+        ("frontend_dependencies", (f"{task_command} setup:frontend:ci",)),
+        ("fast_checks", fast_commands),
     ]
     if _e2e_enabled():
-        commands.append(("e2e_checks", E2E_COMMANDS))
+        commands.append(("e2e_checks", (f"{task_command} ci:test:e2e",)))
     results: list[dict[str, Any]] = []
     for phase, phase_commands in commands:
         for command in phase_commands:
