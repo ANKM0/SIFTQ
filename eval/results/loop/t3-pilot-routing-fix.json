@@ -1,0 +1,23 @@
+{
+  "name": "t3-pilot-routing-fix",
+  "date": "2026-09-25",
+  "harness": "loop_eval.replay",
+  "change": "llm step 失敗を max_fix_attempts まで再試行する（runner で cap、main_loop / eval クローンの implement/fix の on_failure を fix に）",
+  "before": {
+    "source": "#528 pilot",
+    "note": "provider/tool の一時失敗（feedback=unknown、空出力で非0）で 1 iteration human 直行が発生（例: ISSUE-264-01 20260924T172047Z は implement failure→iteration 1 human）",
+    "tasks": ["ISSUE-264-01", "ISSUE-293", "ISSUE-369"]
+  },
+  "after": {
+    "config": {"repetitions": 1, "skip_e2e": true, "arm_a": "eval/baselines/loop/main_loop_eval.yaml", "arm_b": "eval/baselines/loop/main_loop_minimal.yaml"},
+    "results": {
+      "ISSUE-264-01": {"A": "human / iteration 8 / verification_fix cap", "B": "human / iteration 8"},
+      "ISSUE-293": {"A": "human / iteration 8", "B": "human / iteration 8"},
+      "ISSUE-369": "timeout (20 min)"
+    }
+  },
+  "summary": {
+    "closure": 0.0,
+    "note": "closure は不変（タスク/モデル能力律速）。一時失敗による 1-iteration human 直行は解消し、verification cap まで再試行するようになった。"
+  }
+}
