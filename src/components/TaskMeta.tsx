@@ -1,13 +1,14 @@
 import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
-import type { Task } from "../task";
+import type { Task, TaskStatus } from "../task";
 
-export const TaskMeta: FC<{ task: Task; returnTo?: "matrix" | "tasks" }> = ({
+export const TaskMeta: FC<{ task: Task; returnTo?: "matrix" | "tasks"; listStatus?: TaskStatus }> = ({
   task,
   returnTo,
+  listStatus = "do",
 }) => {
-  if (returnTo === undefined) return <TaskSidePanel task={task} />;
-  return <TaskSidePanel task={task} returnTo={returnTo} />;
+  if (returnTo === undefined) return <TaskSidePanel task={task} listStatus={listStatus} />;
+  return <TaskSidePanel task={task} returnTo={returnTo} listStatus={listStatus} />;
 };
 
 export const TaskSidePanel: FC<{
@@ -15,16 +16,19 @@ export const TaskSidePanel: FC<{
   className?: string;
   children?: JSX.Element;
   returnTo?: "matrix" | "tasks";
+  listStatus?: TaskStatus;
 }> = ({
   task,
   className = "side-panel",
   children,
   returnTo = "tasks",
+  listStatus = "do",
 }) => {
-  const detailPath = `/tasks/${task.id}?from=${returnTo}`;
-  const statusPath = `/tasks/${task.id}/status/menu?from=${returnTo}`;
-  const areaPath = `/tasks/${task.id}/area/menu?from=${returnTo}`;
-  const workingPath = `/tasks/${task.id}/working?from=${returnTo}`;
+  const statusQuery = returnTo === "matrix" ? "" : `&status=${listStatus}`;
+  const detailPath = `/tasks/${task.id}?from=${returnTo}${statusQuery}`;
+  const statusPath = `/tasks/${task.id}/status/menu?from=${returnTo}${statusQuery}`;
+  const areaPath = `/tasks/${task.id}/area/menu?from=${returnTo}${statusQuery}`;
+  const workingPath = `/tasks/${task.id}/working?from=${returnTo}${statusQuery}`;
 
   return (
     <aside

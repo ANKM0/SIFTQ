@@ -2,7 +2,7 @@ import { splitDescription } from "../description";
 import { TaskMeta } from "../components/TaskMeta";
 import { NewTaskMeta } from "../components/NewTaskMeta";
 import type { NewTaskState } from "../components/NewTaskMeta";
-import type { Task } from "../task";
+import type { Task, TaskStatus } from "../task";
 
 function TitleField({ value }: { value?: string }) {
   return (
@@ -94,12 +94,14 @@ export function TaskDetailPage({
   task,
   error,
   returnTo = "tasks",
+  listStatus = "do",
 }: {
   task: Task;
   error?: string;
   returnTo?: "matrix" | "tasks";
+  listStatus?: TaskStatus;
 }) {
-  const cancelHref = returnTo === "matrix" ? "/matrix" : "/tasks";
+  const cancelHref = returnTo === "matrix" ? "/matrix" : `/tasks?status=${listStatus}`;
 
   return (
     <div class="page page--detail" data-state="normal">
@@ -125,7 +127,7 @@ export function TaskDetailPage({
           <DescriptionField>{task.description}</DescriptionField>
           <TaskFormActions submitLabel="Save" cancelHref={cancelHref} />
         </form>
-        <TaskMeta task={task} returnTo={returnTo} />
+        <TaskMeta task={task} returnTo={returnTo} listStatus={listStatus} />
       </div>
     </div>
   );
