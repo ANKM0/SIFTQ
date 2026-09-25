@@ -231,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runs-root", type=Path, default=Path(".taqt/runs"))
     parser.add_argument("--repo", type=Path)
     parser.add_argument("--repetitions", type=int)
+    parser.add_argument("--worktree-root", type=Path, default=DEFAULT_WORKTREE_ROOT)
     args = parser.parse_args(argv)
 
     spec = load_replay_spec(args.spec)
@@ -245,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         base_commit=spec["base_commit"],
         repetitions=repetitions,
         repo=repo if spec["base_commit"] else None,
+        worktree_root=args.worktree_root,
     )
     result["name"] = spec["name"]
     print(json.dumps(result, ensure_ascii=False, indent=2))

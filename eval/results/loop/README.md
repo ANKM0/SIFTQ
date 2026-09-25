@@ -50,6 +50,19 @@
 - 補足: `opencode-go/muse-spark-1.3-contributor` で実行（`opencode/muse-spark-1.3-contributor-free` の `stream error` ハングを回避）。usage（tokens / cost）は harness が記録できた。
 - 残: A（12 件、R=3、e2e 込み、並列 2〜4）の実行。72 run 規模のため未実施。
 
+## 段階3 比較（A, 2026-09-25）
+
+- 構成: gold 12 件 × R=3 × arm A（現行構造）/ B（最小構造、checker / post_review を外す）、e2e 込み、ローカル並列 4。
+- 結果: `t3-comparison.json`
+- 集計:
+  - A: total 36、done 0、human 36、escaped 0 → closure 0.0% / human 100.0% / escaped 0 / cost $0.9041 / tokens 107.9M
+  - B: total 36、done 1、human 35、escaped 0 → closure 2.8% / human 97.2% / escaped 0 / cost $0.7625 / tokens 86.7M
+- 判定（`eval/loop-evaluation.md`）:
+  1. 必須条件: escaped 0 → 両 arm 満たす。
+  2. 主判定: closure 差 +2.8pt、human 差 2.8pt（±10pt 以内）→ タイブレーク。
+  3. 最低ライン: 両 arm とも done ≥60% / human ≤30% を大きく未達 → **改修**。
+- 結論: **改修**。レビュー構造（checker / post_review）の有無で closure はほぼ変わらない（差 ±10pt 以内）。両 arm とも閉じられない（closure 0〜2.8%、human 97〜100%）ため、verification / routing を先に改修する。段階4（commodity 委譲）は実行しない（簡素化の結論ではないため）。
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。
