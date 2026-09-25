@@ -102,6 +102,12 @@ describe("styles regression guards", () => {
     expect(STYLES_CSS).toContain("width: min(360px, calc(100vw - 32px));");
     expect(STYLES_CSS).toContain("@media (width < 40rem)");
   });
+
+  it("gives the task row link a single full-width column", () => {
+    const link = STYLES_CSS.match(/(?:^|\n)\.task-row-link\s*\{[^}]*\}/);
+    expect(link?.[0]).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(link?.[0]).not.toContain("48px");
+  });
 });
 
 describe("Idea card description divider", () => {
