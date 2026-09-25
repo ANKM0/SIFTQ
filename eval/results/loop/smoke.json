@@ -1,0 +1,101 @@
+{
+  "name": "smoke",
+  "date": "2026-09-26",
+  "harness": "loop_eval.replay",
+  "config": {
+    "repetitions": 1,
+    "skip_e2e": true,
+    "tasks": [
+      "SMOKE-1"
+    ]
+  },
+  "before_improvements": {
+    "summary": {
+      "arms": {
+        "A": {
+          "total": 1,
+          "done": 1,
+          "human": 0,
+          "failed": 0,
+          "escaped": 0,
+          "tokens": {
+            "input": 11132,
+            "output": 1663,
+            "reasoning": 2059,
+            "cache_read": 179819,
+            "cache_write": 17044,
+            "total": 211717
+          },
+          "cost": 0.008305,
+          "closure_rate": 1.0,
+          "escaped_rate": 0.0,
+          "human_rate": 0.0
+        },
+        "B": {
+          "total": 1,
+          "done": 1,
+          "human": 0,
+          "failed": 0,
+          "escaped": 0,
+          "tokens": {
+            "input": 10187,
+            "output": 1290,
+            "reasoning": 926,
+            "cache_read": 158299,
+            "cache_write": 0,
+            "total": 170702
+          },
+          "cost": 0.001778,
+          "closure_rate": 1.0,
+          "escaped_rate": 0.0,
+          "human_rate": 0.0
+        }
+      }
+    }
+  },
+  "after_improvements": {
+    "summary": {
+      "arms": {
+        "A": {
+          "total": 1,
+          "done": 1,
+          "human": 0,
+          "failed": 0,
+          "escaped": 0,
+          "tokens": {
+            "input": 8635,
+            "output": 1397,
+            "reasoning": 1029,
+            "cache_read": 162765,
+            "cache_write": 20158,
+            "total": 193984
+          },
+          "cost": 0.009187,
+          "closure_rate": 1.0,
+          "escaped_rate": 0.0,
+          "human_rate": 0.0
+        },
+        "B": {
+          "total": 1,
+          "done": 1,
+          "human": 0,
+          "failed": 0,
+          "escaped": 0,
+          "tokens": {
+            "input": 24326,
+            "output": 1351,
+            "reasoning": 668,
+            "cache_read": 127978,
+            "cache_write": 0,
+            "total": 154323
+          },
+          "cost": 0.003092,
+          "closure_rate": 1.0,
+          "escaped_rate": 0.0,
+          "human_rate": 0.0
+        }
+      }
+    }
+  },
+  "note": "smoke は改良前後とも A/B とも done（closure 1.0）。回帰なしのカナリア。"
+}

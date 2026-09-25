@@ -184,6 +184,15 @@ def test_task_command_prefers_config_then_root(tmp_path: Path) -> None:
     ]
 
 
+def test_missing_tasks_detects_base_without_interface() -> None:
+    from loop_eval.preflight import missing_tasks
+
+    repo = Path(__file__).resolve().parents[2]
+
+    assert "ci:test:unit" in missing_tasks("a4279946", repo)
+    assert missing_tasks("21e97b54", repo) == []
+
+
 def test_load_replay_spec_reads_base_commit_and_repetitions(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yaml"
     spec.write_text(

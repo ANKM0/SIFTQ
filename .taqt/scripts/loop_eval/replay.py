@@ -1,7 +1,9 @@
 import argparse
 import contextlib
 import json
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence
 
@@ -11,6 +13,7 @@ from loop.runner import run_loop
 from loop.state import load_events
 
 from .defect_injection import subprocess_runner
+from .preflight import missing_tasks
 
 RunLoopFn = Callable[..., dict[str, Any]]
 CommandRunner = Callable[[str, Path], int]
@@ -132,15 +135,16 @@ def _default_worktree(
     arm: str, rep: int, base_commit: str, repo: Path, worktree_root: Path
 ) -> Iterator[Path]:
     safe_arm = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in arm)
-    path = (repo / worktree_root / f"{safe_arm}-{rep}").resolve()
+    base_path = (repo / worktree_root / f"{safe_arm}-{rep}").resolve()
     subprocess.run(
-        ["git", "worktree", "add", "--detach", "--force", str(path), base_commit],
+        ["git", "worktree", "prune"],
         cwd=repo,
-        check=True,
+        check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
+    path = _add_worktree(base_path, base_commit, repo)
     try:
         yield path
     finally:
@@ -160,6 +164,26 @@ def _default_worktree(
             stderr=subprocess.PIPE,
             text=True,
         )
+
+
+def _add_worktree(base_path: Path, base_commit: str, repo: Path) -> Path:
+    for attempt in range(3):
+        candidate = base_path if attempt == 0 else base_path.with_name(f"{base_path.name}-{attempt}")
+        if candidate.exists():
+            shutil.rmtree(candidate, ignore_errors=True)
+        completed = subprocess.run(
+            ["git", "worktree", "add", "--detach", "--force", str(candidate), base_commit],
+            cwd=repo,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if completed.returncode == 0:
+            return candidate
+    raise RuntimeError(
+        f"git worktree add failed for {base_commit} after retries: {completed.stderr.strip()}"
+    )
 
 
 def _run_usage(run_dir: Path) -> dict[str, Any]:
@@ -254,6 +278,13 @@ def main(argv: list[str] | None = None) -> int:
     spec = load_replay_spec(args.spec)
     repo = args.repo or args.workspace
     repetitions = args.repetitions or spec["repetitions"]
+    if spec["base_commit"]:
+        missing = missing_tasks(spec["base_commit"], repo)
+        if missing:
+            print(
+                f"::warning::gold {spec['name']} base lacks tasks: {', '.join(missing)}",
+                file=sys.stderr,
+            )
     result = run_replay(
         task_path=args.task,
         arms=spec["arms"],

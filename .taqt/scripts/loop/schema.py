@@ -103,6 +103,10 @@ def _validate_agents(value: Any) -> set[str]:
             raise ValueError(f"agent {agent_id}.readonly must be a boolean")
         if "command" in agent and not isinstance(agent["command"], str):
             raise ValueError(f"agent {agent_id}.command must be a string")
+        if "writes" in agent:
+            writes = agent["writes"]
+            if not isinstance(writes, list) or any(not isinstance(entry, str) or not entry for entry in writes):
+                raise ValueError(f"agent {agent_id}.writes must be a list of strings")
         for key in ("adapter", "model", "profile"):
             if key in agent and not isinstance(agent[key], str):
                 raise ValueError(f"agent {agent_id}.{key} must be a string")

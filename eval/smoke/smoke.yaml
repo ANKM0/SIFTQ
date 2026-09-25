@@ -1,0 +1,9 @@
+name: smoke
+arms:
+  A: eval/baselines/loop/main_loop_eval.yaml
+  B: eval/baselines/loop/main_loop_minimal.yaml
+checks:
+- python3 -c "import fizzbuzz; assert fizzbuzz.fizz(15)=='FizzBuzz' and fizzbuzz.fizz(3)=='Fizz'
+  and fizzbuzz.fizz(5)=='Buzz' and fizzbuzz.fizz(2)=='2'"
+base_commit: 15ecb7fbc722a99b8fd576213aed96ba1aebc5ae
+repetitions: 1

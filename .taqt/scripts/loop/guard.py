@@ -70,6 +70,12 @@ def validate_agent_changes(agent: dict[str, Any], paths: Iterable[Path]) -> None
 def validate_write_path(agent: dict[str, Any], path: Path) -> None:
     if agent.get("readonly"):
         raise ValueError(f"readonly agent cannot write: {path}")
+    writes = agent.get("writes")
+    if isinstance(writes, list) and writes:
+        allowed = [str(entry).rstrip("/") for entry in writes]
+        posix = path.as_posix().rstrip("/")
+        if not any(posix == entry or posix.startswith(entry + "/") for entry in allowed):
+            raise ValueError(f"write outside allowed paths: {path}")
 
 
 def _digest_path(path: Path) -> str:

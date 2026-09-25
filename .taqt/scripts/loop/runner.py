@@ -1,5 +1,6 @@
 import argparse
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -78,19 +79,21 @@ def run_loop(
     limits = loop_definition.get("limits") if isinstance(loop_definition.get("limits"), dict) else {}
     max_iterations = int(limits.get("max_iterations", 12))
     max_fix_attempts = int(limits.get("max_fix_attempts", 3))
+    max_provider_retries = int(limits.get("provider_retries", 3))
 
     while state["status"] == "running":
+        step_id = state["current_step"]
+        if step_id in TERMINAL_STEPS:
+            state["status"] = step_id
+            append_event(run_dir, {"type": "terminal", "step": step_id})
+            break
+
         if state["iteration"] >= max_iterations:
             state["status"] = "failed"
             state["blocked_reason"] = "max_iterations exceeded"
             append_event(run_dir, {"type": "blocked", "reason": state["blocked_reason"]})
             break
 
-        step_id = state["current_step"]
-        if step_id in TERMINAL_STEPS:
-            state["status"] = step_id
-            append_event(run_dir, {"type": "terminal", "step": step_id})
-            break
         step = steps.get(step_id)
         if step is None:
             raise ValueError(f"unknown step: {step_id}")
@@ -107,6 +110,7 @@ def run_loop(
             run_dir=run_dir,
             workspace=workspace,
             max_fix_attempts=max_fix_attempts,
+            max_provider_retries=max_provider_retries,
             child_environment=child_environment,
         )
         state["current_step"] = next_step
@@ -129,6 +133,7 @@ def _run_step(
     run_dir: Path,
     workspace: Path,
     max_fix_attempts: int,
+    max_provider_retries: int = 3,
     child_environment: Mapping[str, str] | None = None,
 ) -> str:
     kind = step["kind"]
@@ -164,6 +169,7 @@ def _run_step(
     if kind == "verification":
         result = run_verification(cwd=workspace)
         state["last_feedback"] = result.get("feedback")
+        state["last_verification"] = result
         append_event(run_dir, {"type": "verification", "step": step["id"], "result": result})
         if result["status"] == "fix":
             feedback = str(result.get("feedback") or "unknown")
@@ -202,6 +208,8 @@ def _run_step(
         agent = agents.get(agent_id, {}) if isinstance(agent_id, str) else {}
         before = workspace_snapshot(workspace)
         context = build_context(task=task, step=step, events=load_events(run_dir), workspace=workspace)
+        if state.get("last_verification"):
+            context["last_verification"] = state["last_verification"]
         response = run_agent(
             loop_definition=loop_definition,
             task=task,
@@ -220,6 +228,7 @@ def _run_step(
         except ValueError as error:
             response["status"] = "failure"
             response["guard_error"] = str(error)
+            response["feedback"] = "scope_violation"
         next_step = str(step.get("next", step.get("on_pass", "done")))
         event_response = compact_successful_agent_response(response, next_step=next_step)
         append_event(
@@ -232,6 +241,22 @@ def _run_step(
             feedback = str(response.get("feedback") or "unknown")
             state["last_feedback"] = feedback
             state["last_failed_step"] = step["id"]
+            if feedback == "provider_error":
+                provider_attempts = state.setdefault("provider_attempts", {})
+                provider_attempts[step["id"]] = int(provider_attempts.get(step["id"], 0)) + 1
+                if provider_attempts[step["id"]] <= max_provider_retries:
+                    append_event(
+                        run_dir,
+                        {
+                            "type": "provider_retry",
+                            "step": step["id"],
+                            "attempt": provider_attempts[step["id"]],
+                            "reason": "provider_error",
+                        },
+                    )
+                    time.sleep(min(30, 5 * provider_attempts[step["id"]]))
+                    return step["id"]
+                return "human"
             attempts = state.setdefault("feedback_attempts", {})
             attempts[feedback] = int(attempts.get(feedback, 0)) + 1
             if attempts[feedback] > max_fix_attempts:

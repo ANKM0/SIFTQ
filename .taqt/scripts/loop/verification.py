@@ -35,33 +35,49 @@ def run_verification(
     cwd: Path,
 ) -> dict[str, Any]:
     task_command = _task_command(cwd)
-    fast_commands = (
-        f"{task_command} ci:lint",
-        f"{task_command} ci:lint:python",
-        f"{task_command} ci:typecheck",
-        f"{task_command} ci:test:unit",
-    )
-    commands: list[tuple[str, tuple[str, ...]]] = [
+    fast_phases: list[tuple[str, tuple[str, ...]]] = [
         ("diff_check", ("git diff --check",)),
         ("frontend_dependencies", (f"{task_command} setup:frontend:ci",)),
-        ("fast_checks", fast_commands),
+        (
+            "fast_checks",
+            (
+                f"{task_command} ci:lint",
+                f"{task_command} ci:lint:python",
+                f"{task_command} ci:typecheck",
+                f"{task_command} ci:test:unit",
+            ),
+        ),
     ]
+    results = _run_phases(fast_phases, cwd=cwd)
+    if any(result["exit_code"] != 0 for result in results):
+        return _failure_result(results, cwd=cwd)
     if _e2e_enabled():
-        commands.append(("e2e_checks", (f"{task_command} ci:test:e2e",)))
+        results += _run_phases([("e2e_checks", (f"{task_command} ci:test:e2e",))], cwd=cwd)
+        if any(result["exit_code"] != 0 for result in results):
+            return _failure_result(results, cwd=cwd)
+    return _result(status="pass", feedback=None, commands=results, cwd=cwd)
+
+
+def _run_phases(phases: list[tuple[str, tuple[str, ...]]], *, cwd: Path) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for phase, phase_commands in commands:
+    for phase, phase_commands in phases:
         for command in phase_commands:
             result = _run_command(command, cwd=cwd)
             result["phase"] = phase
             results.append(result)
-            if result["exit_code"] != 0:
-                return _result(
-                    status="human" if result.get("timed_out") else "fix",
-                    feedback="verification_human" if result.get("timed_out") else "verification_fix",
-                    commands=results,
-                    cwd=cwd,
-                )
-    return _result(status="pass", feedback=None, commands=results, cwd=cwd)
+    return results
+
+
+def _failure_result(results: list[dict[str, Any]], *, cwd: Path) -> dict[str, Any]:
+    failed = [result for result in results if result["exit_code"] != 0]
+    timed_out = any(result.get("timed_out") for result in failed)
+    return _result(
+        status="human" if timed_out else "fix",
+        feedback="verification_human" if timed_out else "verification_fix",
+        commands=results,
+        cwd=cwd,
+        findings=[f"failed: {result['command']}" for result in failed],
+    )
 
 
 def validate_review(

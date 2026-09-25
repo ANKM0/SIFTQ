@@ -170,11 +170,13 @@ def _run_opencode(
         if completed.returncode != 0:
             response["status"] = "failure"
     if response["status"] != "success":
-        response["feedback"] = response.get("feedback") or (
-            "model_limit"
-            if is_opencode_fallback_error(completed.stdout, completed.stderr)
-            else "unknown"
-        )
+        if is_opencode_fallback_error(completed.stdout, completed.stderr):
+            feedback = response.get("feedback") or "model_limit"
+        elif not parsed and not completed.stdout.strip():
+            feedback = response.get("feedback") or "provider_error"
+        else:
+            feedback = response.get("feedback") or "unknown"
+        response["feedback"] = feedback
     return response
 
 
