@@ -217,16 +217,20 @@ export const IDEAS_CSS = `
 }
 
 .idea-card__description {
+  border-top: 1px solid #8b949e;
   color: #57606a;
   font-size: 14px;
   grid-column: 1 / -1;
   line-height: 1.55;
   margin: 12px 0 0;
+  padding-top: 12px;
   white-space: pre-wrap;
 }
 
 .idea-card__description--empty {
+  border-top: 0;
   font-style: italic;
+  padding-top: 0;
 }
 
 .ideas-grid.masonry-ready > .idea-card {
