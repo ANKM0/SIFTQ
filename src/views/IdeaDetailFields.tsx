@@ -20,7 +20,11 @@ export function IdeaDetailFields({
         </button>
       </header>
       <div
-        class="idea-detail__description"
+        class={
+          description === ""
+            ? "idea-detail__description idea-detail__description--empty"
+            : "idea-detail__description"
+        }
         contenteditable={true}
         data-description-editor
         role="textbox"

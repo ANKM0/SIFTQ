@@ -447,15 +447,21 @@ export const IDEAS_CSS = `
 .idea-detail__description {
   background: transparent;
   border: 0;
+  border-top: 1px solid #8b949e;
   box-shadow: none;
   line-height: 1.55;
   max-height: calc(100vh - 180px);
   min-height: 240px;
   outline: 0;
   overflow-y: auto;
-  padding: 0;
+  padding: 12px 0 0;
   white-space: pre-wrap;
   width: 100%;
+}
+
+.idea-detail__description--empty {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .idea-detail__description a {
