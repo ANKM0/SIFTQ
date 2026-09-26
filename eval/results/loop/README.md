@@ -85,6 +85,81 @@
 - 検証: smoke / ISSUE-375 / ISSUE-369 がすべて closure 1.0・escaped 0（375 / 369 は弱モデル muse-spark では失敗していた）。
 - 結果: `loop-simplify-strong.json`
 
+## replay 集計の arm 別 human_causes（#561, 2026-09-26）
+
+- 変更: `loop_eval.replay.summarize_records` が arm ごとに `human_causes` を返す。各 run の `state.json` に `human_rate.classify_cause` を適用し、`routing` / `verification` / `review` / `spec_product` / `permission` / `model_infra` を集計する。cost / tokens は既存。
+- 出力例（合成レコード、`summarize_records` の実出力）:
+
+```json
+{
+  "arms": {
+    "A": {
+      "total": 3,
+      "done": 1,
+      "human": 2,
+      "failed": 0,
+      "escaped": 0,
+      "human_causes": {
+        "routing": 1,
+        "verification": 1,
+        "review": 0,
+        "spec_product": 0,
+        "permission": 0,
+        "model_infra": 0
+      },
+      "tokens": {
+        "input": 1500,
+        "output": 300,
+        "reasoning": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "total": 1800
+      },
+      "cost": 0.015,
+      "closure_rate": 0.3333,
+      "escaped_rate": 0.0,
+      "human_rate": 0.6667
+    },
+    "B": {
+      "total": 2,
+      "done": 1,
+      "human": 1,
+      "failed": 0,
+      "escaped": 0,
+      "human_causes": {
+        "routing": 0,
+        "verification": 0,
+        "review": 0,
+        "spec_product": 0,
+        "permission": 1,
+        "model_infra": 0
+      },
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "reasoning": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "total": 0
+      },
+      "cost": 0.0,
+      "closure_rate": 0.5,
+      "escaped_rate": 0.0,
+      "human_rate": 0.5
+    }
+  }
+}
+```
+
+## loop 変更の effect measurement 要否（#561, 2026-09-26）
+
+- 変更: review 分岐・schema kind・`last_review_response` の削除、`summarize_records` への `human_causes` 追加、eval baseline の簡略構造化。
+- 判定: **effect measurement 不要**。
+  - 削除対象は `main_loop` から到達不能な review 分岐で、verification / routing / guard の判定を変えない。
+  - `human_causes` は観測集計のみで loop 実行に影響しない。
+  - eval baseline は実行時未使用で、構造を main_loop に一致させる変更。
+- 参考: 直近の測定は `loop-simplify-strong.json` / `e2e-granularity.json` / `t3-comparison.json`。ADR 0068。
+
 ## 検証粒度の調整（e2e, 2026-09-26）
 
 - verification の e2e を**フロント変更時のみ**実行する（変更パスに `src/` または `tests/` または `package.json` / `bun.lock` を含む場合）。

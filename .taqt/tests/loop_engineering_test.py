@@ -18,7 +18,7 @@ from loop.llm import (
 from loop.runner import _run_step, run_loop
 from loop.schema import load_document, validate_loop_definition
 from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
-from loop.verification import _checks_for, run_verification, validate_review
+from loop.verification import _checks_for, run_verification
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
 from taqt.self_improvement import self_improvement_kind
@@ -742,26 +742,7 @@ def test_checks_for_selects_commands_by_changed_paths(paths: list[str], expected
     assert _checks_for(paths) == expected
 
 
-@pytest.mark.parametrize(
-    ("response", "changed_paths", "status"),
-    [
-        ({"parsed_json": True, "status": "success", "verdict": "approve"}, [], "pass"),
-        ({"parsed_json": True, "status": "success", "verdict": "changes_requested"}, [], "fix"),
-        ({"parsed_json": True, "status": "success", "verdict": "human_required"}, [], "human"),
-        ({"parsed_json": False, "status": "success"}, [], "human"),
-        ({"parsed_json": True, "status": "success"}, [], "human"),
-        ({"parsed_json": True, "status": "success", "verdict": "maybe"}, [], "human"),
-        ({"parsed_json": True, "status": "failure", "verdict": "approve"}, [], "human"),
-        ({"parsed_json": True, "status": "success", "verdict": "approve"}, ["changed.py"], "human"),
-    ],
-)
-def test_post_review_requires_json_contract_and_readonly(
-    tmp_path: Path, response: dict[str, object], changed_paths: list[str], status: str
-) -> None:
-    assert validate_review(response, changed_paths=changed_paths, cwd=tmp_path)["status"] == status
-
-
-def test_loop_runs_reviewer_only_after_verification_pass(tmp_path: Path, monkeypatch) -> None:
+def test_loop_runs_readonly_agent_after_verification_pass(tmp_path: Path, monkeypatch) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
     loop_path.write_text(
@@ -780,12 +761,7 @@ steps:
   - id: checker
     kind: llm
     agent: checker
-    next: post_review
-  - id: post_review
-    kind: post_review
-    on_pass: done
-    on_fix: human
-    on_human: human
+    next: done
   - id: done
     kind: terminal
   - id: human
@@ -802,7 +778,7 @@ steps:
 
     def fake_agent(**_kwargs: object) -> dict[str, object]:
         calls.append("checker")
-        return {"status": "success", "parsed_json": True, "verdict": "approve"}
+        return {"status": "success", "parsed_json": True}
 
     monkeypatch.setattr("loop.runner.run_agent", fake_agent)
     result = run_loop(loop_path=loop_path, task_path=task_path, workspace=tmp_path, runs_root=tmp_path / "runs")
@@ -1015,12 +991,7 @@ steps:
     agent: checker
     command: >-
       python -c 'from pathlib import Path; Path("changed.txt").write_text("x"); print("agent output")'
-    next: post_review
-  - id: post_review
-    kind: post_review
-    on_pass: done
-    on_fix: human
-    on_human: human
+    next: done
   - id: done
     kind: terminal
   - id: human

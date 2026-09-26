@@ -18,7 +18,6 @@ from loop.runner import run_loop
 
 TRANSITION_FEEDBACK = {
     ("verification", "on_fix"): "verification_fix",
-    ("post_review", "on_fix"): "review_fix",
 }
 
 
