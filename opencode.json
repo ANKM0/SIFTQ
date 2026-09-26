@@ -10,6 +10,10 @@
       "git clean -fd*": "deny",
       "git push --force*": "deny"
     },
+    "external_directory": {
+      "/home/develop/Yoriwake/**": "allow",
+      "/home/develop/Yoriwake-*/**": "allow"
+    },
     "skill": {
       "*": "allow"
     }
