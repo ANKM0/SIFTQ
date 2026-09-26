@@ -1,12 +1,13 @@
 export const TASK_LIST_CSS = `
 .list {
-  border: 1px solid #d0d7de;
+  background: #aeb8c4;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   overflow: hidden;
 }
 
 .task-list-empty {
-  color: #57606a;
+  color: #3f4854;
   margin: 0;
   padding: 24px;
   text-align: center;
@@ -19,11 +20,13 @@ export const TASK_LIST_CSS = `
   display: grid;
   gap: 10px;
   grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 68px;
   padding: 12px 14px;
 }
 
 .task-row.is-selected {
-  background: #ddf4ff;
+  background: #aeb8c4;
+  box-shadow: inset 3px 0 0 #0f4d24;
 }
 
 .task-row-selection {
@@ -35,7 +38,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-selection input,
 .task-select-all input {
-  accent-color: #0969da;
+  accent-color: #0f4d24;
   height: 20px;
   margin: 0;
   width: 20px;
@@ -51,7 +54,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-link:focus-visible,
 .task-row-selection:has(input:focus-visible) {
-  outline: 2px solid #0969da;
+  outline: 2px solid #0f4d24;
   outline-offset: 2px;
 }
 
@@ -78,8 +81,8 @@ export const TASK_LIST_CSS = `
 
 .task-list-toolbar {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   display: flex;
   gap: 12px;
@@ -145,14 +148,14 @@ export const TASK_LIST_CSS = `
 }
 
 .task-label-filter.is-active summary {
-  background: #ddf4ff;
-  border-color: #54aeff;
-  color: #0969da;
+  background: #b7e3c3;
+  border-color: #0f4d24;
+  color: #0f4d24;
 }
 
 .task-label-menu {
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
   display: grid;
@@ -194,8 +197,8 @@ export const TASK_LIST_CSS = `
 }
 
 .task-bulk-menu-items {
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
   display: grid;
@@ -227,10 +230,10 @@ export const TASK_LIST_CSS = `
 }
 
 .task-selection-feedback {
-  background: #dafbe1;
+  background: #b7e3c3;
   border: 1px solid #4ac26b;
   border-radius: 6px;
-  color: #1a7f37;
+  color: #0f4d24;
   margin: 0 0 10px;
   padding: 8px 12px;
 }
@@ -264,7 +267,7 @@ export const TASK_LIST_CSS = `
 }
 
 .button--danger {
-  color: #b00;
+  color: #1b1f24;
 }
 
 .pagination {
@@ -277,7 +280,7 @@ export const TASK_LIST_CSS = `
 }
 
 .pagination .button.small.is-active {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -288,7 +291,7 @@ export const TASK_LIST_CSS = `
 }
 
 .pagination-ellipsis {
-  color: #57606a;
+  color: #b1bac4;
   font-weight: 700;
   padding: 0 4px;
 }

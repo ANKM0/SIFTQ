@@ -46,7 +46,7 @@ export const TASK_FORM_CSS = `
 }
 
 .meta-row--spaced {
-  border-top: 1px solid #d0d7de;
+  border-top: 1px solid #8b949e;
   margin-top: 16px;
   padding-top: 16px;
 }
@@ -54,7 +54,7 @@ export const TASK_FORM_CSS = `
 .meta-caret {
   align-items: center;
   border: 0;
-  color: #57606a;
+  color: #3f4854;
   display: inline-flex;
   font-size: 20px;
   justify-content: center;
@@ -74,7 +74,8 @@ input,
 textarea,
 select,
 .description-editor {
-  border: 1px solid #d0d7de;
+  background: #cfd6de;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   font: inherit;
   padding: 9px 10px;
@@ -86,14 +87,14 @@ textarea {
 }
 
 .description-editor {
-  background: #ffffff;
+  background: #c1c9d3;
   min-height: 180px;
   overflow: auto;
   white-space: pre-wrap;
 }
 
 .description-editor a {
-  color: #0969da;
+  color: inherit;
   text-decoration: underline;
 }
 
@@ -156,14 +157,14 @@ textarea[data-description-value] {
 }
 
 .status-option {
-  border: 1px solid #d0d7de;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   padding: 10px;
 }
 
 .popover {
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 12px;
   box-shadow: 0 16px 36px rgb(31 35 40 / 18%);
   display: grid;
@@ -190,9 +191,9 @@ details:not([open]) .popover {
 
 .status-group-title {
   background: #f6f8fa;
-  border-bottom: 1px solid #d0d7de;
-  border-top: 1px solid #d0d7de;
-  color: #57606a;
+  border-bottom: 1px solid #8b949e;
+  border-top: 1px solid #8b949e;
+  color: #3f4854;
   font-size: 13px;
   font-weight: 700;
   padding: 10px 16px;
@@ -208,7 +209,7 @@ details:not([open]) .popover {
 
 .status-choice.selected {
   background: #f6f8fa;
-  box-shadow: inset 4px 0 0 #0969da;
+  box-shadow: inset 4px 0 0 #0f4d24;
 }
 
 button.status-choice {
@@ -223,7 +224,7 @@ button.status-choice {
 
 .check {
   align-items: center;
-  background: #0969da;
+  background: #1f883d;
   border-radius: 4px;
   color: #ffffff;
   display: inline-flex;
@@ -250,31 +251,31 @@ button.status-choice {
 }
 
 .status-dot--do {
-  background: #bfdbfe;
+  background: #1b1f24;
 }
 
 .status-dot--one {
-  background: #bfdbfe;
+  background: #aeb8c4;
 }
 
 .status-dot--two {
-  background: #bfdbfe;
+  background: #8b949e;
 }
 
 .status-dot--three {
-  background: #fef08a;
+  background: #6e7781;
 }
 
 .status-dot--four {
-  background: #fde68a;
+  background: #57606a;
 }
 
 .status-dot--done {
-  background: #86efac;
+  background: #0f4d24;
 }
 
 .status-dot--skip {
-  background: #d1d5db;
+  background: #4a5260;
 }
 
 @media (width >= 48rem) {
