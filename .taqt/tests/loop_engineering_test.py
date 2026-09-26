@@ -337,13 +337,14 @@ def test_main_loop_is_a_single_lightweight_structure() -> None:
     validate_loop_definition(loop)
 
     assert loop["id"] == "main_loop"
-    assert {"implement", "fix", "checker"} == set(loop["agents"])
-    assert loop["agents"]["checker"]["readonly"] is True
+    assert {"implement", "fix"} == set(loop["agents"])
     assert loop["limits"]["max_fix_attempts"] == 3
 
     step_ids = [step["id"] for step in loop["steps"]]
     assert "design" not in step_ids
     assert "test" not in step_ids
+    assert "checker" not in step_ids
+    assert "post_review" not in step_ids
     assert step_ids.index("implement") < step_ids.index("verification")
 
     profiles = load_profiles(repository_root / ".taqt/loops")
@@ -360,23 +361,22 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert loop["id"] == "main_loop"
     agents = loop["agents"]
     steps = loop["steps"]
-    assert {"implement", "fix", "checker"} == set(agents)
+    assert {"implement", "fix"} == set(agents)
 
-    assert agents["implement"]["model"] == "opencode/muse-spark-1.3-contributor-free"
+    assert agents["implement"]["model"] == "opencode-go/deepseek-v4.1-flash"
     assert agents["implement"]["reasoning_effort"] == "high"
-    assert agents["fix"]["model"] == "opencode/muse-spark-1.3-contributor-free"
+    assert agents["fix"]["model"] == "opencode-go/deepseek-v4.1-flash"
     assert agents["fix"]["reasoning_effort"] == "high"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["reasoning_effort"] == "xhigh"
-
-    assert agents["checker"]["readonly"] is True
 
     steps_by_id = {step["id"]: step for step in steps}
     assert steps_by_id["fix"]["kind"] == "llm"
     assert steps_by_id["fix"]["agent"] == "fix"
 
     assert "decide" not in steps_by_id
+    assert "checker" not in steps_by_id
+    assert "post_review" not in steps_by_id
     assert steps_by_id["verification"]["on_fix"] == "fix"
+    assert steps_by_id["verification"]["on_pass"] == "done"
 
 
 def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) -> None:

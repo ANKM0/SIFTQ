@@ -6,17 +6,18 @@ id: main_loop_minimal
 limits:
   max_iterations: 12
   max_fix_attempts: 3
+  provider_retries: 3
 
 agents:
   implement:
     role: implementation
     adapter: opencode
-    model: opencode-go/muse-spark-1.3-contributor
+    model: opencode-go/deepseek-v4.1-flash
     reasoning_effort: high
   fix:
     role: implementation_fixer
     adapter: opencode
-    model: opencode-go/muse-spark-1.3-contributor
+    model: opencode-go/deepseek-v4.1-flash
     reasoning_effort: high
 
 steps:

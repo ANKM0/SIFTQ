@@ -35,7 +35,7 @@ def test_profiles_have_no_worktree_codex_home_or_qwen_profile() -> None:
     ]
 
 
-def test_main_loop_selects_luna_reviewer_and_muse_implementer() -> None:
+def test_main_loop_selects_implement_and_fix_models() -> None:
     loop = yaml.safe_load(
         (REPOSITORY_ROOT / ".taqt" / "loops" / "main_loop.yaml").read_text(
             encoding="utf-8"
@@ -43,12 +43,10 @@ def test_main_loop_selects_luna_reviewer_and_muse_implementer() -> None:
     )
     agents = loop["agents"]
 
+    assert set(agents) == {"implement", "fix"}
     for agent_name in ("implement", "fix"):
         assert agents[agent_name]["adapter"] == "opencode"
-        assert agents[agent_name]["model"] == "opencode/muse-spark-1.3-contributor-free"
-    assert agents["checker"]["adapter"] == "opencode"
-    assert agents["checker"]["model"] == "openai/gpt-5.6-luna"
-    assert agents["checker"]["readonly"] is True
+        assert agents[agent_name]["model"] == "opencode-go/deepseek-v4.1-flash"
 
 
 def test_resolve_codex_home_uses_shared_default(tmp_path: Path, monkeypatch) -> None:

@@ -68,7 +68,7 @@ def test_policy_routes_cover_producer_feedback(loop_path: Path) -> None:
             )
 
 
-def test_verification_failure_routes_to_fix_and_then_reviews(tmp_path: Path, monkeypatch) -> None:
+def test_verification_failure_routes_to_fix_then_completes(tmp_path: Path, monkeypatch) -> None:
     loop_path = REPOSITORY_ROOT / ".taqt" / "loops" / "main_loop.yaml"
     task_path = tmp_path / "task.yaml"
     task_path.write_text(_task_yaml(), encoding="utf-8")
@@ -82,10 +82,7 @@ def test_verification_failure_routes_to_fix_and_then_reviews(tmp_path: Path, mon
     calls: list[str] = []
 
     def fake_agent(**kwargs: object) -> dict[str, object]:
-        step_id = str(kwargs["step"]["id"])
-        calls.append(step_id)
-        if step_id == "checker":
-            return {"status": "success", "parsed_json": True, "verdict": "approve"}
+        calls.append(str(kwargs["step"]["id"]))
         return {"status": "success", "parsed_json": True}
 
     monkeypatch.setattr("loop.runner.run_agent", fake_agent)
@@ -98,4 +95,4 @@ def test_verification_failure_routes_to_fix_and_then_reviews(tmp_path: Path, mon
     )
 
     assert result["status"] == "done"
-    assert calls == ["implement", "fix", "checker"]
+    assert calls == ["implement", "fix"]
