@@ -1,0 +1,12 @@
+{
+  "name": "e2e-granularity",
+  "date": "2026-09-26",
+  "change": "verification の e2e をフロント変更時のみ実行（変更パスに src/ または tests/ または package.json / bun.lock を含む場合）。非フロント変更は e2e をスキップ。",
+  "check": {
+    "task": "smoke (fizzbuzz, non-frontend)",
+    "verification_phases": ["diff_check", "frontend_dependencies", "fast_checks"],
+    "e2e_run": false,
+    "closure": 1.0,
+    "escaped": 0
+  }
+}
