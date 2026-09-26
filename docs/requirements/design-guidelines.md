@@ -15,36 +15,38 @@
 | スロット | 値 | 役割 |
 | --- | --- | --- |
 | Ink | `#1b1f24` | 主要文字、強い境界 |
-| Chrome | `#ffffff` | トップバーのみ（例外） |
-| Surface | `#e6e9ee` / `#d5dae1` / `#f1f3f6` | 面（カード・コンテナ・入力） |
-| Border | `#d0d7de` / `#8b949e` | 境界、区切り |
-| Green | `#1f883d` | 唯一の機能色（主要アクション、done、working） |
+| Chrome | `#e6e9ee` | トップバー |
+| Surface | `#c1c9d3` / `#aeb8c4` / `#cfd6de` | 面（カード・コンテナ・入力） |
+| Border | `#8b949e` / `#6e7781` | 境界、区切り |
+| Green | `#1f883d`（塗り）/ `#0f4d24`（文字・枠） | 唯一の機能色（主要アクション、done、working） |
 
 ## ニュートラル（Slate）
 
 構造（背景・面・境界・文字）はグレーの明度ランプで表現する。
+大きな面積の輝度差を抑えるため、背景と面のコントラストは 5〜7:1 に収める。
 
 | トークン | 値 | 用途 |
 | --- | --- | --- |
-| bg | `#30363d` | ページ背景 |
-| surface-sunken | `#d5dae1` | コンテナ（Matrix の枠内、一覧の外枠） |
-| surface | `#e6e9ee` | カード、パネル、行、ボタン、モーダル |
-| field | `#f1f3f6` | 入力欄・編集領域（面より一段明るい） |
-| border | `#d0d7de` | 面と面の境界 |
-| border-strong | `#8b949e` | 強調境界、区切り |
+| bg | `#3b434d` | ページ背景 |
+| surface-sunken | `#aeb8c4` | コンテナ（Matrix の枠内、一覧の外枠） |
+| surface | `#c1c9d3` | カード、パネル、行、ボタン、モーダル |
+| field | `#cfd6de` | 入力欄・編集領域（面より一段明るい） |
+| border | `#8b949e` | 面と面の境界 |
+| border-strong | `#6e7781` | 強調境界、区切り |
 | text | `#1b1f24` | 面の上の主要文字 |
-| text-muted | `#57606a` | 面の上の補助文字 |
+| text-muted | `#3f4854` | 面の上の補助文字 |
 | text-inverse | `#e6e9ee` | 暗背景上の主要文字 |
 | text-inverse-muted | `#b1bac4` | 暗背景上の補助文字 |
-| chrome | `#ffffff` | トップバーのみ（例外） |
+| chrome | `#e6e9ee` | トップバー |
 
 ## グリーン
 
 | 用途 | 値 |
 | --- | --- |
 | 主要アクション（塗り） | `#1f883d`（白文字 4.5:1） |
-| 面（tint） | `#dafbe1` |
-| tint 上の文字 | `#1a7f37` |
+| 面（tint） | `#b7e3c3` |
+| tint 上の文字 | `#0f4d24` |
+| 面の上の文字・枠 | `#0f4d24` |
 | 境界 | `#2a9147` / `#4ac26b` |
 
 緑は「塗り = アクション」「tint 面 + 緑文字 = done / working」として形で区別する。
@@ -80,16 +82,19 @@
 
 | 組み合わせ | 比 |
 | --- | --- |
-| text / surface | 13.6:1 |
-| text-muted / surface | 5.3:1 |
-| text-inverse / bg | 10.0:1 |
+| text / surface | 9.9:1 |
+| text-muted / surface | 5.5:1 |
+| text-inverse / bg | 8.2:1 |
 | 白文字 / Green `#1f883d` | 4.5:1 |
-| Green 文字 / Green tint | 4.6:1 |
-| focus 緑 / surface | 3.7:1 |
-| focus 緑 / bg | 2.7:1（不足） |
+| Green 文字 / surface | 6.0:1 |
+| Green 文字 / Green tint | 7.0:1 |
+| surface / bg | 6.0:1 |
+| surface-sunken / bg | 5.0:1 |
+| field / bg | 6.8:1 |
+| border / surface | 1.8:1（不足） |
 
-`focus 緑 / bg` と面・境界の段差は 3:1 に届かないため、色だけに頼らず
-下記の非色キューで補う。
+面と背景の差は 5〜7:1 に抑え、グレアを避ける。`border / surface` は 3:1 に
+届かないため、色だけに頼らず下記の非色キューで補う。
 
 ## ユニバーサルカラーのルール
 
@@ -102,7 +107,8 @@
 
 ## 適用メモ
 
-- トップバーだけは `chrome` (`#ffffff`) を維持する。
+- 面と背景のコントラストを下げてグレアを抑える（`bg` `#3b434d` / `surface` `#c1c9d3`）。
+- トップバーも `chrome` (`#e6e9ee`) に落とす。純白は使わない。
 - 面・境界の段差が 3:1 未満のため、境界は `box-shadow` と形で補う。
 - 選択行は薄い tint が 1.1:1 程度のため、checkbox と緑の左バーを必須にする。
 - 赤を全廃した。delete は Ink 塗りボタン、エラーは Ink 太字。危険色の慣習を失う代わりに非色キューで担保する。

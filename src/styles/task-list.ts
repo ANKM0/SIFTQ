@@ -1,13 +1,13 @@
 export const TASK_LIST_CSS = `
 .list {
-  background: #d5dae1;
-  border: 1px solid #d0d7de;
+  background: #aeb8c4;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   overflow: hidden;
 }
 
 .task-list-empty {
-  color: #57606a;
+  color: #3f4854;
   margin: 0;
   padding: 24px;
   text-align: center;
@@ -24,8 +24,8 @@ export const TASK_LIST_CSS = `
 }
 
 .task-row.is-selected {
-  background: #d5dae1;
-  box-shadow: inset 3px 0 0 #1f883d;
+  background: #aeb8c4;
+  box-shadow: inset 3px 0 0 #0f4d24;
 }
 
 .task-row-selection {
@@ -37,7 +37,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-selection input,
 .task-select-all input {
-  accent-color: #1f883d;
+  accent-color: #0f4d24;
   height: 20px;
   margin: 0;
   width: 20px;
@@ -53,7 +53,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-link:focus-visible,
 .task-row-selection:has(input:focus-visible) {
-  outline: 2px solid #1f883d;
+  outline: 2px solid #0f4d24;
   outline-offset: 2px;
 }
 
@@ -80,8 +80,8 @@ export const TASK_LIST_CSS = `
 
 .task-list-toolbar {
   align-items: center;
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   display: flex;
   gap: 12px;
@@ -147,14 +147,14 @@ export const TASK_LIST_CSS = `
 }
 
 .task-label-filter.is-active summary {
-  background: #dafbe1;
-  border-color: #1f883d;
-  color: #1f883d;
+  background: #b7e3c3;
+  border-color: #0f4d24;
+  color: #0f4d24;
 }
 
 .task-label-menu {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
   display: grid;
@@ -196,8 +196,8 @@ export const TASK_LIST_CSS = `
 }
 
 .task-bulk-menu-items {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
   display: grid;
@@ -229,10 +229,10 @@ export const TASK_LIST_CSS = `
 }
 
 .task-selection-feedback {
-  background: #dafbe1;
+  background: #b7e3c3;
   border: 1px solid #4ac26b;
   border-radius: 6px;
-  color: #1a7f37;
+  color: #0f4d24;
   margin: 0 0 10px;
   padding: 8px 12px;
 }

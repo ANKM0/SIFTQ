@@ -10,8 +10,8 @@ export const MATRIX_CSS = `
 }
 
 .matrix-axis {
-  background: #d5dae1;
-  border: 1px solid #d0d7de;
+  background: #aeb8c4;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   gap: 12px;
   grid-template-rows: repeat(4, minmax(0, auto));
@@ -21,7 +21,7 @@ export const MATRIX_CSS = `
 }
 
 .axis-line {
-  color: #57606a;
+  color: #3f4854;
   display: none;
   font-size: 13px;
   font-weight: 700;
@@ -31,21 +31,21 @@ export const MATRIX_CSS = `
 }
 
 .axis-line::before {
-  background: #57606a;
+  background: #3f4854;
   content: "";
   position: absolute;
 }
 
 .axis-line::after {
-  border-color: #57606a;
+  border-color: #3f4854;
   border-style: solid;
   content: "";
   position: absolute;
 }
 
 .axis-line span {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 999px;
   padding: 4px 10px;
   position: absolute;
@@ -105,8 +105,8 @@ export const MATRIX_CSS = `
 }
 
 .area {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   min-height: 280px;
   padding: 14px;
@@ -192,16 +192,16 @@ export const MATRIX_CSS = `
 
 .task-card,
 .task-row {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
 }
 
 .form-panel,
 .side-panel,
 .state-card {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
 }
 
@@ -219,12 +219,12 @@ export const MATRIX_CSS = `
 
 .task-card--working,
 .task-row--working {
-  border-left: 4px solid #1f883d;
+  border-left: 4px solid #0f4d24;
 }
 
 .task-card:hover {
   border-color: #1f883d;
-  box-shadow: 0 0 0 2px #dafbe1;
+  box-shadow: 0 0 0 2px #b7e3c3;
 }
 
 .task-card-header {
@@ -236,7 +236,7 @@ export const MATRIX_CSS = `
 
 .task-card.dragging {
   border-color: #1f883d;
-  box-shadow: 0 0 0 3px #dafbe1;
+  box-shadow: 0 0 0 3px #b7e3c3;
   opacity: 0.72;
 }
 
@@ -251,7 +251,7 @@ export const MATRIX_CSS = `
 }
 
 .matrix-drag-placeholder {
-  background: #dafbe1;
+  background: #b7e3c3;
   flex: none;
   margin-bottom: 12px;
   pointer-events: none;
@@ -278,8 +278,8 @@ export const MATRIX_CSS = `
 
 .area-badge {
   background: transparent;
-  border-color: #d0d7de;
-  color: #57606a;
+  border-color: #8b949e;
+  color: #3f4854;
 }
 
 .status--do {
@@ -289,23 +289,23 @@ export const MATRIX_CSS = `
 }
 
 .status--done {
-  background: #dafbe1;
+  background: #b7e3c3;
   border-color: #4ac26b;
-  color: #1a7f37;
+  color: #0f4d24;
 }
 
 .status--skip {
   background: #f6f8fa;
-  border-color: #d0d7de;
-  color: #57606a;
+  border-color: #8b949e;
+  color: #3f4854;
 }
 
 .working-badge {
   align-items: center;
   background: transparent;
-  border: 1px solid #1f883d;
+  border: 1px solid #0f4d24;
   border-radius: 999px;
-  color: #1a7f37;
+  color: #0f4d24;
   display: inline-flex;
   font-size: 12px;
   font-weight: 700;
@@ -315,7 +315,7 @@ export const MATRIX_CSS = `
 }
 
 .working-badge::before {
-  background: #1f883d;
+  background: #0f4d24;
   border-radius: 50%;
   content: "";
   height: 6px;
@@ -333,9 +333,9 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .drop-line {
-  border: 2px dashed #1f883d;
+  border: 2px dashed #0f4d24;
   border-radius: 6px;
-  color: #1f883d;
+  color: #0f4d24;
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 10px;
@@ -344,8 +344,8 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-menu {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
   display: grid;
@@ -385,8 +385,8 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 12px;
   box-shadow: 0 16px 36px rgb(31 35 40 / 30%);
   display: flex;
@@ -411,7 +411,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal-button {
-  border: 1px solid #d0d7de;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -421,7 +421,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal-button--cancel {
-  background: #e6e9ee;
+  background: #c1c9d3;
 }
 
 .matrix-modal-button--cancel:hover {

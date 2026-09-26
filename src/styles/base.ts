@@ -1,7 +1,7 @@
 export const BASE_CSS = `
 :root {
   color: #1b1f24;
-  background: #30363d;
+  background: #3b434d;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
@@ -21,7 +21,7 @@ body {
 
 :focus-visible {
   box-shadow: 0 0 0 4px #e6e9ee;
-  outline: 2px solid #1f883d;
+  outline: 2px solid #0f4d24;
   outline-offset: 2px;
 }
 
@@ -36,8 +36,8 @@ a {
 
 .topbar {
   align-items: center;
-  background: #ffffff;
-  border-bottom: 1px solid #d0d7de;
+  background: #e6e9ee;
+  border-bottom: 1px solid #8b949e;
   display: flex;
   gap: 16px;
   justify-content: flex-start;
@@ -61,8 +61,8 @@ a {
 
 .nav a,
 .button {
-  background: #e6e9ee;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   display: inline-flex;
   font-size: 14px;

@@ -24,7 +24,7 @@ describe("styles", () => {
     const taskCard = STYLES_CSS.match(/(?:^|\n)\.task-card\s*\{[^}]*\}/);
     const matrixAxis = STYLES_CSS.match(/(?:^|\n)\.matrix-axis\s*\{[^}]*\}/);
     expect(taskCard?.[0]).toContain("border-color: #1b1f24;");
-    expect(matrixAxis?.[0]).toContain("border: 1px solid #d0d7de;");
+    expect(matrixAxis?.[0]).toContain("border: 1px solid #8b949e;");
   });
 
   it("does not override the cursor on draggable Matrix cards", () => {
