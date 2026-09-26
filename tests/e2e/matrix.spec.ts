@@ -53,6 +53,9 @@ async function expectDraftNotSaved(page: Page, title: string, description: strin
 }
 
 async function waitForPageSettle(page: Page) {
+  // A full-page navigation runs its deferred scripts before `load`, so wait for
+  // it to attach the form/description handlers before the test interacts.
+  await page.waitForLoadState("load");
   // htmx swaps #page and settles (attaching submit handlers to the new form)
   // asynchronously; submitting before htmx:afterSettle falls back to a native
   // GET submit that stays on the form.
@@ -360,6 +363,7 @@ test("keeps matrix task card navigation working", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/tasks\/[^/]+\?from=matrix/);
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
   await expect(page.getByLabel("Title")).toHaveValue(title);
 });
 
@@ -880,6 +884,7 @@ test("opens description URLs with native link behavior", async ({ page }) => {
   await page.getByRole("button", { name: "Create" }).click();
 
   await page.locator(".task-card", { hasText: taskTitle }).click();
+  await waitForPageSettle(page);
   const links = descriptionEditor(page).locator("a");
   await expect(links).toHaveCount(2);
   await expect(links.first()).toHaveAttribute("href", taskUrl);
@@ -921,6 +926,7 @@ test("linkifies pasted URLs and submits plain text", async ({ page }) => {
   await expect(editor.locator("a")).toHaveAttribute("href", taskUrl);
   await page.getByRole("button", { name: "Create" }).click();
   await page.locator(".task-card", { hasText: taskTitle }).click();
+  await waitForPageSettle(page);
 
   await expect(descriptionEditor(page).locator("a")).toHaveAttribute("href", taskUrl);
   await expect(page.locator('textarea[data-description-value]')).toHaveValue(description);
@@ -939,6 +945,7 @@ test("deletes text before a description URL at the URL boundary", async ({ page 
   await page.getByRole("button", { name: "Create" }).click();
 
   await page.locator(".task-card", { hasText: taskTitle }).click();
+  await waitForPageSettle(page);
   const editor = descriptionEditor(page);
   const urlLink = editor.locator("a", { hasText: taskUrl });
   await expect(urlLink).toHaveCount(1);
@@ -990,6 +997,7 @@ test("saves exactly one task with Ctrl+Enter from the detail form", async ({ pag
   await createMatrixTask(page, originalTitle);
   await page.locator(".task-card", { hasText: originalTitle }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
 
   await page.getByLabel("Title").fill(updatedTitle);
   await descriptionEditor(page).press("Control+Enter");
@@ -1013,6 +1021,7 @@ test("refreshes task detail after browser back before Ctrl+Enter and Save", asyn
   await createMatrixTask(page, originalTitle);
   await page.locator(".task-card", { hasText: originalTitle }).click();
   await expect(page.getByRole("heading", { name: "Task detail" })).toBeVisible();
+  await waitForPageSettle(page);
   const initialVersion = await page.locator("#task-version").inputValue();
 
   await page.getByLabel("Title").fill(shortcutTitle);
