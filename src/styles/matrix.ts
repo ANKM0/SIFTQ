@@ -6,7 +6,7 @@ export const MATRIX_CSS = `
 }
 
 .page--matrix .error {
-  color: #ff7b72;
+  color: #e6e9ee;
 }
 
 .matrix-axis {
@@ -206,7 +206,7 @@ export const MATRIX_CSS = `
 }
 
 .task-card {
-  border-color: #24292f;
+  border-color: #1b1f24;
   box-shadow: 0 1px 2px rgb(31 35 40 / 12%);
   display: flex;
   flex-direction: column;
@@ -219,12 +219,12 @@ export const MATRIX_CSS = `
 
 .task-card--working,
 .task-row--working {
-  border-left: 4px solid #8250df;
+  border-left: 4px solid #1f883d;
 }
 
 .task-card:hover {
-  border-color: #0969da;
-  box-shadow: 0 0 0 2px #ddf4ff;
+  border-color: #1f883d;
+  box-shadow: 0 0 0 2px #dafbe1;
 }
 
 .task-card-header {
@@ -235,8 +235,8 @@ export const MATRIX_CSS = `
 }
 
 .task-card.dragging {
-  border-color: #0969da;
-  box-shadow: 0 0 0 3px #ddf4ff;
+  border-color: #1f883d;
+  box-shadow: 0 0 0 3px #dafbe1;
   opacity: 0.72;
 }
 
@@ -251,7 +251,7 @@ export const MATRIX_CSS = `
 }
 
 .matrix-drag-placeholder {
-  background: #ddf4ff;
+  background: #dafbe1;
   flex: none;
   margin-bottom: 12px;
   pointer-events: none;
@@ -276,11 +276,16 @@ export const MATRIX_CSS = `
   width: max-content;
 }
 
-.area-badge,
+.area-badge {
+  background: transparent;
+  border-color: #d0d7de;
+  color: #57606a;
+}
+
 .status--do {
-  background: #ddf4ff;
-  border-color: #54aeff;
-  color: #0969da;
+  background: transparent;
+  border-color: #1b1f24;
+  color: #1b1f24;
 }
 
 .status--done {
@@ -296,15 +301,25 @@ export const MATRIX_CSS = `
 }
 
 .working-badge {
-  background: #fbefff;
-  border: 1px solid #c297ff;
+  align-items: center;
+  background: transparent;
+  border: 1px solid #1f883d;
   border-radius: 999px;
-  color: #6639ba;
+  color: #1a7f37;
   display: inline-flex;
   font-size: 12px;
   font-weight: 700;
+  gap: 5px;
   padding: 3px 8px;
   width: max-content;
+}
+
+.working-badge::before {
+  background: #1f883d;
+  border-radius: 50%;
+  content: "";
+  height: 6px;
+  width: 6px;
 }
 
 `;
@@ -318,9 +333,9 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .drop-line {
-  border: 2px dashed #0969da;
+  border: 2px dashed #1f883d;
   border-radius: 6px;
-  color: #0969da;
+  color: #1f883d;
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 10px;
@@ -355,7 +370,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-menu-item--delete {
-  color: #b00;
+  color: #1b1f24;
 }
 
 .matrix-modal-backdrop {
@@ -414,13 +429,13 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal-button--danger {
-  background: #b00;
-  border-color: #900;
+  background: #1b1f24;
+  border-color: #1b1f24;
   color: #ffffff;
 }
 
 .matrix-modal-button--danger:hover {
-  background: #900;
+  background: #1b1f24;
 }
 
 @media (width >= 40rem) {

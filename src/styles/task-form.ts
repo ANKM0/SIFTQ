@@ -94,7 +94,7 @@ textarea {
 }
 
 .description-editor a {
-  color: #0969da;
+  color: inherit;
   text-decoration: underline;
 }
 
@@ -209,7 +209,7 @@ details:not([open]) .popover {
 
 .status-choice.selected {
   background: #f6f8fa;
-  box-shadow: inset 4px 0 0 #0969da;
+  box-shadow: inset 4px 0 0 #1f883d;
 }
 
 button.status-choice {
@@ -224,7 +224,7 @@ button.status-choice {
 
 .check {
   align-items: center;
-  background: #0969da;
+  background: #1f883d;
   border-radius: 4px;
   color: #ffffff;
   display: inline-flex;
@@ -251,23 +251,23 @@ button.status-choice {
 }
 
 .status-dot--do {
-  background: #bfdbfe;
+  background: #d0d7de;
 }
 
 .status-dot--one {
-  background: #bfdbfe;
+  background: #d0d7de;
 }
 
 .status-dot--two {
-  background: #bfdbfe;
+  background: #d0d7de;
 }
 
 .status-dot--three {
-  background: #fef08a;
+  background: #8b949e;
 }
 
 .status-dot--four {
-  background: #fde68a;
+  background: #57606a;
 }
 
 .status-dot--done {

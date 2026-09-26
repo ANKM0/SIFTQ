@@ -1,5 +1,5 @@
 export const COMMON_CSS = `
-.error { color: #b00; }
+.error { color: #1b1f24; font-weight: 700; }
 button { font: inherit; }
 `;
 

@@ -1,6 +1,6 @@
 export const BASE_CSS = `
 :root {
-  color: #24292f;
+  color: #1b1f24;
   background: #30363d;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -17,6 +17,12 @@ body {
 ::selection {
   background: #444444;
   color: #ffffff;
+}
+
+:focus-visible {
+  box-shadow: 0 0 0 4px #e6e9ee;
+  outline: 2px solid #1f883d;
+  outline-offset: 2px;
 }
 
 a {
@@ -122,7 +128,7 @@ a {
 
 .task-selection-summary {
   align-items: center;
-  color: #f1f3f4;
+  color: #e6e9ee;
   display: flex;
   font-size: 14px;
   font-weight: 600;
@@ -147,7 +153,7 @@ a {
 }
 
 .page-title {
-  color: #f1f3f4;
+  color: #e6e9ee;
   font-size: 24px;
   margin: 0;
 }

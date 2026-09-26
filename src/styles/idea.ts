@@ -1,7 +1,7 @@
 export const IDEAS_CSS = `
 .page--ideas {
   background: #30363d;
-  color: #f1f3f4;
+  color: #e6e9ee;
   max-width: none;
   min-height: calc(100vh - 63px);
   padding: 48px 16px;
@@ -74,7 +74,7 @@ export const IDEAS_CSS = `
 .ideas-composer__description {
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   font: inherit;
   outline: 0;
   padding: 0;
@@ -97,7 +97,7 @@ export const IDEAS_CSS = `
 
 .ideas-composer__title:focus,
 .ideas-composer__description:focus {
-  box-shadow: 0 2px 0 #0969da;
+  box-shadow: 0 2px 0 #1f883d;
 }
 
 .ideas-composer__actions {
@@ -118,7 +118,7 @@ export const IDEAS_CSS = `
 .ideas-composer__close:hover,
 .ideas-composer__close:focus-visible {
   background: #f6f8fa;
-  color: #0969da;
+  color: #1f883d;
 }
 
 .ideas-grid {
@@ -163,7 +163,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-card:hover {
-  border-color: #0969da;
+  border-color: #1f883d;
   box-shadow: 0 4px 12px rgb(31 35 40 / 14%);
   transform: translateY(-1px);
 }
@@ -178,7 +178,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-card.drop-target {
-  border-color: #0969da;
+  border-color: #1f883d;
 }
 
 .idea-card__link {
@@ -195,18 +195,18 @@ export const IDEAS_CSS = `
   fill: #ffffff;
   grid-column: 1;
   height: 18px;
-  stroke: #24292f;
+  stroke: #1b1f24;
   stroke-width: 1.5;
   width: 18px;
 }
 
 .idea-card[data-pinned="true"] .idea-card__pin {
-  fill: #24292f;
+  fill: #1b1f24;
   stroke: none;
 }
 
 .idea-card h2 {
-  color: #24292f;
+  color: #1b1f24;
   font-size: 17px;
   line-height: 1.4;
   grid-column: 2;
@@ -300,7 +300,7 @@ export const IDEAS_CSS = `
   border: 1px dashed #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
-  color: #24292f;
+  color: #1b1f24;
   align-items: center;
   display: flex;
   flex: 1;
@@ -339,7 +339,7 @@ export const IDEAS_CSS = `
 .idea-detail__title {
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   flex: 1;
   font-size: 22px;
   font-weight: 700;
@@ -349,14 +349,14 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__title:focus {
-  box-shadow: 0 2px 0 #0969da;
+  box-shadow: 0 2px 0 #1f883d;
 }
 
 .idea-detail__pin {
   align-items: center;
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
@@ -374,7 +374,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__pin[aria-pressed="true"] {
-  color: #24292f;
+  color: #1b1f24;
 }
 
 .idea-detail__pin[aria-pressed="false"] {
@@ -382,7 +382,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__pin[aria-pressed="false"] svg {
-  stroke: #24292f;
+  stroke: #1b1f24;
   stroke-width: 1.5;
 }
 
@@ -402,7 +402,7 @@ export const IDEAS_CSS = `
 
 .idea-detail-modal {
   background: #e6e9ee;
-  color: #24292f;
+  color: #1b1f24;
   border: 0;
   border-radius: 8px;
   max-height: calc(100vh - 48px);
@@ -434,7 +434,7 @@ export const IDEAS_CSS = `
 .idea-detail__close:hover,
 .idea-detail__close:focus-visible {
   background: #f6f8fa;
-  color: #0969da;
+  color: #1f883d;
 }
 
 .idea-detail__form {
@@ -466,7 +466,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__description a {
-  color: #0969da;
+  color: inherit;
   text-decoration: underline;
 }
 

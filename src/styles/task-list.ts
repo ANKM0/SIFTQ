@@ -24,7 +24,8 @@ export const TASK_LIST_CSS = `
 }
 
 .task-row.is-selected {
-  background: #ddf4ff;
+  background: #d5dae1;
+  box-shadow: inset 3px 0 0 #1f883d;
 }
 
 .task-row-selection {
@@ -36,7 +37,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-selection input,
 .task-select-all input {
-  accent-color: #0969da;
+  accent-color: #1f883d;
   height: 20px;
   margin: 0;
   width: 20px;
@@ -52,7 +53,7 @@ export const TASK_LIST_CSS = `
 
 .task-row-link:focus-visible,
 .task-row-selection:has(input:focus-visible) {
-  outline: 2px solid #0969da;
+  outline: 2px solid #1f883d;
   outline-offset: 2px;
 }
 
@@ -146,9 +147,9 @@ export const TASK_LIST_CSS = `
 }
 
 .task-label-filter.is-active summary {
-  background: #ddf4ff;
-  border-color: #54aeff;
-  color: #0969da;
+  background: #dafbe1;
+  border-color: #1f883d;
+  color: #1f883d;
 }
 
 .task-label-menu {
@@ -265,7 +266,7 @@ export const TASK_LIST_CSS = `
 }
 
 .button--danger {
-  color: #b00;
+  color: #1b1f24;
 }
 
 .pagination {
