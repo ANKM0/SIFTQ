@@ -16,7 +16,7 @@ export const IDEAS_CSS = `
 }
 
 .ideas-composer {
-  background: #dfe3e8;
+  background: #e6e9ee;
   border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 2px rgb(31 35 40 / 8%);
@@ -50,7 +50,7 @@ export const IDEAS_CSS = `
 }
 
 .ideas-composer--open {
-  background: #dfe3e8;
+  background: #e6e9ee;
   border: 1px solid #8b949e;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
   padding: 0;
@@ -142,7 +142,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-card {
-  background: #dfe3e8;
+  background: #e6e9ee;
   border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
@@ -155,11 +155,11 @@ export const IDEAS_CSS = `
 }
 
 .idea-card:nth-child(3n + 2) {
-  background: #d9dee5;
+  background: #dfe3e8;
 }
 
 .idea-card:nth-child(3n + 3) {
-  background: #e3e7ec;
+  background: #eceef2;
 }
 
 .idea-card:hover {
@@ -296,7 +296,7 @@ export const IDEAS_CSS = `
 }
 
 .ideas-empty {
-  background: #dfe3e8;
+  background: #e6e9ee;
   border: 1px dashed #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
@@ -323,6 +323,7 @@ export const IDEAS_CSS = `
 }
 
 .page--idea-detail {
+  background: #30363d;
   max-width: none;
   min-height: calc(100vh - 63px);
   padding: 24px 5vw 48px;
@@ -400,7 +401,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail-modal {
-  background: #dfe3e8;
+  background: #e6e9ee;
   color: #24292f;
   border: 0;
   border-radius: 8px;
@@ -415,7 +416,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail-modal .idea-detail__form {
-  background: #dfe3e8;
+  background: #e6e9ee;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -437,7 +438,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__form {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);

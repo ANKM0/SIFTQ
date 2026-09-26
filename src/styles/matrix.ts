@@ -5,8 +5,12 @@ export const MATRIX_CSS = `
   grid-template-columns: minmax(0, 1fr);
 }
 
+.page--matrix .error {
+  color: #ff7b72;
+}
+
 .matrix-axis {
-  background: #ffffff;
+  background: #d5dae1;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   gap: 12px;
@@ -40,7 +44,7 @@ export const MATRIX_CSS = `
 }
 
 .axis-line span {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 999px;
   padding: 4px 10px;
@@ -101,7 +105,7 @@ export const MATRIX_CSS = `
 }
 
 .area {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   min-height: 280px;
@@ -187,11 +191,16 @@ export const MATRIX_CSS = `
 }
 
 .task-card,
-.task-row,
+.task-row {
+  background: #e6e9ee;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+}
+
 .form-panel,
 .side-panel,
 .state-card {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 8px;
 }
@@ -320,7 +329,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-menu {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
@@ -361,7 +370,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 12px;
   box-shadow: 0 16px 36px rgb(31 35 40 / 30%);
@@ -397,7 +406,7 @@ export const MATRIX_ACTIONS_CSS = `
 }
 
 .matrix-modal-button--cancel {
-  background: #ffffff;
+  background: #e6e9ee;
 }
 
 .matrix-modal-button--cancel:hover {

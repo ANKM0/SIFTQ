@@ -74,6 +74,7 @@ input,
 textarea,
 select,
 .description-editor {
+  background: #f1f3f6;
   border: 1px solid #d0d7de;
   border-radius: 6px;
   font: inherit;
@@ -86,7 +87,7 @@ textarea {
 }
 
 .description-editor {
-  background: #ffffff;
+  background: #e6e9ee;
   min-height: 180px;
   overflow: auto;
   white-space: pre-wrap;
@@ -162,7 +163,7 @@ textarea[data-description-value] {
 }
 
 .popover {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 12px;
   box-shadow: 0 16px 36px rgb(31 35 40 / 18%);

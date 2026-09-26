@@ -1,7 +1,7 @@
 export const BASE_CSS = `
 :root {
   color: #24292f;
-  background: #f6f8fa;
+  background: #30363d;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
@@ -55,7 +55,7 @@ a {
 
 .nav a,
 .button {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 6px;
   display: inline-flex;
@@ -67,7 +67,7 @@ a {
 
 .nav .active,
 .button.primary {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -106,7 +106,7 @@ a {
 }
 
 .task-status-filter .button.is-active {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -122,7 +122,7 @@ a {
 
 .task-selection-summary {
   align-items: center;
-  color: #24292f;
+  color: #f1f3f4;
   display: flex;
   font-size: 14px;
   font-weight: 600;
@@ -147,12 +147,13 @@ a {
 }
 
 .page-title {
+  color: #f1f3f4;
   font-size: 24px;
   margin: 0;
 }
 
 .muted {
-  color: #57606a;
+  color: #b1bac4;
   font-size: 13px;
 }
 

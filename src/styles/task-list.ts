@@ -1,5 +1,6 @@
 export const TASK_LIST_CSS = `
 .list {
+  background: #d5dae1;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   overflow: hidden;
@@ -78,7 +79,7 @@ export const TASK_LIST_CSS = `
 
 .task-list-toolbar {
   align-items: center;
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   display: flex;
@@ -151,7 +152,7 @@ export const TASK_LIST_CSS = `
 }
 
 .task-label-menu {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
@@ -194,7 +195,7 @@ export const TASK_LIST_CSS = `
 }
 
 .task-bulk-menu-items {
-  background: #ffffff;
+  background: #e6e9ee;
   border: 1px solid #d0d7de;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(31 35 40 / 18%);
@@ -277,7 +278,7 @@ export const TASK_LIST_CSS = `
 }
 
 .pagination .button.small.is-active {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -288,7 +289,7 @@ export const TASK_LIST_CSS = `
 }
 
 .pagination-ellipsis {
-  color: #57606a;
+  color: #b1bac4;
   font-weight: 700;
   padding: 0 4px;
 }
