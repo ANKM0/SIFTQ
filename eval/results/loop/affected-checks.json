@@ -1,0 +1,66 @@
+{
+  "name": "affected-checks",
+  "date": "2026-09-26",
+  "change": "verification を変更パス対応（_checks_for）にし、fast 群を task --parallel の 1 コマンドで実行する。フロント変更の unit は変更関連テスト（vp test run --changed）に絞る。",
+  "checks_for": {
+    "always": ["git diff --check"],
+    "docs/ or *.md": ["ci:markdown"],
+    "scripts/ or .taqt/": ["ci:lint:python"],
+    "src/ tests/ package.json bun.lock": [
+      "setup:frontend:ci",
+      "ci:lint",
+      "ci:typecheck",
+      "ci:test:unit:changed"
+    ],
+    "src/components src/client src/views tests/e2e": ["+ ci:test:e2e"],
+    "unknown only": [
+      "setup:frontend:ci",
+      "ci:lint",
+      "ci:lint:python",
+      "ci:typecheck",
+      "ci:test:unit",
+      "ci:test:e2e"
+    ]
+  },
+  "parallel": {
+    "command": "task -t .config/Taskfile.yml --parallel <checks>",
+    "serial": ["git diff --check", "setup:frontend:ci", "ci:test:e2e"]
+  },
+  "changed_tests": {
+    "adopted": true,
+    "task": "ci:test:unit:changed",
+    "command": "vp test run --changed --passWithNoTests",
+    "tool": "vitest 4.1.11 (vp v0.3.0, `vp test run --help` lists --changed)",
+    "observation": {
+      "changed_tree": "src/views/IdeaDetailFields.tsx modified",
+      "changed_files": 8,
+      "changed_tests": 99,
+      "full_files": 29,
+      "full_tests": 210,
+      "exit_code": 0
+    }
+  },
+  "skip_e2e_override": {
+    "env": "LOOP_VERIFICATION_SKIP_E2E",
+    "maintained": true,
+    "covered_by": ".taqt/tests/loop_engineering_test.py::test_verification_skips_e2e_when_flag_set"
+  },
+  "real_run": {
+    "command": "PYTHONPATH=.taqt/scripts LOOP_VERIFICATION_SKIP_E2E=1 uv run python -c '...run_verification...'",
+    "changed_paths": [
+      ".codex/rules/shared.rules",
+      ".config/taskfile/ci.yml",
+      ".taqt/scripts/loop/verification.py",
+      ".taqt/tests/loop_engineering_test.py"
+    ],
+    "status": "pass",
+    "phases": ["diff_check", "frontend_dependencies", "fast_checks"],
+    "fast_command": "task -t .config/Taskfile.yml --parallel ci:lint ci:lint:python ci:typecheck ci:test:unit",
+    "note": "未知パス（.config/ .codex/）を含むためフルセット。非フロント縮小は _checks_for のテストで確認。"
+  },
+  "effect_measurement": {
+    "closure": "非低下（未測定・LLM budget が必要）",
+    "escaped": "非増加（未測定・LLM budget が必要）",
+    "rationale": "本変更は checks の選択と実行方法のみで、フロント変更の検出集合は不変。e2e 粒度は #556 のまま。T2/T3 ハーネスは LLM budget と e2e ブラウザを要するため別途実施。"
+  }
+}

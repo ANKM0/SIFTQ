@@ -17,6 +17,12 @@ FAST_COMMANDS = (
 E2E_COMMANDS = (f"{TASKFILE} ci:test:e2e",)
 FRONTEND_DEPENDENCY_COMMAND = f"{TASKFILE} setup:frontend:ci"
 
+DIFF_COMMAND = "git diff --check"
+FRONTEND_DEPENDENCY_TASK = "setup:frontend:ci"
+FULL_CHECKS = ("ci:lint", "ci:lint:python", "ci:typecheck", "ci:test:unit")
+FRONTEND_CHECKS = ("ci:lint", "ci:typecheck", "ci:test:unit:changed")
+E2E_TASK = "ci:test:e2e"
+
 
 def _e2e_enabled() -> bool:
     value = os.environ.get("LOOP_VERIFICATION_SKIP_E2E", "").strip().lower()
@@ -41,11 +47,47 @@ def _task_command(cwd: Path) -> str:
     return TASKFILE
 
 
-def _touches_frontend(paths: Sequence[str]) -> bool:
-    for path in paths:
-        if path.startswith(("src/", "tests/")) or path in {"package.json", "bun.lock"}:
-            return True
-    return False
+def _is_documentation_path(path: str) -> bool:
+    return path.startswith("docs/") or path.endswith(".md")
+
+
+def _is_python_path(path: str) -> bool:
+    return path.startswith(("scripts/", ".taqt/"))
+
+
+def _is_frontend_path(path: str) -> bool:
+    return path.startswith(("src/", "tests/")) or path in {"package.json", "bun.lock"}
+
+
+def _is_e2e_path(path: str) -> bool:
+    return path.startswith(("src/components/", "src/client/", "src/views/", "tests/e2e/"))
+
+
+def _is_known_path(path: str) -> bool:
+    return _is_documentation_path(path) or _is_python_path(path) or _is_frontend_path(path)
+
+
+def _checks_for(paths: Sequence[str]) -> dict[str, Any]:
+    if not paths or any(not _is_known_path(path) for path in paths):
+        return {"setup": True, "checks": FULL_CHECKS, "e2e": True}
+
+    frontend = any(_is_frontend_path(path) for path in paths)
+    checks: list[str] = []
+    if any(_is_documentation_path(path) for path in paths):
+        checks.append("ci:markdown")
+    if any(_is_python_path(path) for path in paths):
+        checks.append("ci:lint:python")
+    if frontend:
+        checks.extend(FRONTEND_CHECKS)
+    return {
+        "setup": frontend,
+        "checks": tuple(checks),
+        "e2e": frontend and any(_is_e2e_path(path) for path in paths),
+    }
+
+
+def _has_failure(results: list[dict[str, Any]]) -> bool:
+    return any(result["exit_code"] != 0 for result in results)
 
 
 def run_verification(
@@ -54,30 +96,37 @@ def run_verification(
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     task_command = _task_command(cwd)
-    fast_phases: list[tuple[str, tuple[str, ...]]] = [
-        ("diff_check", ("git diff --check",)),
-        ("frontend_dependencies", (f"{task_command} setup:frontend:ci",)),
-        (
-            "fast_checks",
-            (
-                f"{task_command} ci:lint",
-                f"{task_command} ci:lint:python",
-                f"{task_command} ci:typecheck",
-                f"{task_command} ci:test:unit",
-            ),
-        ),
-    ]
-    results = _run_phases(fast_phases, cwd=cwd, env=env)
-    if any(result["exit_code"] != 0 for result in results):
+    plan = _checks_for(_changed_paths(cwd))
+
+    results = _run_phases([("diff_check", (DIFF_COMMAND,))], cwd=cwd, env=env)
+    if _has_failure(results):
         return _failure_result(results, cwd=cwd)
-    if _e2e_enabled() and _touches_frontend(_changed_paths(cwd)):
+
+    if plan["setup"]:
         results += _run_phases(
-            [("e2e_checks", (f"{task_command} ci:test:e2e",))],
+            [("frontend_dependencies", (f"{task_command} {FRONTEND_DEPENDENCY_TASK}",))],
+            cwd=cwd,
+            env=env,
+        )
+        if _has_failure(results):
+            return _failure_result(results, cwd=cwd)
+
+    checks = tuple(plan["checks"])
+    if checks:
+        parallel_command = " ".join((task_command, "--parallel", *checks))
+        results += _run_phases([("fast_checks", (parallel_command,))], cwd=cwd, env=env)
+        if _has_failure(results):
+            return _failure_result(results, cwd=cwd)
+
+    if plan["e2e"] and _e2e_enabled():
+        results += _run_phases(
+            [("e2e_checks", (f"{task_command} {E2E_TASK}",))],
             cwd=cwd,
             env=_e2e_environment(env),
         )
-        if any(result["exit_code"] != 0 for result in results):
+        if _has_failure(results):
             return _failure_result(results, cwd=cwd)
+
     return _result(status="pass", feedback=None, commands=results, cwd=cwd)
 
 
