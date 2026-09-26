@@ -1,8 +1,9 @@
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import yaml
 
@@ -108,7 +109,7 @@ def evaluate_mutants(
     return {"records": records, "summary": summarize(records)}
 
 
-def subprocess_runner(command: str, cwd: Path) -> int:
+def subprocess_runner(command: str, cwd: Path, *, env: Mapping[str, str] | None = None) -> int:
     completed = subprocess.run(
         command,
         cwd=cwd,
@@ -117,6 +118,7 @@ def subprocess_runner(command: str, cwd: Path) -> int:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        env={**os.environ, **env} if env else None,
     )
     return completed.returncode
 

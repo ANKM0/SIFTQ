@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import json
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -16,8 +17,9 @@ from .defect_injection import subprocess_runner
 from .preflight import missing_tasks
 
 RunLoopFn = Callable[..., dict[str, Any]]
-CommandRunner = Callable[[str, Path], int]
+CommandRunner = Callable[..., int]
 WorktreeFactory = Callable[[str, int, str, Path], "contextlib.AbstractContextManager[Path]"]
+PreviewRunner = Callable[..., subprocess.CompletedProcess[Any]]
 
 DEFAULT_REPLAY_ROOT = Path("eval/gold/loop-tasks")
 DEFAULT_WORKTREE_ROOT = Path("tmp/replay-worktrees")
@@ -68,11 +70,13 @@ def run_replay(
     repetitions: int = 1,
     repo: Path | None = None,
     worktree_root: Path = DEFAULT_WORKTREE_ROOT,
+    keep_worktrees: bool = False,
     run_loop_fn: RunLoopFn = run_loop,
     check_runner: CommandRunner = subprocess_runner,
     worktree_factory: WorktreeFactory | None = None,
 ) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
+    kept_workspaces: list[str] = []
     for arm, loop_path in arms.items():
         for rep in range(repetitions):
             with _workspace_for(
@@ -83,12 +87,17 @@ def run_replay(
                 workspace=workspace,
                 worktree_root=worktree_root,
                 factory=worktree_factory,
+                keep=keep_worktrees,
             ) as run_workspace:
+                if keep_worktrees:
+                    kept_workspaces.append(str(run_workspace))
+                environment = _isolated_environment(run_workspace)
                 result = run_loop_fn(
                     loop_path=Path(loop_path),
                     task_path=task_path,
                     workspace=run_workspace,
                     runs_root=runs_root,
+                    child_environment=environment,
                 )
                 status = str(result.get("status"))
                 escaped = False
@@ -97,6 +106,7 @@ def run_replay(
                         _resolve_checks(checks, run_workspace),
                         cwd=run_workspace,
                         runner=check_runner,
+                        env=environment,
                     )
                 record: dict[str, Any] = {"arm": arm, "status": status, "escaped": escaped}
                 if repetitions > 1:
@@ -105,7 +115,10 @@ def run_replay(
                 if run_dir:
                     record["usage"] = _run_usage(Path(run_dir))
                 records.append(record)
-    return {"records": records, "summary": summarize_records(records)}
+    result = {"records": records, "summary": summarize_records(records)}
+    if keep_worktrees:
+        result["kept_workspaces"] = kept_workspaces
+    return result
 
 
 @contextlib.contextmanager
@@ -118,6 +131,7 @@ def _workspace_for(
     workspace: Path,
     worktree_root: Path,
     factory: WorktreeFactory | None,
+    keep: bool = False,
 ) -> Iterator[Path]:
     if base_commit is None or repo is None:
         yield workspace
@@ -126,13 +140,13 @@ def _workspace_for(
         with factory(arm, rep, base_commit, repo) as isolated:
             yield isolated
         return
-    with _default_worktree(arm, rep, base_commit, repo, worktree_root) as isolated:
+    with _default_worktree(arm, rep, base_commit, repo, worktree_root, keep=keep) as isolated:
         yield isolated
 
 
 @contextlib.contextmanager
 def _default_worktree(
-    arm: str, rep: int, base_commit: str, repo: Path, worktree_root: Path
+    arm: str, rep: int, base_commit: str, repo: Path, worktree_root: Path, *, keep: bool = False
 ) -> Iterator[Path]:
     safe_arm = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in arm)
     base_path = (repo / worktree_root / f"{safe_arm}-{rep}").resolve()
@@ -148,22 +162,23 @@ def _default_worktree(
     try:
         yield path
     finally:
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(path)],
-            cwd=repo,
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        subprocess.run(
-            ["git", "worktree", "prune"],
-            cwd=repo,
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        if not keep:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(path)],
+                cwd=repo,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "worktree", "prune"],
+                cwd=repo,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
 
 def _add_worktree(base_path: Path, base_commit: str, repo: Path) -> Path:
@@ -243,8 +258,19 @@ def summarize_records(records: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {"arms": per_arm}
 
 
-def _checks_failed(commands: Sequence[str], *, cwd: Path, runner: CommandRunner) -> bool:
-    return any(runner(command, cwd) != 0 for command in commands)
+def _isolated_environment(workspace: Path) -> dict[str, str]:
+    tmp_root = (workspace / ".tmp").resolve()
+    return {"TMP_ROOT": str(tmp_root), "UV_PROJECT_ENVIRONMENT": str(tmp_root / ".venv")}
+
+
+def _checks_failed(
+    commands: Sequence[str],
+    *,
+    cwd: Path,
+    runner: CommandRunner,
+    env: dict[str, str] | None = None,
+) -> bool:
+    return any(runner(command, cwd, env=env) != 0 for command in commands)
 
 
 def _task_command(workspace: Path) -> str:
@@ -264,16 +290,53 @@ def _spec_paths(root: Path) -> list[Path]:
     return sorted(path for path in root.glob("*.yaml"))
 
 
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def preview_command(port: int) -> list[str]:
+    return ["bun", "run", "preview:mock", "--local", "--ip", "127.0.0.1", "--port", str(port)]
+
+
+def run_preview(
+    workspace: Path,
+    *,
+    port: int | None = None,
+    runner: PreviewRunner = subprocess.run,
+) -> int:
+    chosen = port or free_port()
+    print(f"preview: http://127.0.0.1:{chosen} (password: preview)", flush=True)
+    completed = runner(preview_command(chosen), cwd=workspace, text=True)
+    return int(completed.returncode)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="loop-eval-paired-replay")
-    parser.add_argument("--spec", type=Path, required=True)
-    parser.add_argument("--task", type=Path, required=True)
+    parser.add_argument("--spec", type=Path)
+    parser.add_argument("--task", type=Path)
     parser.add_argument("--workspace", type=Path, default=Path("."))
     parser.add_argument("--runs-root", type=Path, default=Path(".taqt/runs"))
     parser.add_argument("--repo", type=Path)
     parser.add_argument("--repetitions", type=int)
     parser.add_argument("--worktree-root", type=Path, default=DEFAULT_WORKTREE_ROOT)
+    parser.add_argument(
+        "--keep-worktrees",
+        action="store_true",
+        help="Keep replay worktrees on disk and print their paths.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+    preview_parser = subparsers.add_parser("preview", help="Serve a kept worktree with preview:mock.")
+    preview_parser.add_argument("--workspace", type=Path, required=True)
+    preview_parser.add_argument("--port", type=int)
     args = parser.parse_args(argv)
+
+    if args.command == "preview":
+        return run_preview(args.workspace, port=args.port)
+
+    if args.spec is None or args.task is None:
+        parser.error("--spec and --task are required")
 
     spec = load_replay_spec(args.spec)
     repo = args.repo or args.workspace
@@ -295,6 +358,7 @@ def main(argv: list[str] | None = None) -> int:
         repetitions=repetitions,
         repo=repo if spec["base_commit"] else None,
         worktree_root=args.worktree_root,
+        keep_worktrees=args.keep_worktrees,
     )
     result["name"] = spec["name"]
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -13,13 +13,18 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 def test_env_sh_redirects_venv_and_ruff_cache_under_tmp() -> None:
     env = (REPOSITORY_ROOT / ".config/env.sh").read_text(encoding="utf-8")
-    assert 'UV_PROJECT_ENVIRONMENT="$_repo_root/tmp/.venv"' in env
+    assert 'export TMP_ROOT="${TMP_ROOT:-$_repo_root/tmp}"' in env
+    assert 'UV_PROJECT_ENVIRONMENT="$TMP_ROOT/.venv"' in env
     assert 'RUFF_CACHE_DIR="$_repo_root/tmp/.ruff_cache"' in env
 
 
 def test_taskfile_redirects_venv_and_ruff_cache_under_tmp() -> None:
     taskfile = (REPOSITORY_ROOT / ".config/Taskfile.yml").read_text(encoding="utf-8")
-    assert 'UV_PROJECT_ENVIRONMENT: "{{.ROOT_DIR}}/../tmp/.venv"' in taskfile
+    assert "TMP_ROOT: '{{.TMP_ROOT | default (printf \"%s/../tmp\" .ROOT_DIR)}}'" in taskfile
+    assert (
+        "UV_PROJECT_ENVIRONMENT: '{{.TMP_ROOT | default (printf \"%s/../tmp\" .ROOT_DIR)}}/.venv'"
+        in taskfile
+    )
     assert 'RUFF_CACHE_DIR: "{{.ROOT_DIR}}/../tmp/.ruff_cache"' in taskfile
 
 
