@@ -85,6 +85,13 @@
 - 検証: smoke / ISSUE-375 / ISSUE-369 がすべて closure 1.0・escaped 0（375 / 369 は弱モデル muse-spark では失敗していた）。
 - 結果: `loop-simplify-strong.json`
 
+## 検証粒度の調整（e2e, 2026-09-26）
+
+- verification の e2e を**フロント変更時のみ**実行する（変更パスに `src/` または `tests/` または `package.json` / `bun.lock` を含む場合）。
+- 非フロント変更（`.taqt/`・`docs/`・`scripts/` 等）では e2e をスキップし、fast checks までで判定（コスト削減）。
+- 確認: smoke（fizzbuzz、非フロント）で phases = `diff_check` / `frontend_dependencies` / `fast_checks`、**e2e なし**。closure 1.0・escaped 0。
+- 結果: `e2e-granularity.json`
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。

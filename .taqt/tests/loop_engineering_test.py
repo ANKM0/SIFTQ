@@ -479,6 +479,7 @@ def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> 
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
@@ -507,6 +508,7 @@ def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> No
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
     monkeypatch.setenv("LOOP_VERIFICATION_SKIP_E2E", "1")
 
     result = run_verification(cwd=tmp_path)
@@ -514,6 +516,28 @@ def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> No
     assert result["status"] == "pass"
     assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
     assert "task -t .config/Taskfile.yml ci:test:unit" in calls
+
+
+def test_verification_skips_e2e_for_non_frontend_changes(tmp_path: Path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
+        calls.append(command)
+        return {
+            "command": command,
+            "exit_code": 0,
+            "elapsed_seconds": 0.1,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+
+    monkeypatch.setattr("loop.verification._run_command", fake_run)
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: [".taqt/scripts/loop/runner.py"])
+
+    result = run_verification(cwd=tmp_path)
+
+    assert result["status"] == "pass"
+    assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
 
 
 @pytest.mark.parametrize(

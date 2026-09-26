@@ -30,6 +30,13 @@ def _task_command(cwd: Path) -> str:
     return TASKFILE
 
 
+def _touches_frontend(paths: Sequence[str]) -> bool:
+    for path in paths:
+        if path.startswith(("src/", "tests/")) or path in {"package.json", "bun.lock"}:
+            return True
+    return False
+
+
 def run_verification(
     *,
     cwd: Path,
@@ -51,7 +58,7 @@ def run_verification(
     results = _run_phases(fast_phases, cwd=cwd)
     if any(result["exit_code"] != 0 for result in results):
         return _failure_result(results, cwd=cwd)
-    if _e2e_enabled():
+    if _e2e_enabled() and _touches_frontend(_changed_paths(cwd)):
         results += _run_phases([("e2e_checks", (f"{task_command} ci:test:e2e",))], cwd=cwd)
         if any(result["exit_code"] != 0 for result in results):
             return _failure_result(results, cwd=cwd)
