@@ -92,6 +92,14 @@
 - 確認: smoke（fizzbuzz、非フロント）で phases = `diff_check` / `frontend_dependencies` / `fast_checks`、**e2e なし**。closure 1.0・escaped 0。
 - 結果: `e2e-granularity.json`
 
+## 変更パス対応・差分テスト・並列実行（#559, 2026-09-26）
+
+- verification に `_checks_for(paths)` を追加し、変更パスで実行 checks を絞る（`docs/`・`*.md` → markdown、`scripts/`・`.taqt/` → `ci:lint:python`、フロント → setup + lint/typecheck/unit、`src/components`・`src/client`・`src/views`・`tests/e2e` → +e2e、未知パス → フルセット）。
+- fast 群は `task -t .config/Taskfile.yml --parallel <checks>` の 1 コマンドで並列実行。`git diff --check` / `setup:frontend:ci` / `ci:test:e2e` は直列。
+- フロント変更の unit は `ci:test:unit:changed`（`vp test run --changed --passWithNoTests`）に採用。実機確認: `src/views/IdeaDetailFields.tsx` 変更で 8 files / 99 tests、フルは 29 files / 210 tests。`--changed` 非対応時は `ci:test:unit` へフォールバック。
+- `LOOP_VERIFICATION_SKIP_E2E` の上書きは維持。
+- 結果: `affected-checks.json`。closure / escaped の paired replay は LLM budget と e2e ブラウザを要するため未測定（検出集合は不変）。
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。
