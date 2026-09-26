@@ -128,6 +128,26 @@ export const MATRIX_CSS = `
   overflow-y: visible;
 }
 
+.area--quadrant::after {
+  background: linear-gradient(to bottom, rgb(174 184 196 / 0%), #aeb8c4);
+  border-radius: 0 0 6px 6px;
+  bottom: 0;
+  content: "";
+  height: 28px;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+.area--quadrant:hover::after,
+.area--quadrant:focus-within::after {
+  opacity: 1;
+}
+
 .area-create-link {
   inset: 0;
   position: absolute;

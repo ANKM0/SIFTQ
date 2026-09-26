@@ -25,6 +25,64 @@ body {
   outline-offset: 2px;
 }
 
+.matrix-cards,
+.description-editor,
+.ideas-composer__description,
+.idea-detail-modal .idea-detail__form,
+.idea-detail__description {
+  scrollbar-color: #8b949e transparent;
+  scrollbar-width: thin;
+}
+
+.matrix-cards::-webkit-scrollbar,
+.description-editor::-webkit-scrollbar,
+.ideas-composer__description::-webkit-scrollbar,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar,
+.idea-detail__description::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.matrix-cards::-webkit-scrollbar-track,
+.description-editor::-webkit-scrollbar-track,
+.ideas-composer__description::-webkit-scrollbar-track,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-track,
+.idea-detail__description::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.matrix-cards::-webkit-scrollbar-button,
+.description-editor::-webkit-scrollbar-button,
+.ideas-composer__description::-webkit-scrollbar-button,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-button,
+.idea-detail__description::-webkit-scrollbar-button {
+  display: none;
+}
+
+.matrix-cards::-webkit-scrollbar-thumb,
+.description-editor::-webkit-scrollbar-thumb,
+.ideas-composer__description::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-thumb,
+.idea-detail__description::-webkit-scrollbar-thumb {
+  background: transparent;
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.matrix-cards:hover::-webkit-scrollbar-thumb,
+.description-editor:hover::-webkit-scrollbar-thumb,
+.ideas-composer__description:hover::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form:hover::-webkit-scrollbar-thumb,
+.idea-detail__description:hover::-webkit-scrollbar-thumb,
+.matrix-cards:focus-within::-webkit-scrollbar-thumb,
+.description-editor:focus-within::-webkit-scrollbar-thumb,
+.ideas-composer__description:focus-within::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form:focus-within::-webkit-scrollbar-thumb,
+.idea-detail__description:focus-within::-webkit-scrollbar-thumb {
+  background: #8b949e;
+}
+
 a {
   color: inherit;
   text-decoration: none;
