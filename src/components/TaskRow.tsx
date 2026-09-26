@@ -20,7 +20,6 @@ export const TaskRow: FC<{ task: Task; listStatus?: TaskStatus }> = ({ task, lis
           <span class={`status status--${task.status}`}>{task.status}</span>
           {is_working(task) ? <span class="working-badge">working</span> : null}
         </span>
-        <span class="muted">Matrix quadrant</span>
       </span>
     </a>
   </div>

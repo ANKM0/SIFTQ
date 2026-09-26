@@ -23,8 +23,8 @@ describe("styles", () => {
   it("uses a dark border for Matrix cards against the light Matrix frame", () => {
     const taskCard = STYLES_CSS.match(/(?:^|\n)\.task-card\s*\{[^}]*\}/);
     const matrixAxis = STYLES_CSS.match(/(?:^|\n)\.matrix-axis\s*\{[^}]*\}/);
-    expect(taskCard?.[0]).toContain("border-color: #24292f;");
-    expect(matrixAxis?.[0]).toContain("border: 1px solid #d0d7de;");
+    expect(taskCard?.[0]).toContain("border-color: #1b1f24;");
+    expect(matrixAxis?.[0]).toContain("border: 1px solid #8b949e;");
   });
 
   it("does not override the cursor on draggable Matrix cards", () => {
@@ -122,9 +122,10 @@ describe("Idea card description divider", () => {
 
 describe("Idea detail description divider", () => {
   it("draws a top border above the detail description but not when empty", () => {
-    const description = STYLES_CSS.match(/(?:^|\n)\.idea-detail__description\s*\{[^}]*\}/);
-    expect(description?.[0]).toContain("border-top: 1px solid #8b949e;");
-    expect(description?.[0]).toContain("padding: 12px 0 0;");
+    const description = STYLES_CSS.match(/(?:^|\n)\.idea-detail__description\s*\{[^}]*\}/g);
+    const bordered = description?.find((rule) => rule.includes("border-top: 1px solid #8b949e;"));
+    expect(bordered).toContain("border-top: 1px solid #8b949e;");
+    expect(bordered).toContain("padding: 12px 0 0;");
 
     const empty = STYLES_CSS.match(/(?:^|\n)\.idea-detail__description--empty\s*\{[^}]*\}/);
     expect(empty?.[0]).toContain("border-top: 0;");

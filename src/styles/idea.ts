@@ -1,7 +1,7 @@
 export const IDEAS_CSS = `
 .page--ideas {
-  background: #30363d;
-  color: #f1f3f4;
+  background: #3b434d;
+  color: #e6e9ee;
   max-width: none;
   min-height: calc(100vh - 63px);
   padding: 48px 16px;
@@ -16,11 +16,11 @@ export const IDEAS_CSS = `
 }
 
 .ideas-composer {
-  background: #dfe3e8;
+  background: #c1c9d3;
   border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 2px rgb(31 35 40 / 8%);
-  color: #57606a;
+  color: #3f4854;
   margin: 0 auto 28px;
   width: min(100%, 1008px);
 }
@@ -42,15 +42,15 @@ export const IDEAS_CSS = `
 }
 
 .ideas-composer__line {
-  border-bottom: 2px solid #57606a;
-  border-top: 2px solid #57606a;
+  border-bottom: 2px solid #3f4854;
+  border-top: 2px solid #3f4854;
   height: 8px;
   opacity: 0.7;
   width: 18px;
 }
 
 .ideas-composer--open {
-  background: #dfe3e8;
+  background: #c1c9d3;
   border: 1px solid #8b949e;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
   padding: 0;
@@ -74,7 +74,7 @@ export const IDEAS_CSS = `
 .ideas-composer__description {
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   font: inherit;
   outline: 0;
   padding: 0;
@@ -97,7 +97,7 @@ export const IDEAS_CSS = `
 
 .ideas-composer__title:focus,
 .ideas-composer__description:focus {
-  box-shadow: 0 2px 0 #0969da;
+  box-shadow: 0 2px 0 #0f4d24;
 }
 
 .ideas-composer__actions {
@@ -109,7 +109,7 @@ export const IDEAS_CSS = `
   background: transparent;
   border: 0;
   border-radius: 6px;
-  color: #57606a;
+  color: #3f4854;
   cursor: pointer;
   font: inherit;
   padding: 8px 16px;
@@ -118,7 +118,7 @@ export const IDEAS_CSS = `
 .ideas-composer__close:hover,
 .ideas-composer__close:focus-visible {
   background: #f6f8fa;
-  color: #0969da;
+  color: #0f4d24;
 }
 
 .ideas-grid {
@@ -142,7 +142,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-card {
-  background: #dfe3e8;
+  background: #c1c9d3;
   border: 1px solid #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
@@ -155,15 +155,15 @@ export const IDEAS_CSS = `
 }
 
 .idea-card:nth-child(3n + 2) {
-  background: #d9dee5;
+  background: #b6c0cb;
 }
 
 .idea-card:nth-child(3n + 3) {
-  background: #e3e7ec;
+  background: #ccd3dc;
 }
 
 .idea-card:hover {
-  border-color: #0969da;
+  border-color: #1f883d;
   box-shadow: 0 4px 12px rgb(31 35 40 / 14%);
   transform: translateY(-1px);
 }
@@ -178,7 +178,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-card.drop-target {
-  border-color: #0969da;
+  border-color: #1f883d;
 }
 
 .idea-card__link {
@@ -195,18 +195,18 @@ export const IDEAS_CSS = `
   fill: #ffffff;
   grid-column: 1;
   height: 18px;
-  stroke: #24292f;
+  stroke: #1b1f24;
   stroke-width: 1.5;
   width: 18px;
 }
 
 .idea-card[data-pinned="true"] .idea-card__pin {
-  fill: #24292f;
+  fill: #1b1f24;
   stroke: none;
 }
 
 .idea-card h2 {
-  color: #24292f;
+  color: #1b1f24;
   font-size: 17px;
   line-height: 1.4;
   grid-column: 2;
@@ -218,7 +218,7 @@ export const IDEAS_CSS = `
 
 .idea-card__description {
   border-top: 1px solid #8b949e;
-  color: #57606a;
+  color: #3f4854;
   font-size: 14px;
   grid-column: 1 / -1;
   line-height: 1.55;
@@ -241,7 +241,7 @@ export const IDEAS_CSS = `
 .idea-card__footer {
   align-items: center;
   bottom: 16px;
-  color: #57606a;
+  color: #3f4854;
   display: flex;
   font-size: 11px;
   justify-content: flex-end;
@@ -269,13 +269,13 @@ export const IDEAS_CSS = `
 }
 
 .idea-card__more:hover {
-  background: #d0d7de;
+  background: #8b949e;
 }
 
 .idea-card__more span,
 .idea-card__more span::before,
 .idea-card__more span::after {
-  background: #57606a;
+  background: #3f4854;
   border-radius: 50%;
   content: "";
   height: 3px;
@@ -296,11 +296,11 @@ export const IDEAS_CSS = `
 }
 
 .ideas-empty {
-  background: #dfe3e8;
+  background: #c1c9d3;
   border: 1px dashed #8b949e;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
-  color: #24292f;
+  color: #1b1f24;
   align-items: center;
   display: flex;
   flex: 1;
@@ -323,6 +323,7 @@ export const IDEAS_CSS = `
 }
 
 .page--idea-detail {
+  background: #3b434d;
   max-width: none;
   min-height: calc(100vh - 63px);
   padding: 24px 5vw 48px;
@@ -338,7 +339,7 @@ export const IDEAS_CSS = `
 .idea-detail__title {
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   flex: 1;
   font-size: 22px;
   font-weight: 700;
@@ -348,14 +349,14 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__title:focus {
-  box-shadow: 0 2px 0 #0969da;
+  box-shadow: 0 2px 0 #0f4d24;
 }
 
 .idea-detail__pin {
   align-items: center;
   background: transparent;
   border: 0;
-  color: #24292f;
+  color: #1b1f24;
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
@@ -373,7 +374,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__pin[aria-pressed="true"] {
-  color: #24292f;
+  color: #1b1f24;
 }
 
 .idea-detail__pin[aria-pressed="false"] {
@@ -381,7 +382,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__pin[aria-pressed="false"] svg {
-  stroke: #24292f;
+  stroke: #1b1f24;
   stroke-width: 1.5;
 }
 
@@ -390,7 +391,7 @@ export const IDEAS_CSS = `
   background: transparent;
   border: 0;
   border-radius: 6px;
-  color: #57606a;
+  color: #3f4854;
   display: inline-flex;
   font: inherit;
   justify-content: center;
@@ -400,8 +401,8 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail-modal {
-  background: #dfe3e8;
-  color: #24292f;
+  background: #c1c9d3;
+  color: #1b1f24;
   border: 0;
   border-radius: 8px;
   max-height: calc(100vh - 48px);
@@ -415,7 +416,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail-modal .idea-detail__form {
-  background: #dfe3e8;
+  background: #c1c9d3;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -433,12 +434,12 @@ export const IDEAS_CSS = `
 .idea-detail__close:hover,
 .idea-detail__close:focus-visible {
   background: #f6f8fa;
-  color: #0969da;
+  color: #0f4d24;
 }
 
 .idea-detail__form {
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
   padding: 24px;
@@ -465,7 +466,7 @@ export const IDEAS_CSS = `
 }
 
 .idea-detail__description a {
-  color: #0969da;
+  color: inherit;
   text-decoration: underline;
 }
 

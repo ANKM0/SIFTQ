@@ -1,7 +1,7 @@
 export const BASE_CSS = `
 :root {
-  color: #24292f;
-  background: #f6f8fa;
+  color: #1b1f24;
+  background: #3b434d;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
 }
@@ -19,6 +19,70 @@ body {
   color: #ffffff;
 }
 
+:focus-visible {
+  box-shadow: 0 0 0 4px #e6e9ee;
+  outline: 2px solid #0f4d24;
+  outline-offset: 2px;
+}
+
+.matrix-cards,
+.description-editor,
+.ideas-composer__description,
+.idea-detail-modal .idea-detail__form,
+.idea-detail__description {
+  scrollbar-color: #8b949e transparent;
+  scrollbar-width: thin;
+}
+
+.matrix-cards::-webkit-scrollbar,
+.description-editor::-webkit-scrollbar,
+.ideas-composer__description::-webkit-scrollbar,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar,
+.idea-detail__description::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.matrix-cards::-webkit-scrollbar-track,
+.description-editor::-webkit-scrollbar-track,
+.ideas-composer__description::-webkit-scrollbar-track,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-track,
+.idea-detail__description::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.matrix-cards::-webkit-scrollbar-button,
+.description-editor::-webkit-scrollbar-button,
+.ideas-composer__description::-webkit-scrollbar-button,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-button,
+.idea-detail__description::-webkit-scrollbar-button {
+  display: none;
+}
+
+.matrix-cards::-webkit-scrollbar-thumb,
+.description-editor::-webkit-scrollbar-thumb,
+.ideas-composer__description::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form::-webkit-scrollbar-thumb,
+.idea-detail__description::-webkit-scrollbar-thumb {
+  background: transparent;
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.matrix-cards:hover::-webkit-scrollbar-thumb,
+.description-editor:hover::-webkit-scrollbar-thumb,
+.ideas-composer__description:hover::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form:hover::-webkit-scrollbar-thumb,
+.idea-detail__description:hover::-webkit-scrollbar-thumb,
+.matrix-cards:focus-within::-webkit-scrollbar-thumb,
+.description-editor:focus-within::-webkit-scrollbar-thumb,
+.ideas-composer__description:focus-within::-webkit-scrollbar-thumb,
+.idea-detail-modal .idea-detail__form:focus-within::-webkit-scrollbar-thumb,
+.idea-detail__description:focus-within::-webkit-scrollbar-thumb {
+  background: #8b949e;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -30,8 +94,8 @@ a {
 
 .topbar {
   align-items: center;
-  background: #ffffff;
-  border-bottom: 1px solid #d0d7de;
+  background: #e6e9ee;
+  border-bottom: 1px solid #8b949e;
   display: flex;
   gap: 16px;
   justify-content: flex-start;
@@ -55,8 +119,8 @@ a {
 
 .nav a,
 .button {
-  background: #ffffff;
-  border: 1px solid #d0d7de;
+  background: #c1c9d3;
+  border: 1px solid #8b949e;
   border-radius: 6px;
   display: inline-flex;
   font-size: 14px;
@@ -67,7 +131,7 @@ a {
 
 .nav .active,
 .button.primary {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -106,7 +170,7 @@ a {
 }
 
 .task-status-filter .button.is-active {
-  background: #2da44e;
+  background: #1f883d;
   border-color: #2a9147;
   color: #ffffff;
 }
@@ -122,7 +186,7 @@ a {
 
 .task-selection-summary {
   align-items: center;
-  color: #24292f;
+  color: #1b1f24;
   display: flex;
   font-size: 14px;
   font-weight: 600;
@@ -147,12 +211,13 @@ a {
 }
 
 .page-title {
+  color: #e6e9ee;
   font-size: 24px;
   margin: 0;
 }
 
 .muted {
-  color: #57606a;
+  color: #b1bac4;
   font-size: 13px;
 }
 
