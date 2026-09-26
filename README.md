@@ -100,6 +100,12 @@ task -t .config/Taskfile.yml ci:build
 Cloudflare Workers とリモート D1 へのデプロイ手順は
 [`docs/contributing/deployment.md`](docs/contributing/deployment.md) を参照する。
 
+## Session Backup
+
+Codex と opencode のセッションは age で暗号化して `sessions/` へ保存する。
+鍵管理・注入・復元・サイズ・履歴の扱いは
+[`docs/contributing/session-backup.md`](docs/contributing/session-backup.md) を参照する。
+
 ## Loop Engineering
 
 The loop engineering direction is recorded in

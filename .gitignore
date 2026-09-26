@@ -46,6 +46,10 @@
 !/.taqt/scripts/**
 !/.taqt/tests/
 !/.taqt/tests/**
+!/.taqt/session-backup/
+!/.taqt/session-backup/recipient.pub
+!/sessions/
+!/sessions/**
 
 # Python and virtual environments
 __pycache__/

@@ -22,6 +22,9 @@ ALLOWLISTED_PATHS = (
     ".agents/skills/graphify/SKILL.md",
     ".codex/rules/shared.rules",
     ".taqt/config/profiles.yaml",
+    ".taqt/session-backup/recipient.pub",
+    "sessions/codex/2026/09/26/rollout-abc.jsonl.zst.age",
+    "sessions/opencode/opencode.db.zst.age",
     ".aqua/aqua.yaml",
 )
 IGNORED_PATHS = (
@@ -30,6 +33,10 @@ IGNORED_PATHS = (
     ".taqt/runs/example.jsonl",
     ".taqt/worktrees/example/file.ts",
     ".taqt/config/active.yaml",
+    ".taqt/session-backup/session.key",
+    ".taqt/session-backup/recipient.key",
+    ".taqt/session-backup/identity.age",
+    "sessions/private.key",
     ".dev.vars",
     ".env.local",
     "private.pem",
