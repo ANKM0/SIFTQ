@@ -78,6 +78,13 @@
 - モデル比較: 同一タスク `ISSUE-369` で strong（`opencode-go/deepseek-v4.1-flash`）= done / weak（`opencode-go/muse-spark-1.3-contributor`）= human。**モデル能力が closure に効く**（n=1）。`model-compare.json`
 - 7（checker / post_review の要否）: **決定は保留**。部分結果（A3 で B > A）と smoke（A=B）では結論に不足。13 件 A/B の完走後に判断。
 
+## loop 簡略化とモデル強化（2026-09-26）
+
+- 変更: `main_loop` から checker / post_review を除去（`implement → verification → fix`）。implement / fix を `opencode-go/deepseek-v4.1-flash` に強化。eval クローンも同構造に更新。
+- 根拠: A3 部分（A=closure 25% / human 67%、B=50% / 50%）と light A/B（ISSUE-375: A=human, B=done）で **B ≥ A が一貫**。
+- 検証: smoke / ISSUE-375 / ISSUE-369 がすべて closure 1.0・escaped 0（375 / 369 は弱モデル muse-spark では失敗していた）。
+- 結果: `loop-simplify-strong.json`
+
 ## T3: paired replay（#528 で有効化）
 
 ハーネスを #528 で改修した。`loop_eval.replay` は spec の `base_commit` と `repetitions` に対応し、arm × repetition ごとに `git worktree` で隔離 workspace を使う。集計は closure / escaped / human 率 / tokens / n。

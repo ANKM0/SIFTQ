@@ -1,0 +1,22 @@
+{
+  "name": "loop-simplify-strong",
+  "date": "2026-09-26",
+  "harness": "loop_eval.replay",
+  "change": "main_loop を簡略化（checker / post_review を除去）し、implement / fix を opencode-go/deepseek-v4.1-flash に強化",
+  "evidence_for_simplify": {
+    "a3_partial": "A（現行構造）closure 25% / human 67%、B（最小構造）closure 50% / human 50%（4 spec, n=12/arm）",
+    "light_ab": "ISSUE-375 で A=human / B=done",
+    "conclusion": "B >= A が一貫 → checker / post_review を外す簡略化を採用"
+  },
+  "after": {
+    "config": {"repetitions": 1, "skip_e2e": true},
+    "summary": {
+      "smoke": "A/B done (closure 1.0)",
+      "ISSUE-375": "done (closure 1.0)",
+      "ISSUE-369": "done (closure 1.0)"
+    },
+    "closure": 1.0,
+    "escaped": 0
+  },
+  "note": "簡略化 + 強モデルで smoke / 375 / 369 すべて closure 1.0・escaped 0。375 / 369 は弱モデル（muse-spark）では失敗していた。"
+}
