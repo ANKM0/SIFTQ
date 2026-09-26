@@ -123,6 +123,7 @@ prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:lint"], decision=
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:lint:python"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:test"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:test:unit"], decision="allow")
+prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:test:unit:changed"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:test:e2e"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:test:e2e:setup"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:build"], decision="allow")

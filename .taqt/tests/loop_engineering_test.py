@@ -18,7 +18,7 @@ from loop.llm import (
 from loop.runner import _run_step, run_loop
 from loop.schema import load_document, validate_loop_definition
 from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
-from loop.verification import run_verification
+from loop.verification import _checks_for, run_verification
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
 from taqt.self_improvement import self_improvement_kind
@@ -500,6 +500,14 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert steps_by_id["verification"]["on_pass"] == "done"
 
 
+PARALLEL_FULL = (
+    "task -t .config/Taskfile.yml --parallel ci:lint ci:lint:python ci:typecheck ci:test:unit"
+)
+PARALLEL_FRONTEND = (
+    "task -t .config/Taskfile.yml --parallel ci:lint ci:typecheck ci:test:unit:changed"
+)
+
+
 def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
@@ -507,7 +515,7 @@ def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) ->
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:lint" else 0,
+            "exit_code": 1 if command == PARALLEL_FULL else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -521,10 +529,7 @@ def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) ->
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FULL,
     ]
 
 
@@ -537,7 +542,7 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
+            "exit_code": 1 if command == PARALLEL_FRONTEND else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -551,21 +556,18 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FRONTEND,
     ]
 
 
-def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
+def test_verification_runs_python_lint_only_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
+            "exit_code": 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -578,11 +580,7 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
 
     assert calls == [
         "git diff --check",
-        "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        "task -t .config/Taskfile.yml --parallel ci:lint:python",
     ]
 
 
@@ -600,17 +598,14 @@ def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> 
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/components/TaskCard.tsx"])
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FRONTEND,
         "task -t .config/Taskfile.yml ci:test:e2e",
     ]
 
@@ -632,7 +627,7 @@ def test_verification_assigns_e2e_port_and_disables_server_reuse(
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/client/app.ts"])
 
     result = run_verification(cwd=tmp_path)
 
@@ -655,17 +650,17 @@ def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> No
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/components/TaskCard.tsx"])
     monkeypatch.setenv("LOOP_VERIFICATION_SKIP_E2E", "1")
 
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
     assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
-    assert "task -t .config/Taskfile.yml ci:test:unit" in calls
+    assert PARALLEL_FRONTEND in calls
 
 
-def test_verification_skips_e2e_for_non_frontend_changes(tmp_path: Path, monkeypatch) -> None:
+def test_verification_skips_unit_and_e2e_for_non_frontend_changes(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
@@ -684,7 +679,67 @@ def test_verification_skips_e2e_for_non_frontend_changes(tmp_path: Path, monkeyp
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
-    assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
+    joined = " ".join(calls)
+    assert "ci:test:e2e" not in joined
+    assert "ci:test:unit" not in joined
+    assert "ci:lint:python" in joined
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    [
+        ([], {"setup": True, "checks": ("ci:lint", "ci:lint:python", "ci:typecheck", "ci:test:unit"), "e2e": True}),
+        (["README.md"], {"setup": False, "checks": ("ci:markdown",), "e2e": False}),
+        (["docs/design.md"], {"setup": False, "checks": ("ci:markdown",), "e2e": False}),
+        (["scripts/ci/check_docs.py"], {"setup": False, "checks": ("ci:lint:python",), "e2e": False}),
+        (
+            [".taqt/scripts/loop/verification.py"],
+            {"setup": False, "checks": ("ci:lint:python",), "e2e": False},
+        ),
+        (
+            ["src/index.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["tests/TaskCard.test.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["package.json"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["src/components/TaskCard.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["src/client/app.ts"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["src/views/IdeaDetailFields.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["tests/e2e/home.spec.ts"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["unknown/file.xyz"],
+            {"setup": True, "checks": ("ci:lint", "ci:lint:python", "ci:typecheck", "ci:test:unit"), "e2e": True},
+        ),
+        (
+            ["docs/design.md", "src/index.tsx"],
+            {
+                "setup": True,
+                "checks": ("ci:markdown", "ci:lint", "ci:typecheck", "ci:test:unit:changed"),
+                "e2e": False,
+            },
+        ),
+    ],
+)
+def test_checks_for_selects_commands_by_changed_paths(paths: list[str], expected: dict[str, object]) -> None:
+    assert _checks_for(paths) == expected
 
 
 def test_loop_runs_readonly_agent_after_verification_pass(tmp_path: Path, monkeypatch) -> None:

@@ -238,6 +238,16 @@ tasks:
         fi
         vp test run --passWithNoTests
 
+  ci:test:unit:changed:
+    desc: Run Vitest tests affected by changed files.
+    cmds:
+      - |
+        if [ ! -d src ]; then
+          echo "Skipping Worker tests: src/ does not exist yet."
+          exit 0
+        fi
+        vp test run --changed --passWithNoTests
+
   ci:test:e2e:
     desc: Run Playwright E2E.
     cmds:
