@@ -18,7 +18,7 @@ from loop.llm import (
 from loop.runner import _run_step, run_loop
 from loop.schema import load_document, validate_loop_definition
 from loop.state import SUCCESS_LOG_TAIL_CHARS, compact_successful_agent_response
-from loop.verification import run_verification, validate_review
+from loop.verification import _checks_for, run_verification
 from taqt.run_report import render_report
 from taqt.task_run import main as task_run_main
 from taqt.self_improvement import self_improvement_kind
@@ -159,6 +159,45 @@ profiles:
     assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENCODE_API_KEY"]
 
 
+def test_load_profiles_reads_model_overrides(tmp_path: Path) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: main_loop
+    models:
+      implement: opencode-go/deepseek-v4.1-flash
+      fix: opencode-go/deepseek-v4.1-pro
+""",
+        encoding="utf-8",
+    )
+
+    profiles = load_profiles(loop_root)
+
+    assert profiles["main"]["models"] == {
+        "implement": "opencode-go/deepseek-v4.1-flash",
+        "fix": "opencode-go/deepseek-v4.1-pro",
+    }
+
+
+@pytest.mark.parametrize(
+    "models",
+    ["not-a-mapping", {"implement": ""}, {"": "opencode-go/deepseek-v4.1-flash"}],
+)
+def test_load_profiles_rejects_invalid_models(tmp_path: Path, models: object) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        yaml.safe_dump({"profiles": {"main": {"loop": "main_loop", "models": models}}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_profiles(loop_root)
+
+
 def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
     loop_root = tmp_path / "loops"
     (tmp_path / "config").mkdir()
@@ -195,6 +234,88 @@ profiles:
 
     with pytest.raises(ValueError):
         resolve_profile(loop_root, "deepseek")
+
+
+def test_loop_runner_applies_model_overrides_to_effective_yaml(tmp_path: Path) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    runs_root = tmp_path / "runs"
+    loop_path.write_text(
+        """
+version: 1
+id: model-override
+agents:
+  implement:
+    role: implementation
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+  fix:
+    role: implementation_fixer
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+steps:
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-560
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 560
+status: pending
+phase: spec
+priority: normal
+loop: model-override
+input: {}
+run:
+  id: null
+  state_path: null
+  events_path: null
+worker:
+  id: null
+  heartbeat_at: null
+blocked_reason: null
+""",
+        encoding="utf-8",
+    )
+
+    overridden = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root / "overridden",
+        model_overrides={"implement": "opencode-go/deepseek-v4.1-pro"},
+    )
+    effective = yaml.safe_load(
+        (Path(overridden["run_dir"]) / "loop.yaml").read_text(encoding="utf-8")
+    )
+    assert effective["agents"]["implement"]["model"] == "opencode-go/deepseek-v4.1-pro"
+    assert effective["agents"]["fix"]["model"] == "opencode-go/deepseek-v4.1-flash"
+
+    default = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root / "default",
+        model_overrides=None,
+    )
+    unchanged = yaml.safe_load(
+        (Path(default["run_dir"]) / "loop.yaml").read_text(encoding="utf-8")
+    )
+    assert unchanged["agents"]["implement"]["model"] == "opencode-go/deepseek-v4.1-flash"
+
+    with pytest.raises(ValueError):
+        run_loop(
+            loop_path=loop_path,
+            task_path=task_path,
+            workspace=tmp_path,
+            runs_root=runs_root,
+            model_overrides={"missing": "opencode-go/deepseek-v4.1-pro"},
+        )
 
 
 def test_loop_runner_resumes_from_last_failed_llm_step(tmp_path: Path, monkeypatch) -> None:
@@ -379,6 +500,14 @@ def test_main_loop_assigns_roles_to_luna_and_muse_spark() -> None:
     assert steps_by_id["verification"]["on_pass"] == "done"
 
 
+PARALLEL_FULL = (
+    "task -t .config/Taskfile.yml --parallel ci:lint ci:lint:python ci:typecheck ci:test:unit"
+)
+PARALLEL_FRONTEND = (
+    "task -t .config/Taskfile.yml --parallel ci:lint ci:typecheck ci:test:unit:changed"
+)
+
+
 def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
@@ -386,7 +515,7 @@ def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) ->
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:lint" else 0,
+            "exit_code": 1 if command == PARALLEL_FULL else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -400,10 +529,7 @@ def test_verification_aggregates_failed_commands(tmp_path: Path, monkeypatch) ->
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FULL,
     ]
 
 
@@ -416,7 +542,7 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
+            "exit_code": 1 if command == PARALLEL_FRONTEND else 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -430,21 +556,18 @@ def test_verification_installs_frontend_dependencies_before_checks_for_frontend_
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FRONTEND,
     ]
 
 
-def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
+def test_verification_runs_python_lint_only_for_taqt_changes(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
         calls.append(command)
         return {
             "command": command,
-            "exit_code": 1 if command == "task -t .config/Taskfile.yml ci:typecheck" else 0,
+            "exit_code": 0,
             "elapsed_seconds": 0.1,
             "stdout_tail": "",
             "stderr_tail": "",
@@ -457,11 +580,7 @@ def test_verification_installs_frontend_dependencies_for_taqt_changes(tmp_path: 
 
     assert calls == [
         "git diff --check",
-        "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        "task -t .config/Taskfile.yml --parallel ci:lint:python",
     ]
 
 
@@ -479,19 +598,42 @@ def test_verification_runs_fast_checks_then_e2e(tmp_path: Path, monkeypatch) -> 
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/components/TaskCard.tsx"])
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
     assert calls == [
         "git diff --check",
         "task -t .config/Taskfile.yml setup:frontend:ci",
-        "task -t .config/Taskfile.yml ci:lint",
-        "task -t .config/Taskfile.yml ci:lint:python",
-        "task -t .config/Taskfile.yml ci:typecheck",
-        "task -t .config/Taskfile.yml ci:test:unit",
+        PARALLEL_FRONTEND,
         "task -t .config/Taskfile.yml ci:test:e2e",
     ]
+
+
+def test_verification_assigns_e2e_port_and_disables_server_reuse(
+    tmp_path: Path, monkeypatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_run(command: str, **kwargs: object) -> dict[str, object]:
+        if command.endswith("ci:test:e2e"):
+            seen.update(kwargs.get("env") or {})
+        return {
+            "command": command,
+            "exit_code": 0,
+            "elapsed_seconds": 0.1,
+            "stdout_tail": "",
+            "stderr_tail": "",
+        }
+
+    monkeypatch.setattr("loop.verification._run_command", fake_run)
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/client/app.ts"])
+
+    result = run_verification(cwd=tmp_path)
+
+    assert result["status"] == "pass"
+    assert seen["CI"] == "1"
+    assert int(str(seen["E2E_PORT"])) > 0
 
 
 def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> None:
@@ -508,17 +650,17 @@ def test_verification_skips_e2e_when_flag_set(tmp_path: Path, monkeypatch) -> No
         }
 
     monkeypatch.setattr("loop.verification._run_command", fake_run)
-    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/index.tsx"])
+    monkeypatch.setattr("loop.verification._changed_paths", lambda _cwd: ["src/components/TaskCard.tsx"])
     monkeypatch.setenv("LOOP_VERIFICATION_SKIP_E2E", "1")
 
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
     assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
-    assert "task -t .config/Taskfile.yml ci:test:unit" in calls
+    assert PARALLEL_FRONTEND in calls
 
 
-def test_verification_skips_e2e_for_non_frontend_changes(tmp_path: Path, monkeypatch) -> None:
+def test_verification_skips_unit_and_e2e_for_non_frontend_changes(tmp_path: Path, monkeypatch) -> None:
     calls: list[str] = []
 
     def fake_run(command: str, **_kwargs: object) -> dict[str, object]:
@@ -537,29 +679,70 @@ def test_verification_skips_e2e_for_non_frontend_changes(tmp_path: Path, monkeyp
     result = run_verification(cwd=tmp_path)
 
     assert result["status"] == "pass"
-    assert "task -t .config/Taskfile.yml ci:test:e2e" not in calls
+    joined = " ".join(calls)
+    assert "ci:test:e2e" not in joined
+    assert "ci:test:unit" not in joined
+    assert "ci:lint:python" in joined
 
 
 @pytest.mark.parametrize(
-    ("response", "changed_paths", "status"),
+    ("paths", "expected"),
     [
-        ({"parsed_json": True, "status": "success", "verdict": "approve"}, [], "pass"),
-        ({"parsed_json": True, "status": "success", "verdict": "changes_requested"}, [], "fix"),
-        ({"parsed_json": True, "status": "success", "verdict": "human_required"}, [], "human"),
-        ({"parsed_json": False, "status": "success"}, [], "human"),
-        ({"parsed_json": True, "status": "success"}, [], "human"),
-        ({"parsed_json": True, "status": "success", "verdict": "maybe"}, [], "human"),
-        ({"parsed_json": True, "status": "failure", "verdict": "approve"}, [], "human"),
-        ({"parsed_json": True, "status": "success", "verdict": "approve"}, ["changed.py"], "human"),
+        ([], {"setup": True, "checks": ("ci:lint", "ci:lint:python", "ci:typecheck", "ci:test:unit"), "e2e": True}),
+        (["README.md"], {"setup": False, "checks": ("ci:markdown",), "e2e": False}),
+        (["docs/design.md"], {"setup": False, "checks": ("ci:markdown",), "e2e": False}),
+        (["scripts/ci/check_docs.py"], {"setup": False, "checks": ("ci:lint:python",), "e2e": False}),
+        (
+            [".taqt/scripts/loop/verification.py"],
+            {"setup": False, "checks": ("ci:lint:python",), "e2e": False},
+        ),
+        (
+            ["src/index.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["tests/TaskCard.test.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["package.json"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": False},
+        ),
+        (
+            ["src/components/TaskCard.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["src/client/app.ts"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["src/views/IdeaDetailFields.tsx"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["tests/e2e/home.spec.ts"],
+            {"setup": True, "checks": ("ci:lint", "ci:typecheck", "ci:test:unit:changed"), "e2e": True},
+        ),
+        (
+            ["unknown/file.xyz"],
+            {"setup": True, "checks": ("ci:lint", "ci:lint:python", "ci:typecheck", "ci:test:unit"), "e2e": True},
+        ),
+        (
+            ["docs/design.md", "src/index.tsx"],
+            {
+                "setup": True,
+                "checks": ("ci:markdown", "ci:lint", "ci:typecheck", "ci:test:unit:changed"),
+                "e2e": False,
+            },
+        ),
     ],
 )
-def test_post_review_requires_json_contract_and_readonly(
-    tmp_path: Path, response: dict[str, object], changed_paths: list[str], status: str
-) -> None:
-    assert validate_review(response, changed_paths=changed_paths, cwd=tmp_path)["status"] == status
+def test_checks_for_selects_commands_by_changed_paths(paths: list[str], expected: dict[str, object]) -> None:
+    assert _checks_for(paths) == expected
 
 
-def test_loop_runs_reviewer_only_after_verification_pass(tmp_path: Path, monkeypatch) -> None:
+def test_loop_runs_readonly_agent_after_verification_pass(tmp_path: Path, monkeypatch) -> None:
     loop_path = tmp_path / "loop.yaml"
     task_path = tmp_path / "task.yaml"
     loop_path.write_text(
@@ -578,12 +761,7 @@ steps:
   - id: checker
     kind: llm
     agent: checker
-    next: post_review
-  - id: post_review
-    kind: post_review
-    on_pass: done
-    on_fix: human
-    on_human: human
+    next: done
   - id: done
     kind: terminal
   - id: human
@@ -600,7 +778,7 @@ steps:
 
     def fake_agent(**_kwargs: object) -> dict[str, object]:
         calls.append("checker")
-        return {"status": "success", "parsed_json": True, "verdict": "approve"}
+        return {"status": "success", "parsed_json": True}
 
     monkeypatch.setattr("loop.runner.run_agent", fake_agent)
     result = run_loop(loop_path=loop_path, task_path=task_path, workspace=tmp_path, runs_root=tmp_path / "runs")
@@ -813,12 +991,7 @@ steps:
     agent: checker
     command: >-
       python -c 'from pathlib import Path; Path("changed.txt").write_text("x"); print("agent output")'
-    next: post_review
-  - id: post_review
-    kind: post_review
-    on_pass: done
-    on_fix: human
-    on_human: human
+    next: done
   - id: done
     kind: terminal
   - id: human
@@ -1541,6 +1714,8 @@ profiles:
     env_keys:
       - DEEPSEEK_API_KEY
       - OPENROUTER_API_KEY
+    models:
+      implement: opencode-go/deepseek-v4.1-pro
 """,
         encoding="utf-8",
     )
@@ -1592,6 +1767,7 @@ steps:
     assert calls[0]["child_environment"]["DEEPSEEK_API_KEY"] == "secret"
     assert calls[0]["child_environment"]["OPENROUTER_API_KEY"] == "qwen-secret"
     assert calls[0]["child_environment"]["CODEX_HOME"] == str(deepseek_home)
+    assert calls[0]["model_overrides"] == {"implement": "opencode-go/deepseek-v4.1-pro"}
 
     task = load_document(task_path)
     assert task["self_improvement"]["event"] == "loop_done"

@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+import yaml
+
 from .context import build_context
 from .guard import changed_paths, validate_agent_changes, workspace_snapshot
 from .llm import run_agent
@@ -17,7 +19,7 @@ from .state import (
     load_state,
     save_state,
 )
-from .verification import run_verification, validate_review
+from .verification import run_verification
 
 
 TERMINAL_STEPS = {"done", "human", "failed"}
@@ -51,15 +53,31 @@ def run_loop(
     runs_root: Path,
     resume_dir: Path | None = None,
     child_environment: Mapping[str, str] | None = None,
+    model_overrides: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     loop_definition = load_document(loop_path)
     validate_loop_definition(loop_definition)
+    if model_overrides:
+        agents = loop_definition.get("agents")
+        if not isinstance(agents, dict):
+            agents = {}
+            loop_definition["agents"] = agents
+        for agent_id, model in model_overrides.items():
+            if agent_id not in agents:
+                raise ValueError(f"model override references unknown agent: {agent_id}")
+            agents[agent_id]["model"] = model
     task = load_document(task_path)
     validate_task(task)
 
     run_dir = resume_dir or create_run_dir(str(task["id"]), runs_root)
     if not resume_dir:
-        shutil.copyfile(loop_path, run_dir / loop_path.name)
+        if model_overrides:
+            (run_dir / loop_path.name).write_text(
+                yaml.safe_dump(loop_definition, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+        else:
+            shutil.copyfile(loop_path, run_dir / loop_path.name)
         shutil.copyfile(task_path, run_dir / "task.yaml")
 
     steps = {step["id"]: step for step in loop_definition["steps"]}
@@ -167,7 +185,7 @@ def _run_step(
         return next_step
 
     if kind == "verification":
-        result = run_verification(cwd=workspace)
+        result = run_verification(cwd=workspace, env=child_environment)
         state["last_feedback"] = result.get("feedback")
         state["last_verification"] = result
         append_event(run_dir, {"type": "verification", "step": step["id"], "result": result})
@@ -189,19 +207,6 @@ def _run_step(
                 return "human"
         return str(step[f"on_{result['status']}"])
 
-    if kind == "post_review":
-        response = state.get("last_review_response")
-        if not isinstance(response, dict):
-            response = {}
-        result = validate_review(
-            response,
-            changed_paths=response.get("changed_paths") if isinstance(response.get("changed_paths"), list) else [],
-            cwd=workspace,
-        )
-        state["last_feedback"] = result.get("feedback")
-        append_event(run_dir, {"type": "post_review", "step": step["id"], "result": result})
-        return str(step[f"on_{result['status']}"])
-
     if kind == "llm":
         agents = loop_definition.get("agents") if isinstance(loop_definition.get("agents"), dict) else {}
         agent_id = step.get("agent")
@@ -221,8 +226,6 @@ def _run_step(
         after = workspace_snapshot(workspace)
         changed = changed_paths(before, after)
         response["changed_paths"] = [path.as_posix() for path in changed]
-        if agent.get("readonly"):
-            state["last_review_response"] = response
         try:
             validate_agent_changes(agent, changed)
         except ValueError as error:
@@ -235,8 +238,6 @@ def _run_step(
             run_dir,
             {"type": "agent_response", "step": step["id"], "response": event_response},
         )
-        if agent.get("readonly"):
-            return next_step
         if response["status"] != "success":
             feedback = str(response.get("feedback") or "unknown")
             state["last_feedback"] = feedback

@@ -111,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         runs_root=args.runs_root,
         resume_dir=args.resume,
         child_environment=child_environment,
+        model_overrides=profile_spec.get("models"),
     )
 
     label_error = enabled_error(task)

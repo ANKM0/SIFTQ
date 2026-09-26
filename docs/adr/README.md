@@ -71,6 +71,7 @@
 | [ADR 0065: 生成物をtmp配下へ集約する](0065-keep-generated-artifacts-under-tmp.md) | Accepted. | 生成物、cache、一時ファイルを`tmp/`へ集約する。 |
 | [ADR 0066: レスポンシブ対応のブレークポイントを定める](0066-define-responsive-breakpoints.md) | Accepted. | モバイルファーストで`640 / 768 / 1024 / 1280px`の閾値を採用する。 |
 | [ADR 0067: design step と design_notes を廃止する](0067-remove-design-step-and-design-notes.md) | Accepted. | design step と design_notes を廃止し、design artifact の生成と表示を削除する。 |
+| [ADR 0068: taqt loop の簡略化と検証・再試行方針を定める](0068-simplify-taqt-loop-and-verification-policy.md) | Accepted. | checker / post_review を廃止し、e2e 粒度・一時失敗の再試行・工程別モデル・検証対象の選択と並列実行を定める。 |
 
 ## 検証待ち
 
@@ -84,3 +85,8 @@
 | V-052-001 | [ADR 0052](0052-define-provisional-adr-verification-lifecycle.md) | データ不足と否定を区別できるか | 不足例はデータ不足、充足未達例は否定になる | 暫定 | 運用データ未収集 | - | 状態運用のテスト結果が蓄積した時 |
 | V-052-002 | [ADR 0052](0052-define-provisional-adr-verification-lifecycle.md) | 検証結果の記録と決定変更を分離できるか | 結果は検証結果、新しい決定は新ADRになる | 暫定 | 運用データ未収集 | - | 運用の実例が蓄積した時 |
 | V-066-001 | [ADR 0066](0066-define-responsive-breakpoints.md) | 4つの閾値が現在の画面構成に適用できるか | 主要画面を代表的なビューポート幅で確認する | レスポンシブ実装と代表的な操作フローが揃っている | 各幅で横スクロールや操作不能な重なりがない | 暫定 | 主要画面の追加、レイアウト構成の変更、または検証不合格時 |
+| V-068-001 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | review 構造を外しても closure は同等以上か | 全 gold を repetition 3 以上で完走し、簡略 arm の closure が review arm 以上 | 全 gold の完走結果が揃っている | 簡略 arm の closure が review arm 以上 | 暫定 | 全量比較の完走または gold 更新時 |
+| V-068-002 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 非フロント変更で e2e を省いても escaped は 0 か | 非フロント変更 run の escaped が 0 | 非フロント変更 run が蓄積している | escaped が 0 | 暫定 | 検証対象や変更分類の変更時 |
+| V-068-003 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 一時失敗の再試行で human 直行が減るか | 一時失敗 run の再試行後の終端が human 直行より減る | 一時失敗 run が蓄積している | 再試行で human 直行が減る | 暫定 | 失敗種別や provider の変更時 |
+| V-068-004 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 工程ごとのモデル指定で closure が改善するか | モデル別に repetition 3 以上で closure を比較する | モデル別の完走結果が揃っている | 強いモデルで closure が改善 | 暫定 | モデルまたは工程構成の変更時 |
+| V-068-005 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 変更範囲による検証選択と並列実行で費用が下がるか | 同一変更の before / after で検証時間とコストを比較する | before / after が取得できる | 費用が非悪化し escaped が 0 | 暫定 | 検証基盤または並列度の変更時 |
