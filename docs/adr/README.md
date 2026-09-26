@@ -72,6 +72,7 @@
 | [ADR 0066: レスポンシブ対応のブレークポイントを定める](0066-define-responsive-breakpoints.md) | Accepted. | モバイルファーストで`640 / 768 / 1024 / 1280px`の閾値を採用する。 |
 | [ADR 0067: design step と design_notes を廃止する](0067-remove-design-step-and-design-notes.md) | Accepted. | design step と design_notes を廃止し、design artifact の生成と表示を削除する。 |
 | [ADR 0068: taqt loop の簡略化と検証・再試行方針を定める](0068-simplify-taqt-loop-and-verification-policy.md) | Accepted. | checker / post_review を廃止し、e2e 粒度・一時失敗の再試行・工程別モデル・検証対象の選択と並列実行を定める。 |
+| [ADR 0069: セッションを age で暗号化して公開リポジトリへバックアップする](0069-encrypt-session-backup-with-age.md) | Accepted. | セッションを zstd + age で暗号化して公開リポジトリへ保存し、秘密鍵はリポジトリ外に置いて手動のバックアップ・復元タスクを用意する。 |
 
 ## 検証待ち
 

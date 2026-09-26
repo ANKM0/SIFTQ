@@ -35,6 +35,10 @@ includes:
     taskfile: taskfile/release.yml
     dir: ..
     flatten: true
+  session:
+    taskfile: taskfile/session.yml
+    dir: ..
+    flatten: true
   taqt:
     taskfile: taskfile/taqt.yml
     dir: ..
