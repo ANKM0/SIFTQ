@@ -1,3 +1,4 @@
+import json
 import socket
 import subprocess
 import sys
@@ -38,6 +39,14 @@ def test_summarize_records_computes_closure_and_escaped_rates() -> None:
         "human": 1,
         "failed": 1,
         "escaped": 1,
+        "human_causes": {
+            "routing": 1,
+            "verification": 0,
+            "review": 0,
+            "spec_product": 0,
+            "permission": 0,
+            "model_infra": 0,
+        },
         "tokens": {
             "input": 0,
             "output": 0,
@@ -54,6 +63,30 @@ def test_summarize_records_computes_closure_and_escaped_rates() -> None:
     assert summary["arms"]["B"]["closure_rate"] == 1.0
     assert summary["arms"]["B"]["escaped_rate"] == 0.0
     assert summary["arms"]["B"]["human_rate"] == 0.0
+    assert summary["arms"]["B"]["human_causes"] == {
+        "routing": 0,
+        "verification": 0,
+        "review": 0,
+        "spec_product": 0,
+        "permission": 0,
+        "model_infra": 0,
+    }
+
+
+def test_summarize_records_counts_human_causes_per_arm() -> None:
+    records = [
+        {"arm": "A", "status": "human", "escaped": False, "human_cause": "verification"},
+        {"arm": "A", "status": "human", "escaped": False, "human_cause": "verification"},
+        {"arm": "A", "status": "human", "escaped": False, "human_cause": "permission"},
+        {"arm": "B", "status": "human", "escaped": False, "human_cause": "routing"},
+        {"arm": "B", "status": "done", "escaped": False},
+    ]
+
+    summary = summarize_records(records)
+
+    assert summary["arms"]["A"]["human_causes"]["verification"] == 2
+    assert summary["arms"]["A"]["human_causes"]["permission"] == 1
+    assert summary["arms"]["B"]["human_causes"]["routing"] == 1
 
 
 def test_run_replay_runs_each_arm_without_github(tmp_path: Path) -> None:
@@ -104,17 +137,40 @@ def test_run_replay_skips_checks_when_not_done(tmp_path: Path) -> None:
     assert result["records"] == [{"arm": "A", "status": "human", "escaped": False}]
 
 
+def test_run_replay_records_human_cause_from_state(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "state.json").write_text(
+        json.dumps({"status": "human", "last_feedback": "verification_fix"}),
+        encoding="utf-8",
+    )
+
+    def run_loop_fn(**kwargs: object) -> dict[str, object]:
+        return {"status": "human", "run_dir": str(run_dir)}
+
+    result = run_replay(
+        task_path=tmp_path / "task.yaml",
+        arms={"A": tmp_path / "a.yaml"},
+        workspace=tmp_path,
+        runs_root=tmp_path / "runs",
+        run_loop_fn=run_loop_fn,
+    )
+
+    assert result["records"][0]["human_cause"] == "verification"
+    assert result["summary"]["arms"]["A"]["human_causes"]["verification"] == 1
+
+
 def test_load_replay_spec_reads_arms_and_checks(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yaml"
     spec.write_text(
-        "name: ISSUE-1\narms:\n  A: .taqt/loops/main_loop.yaml\n  B: eval/baselines/loop/main_loop_full_structure.yaml\nchecks:\n  - task ci:test:unit\n",
+        "name: ISSUE-1\narms:\n  A: .taqt/loops/main_loop.yaml\n  B: eval/baselines/loop/main_loop_minimal.yaml\nchecks:\n  - task ci:test:unit\n",
         encoding="utf-8",
     )
 
     payload = load_replay_spec(spec)
 
     assert payload["name"] == "ISSUE-1"
-    assert payload["arms"]["B"] == "eval/baselines/loop/main_loop_full_structure.yaml"
+    assert payload["arms"]["B"] == "eval/baselines/loop/main_loop_minimal.yaml"
     assert payload["checks"] == ["task ci:test:unit"]
 
 

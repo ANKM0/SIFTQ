@@ -108,41 +108,6 @@ def _failure_result(results: list[dict[str, Any]], *, cwd: Path) -> dict[str, An
     )
 
 
-def validate_review(
-    response: dict[str, Any], *, changed_paths: Sequence[str], cwd: Path
-) -> dict[str, Any]:
-    if changed_paths:
-        return _result(
-            status="human",
-            feedback="review_human",
-            commands=[],
-            cwd=cwd,
-            findings=["readonly review modified the workspace"],
-        )
-    if not response.get("parsed_json") or response.get("status") != "success":
-        return _result(
-            status="human",
-            feedback="review_human",
-            commands=[],
-            cwd=cwd,
-            findings=["review response was not a JSON object"],
-        )
-    verdict = response.get("verdict")
-    if verdict == "approve":
-        return _result(status="pass", feedback=None, commands=[], cwd=cwd)
-    if verdict == "changes_requested":
-        return _result(status="fix", feedback="review_fix", commands=[], cwd=cwd)
-    if verdict == "human_required":
-        return _result(status="human", feedback="review_human", commands=[], cwd=cwd)
-    return _result(
-        status="human",
-        feedback="review_human",
-        commands=[],
-        cwd=cwd,
-        findings=["review verdict is invalid"],
-    )
-
-
 def _changed_paths(cwd: Path) -> list[str]:
     completed = subprocess.run(
         ["git", "diff", "--name-only", "HEAD"],

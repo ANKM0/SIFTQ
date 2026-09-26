@@ -11,9 +11,10 @@ from typing import Any, Callable, Iterator, Sequence
 import yaml
 
 from loop.runner import run_loop
-from loop.state import load_events
+from loop.state import load_events, load_state
 
 from .defect_injection import subprocess_runner
+from .human_rate import CAUSE_CATEGORIES, classify_cause
 from .preflight import missing_tasks
 
 RunLoopFn = Callable[..., dict[str, Any]]
@@ -114,6 +115,10 @@ def run_replay(
                 run_dir = result.get("run_dir")
                 if run_dir:
                     record["usage"] = _run_usage(Path(run_dir))
+                    if status == "human":
+                        state = load_state(Path(run_dir))
+                        if state is not None:
+                            record["human_cause"] = classify_cause(state)
                 records.append(record)
     result = {"records": records, "summary": summarize_records(records)}
     if keep_worktrees:
@@ -231,6 +236,7 @@ def summarize_records(records: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 "human": 0,
                 "failed": 0,
                 "escaped": 0,
+                "human_causes": {category: 0 for category in CAUSE_CATEGORIES},
                 "tokens": dict(EMPTY_TOKENS),
                 "cost": 0.0,
             },
@@ -239,6 +245,10 @@ def summarize_records(records: Sequence[dict[str, Any]]) -> dict[str, Any]:
         status = str(record["status"])
         if status in stats:
             stats[status] += 1
+        if status == "human":
+            cause = str(record.get("human_cause") or "routing")
+            if cause in stats["human_causes"]:
+                stats["human_causes"][cause] += 1
         if record.get("escaped"):
             stats["escaped"] += 1
         usage = record.get("usage")

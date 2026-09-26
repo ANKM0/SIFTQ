@@ -19,7 +19,7 @@ from .state import (
     load_state,
     save_state,
 )
-from .verification import run_verification, validate_review
+from .verification import run_verification
 
 
 TERMINAL_STEPS = {"done", "human", "failed"}
@@ -207,19 +207,6 @@ def _run_step(
                 return "human"
         return str(step[f"on_{result['status']}"])
 
-    if kind == "post_review":
-        response = state.get("last_review_response")
-        if not isinstance(response, dict):
-            response = {}
-        result = validate_review(
-            response,
-            changed_paths=response.get("changed_paths") if isinstance(response.get("changed_paths"), list) else [],
-            cwd=workspace,
-        )
-        state["last_feedback"] = result.get("feedback")
-        append_event(run_dir, {"type": "post_review", "step": step["id"], "result": result})
-        return str(step[f"on_{result['status']}"])
-
     if kind == "llm":
         agents = loop_definition.get("agents") if isinstance(loop_definition.get("agents"), dict) else {}
         agent_id = step.get("agent")
@@ -239,8 +226,6 @@ def _run_step(
         after = workspace_snapshot(workspace)
         changed = changed_paths(before, after)
         response["changed_paths"] = [path.as_posix() for path in changed]
-        if agent.get("readonly"):
-            state["last_review_response"] = response
         try:
             validate_agent_changes(agent, changed)
         except ValueError as error:
@@ -253,8 +238,6 @@ def _run_step(
             run_dir,
             {"type": "agent_response", "step": step["id"], "response": event_response},
         )
-        if agent.get("readonly"):
-            return next_step
         if response["status"] != "success":
             feedback = str(response.get("feedback") or "unknown")
             state["last_feedback"] = feedback

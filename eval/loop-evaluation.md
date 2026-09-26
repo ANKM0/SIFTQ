@@ -46,6 +46,15 @@ taqt の loop 設計が妥当かを、比較実験で判定するための基準
 - 段階: パイロット 3〜5 件（fast のみ）→ 全量（e2e 込み）。
 - arm (a): 現行 taqt。arm (b): 最小 loop = checker / post_review を外した現行（fix は残す）。
 
+## 簡略化の反映（#561）
+
+- #554 で main_loop から checker / post_review を廃止し、implement → verification → fix の簡略構造へ移行した。以降の arm (a) は簡略構造であり、本節より上の checker / post_review 前提の記述は履歴として残す。
+- #556 で verification の e2e をフロント変更時のみ実行する。非フロント変更は fast checks までで判定する。
+- #534 で provider / tool の一時失敗を同一 step で `provider_retries` まで再試行する。
+- 簡略構造の baseline は `eval/baselines/loop/main_loop_eval.yaml` / `main_loop_eval_strong.yaml` / `main_loop_minimal.yaml`。`main_loop_full_structure.yaml` は廃止した。
+- 上記の決定は ADR 0068 に記録する。
+
+
 ## 常設化
 
 loop パス（`.taqt/loops/` または `.taqt/scripts/loop/`）を変更する PR では、`eval/results/loop/` の更新または PR 本文に測定結果（harness / command / observed / 採用基準）を記載する。CI は欠落時に warning を出す（block しない）。
