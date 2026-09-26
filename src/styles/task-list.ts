@@ -20,6 +20,7 @@ export const TASK_LIST_CSS = `
   display: grid;
   gap: 10px;
   grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 68px;
   padding: 12px 14px;
 }
 
