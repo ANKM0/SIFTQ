@@ -24,7 +24,9 @@ ALLOWLISTED_PATHS = (
     ".taqt/config/profiles.yaml",
     ".taqt/session-backup/recipient.pub",
     "sessions/codex/2026/09/26/rollout-abc.jsonl.zst.age",
+    "sessions/codex/2026/09/26/rollout-abc.jsonl.zst.age.part-000",
     "sessions/opencode/opencode.db.zst.age",
+    "sessions/opencode/opencode.db.zst.age.part-000",
     ".aqua/aqua.yaml",
 )
 IGNORED_PATHS = (
@@ -36,6 +38,8 @@ IGNORED_PATHS = (
     ".taqt/session-backup/session.key",
     ".taqt/session-backup/recipient.key",
     ".taqt/session-backup/identity.age",
+    ".taqt/session-backup/notes.txt",
+    ".taqt/session-backup/backup.age",
     "sessions/private.key",
     ".dev.vars",
     ".env.local",

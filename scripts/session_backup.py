@@ -11,17 +11,21 @@ recipient public key is tracked.
 
 import argparse
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPOSITORY_ROOT / "sessions"
 DEFAULT_RECIPIENT_FILE = REPOSITORY_ROOT / ".taqt" / "session-backup" / "recipient.pub"
+
+# Keep encrypted parts below GitHub's 100MiB per-file push limit with headroom.
+DEFAULT_PART_SIZE = 90 * 1024 * 1024
 
 
 def default_identity_file() -> Path:
@@ -70,7 +74,44 @@ def require_tool(name: str) -> str:
     return path
 
 
-def compress_encrypt(source: Path, target: Path, recipient_file: Path) -> None:
+def part_path(target: Path, index: int) -> Path:
+    return target.with_name(f"{target.name}.part-{index:03d}")
+
+
+def split_file(source: Path, target: Path, part_size: int) -> list[Path]:
+    """Move ``source`` to ``target``, or split it into ``target.part-NNN`` files.
+
+    Each part is at most ``part_size`` bytes. Stale parts from a previous,
+    larger split are removed so a re-run never leaves orphaned ciphertext.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    for stale in target.parent.glob(f"{target.name}.part-*"):
+        stale.unlink()
+    target.unlink(missing_ok=True)
+    if source.stat().st_size <= part_size:
+        source.replace(target)
+        return [target]
+    parts: list[Path] = []
+    with source.open("rb") as handle:
+        while chunk := handle.read(part_size):
+            part = part_path(target, len(parts))
+            part.write_bytes(chunk)
+            parts.append(part)
+    source.unlink(missing_ok=True)
+    return parts
+
+
+def compress_encrypt(
+    source: Path,
+    target: Path,
+    recipient_file: Path,
+    part_size: int = DEFAULT_PART_SIZE,
+) -> list[Path]:
+    """zstd-compress and age-encrypt ``source`` into ``target``.
+
+    Returns the written files: ``[target]`` when the ciphertext fits
+    ``part_size``, otherwise the ``target.part-NNN`` pieces.
+    """
     zstd = require_tool("zstd")
     age = require_tool("age")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -85,10 +126,25 @@ def compress_encrypt(source: Path, target: Path, recipient_file: Path) -> None:
             [age, "-R", str(recipient_file), "-o", str(temporary), str(compressed)],
             check=True,
         )
-        temporary.replace(target)
+        return split_file(temporary, target, part_size)
     finally:
         compressed.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
+
+
+def existing_archive(target: Path) -> list[Path]:
+    """Return the archive written for ``target``, whether single or split."""
+    if target.exists():
+        return [target]
+    return sorted(target.parent.glob(f"{target.name}.part-*"))
+
+
+_PART_SUFFIX = re.compile(r"\.part-\d+$")
+
+
+def archive_target(path: Path) -> Path:
+    """Map a split part (``....part-NNN``) back to its unsplit archive path."""
+    return path.with_name(_PART_SUFFIX.sub("", path.name))
 
 
 def backup_codex(
@@ -96,6 +152,7 @@ def backup_codex(
     sessions_root: Path,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     recipient_file: Path = DEFAULT_RECIPIENT_FILE,
+    part_size: int = DEFAULT_PART_SIZE,
 ) -> list[Path]:
     if not sessions_root.is_dir():
         raise SystemExit(f"codex sessions root not found: {sessions_root}")
@@ -105,10 +162,13 @@ def backup_codex(
     created: list[Path] = []
     for source in codex_session_files(sessions_root):
         target = codex_backup_path(sessions_root, source, output_root)
-        if target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+        existing = existing_archive(target)
+        if (
+            existing
+            and min(path.stat().st_mtime for path in existing) >= source.stat().st_mtime
+        ):
             continue
-        compress_encrypt(source, target, recipient_file)
-        created.append(target)
+        created.extend(compress_encrypt(source, target, recipient_file, part_size))
     return created
 
 
@@ -138,7 +198,8 @@ def backup_opencode(
     db_path: Path,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     recipient_file: Path = DEFAULT_RECIPIENT_FILE,
-) -> Path:
+    part_size: int = DEFAULT_PART_SIZE,
+) -> list[Path]:
     if not db_path.is_file():
         raise SystemExit(f"opencode database not found: {db_path}")
     if not recipient_file.is_file():
@@ -148,18 +209,28 @@ def backup_opencode(
     with tempfile.TemporaryDirectory() as temporary_dir:
         snapshot = Path(temporary_dir) / "opencode.db"
         snapshot_sqlite(db_path, snapshot)
-        compress_encrypt(snapshot, target, recipient_file)
-    return target
+        return compress_encrypt(snapshot, target, recipient_file, part_size)
 
 
-def decompress_decrypt(source: Path, target: Path, identity: Path | str) -> None:
+def decompress_decrypt(
+    sources: Sequence[Path], target: Path, identity: Path | str
+) -> None:
     age = require_tool("age")
     zstd = require_tool("zstd")
     target.parent.mkdir(parents=True, exist_ok=True)
     compressed = target.with_name(target.name + ".zst.tmp")
     temporary = target.with_name(target.name + ".tmp")
+    joined = target.with_name(target.name + ".cipher.tmp")
     temporary_identity: Path | None = None
     try:
+        if len(sources) == 1:
+            ciphertext = sources[0]
+        else:
+            with joined.open("wb") as output:
+                for part in sources:
+                    with part.open("rb") as handle:
+                        shutil.copyfileobj(handle, output)
+            ciphertext = joined
         if isinstance(identity, str):
             handle = tempfile.NamedTemporaryFile("w", delete=False)
             handle.write(identity if identity.endswith("\n") else identity + "\n")
@@ -170,7 +241,7 @@ def decompress_decrypt(source: Path, target: Path, identity: Path | str) -> None
         else:
             identity_path = identity
         subprocess.run(
-            [age, "-d", "-i", str(identity_path), "-o", str(compressed), str(source)],
+            [age, "-d", "-i", str(identity_path), "-o", str(compressed), str(ciphertext)],
             check=True,
         )
         subprocess.run(
@@ -181,6 +252,7 @@ def decompress_decrypt(source: Path, target: Path, identity: Path | str) -> None
     finally:
         compressed.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
+        joined.unlink(missing_ok=True)
         if temporary_identity is not None:
             temporary_identity.unlink(missing_ok=True)
 
@@ -197,14 +269,22 @@ def restore_codex(
     sessions_root: Path,
     identity: Path | str,
 ) -> list[Path]:
-    archives = sorted((backup_root / "codex").rglob("*.zst.age"))
+    codex_root = backup_root / "codex"
+    targets = sorted(
+        {
+            archive_target(path)
+            for path in codex_root.rglob("*")
+            if path.is_file() and ".zst.age" in path.name
+        }
+    )
     restored: list[Path] = []
-    for archive in archives:
-        if not archive.is_file():
+    for target in targets:
+        sources = existing_archive(target)
+        if not sources:
             continue
-        target = codex_restore_path(backup_root, archive, sessions_root)
-        decompress_decrypt(archive, target, identity)
-        restored.append(target)
+        destination = codex_restore_path(backup_root, target, sessions_root)
+        decompress_decrypt(sources, destination, identity)
+        restored.append(destination)
     return restored
 
 
@@ -214,10 +294,11 @@ def restore_opencode(
     db_path: Path,
     identity: Path | str,
 ) -> Path:
-    archive = opencode_backup_path(backup_root)
-    if not archive.is_file():
-        raise SystemExit(f"opencode backup not found: {archive}")
-    decompress_decrypt(archive, db_path, identity)
+    target = opencode_backup_path(backup_root)
+    sources = existing_archive(target)
+    if not sources:
+        raise SystemExit(f"opencode backup not found: {target}")
+    decompress_decrypt(sources, db_path, identity)
     return db_path
 
 
@@ -244,13 +325,12 @@ def run_backup(args: argparse.Namespace) -> int:
             print(path)
     if args.only in ("opencode", "all"):
         db_path = args.opencode_db or opencode_db_path()
-        print(
-            backup_opencode(
-                db_path=db_path,
-                output_root=args.output_root,
-                recipient_file=args.recipient,
-            )
-        )
+        for path in backup_opencode(
+            db_path=db_path,
+            output_root=args.output_root,
+            recipient_file=args.recipient,
+        ):
+            print(path)
     return 0
 
 
