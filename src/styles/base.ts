@@ -128,7 +128,7 @@ a {
 
 .task-selection-summary {
   align-items: center;
-  color: #e6e9ee;
+  color: #1b1f24;
   display: flex;
   font-size: 14px;
   font-weight: 600;
