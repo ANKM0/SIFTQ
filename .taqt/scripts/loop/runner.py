@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+import yaml
+
 from .context import build_context
 from .guard import changed_paths, validate_agent_changes, workspace_snapshot
 from .llm import run_agent
@@ -51,15 +53,31 @@ def run_loop(
     runs_root: Path,
     resume_dir: Path | None = None,
     child_environment: Mapping[str, str] | None = None,
+    model_overrides: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     loop_definition = load_document(loop_path)
     validate_loop_definition(loop_definition)
+    if model_overrides:
+        agents = loop_definition.get("agents")
+        if not isinstance(agents, dict):
+            agents = {}
+            loop_definition["agents"] = agents
+        for agent_id, model in model_overrides.items():
+            if agent_id not in agents:
+                raise ValueError(f"model override references unknown agent: {agent_id}")
+            agents[agent_id]["model"] = model
     task = load_document(task_path)
     validate_task(task)
 
     run_dir = resume_dir or create_run_dir(str(task["id"]), runs_root)
     if not resume_dir:
-        shutil.copyfile(loop_path, run_dir / loop_path.name)
+        if model_overrides:
+            (run_dir / loop_path.name).write_text(
+                yaml.safe_dump(loop_definition, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+        else:
+            shutil.copyfile(loop_path, run_dir / loop_path.name)
         shutil.copyfile(task_path, run_dir / "task.yaml")
 
     steps = {step["id"]: step for step in loop_definition["steps"]}

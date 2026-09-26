@@ -159,6 +159,45 @@ profiles:
     assert profiles["deepseek"]["env_keys"] == ["DEEPSEEK_API_KEY", "OPENCODE_API_KEY"]
 
 
+def test_load_profiles_reads_model_overrides(tmp_path: Path) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        """
+profiles:
+  main:
+    loop: main_loop
+    models:
+      implement: opencode-go/deepseek-v4.1-flash
+      fix: opencode-go/deepseek-v4.1-pro
+""",
+        encoding="utf-8",
+    )
+
+    profiles = load_profiles(loop_root)
+
+    assert profiles["main"]["models"] == {
+        "implement": "opencode-go/deepseek-v4.1-flash",
+        "fix": "opencode-go/deepseek-v4.1-pro",
+    }
+
+
+@pytest.mark.parametrize(
+    "models",
+    ["not-a-mapping", {"implement": ""}, {"": "opencode-go/deepseek-v4.1-flash"}],
+)
+def test_load_profiles_rejects_invalid_models(tmp_path: Path, models: object) -> None:
+    loop_root = tmp_path / "loops"
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "profiles.yaml").write_text(
+        yaml.safe_dump({"profiles": {"main": {"loop": "main_loop", "models": models}}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_profiles(loop_root)
+
+
 def test_resolve_profile_uses_active_profile(tmp_path: Path) -> None:
     loop_root = tmp_path / "loops"
     (tmp_path / "config").mkdir()
@@ -195,6 +234,88 @@ profiles:
 
     with pytest.raises(ValueError):
         resolve_profile(loop_root, "deepseek")
+
+
+def test_loop_runner_applies_model_overrides_to_effective_yaml(tmp_path: Path) -> None:
+    loop_path = tmp_path / "loop.yaml"
+    task_path = tmp_path / "task.yaml"
+    runs_root = tmp_path / "runs"
+    loop_path.write_text(
+        """
+version: 1
+id: model-override
+agents:
+  implement:
+    role: implementation
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+  fix:
+    role: implementation_fixer
+    adapter: opencode
+    model: opencode-go/deepseek-v4.1-flash
+steps:
+  - id: done
+    kind: terminal
+""",
+        encoding="utf-8",
+    )
+    task_path.write_text(
+        """
+id: ISSUE-560
+source:
+  type: github_issue
+  repo: owner/repo
+  issue_number: 560
+status: pending
+phase: spec
+priority: normal
+loop: model-override
+input: {}
+run:
+  id: null
+  state_path: null
+  events_path: null
+worker:
+  id: null
+  heartbeat_at: null
+blocked_reason: null
+""",
+        encoding="utf-8",
+    )
+
+    overridden = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root / "overridden",
+        model_overrides={"implement": "opencode-go/deepseek-v4.1-pro"},
+    )
+    effective = yaml.safe_load(
+        (Path(overridden["run_dir"]) / "loop.yaml").read_text(encoding="utf-8")
+    )
+    assert effective["agents"]["implement"]["model"] == "opencode-go/deepseek-v4.1-pro"
+    assert effective["agents"]["fix"]["model"] == "opencode-go/deepseek-v4.1-flash"
+
+    default = run_loop(
+        loop_path=loop_path,
+        task_path=task_path,
+        workspace=tmp_path,
+        runs_root=runs_root / "default",
+        model_overrides=None,
+    )
+    unchanged = yaml.safe_load(
+        (Path(default["run_dir"]) / "loop.yaml").read_text(encoding="utf-8")
+    )
+    assert unchanged["agents"]["implement"]["model"] == "opencode-go/deepseek-v4.1-flash"
+
+    with pytest.raises(ValueError):
+        run_loop(
+            loop_path=loop_path,
+            task_path=task_path,
+            workspace=tmp_path,
+            runs_root=runs_root,
+            model_overrides={"missing": "opencode-go/deepseek-v4.1-pro"},
+        )
 
 
 def test_loop_runner_resumes_from_last_failed_llm_step(tmp_path: Path, monkeypatch) -> None:
@@ -1541,6 +1662,8 @@ profiles:
     env_keys:
       - DEEPSEEK_API_KEY
       - OPENROUTER_API_KEY
+    models:
+      implement: opencode-go/deepseek-v4.1-pro
 """,
         encoding="utf-8",
     )
@@ -1592,6 +1715,7 @@ steps:
     assert calls[0]["child_environment"]["DEEPSEEK_API_KEY"] == "secret"
     assert calls[0]["child_environment"]["OPENROUTER_API_KEY"] == "qwen-secret"
     assert calls[0]["child_environment"]["CODEX_HOME"] == str(deepseek_home)
+    assert calls[0]["model_overrides"] == {"implement": "opencode-go/deepseek-v4.1-pro"}
 
     task = load_document(task_path)
     assert task["self_improvement"]["event"] == "loop_done"
