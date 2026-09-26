@@ -27,6 +27,8 @@ def test_build_plan_classifies_worker_and_migrations(monkeypatch) -> None:
             return "commit"
         if args[:3] == ("git", "diff", "--name-only"):
             return "src/index.tsx\nmigrations/0003_add.sql\ndocs/readme.md"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
         raise AssertionError(args)
 
     monkeypatch.setattr(release_deploy, "command", fake_command)
@@ -35,6 +37,85 @@ def test_build_plan_classifies_worker_and_migrations(monkeypatch) -> None:
 
     assert plan.mode == "release+deploy"
     assert plan.migrations == ["migrations/0003_add.sql"]
+
+
+def test_build_plan_reports_latest_tag_and_candidates(monkeypatch) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.17.9"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+
+    plan = release_deploy.build_plan(None, "HEAD", None)
+
+    assert plan.version is None
+    assert plan.latest_tag == "v0.17.9"
+    assert plan.next_patch == "v0.17.10"
+    assert plan.next_minor == "v0.18.0"
+    assert plan.prs == []
+
+
+def test_build_plan_resolves_prs_and_unions_changed_files(monkeypatch) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
+        if args == ("gh", "pr", "view", "12", "--json", "files"):
+            return json.dumps({"files": [{"path": "src/index.tsx"}, {"path": "migrations/0003_add.sql"}]})
+        if args == ("gh", "pr", "view", "13", "--json", "files"):
+            return json.dumps({"files": [{"path": "src/index.tsx"}, {"path": "docs/readme.md"}]})
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", None, ["12", "13"])
+
+    assert plan.prs == ["12", "13"]
+    assert plan.migrations == ["migrations/0003_add.sql"]
+    assert plan.mode == "release+deploy"
+
+
+def test_build_plan_prefers_pr_files_over_base_diff(monkeypatch) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
+        if args[:3] == ("git", "diff", "--name-only"):
+            raise AssertionError("base diff must not classify when --pr is given")
+        if args[:2] == ("git", "show"):
+            raise subprocess.CalledProcessError(128, args)
+        if args == ("gh", "pr", "view", "12", "--json", "files"):
+            return json.dumps({"files": [{"path": "docs/readme.md"}]})
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", "v0.5.2", ["12"])
+
+    assert plan.mode == "release-only"
+
+
+def test_build_plan_detects_wrangler_change_from_pr_without_base(monkeypatch) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
+        if args == ("gh", "pr", "view", "12", "--json", "files"):
+            return json.dumps({"files": [{"path": ".config/wrangler.jsonc"}]})
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", None, ["12"])
+
+    assert plan.worker_change is True
+    assert plan.mode == "release+deploy"
 
 
 WRANGLER_BEFORE = json.dumps(
@@ -64,6 +145,8 @@ def _wrangler_command(contents: dict[str, str]):
     def fake_command(*args: str) -> str:
         if args[:2] == ("git", "rev-parse"):
             return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
         if args[:3] == ("git", "diff", "--name-only"):
             return ".config/wrangler.jsonc\nwrangler.jsonc"
         if args[:2] == ("git", "show"):
@@ -117,6 +200,55 @@ def test_build_plan_detects_wrangler_config_change(monkeypatch) -> None:
 
     assert plan.worker_change is True
     assert plan.mode == "release+deploy"
+
+
+def test_build_plan_uses_base_for_wrangler_comparison_with_pr(monkeypatch) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:2] == ("git", "rev-parse"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
+        if args == ("gh", "pr", "view", "12", "--json", "files"):
+            return json.dumps({"files": [{"path": "docs/readme.md"}]})
+        if args[:2] == ("git", "show"):
+            contents = {
+                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
+                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_BINDING_CHANGE,
+            }
+            if args[2] not in contents:
+                raise subprocess.CalledProcessError(128, args)
+            return contents[args[2]]
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+
+    plan = release_deploy.build_plan("v0.5.3", "HEAD", "v0.5.2", ["12"])
+
+    assert plan.worker_change is True
+    assert plan.mode == "release+deploy"
+
+
+def test_plan_cli_accepts_repeated_pr_without_version(monkeypatch, capsys) -> None:
+    def fake_command(*args: str) -> str:
+        if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
+            return "commit"
+        if args[:2] == ("git", "describe"):
+            return "v0.5.2"
+        if args[:2] == ("gh", "pr"):
+            return json.dumps({"files": [{"path": "src/index.tsx"}]})
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+    monkeypatch.setattr(sys, "argv", ["release_deploy.py", "plan", "--ref", "HEAD", "--pr", "12", "--pr", "13"])
+
+    assert release_deploy.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["version"] is None
+    assert payload["latest_tag"] == "v0.5.2"
+    assert payload["next_patch"] == "v0.5.3"
+    assert payload["prs"] == ["12", "13"]
+    assert payload["worker_change"] is True
 
 
 def _prepare_deploy(monkeypatch, tmp_path, *, migration_fails: bool = False) -> list[list[str]]:

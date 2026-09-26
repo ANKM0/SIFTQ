@@ -19,6 +19,8 @@ Release はリポジトリ変更の配布単位であり、Cloudflare Workers �
 - patch: バグ修正、本来の挙動の補完、利用者に新しい操作を要求しない修正。
 - minor: 後方互換な利用者向け新機能。
 
+`release:plan` は最新タグ（`latest_tag`）と次 patch/minor 候補（`next_patch` / `next_minor`）を常に表示する。候補を決めるときはこの表示を基準にする。
+
 ## 手順
 
 1. Release に含める SHA、変更一覧、Worker・migration・本番設定への影響を確認する。
@@ -30,7 +32,9 @@ Release はリポジトリ変更の配布単位であり、Cloudflare Workers �
 
 ## Task コマンド
 
-- `task release:plan -- --version vX.Y.Z --ref <sha> --base <tag>` は候補を読み取り専用で分類する。
+- `task release:plan -- [--version vX.Y.Z] [--ref <sha>] [--base <tag>] [--pr <N>]...` は候補を読み取り専用で分類する。
+  - `--pr` は繰り返し指定でき、指定 PR の変更ファイル（`gh pr view <N> --json files`）を union して分類対象にする。`--base` 併用時も分類は PR の変更ファイル、wrangler 設定比較は `--base` を使う。
+  - `--version` を省略しても最新タグと次 patch/minor 候補を表示する。
 - `task release:create -- --version vX.Y.Z --ref HEAD --execute` は clean worktree の HEAD を注釈付きタグとして push する。
 - Worker デプロイは、タグを checkout した worktree で `task deploy:release -- --tag vX.Y.Z --execute` を実行する。
 

@@ -14,9 +14,13 @@ WRANGLER_CONFIGS = (".config/wrangler.jsonc", "wrangler.jsonc")
 
 @dataclass(frozen=True)
 class ReleasePlan:
-    version: str
+    version: str | None
     ref: str
     base: str | None
+    latest_tag: str | None
+    next_patch: str | None
+    next_minor: str | None
+    prs: list[str]
     worker_change: bool
     migrations: list[str]
     mode: str
@@ -41,6 +45,30 @@ def changed_paths(base: str | None, ref: str) -> list[str]:
     if base is None:
         return []
     return [line for line in command("git", "diff", "--name-only", f"{base}..{ref}").splitlines() if line]
+
+
+def pr_changed_paths(pr: str) -> list[str]:
+    payload = json.loads(command("gh", "pr", "view", pr, "--json", "files"))
+    return [str(entry["path"]) for entry in payload.get("files") or [] if entry.get("path")]
+
+
+def pr_union_paths(prs: list[str]) -> list[str]:
+    return list(dict.fromkeys(path for pr in prs for path in pr_changed_paths(pr)))
+
+
+def latest_tag() -> str | None:
+    try:
+        tag = command("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+    except subprocess.CalledProcessError:
+        return None
+    return tag if VERSION_PATTERN.fullmatch(tag) else None
+
+
+def next_versions(latest: str | None) -> tuple[str | None, str | None]:
+    if latest is None:
+        return None, None
+    major, minor, patch = (int(part) for part in normalized_version(latest).split("."))
+    return f"v{major}.{minor}.{patch + 1}", f"v{major}.{minor + 1}.0"
 
 
 def parse_jsonc(text: str) -> dict:
@@ -80,14 +108,30 @@ def worker_config_changed(base: str | None, ref: str) -> bool:
     return wrangler_config_at(base) != wrangler_config_at(ref)
 
 
-def build_plan(version: str, ref: str, base: str | None) -> ReleasePlan:
+def build_plan(version: str | None, ref: str, base: str | None, prs: list[str] | None = None) -> ReleasePlan:
+    prs = list(prs or [])
     resolved_ref = command("git", "rev-parse", f"{ref}^{{commit}}")
-    paths = changed_paths(base, resolved_ref)
+    paths = pr_union_paths(prs) if prs else changed_paths(base, resolved_ref)
     migrations = [path for path in paths if path.startswith("migrations/")]
-    worker_change = any(path.startswith(WORKER_PREFIXES) or path == "bun.lock" for path in paths) or worker_config_changed(
-        base, resolved_ref
+    worker_change = (
+        any(path.startswith(WORKER_PREFIXES) or path == "bun.lock" for path in paths)
+        or worker_config_changed(base, resolved_ref)
+        or (base is None and any(path in WRANGLER_CONFIGS for path in paths))
     )
-    return ReleasePlan(tag_name(version), resolved_ref, base, worker_change, migrations, "release+deploy" if worker_change else "release-only")
+    tag = latest_tag()
+    next_patch, next_minor = next_versions(tag)
+    return ReleasePlan(
+        version=tag_name(version) if version else None,
+        ref=resolved_ref,
+        base=base,
+        latest_tag=tag,
+        next_patch=next_patch,
+        next_minor=next_minor,
+        prs=prs,
+        worker_change=worker_change,
+        migrations=migrations,
+        mode="release+deploy" if worker_change else "release-only",
+    )
 
 
 def d1_database_name(path: Path = Path(".config/wrangler.jsonc")) -> str:
@@ -116,9 +160,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Plan and execute releases and Worker deployments.")
     subparsers = parser.add_subparsers(dest="operation", required=True)
     plan = subparsers.add_parser("plan")
-    plan.add_argument("--version", required=True)
+    plan.add_argument("--version")
     plan.add_argument("--ref", default="HEAD")
     plan.add_argument("--base")
+    plan.add_argument("--pr", action="append", default=[])
     release = subparsers.add_parser("release")
     release.add_argument("--version", required=True)
     release.add_argument("--ref", default="HEAD")
@@ -129,7 +174,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.operation == "plan":
-            print(json.dumps(asdict(build_plan(args.version, args.ref, args.base)), ensure_ascii=False, indent=2))
+            print(json.dumps(asdict(build_plan(args.version, args.ref, args.base, args.pr)), ensure_ascii=False, indent=2))
         elif args.operation == "release":
             require_execute(args)
             require_clean()
