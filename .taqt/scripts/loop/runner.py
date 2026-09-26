@@ -185,7 +185,7 @@ def _run_step(
         return next_step
 
     if kind == "verification":
-        result = run_verification(cwd=workspace)
+        result = run_verification(cwd=workspace, env=child_environment)
         state["last_feedback"] = result.get("feedback")
         state["last_verification"] = result
         append_event(run_dir, {"type": "verification", "step": step["id"], "result": result})
