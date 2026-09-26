@@ -108,5 +108,7 @@ describe("md2idx via bun x", () => {
     expect(output.sections[1]).toContain("## Section A");
     expect(output.sections[2]).toContain("### Subsection A.1");
     expect(output.sections[3]).toContain("## Section B");
+    expect(output.sections[1]).not.toContain("Section B");
+    expect(output.sections[3]).not.toContain("Section A");
   });
 });
