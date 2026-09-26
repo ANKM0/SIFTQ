@@ -420,8 +420,11 @@ export const IDEAS_CSS = `
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
   max-height: calc(100vh - 48px);
-  overflow-y: auto;
+  overflow: hidden;
   padding-bottom: 8px;
 }
 
@@ -468,6 +471,11 @@ export const IDEAS_CSS = `
 .idea-detail__description a {
   color: inherit;
   text-decoration: underline;
+}
+
+.idea-detail-modal .idea-detail__description {
+  flex: 1 1 auto;
+  max-height: none;
 }
 
 @media (width < 40rem) {

@@ -14,6 +14,10 @@ body {
   margin: 0;
 }
 
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 ::selection {
   background: #444444;
   color: #ffffff;
