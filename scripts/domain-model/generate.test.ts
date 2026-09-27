@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import {
+  apiMapD2,
   check,
   flowD2,
   logicalD2,
@@ -11,6 +12,7 @@ import {
   parseMigrations,
   patchSvgDimensions,
   physicalD2,
+  readApiRoutes,
   validate,
   type Migrations,
   type Model,
@@ -119,5 +121,184 @@ describe("domain model checks", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("api model", () => {
+  const base: Model = {
+    domains: { string: { kind: "primitive" } },
+    entities: { tasks: { attributes: { id: { domain: "string" } } } },
+  };
+
+  it("checkApi accepts routes that follow the conventions", () => {
+    const model: Model = {
+      ...base,
+      api: {
+        tasks_list: { kind: "api", method: "GET", path: "/api/tasks", operation: "list", entity: "tasks", success: 200 },
+        tasks_create: { kind: "api", method: "POST", path: "/api/tasks", operation: "create", entity: "tasks", success: 201 },
+        tasks_reorder: { kind: "api", method: "POST", path: "/api/tasks/reorder", operation: "reorder", entity: "tasks", success: 200 },
+        html_login: { kind: "html", method: "POST", path: "/login", operation: "login", success: 302 },
+      },
+    };
+    expect(check(model, { invariantIds: null }).errors).toEqual([]);
+  });
+
+  it("checkApi rejects CRUD verbs, wrong success status, and unknown entities", () => {
+    const model: Model = {
+      ...base,
+      api: {
+        bad: { kind: "api", method: "POST", path: "/api/tasks/create", operation: "create", entity: "missing", success: 200 },
+        wrong: { kind: "api", method: "GET", path: "/api/tasks", operation: "list", success: 201 },
+      },
+    };
+    const errors = check(model, { invariantIds: null }).errors;
+    expect(errors.some((e) => e.includes("CRUD 動詞"))).toBe(true);
+    expect(errors.some((e) => e.includes("entities に無い"))).toBe(true);
+    expect(errors.some((e) => e.includes("success は GET"))).toBe(true);
+  });
+
+  it("checkApi enforces the path prefix per kind", () => {
+    const model: Model = {
+      ...base,
+      api: {
+        api_outside: { kind: "api", method: "GET", path: "/tasks", operation: "list", success: 200 },
+        html_in_api: { kind: "html", method: "POST", path: "/api/tasks", operation: "create", success: 201 },
+      },
+    };
+    const errors = check(model, { invariantIds: null }).errors;
+    expect(errors.some((e) => e.includes("/api/ で始める"))).toBe(true);
+    expect(errors.some((e) => e.includes("HTML UI endpoint"))).toBe(true);
+  });
+
+  it("check rejects navigation calls that reference an unknown api", () => {
+    const model: Model = {
+      ...base,
+      screens: { P01: { name: "Matrix", entities: ["tasks"] } },
+      navigation: [{ from: "P01", on: "dnd", to: "P01", call: "tasks_reorder" }],
+    };
+    const errors = check(model, { invariantIds: null }).errors;
+    expect(errors.some((e) => e.includes("call は api に無い"))).toBe(true);
+  });
+});
+
+describe("api call map rendering", () => {
+  it("apiMapD2 links screens to endpoints, endpoints to entities, and initial-render GET", () => {
+    const model: Model = {
+      domains: { string: { kind: "primitive" } },
+      entities: { tasks: { attributes: { id: { domain: "string" } } } },
+      screens: {
+        P01: { name: "Matrix", entities: ["tasks"], onLoad: "html_matrix_page" },
+        P02: { name: "Task list", entities: ["tasks"] },
+      },
+      navigation: [
+        { from: "P01", on: "Tasks 押下", to: "P02" },
+        { from: "P01", on: "ドラッグ&ドロップ", to: "P01", call: "tasks_reorder" },
+      ],
+      api: {
+        tasks_reorder: { kind: "api", method: "POST", path: "/api/tasks/reorder", operation: "reorder", entity: "tasks", success: 200 },
+        html_matrix_page: { kind: "html", method: "GET", path: "/matrix", operation: "load", entity: "tasks", success: 200 },
+      },
+    };
+    const out = apiMapD2(model);
+    expect(out).toContain('P01 -> tasks_reorder: "ドラッグ&ドロップ"');
+    expect(out).toContain("tasks_reorder -> tasks");
+    expect(out).toContain('tasks_reorder: "POST /api/tasks/reorder"');
+    expect(out).toContain("tasks: \"tasks\\n(エンティティ)\"");
+    expect(out).toContain("legend:");
+    expect(out).not.toContain("画面未使用");
+    expect(out).toContain('P01 -> html_matrix_page: "初期表示"');
+    expect(out).toContain("html_matrix_page -> tasks");
+    expect(out).not.toContain('"参照"');
+    expect(out).not.toContain("tasks_reorder -> P01");
+    expect(out).not.toContain('P01 -> P02');
+  });
+});
+
+describe("api call map unused grouping", () => {
+  it("apiMapD2 groups endpoints that no screen calls under 画面未使用", () => {
+    const model: Model = {
+      domains: { string: { kind: "primitive" } },
+      entities: { tasks: { attributes: { id: { domain: "string" } } } },
+      screens: { P02: { name: "Task list", entities: ["tasks"], onLoad: "html_tasks_page" } },
+      api: {
+        html_tasks_page: { kind: "html", method: "GET", path: "/tasks", operation: "load", entity: "tasks", success: 200 },
+        tasks_list: { kind: "api", method: "GET", path: "/api/tasks", operation: "list", entity: "tasks", success: 200 },
+      },
+    };
+    const out = apiMapD2(model);
+    expect(out).toContain('unused: "画面未使用（契約API）"');
+    expect(out).toContain("unused.tasks_list -> tasks");
+    expect(out).toContain('legend_unused: "画面未使用"');
+    expect(out).toContain('P02 -> html_tasks_page: "初期表示"');
+  });
+
+  it("checkScreens rejects an onLoad that is not a known html GET", () => {
+    const model: Model = {
+      domains: { string: { kind: "primitive" } },
+      entities: { tasks: { attributes: { id: { domain: "string" } } } },
+      screens: {
+        P01: { name: "Matrix", entities: ["tasks"], onLoad: "missing" },
+        P02: { name: "Task list", entities: ["tasks"], onLoad: "tasks_reorder" },
+      },
+      api: {
+        tasks_reorder: { kind: "api", method: "POST", path: "/api/tasks/reorder", operation: "reorder", entity: "tasks", success: 200 },
+      },
+    };
+    const errors = check(model, { invariantIds: null }).errors;
+    expect(errors.some((e) => e.includes("onLoad は api に無い"))).toBe(true);
+    expect(errors.some((e) => e.includes("onLoad は html の GET"))).toBe(true);
+  });
+});
+
+describe("api call map logical references", () => {
+  it("apiMapD2 draws references as dashed edges and keeps them out of 画面未使用", () => {
+    const model: Model = {
+      domains: { string: { kind: "primitive" } },
+      entities: { ideas: { attributes: { id: { domain: "string" } } } },
+      screens: { P08: { name: "Idea list", entities: ["ideas"], onLoad: "html_ideas_page", references: ["ideas_list"] } },
+      api: {
+        html_ideas_page: { kind: "html", method: "GET", path: "/ideas", operation: "load", entity: "ideas", success: 200 },
+        ideas_list: { kind: "api", method: "GET", path: "/api/ideas", operation: "list", entity: "ideas", success: 200 },
+      },
+    };
+    const out = apiMapD2(model);
+    expect(out).toContain('P08 -> ideas_list: "参照"');
+    expect(out).toContain("style.stroke-dash: 4");
+    expect(out).toContain("論理参照");
+    expect(out).not.toContain('unused: "画面未使用（契約API）"');
+  });
+
+  it("checkScreens rejects references that are not a known api", () => {
+    const model: Model = {
+      domains: { string: { kind: "primitive" } },
+      entities: { ideas: { attributes: { id: { domain: "string" } } } },
+      screens: { P08: { name: "Idea list", entities: ["ideas"], references: ["missing"] } },
+    };
+    const errors = check(model, { invariantIds: null }).errors;
+    expect(errors.some((e) => e.includes("references は api に無い"))).toBe(true);
+  });
+});
+
+describe("api route drift", () => {
+  const realModel: Model = JSON.parse(
+    readFileSync(new URL("../../docs/requirements/assets/domain-model/domain-model.json", import.meta.url), "utf8"),
+  );
+
+  it("domain-model api matches the registered Hono routes", () => {
+    const routes = readApiRoutes(new URL("../../src/routes/", import.meta.url));
+    const declared = Object.values(realModel.api ?? {})
+      .filter((op) => op.kind === "api")
+      .map((op) => `${op.method} ${op.path}`)
+      .sort();
+    expect(routes).toEqual(declared);
+  });
+
+  it("check rejects api routes that drift from the source routes", () => {
+    expect(realModel.api).toBeDefined();
+    const errors = check(realModel, {
+      invariantIds: null,
+      apiRoutes: [...readApiRoutes(new URL("../../src/routes/", import.meta.url)), "GET /api/ghost"],
+    }).errors;
+    expect(errors.some((e) => e.includes("/api/ghost"))).toBe(true);
   });
 });
