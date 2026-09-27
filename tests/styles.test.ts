@@ -110,6 +110,22 @@ describe("styles regression guards", () => {
   });
 });
 
+describe("Idea height cap", () => {
+  it("caps the composer description at 672px and grows it with its content", () => {
+    const rules = STYLES_CSS.match(/(?:^|\n)\.ideas-composer__description\s*\{[^}]*\}/g) ?? [];
+    const description = rules.find((rule) => rule.includes("line-height: 1.55;"));
+    expect(description).toContain("max-height: 672px;");
+    expect(description).toContain("field-sizing: content;");
+    expect(description).toContain("overflow-y: auto;");
+  });
+
+  it("caps the idea card at 672px and hides overflowing content", () => {
+    const card = STYLES_CSS.match(/(?:^|\n)\.idea-card\s*\{[^}]*\}/);
+    expect(card?.[0]).toContain("max-height: 672px;");
+    expect(card?.[0]).toContain("overflow: hidden;");
+  });
+});
+
 describe("Idea card description divider", () => {
   it("draws a top border above the description but not on empty cards", () => {
     const description = STYLES_CSS.match(/(?:^|\n)\.idea-card__description\s*\{[^}]*\}/);
