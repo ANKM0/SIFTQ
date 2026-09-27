@@ -19,8 +19,18 @@ export type Step = {
   when?: string;
 };
 export type Flow = { name: string; actor?: string; steps: Step[] };
-export type Screen = { name: string; entities: string[]; actions?: string[] };
-export type NavigationItem = { from: string; on: string; to: string };
+export type Screen = { name: string; entities: string[]; onLoad?: string; references?: string[]; actions?: string[] };
+export type NavigationItem = { from: string; on: string; to: string; call?: string };
+export type ApiError = { status: number; code?: string };
+export type ApiOperation = {
+  kind: string;
+  method: string;
+  path: string;
+  operation: string;
+  entity?: string;
+  success: number;
+  errors?: ApiError[];
+};
 export type Model = {
   domains: Record<string, Domain>;
   entities: Record<string, Entity>;
@@ -28,6 +38,7 @@ export type Model = {
   flows?: Record<string, Flow>;
   screens?: Record<string, Screen>;
   navigation?: NavigationItem[];
+  api?: Record<string, ApiOperation>;
 };
 export type Migrations = Record<string, Record<string, string>>;
 
@@ -113,6 +124,7 @@ export type CheckInput = {
   invariantIds: string[] | null;
   testIds?: string[];
   migrations?: Migrations;
+  apiRoutes?: string[];
 };
 
 function checkAttributeDomains(model: Model): string[] {
@@ -186,11 +198,20 @@ function checkFlows(model: Model): string[] {
 }
 
 function checkScreens(model: Model): string[] {
-  return Object.entries(model.screens ?? {}).flatMap(([id, screen]) =>
-    screen.entities
+  return Object.entries(model.screens ?? {}).flatMap(([id, screen]) => {
+    const errors = screen.entities
       .filter((ref) => !(ref in model.entities))
-      .map((ref) => `screens.${id}.entities は entities に無い: ${ref}`),
-  );
+      .map((ref) => `screens.${id}.entities は entities に無い: ${ref}`);
+    if (screen.onLoad !== undefined) {
+      const op = model.api?.[screen.onLoad];
+      if (op === undefined) errors.push(`screens.${id}.onLoad は api に無い: ${screen.onLoad}`);
+      else if (op.kind !== "html" || op.method !== "GET") errors.push(`screens.${id}.onLoad は html の GET にする: ${screen.onLoad}`);
+    }
+    for (const ref of screen.references ?? []) {
+      if (model.api?.[ref] === undefined) errors.push(`screens.${id}.references は api に無い: ${ref}`);
+    }
+    return errors;
+  });
 }
 
 function checkNavigation(model: Model): string[] {
@@ -201,6 +222,79 @@ function checkNavigation(model: Model): string[] {
     if (!screenKeys.has(nav.to)) errors.push(`navigation.to は screens に無い: ${nav.to}`);
   }
   return errors;
+}
+
+const CRUD_VERBS = new Set(["create", "update", "delete", "remove", "get", "list", "fetch", "save", "edit", "new"]);
+const API_SUCCESS_BY_METHOD: Record<string, number[]> = {
+  GET: [200],
+  POST: [200, 201],
+  PATCH: [200],
+  DELETE: [204],
+};
+const HTML_SUCCESS_BY_METHOD: Record<string, number[]> = {
+  GET: [200],
+  POST: [200, 201, 302, 303],
+};
+
+function checkApiPath(where: string, kind: string, path: string): string[] {
+  const errors: string[] = [];
+  if (kind === "api" && !path.startsWith("/api/")) errors.push(`${where}.path は /api/ で始める: ${path}`);
+  if (kind === "html" && path.startsWith("/api/")) errors.push(`${where}.path は HTML UI endpoint なので /api/ にしない: ${path}`);
+  if (path.length > 1 && path.endsWith("/")) errors.push(`${where}.path の末尾 slash を外す: ${path}`);
+  if (path !== path.toLowerCase()) errors.push(`${where}.path は小文字にする: ${path}`);
+  for (const segment of path.split("/")) {
+    if (segment === "" || /^\{[a-z]+\}$/.test(segment)) continue;
+    if (!/^[a-z][a-z0-9-]*$/.test(segment)) errors.push(`${where}.path の segment は名詞・kebab-case にする: ${segment}`);
+    else if (kind === "api" && CRUD_VERBS.has(segment)) errors.push(`${where}.path に CRUD 動詞を入れない: ${segment}`);
+  }
+  return errors;
+}
+
+function checkApiSuccess(where: string, kind: string, method: string, success: number): string[] {
+  const allowed = (kind === "html" ? HTML_SUCCESS_BY_METHOD : API_SUCCESS_BY_METHOD)[method];
+  if (allowed === undefined) return [`${where}.method は ${Object.keys(API_SUCCESS_BY_METHOD).join("/")} のいずれか: ${method}`];
+  if (!allowed.includes(success)) return [`${where}.success は ${method} では ${allowed.join("/")} にする: ${success}`];
+  return [];
+}
+
+function checkApiErrors(where: string, errors: ApiError[]): string[] {
+  return errors
+    .filter((e) => e.status < 400 || e.status > 599)
+    .map((e) => `${where}.errors.status は 4xx/5xx にする: ${e.status}`);
+}
+
+function checkApi(model: Model): string[] {
+  return Object.entries(model.api ?? {}).flatMap(([id, op]) => {
+    const where = `api.${id}`;
+    const unknownEntity =
+      op.entity !== undefined && !(op.entity in model.entities) ? [`${where}.entity は entities に無い: ${op.entity}`] : [];
+    return [
+      ...checkApiPath(where, op.kind, op.path),
+      ...checkApiSuccess(where, op.kind, op.method, op.success),
+      ...unknownEntity,
+      ...checkApiErrors(where, op.errors ?? []),
+    ];
+  });
+}
+
+function checkApiRoutes(model: Model, routes: string[]): string[] {
+  const declared = new Set(
+    Object.values(model.api ?? {})
+      .filter((op) => op.kind === "api")
+      .map((op) => `${op.method} ${op.path}`),
+  );
+  const actual = new Set(routes);
+  return [
+    ...[...declared].filter((r) => !actual.has(r)).map((r) => `domain-model.json の api route が src/routes/*-api.ts に無い: ${r}`),
+    ...[...actual].filter((r) => !declared.has(r)).map((r) => `src/routes/*-api.ts の route が domain-model.json の api に無い: ${r}`),
+  ].sort();
+}
+
+function checkNavigationCalls(model: Model): string[] {
+  const known = new Set(Object.keys(model.api ?? {}));
+  return (model.navigation ?? [])
+    .filter((n) => n.call !== undefined && !known.has(n.call))
+    .map((n) => `navigation ${n.from} -> ${n.to} の call は api に無い: ${n.call}`);
 }
 
 function checkUnreferencedEntities(model: Model): string[] {
@@ -247,9 +341,12 @@ export function check(model: Model, input: CheckInput): { errors: string[]; warn
     ...checkFlows(model),
     ...checkScreens(model),
     ...checkNavigation(model),
+    ...checkApi(model),
+    ...checkNavigationCalls(model),
     ...rules.errors,
   ];
   if (input.migrations !== undefined) errors.push(...checkMigrations(model, input.migrations));
+  if (input.apiRoutes !== undefined) errors.push(...checkApiRoutes(model, input.apiRoutes));
   return { errors, warnings: [...checkUnreferencedEntities(model), ...rules.warnings] };
 }
 
@@ -310,6 +407,119 @@ export function navD2(model: Model): string {
   return `direction: right\n\n${screens}\n\n${edges}\n`;
 }
 
+const API_FILL = { api: "#e8f0ff", html: "#fdf3e3" } as const;
+const UNUSED_FILL = "#eeeeee";
+
+function endpointFill(op: ApiOperation): string {
+  return op.kind === "html" ? API_FILL.html : API_FILL.api;
+}
+
+function endpointNode(id: string, op: ApiOperation, fill: string): string {
+  return [`${id}: "${op.method} ${op.path}"`, `${id}.shape: parallelogram`, `${id}.style.fill: "${fill}"`].join("\n");
+}
+
+function indent(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+}
+
+function usedEndpointIds(model: Model): Set<string> {
+  return new Set([
+    ...(model.navigation ?? []).flatMap((n) => (n.call === undefined ? [] : [n.call])),
+    ...Object.values(model.screens ?? {}).flatMap((s) => (s.onLoad === undefined ? [] : [s.onLoad])),
+    ...Object.values(model.screens ?? {}).flatMap((s) => s.references ?? []),
+  ]);
+}
+
+function referenceEdges(model: Model): string[] {
+  return Object.entries(model.screens ?? {}).flatMap(([id, screen]) =>
+    (screen.references ?? []).map(
+      (ref) => `${id} -> ${ref}: "参照" {\n  style.stroke-dash: 4\n  style.stroke: "#999999"\n}`,
+    ),
+  );
+}
+
+function unusedBlock(entries: [string, ApiOperation][], used: Set<string>): string {
+  const body = entries
+    .filter(([id]) => !used.has(id))
+    .map(([id, op]) => indent(endpointNode(id, op, UNUSED_FILL)))
+    .join("\n");
+  if (body === "") return "";
+  return `unused: "画面未使用（契約API）" {\n${body}\n  style.stroke-dash: 4\n  style.fill: "#fafafa"\n}`;
+}
+
+function legendEntry(id: string, label: string, shape: string, styles: string[]): string[] {
+  return [`  ${id}: "${label}"`, `  ${id}.shape: ${shape}`, ...styles.map((s) => `  ${id}.${s}`)];
+}
+
+function legendD2(model: Model, used: Set<string>): string {
+  const entries = Object.entries(model.api ?? {});
+  const usedKinds = new Set(entries.filter(([id]) => used.has(id)).map(([, op]) => op.kind));
+  const items: string[][] = [];
+  if (usedKinds.has("api")) items.push(legendEntry("legend_api", "内部 API", "parallelogram", [`style.fill: "${API_FILL.api}"`]));
+  if (usedKinds.has("html")) items.push(legendEntry("legend_html", "HTML UI", "parallelogram", [`style.fill: "${API_FILL.html}"`]));
+  if (entries.some(([id]) => !used.has(id))) {
+    items.push(legendEntry("legend_unused", "画面未使用", "parallelogram", [`style.fill: "${UNUSED_FILL}"`]));
+  }
+  if (Object.values(model.screens ?? {}).some((s) => (s.references ?? []).length > 0)) {
+    items.push(legendEntry("legend_ref", "論理参照（実コールなし）", "parallelogram", ['style.stroke-dash: 4', 'style.stroke: "#999999"']));
+  }
+  if (Object.keys(model.entities).length > 0) {
+    items.push(legendEntry("legend_entity", "エンティティ（ドメイン）", "cylinder", []));
+  }
+  if (items.length === 0) return "";
+  return ['legend: "凡例" {', ...items.flat(), "}"].join("\n");
+}
+
+export function apiMapD2(model: Model): string {
+  const entries = Object.entries(model.api ?? {});
+  const used = usedEndpointIds(model);
+  const screens = Object.entries(model.screens ?? {})
+    .map(([id, screen]) => `${id}: "${id}\\n${screen.name}"`)
+    .join("\n");
+  const usedEndpoints = entries
+    .filter(([id]) => used.has(id))
+    .map(([id, op]) => endpointNode(id, op, endpointFill(op)))
+    .join("\n");
+  const entities = Object.entries(model.entities)
+    .map(([id]) => `${id}: "${id}\\n(エンティティ)"\n${id}.shape: cylinder`)
+    .join("\n");
+  const screenCalls = [
+    ...new Set(
+      (model.navigation ?? [])
+        .filter((n) => n.call !== undefined)
+        .map((n) => `${n.from} -> ${n.call}: "${n.on.replace(/"/g, "'")}"`),
+    ),
+  ];
+  const entityCalls = entries
+    .filter(([, op]) => op.entity !== undefined)
+    .map(([id, op]) => {
+      const source = used.has(id) ? id : `unused.${id}`;
+      return `${source} -> ${op.entity}`;
+    });
+  const loads = Object.entries(model.screens ?? {})
+    .filter(([, screen]) => screen.onLoad !== undefined)
+    .map(([id, screen]) => `${id} -> ${screen.onLoad}: "初期表示"`);
+  return [
+    "direction: right",
+    "",
+    screens,
+    "",
+    usedEndpoints,
+    "",
+    entities,
+    "",
+    unusedBlock(entries, used),
+    "",
+    legendD2(model, used),
+    "",
+    [...screenCalls, ...referenceEdges(model), ...entityCalls, ...loads].join("\n"),
+    "",
+  ].join("\n");
+}
+
 function readInvariantIds(domainMd: URL): string[] | null {
   if (!existsSync(domainMd)) return null;
   const text = readFileSync(domainMd, "utf8");
@@ -338,6 +548,22 @@ export function readMigrations(dir: URL): Migrations {
     if (name.endsWith(".sql")) parseMigrations(readFileSync(new URL(name, dir), "utf8"), migrations);
   }
   return migrations;
+}
+
+export function readApiRoutes(dir: URL): string[] {
+  const routes = new Set<string>();
+  if (!existsSync(dir)) return [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith("-api.ts")) continue;
+    const text = readFileSync(new URL(name, dir), "utf8");
+    for (const m of text.matchAll(/app\.(get|post|patch|delete|put)\("([^"]+)"/g)) {
+      const method = m[1];
+      const path = m[2];
+      if (method === undefined || path === undefined) continue;
+      routes.add(`${method.toUpperCase()} ${path.replace(/:([a-z]+)/g, "{$1}")}`);
+    }
+  }
+  return [...routes].sort();
 }
 
 export function patchSvgDimensions(file: URL): void {
@@ -373,6 +599,7 @@ function main(): void {
     invariantIds: readInvariantIds(new URL("../../docs/requirements/domain.md", import.meta.url)),
     testIds: readInvariantTestIds(new URL("../../tests/", import.meta.url)),
     migrations: readMigrations(new URL("../../migrations/", import.meta.url)),
+    apiRoutes: readApiRoutes(new URL("../../src/routes/", import.meta.url)),
   });
   for (const w of warnings) console.warn(`warn: ${w}`);
   if (errors.length > 0) {
@@ -387,6 +614,7 @@ function main(): void {
     ["physical.d2", physicalD2(model)],
     ["flow.d2", flowD2(model)],
     ["nav.d2", navD2(model)],
+    ["api.d2", apiMapD2(model)],
   ];
   for (const [name, content] of outputs) {
     writeFileSync(new URL(name, outDir), content);
