@@ -88,8 +88,9 @@ export const IDEAS_CSS = `
 }
 
 .ideas-composer__description {
+  field-sizing: content;
   line-height: 1.55;
-  max-height: 320px;
+  max-height: 672px;
   min-height: 24px;
   overflow-y: auto;
   resize: none;
@@ -148,6 +149,8 @@ export const IDEAS_CSS = `
   box-shadow: 0 1px 3px rgb(31 35 40 / 8%);
   display: flex;
   flex-direction: column;
+  max-height: 672px;
+  overflow: hidden;
   position: relative;
   width: auto;
   padding: 16px;

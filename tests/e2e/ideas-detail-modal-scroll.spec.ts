@@ -55,6 +55,8 @@ test("keeps a single scrollbar on the description editor in the idea detail moda
   await clearIdeas(page);
   const description = Array.from({ length: 80 }, (_value, index) => `行 ${index + 1}`).join("\n");
   await createIdea(page, "スクロール", description);
+  // Capped idea cards keep the page short, so shrink the viewport to keep it scrollable.
+  await page.setViewportSize({ width: 1440, height: 600 });
   await page.goto("/ideas");
 
   await expect(page.locator(".idea-card").filter({ hasText: "スクロール" })).toHaveCount(1);
