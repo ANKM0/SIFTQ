@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  blueprint:svg:
+    desc: Validate the model and generate the blueprint diagrams.
+    cmds:
+      - node tools/domain-blueprint/src/cli.ts build --config domain-blueprint.config.json
+
+  blueprint:viewer:
+    desc: Serve the generated diagrams locally.
+    cmds:
+      - node tools/domain-blueprint/src/cli.ts serve --config domain-blueprint.config.json

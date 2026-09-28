@@ -1,0 +1,56 @@
+{
+  "domains": {
+    "string": { "kind": "primitive" },
+    "boolean": { "kind": "primitive" },
+    "number": { "kind": "primitive" },
+    "datetime": { "kind": "primitive" },
+    "status": { "kind": "state", "logical": "string", "values": ["todo", "done"] }
+  },
+  "entities": {
+    "tasks": {
+      "description": "A task with a completion status.",
+      "attributes": {
+        "id": { "domain": "string", "pk": true },
+        "title": { "domain": "string" },
+        "status": { "domain": "status" },
+        "created_at": { "domain": "datetime" }
+      },
+      "transitions": [{ "on": "complete", "domain": "status", "from": "todo", "to": "done" }]
+    },
+    "notes": {
+      "description": "A note attached to a task.",
+      "attributes": {
+        "id": { "domain": "string", "pk": true },
+        "body": { "domain": "string" }
+      }
+    }
+  },
+  "relations": [{ "from": "tasks", "to": "notes", "kind": "one-to-many", "on": "has" }],
+  "flows": {
+    "task_management": {
+      "name": "Manage tasks",
+      "actor": "user",
+      "steps": [
+        { "name": "Create a task", "entity": "tasks", "changes": { "status": "todo" } },
+        { "name": "Complete it", "entity": "tasks", "changes": { "status": "done" } }
+      ]
+    }
+  },
+  "screens": {
+    "S01": { "name": "Task list", "entities": ["tasks"], "onLoad": "html_tasks_page" },
+    "S02": { "name": "Task detail", "entities": ["tasks"], "references": ["tasks_list"] },
+    "S03": { "name": "Notes", "entities": ["notes"], "onLoad": "html_notes_page" }
+  },
+  "navigation": [
+    { "from": "S01", "on": "open task", "to": "S02", "call": "html_tasks_update" },
+    { "from": "S02", "on": "back", "to": "S01" },
+    { "from": "S01", "on": "open notes", "to": "S03" }
+  ],
+  "api": {
+    "tasks_list": { "kind": "api", "method": "GET", "path": "/api/tasks", "operation": "list", "entity": "tasks", "success": 200 },
+    "tasks_patch": { "kind": "api", "method": "PATCH", "path": "/api/tasks/{id}", "operation": "patch", "entity": "tasks", "success": 200, "errors": [{ "status": 404, "code": "NOT_FOUND" }] },
+    "html_tasks_page": { "kind": "html", "method": "GET", "path": "/tasks", "operation": "load", "entity": "tasks", "success": 200 },
+    "html_tasks_update": { "kind": "html", "method": "POST", "path": "/tasks/{id}", "operation": "update", "entity": "tasks", "success": 200 },
+    "html_notes_page": { "kind": "html", "method": "GET", "path": "/notes", "operation": "load", "entity": "notes", "success": 200 }
+  }
+}

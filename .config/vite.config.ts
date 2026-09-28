@@ -19,6 +19,7 @@ export default defineConfig({
       ".github/**",
       ".learnings/**",
       "scripts/**",
+      "tools/**",
       "graphify-out/**",
       "dist/**",
       "node_modules/**",
@@ -51,6 +52,7 @@ export default defineConfig({
       "report",
       "target",
       "tmp",
+      "tools",
       ".config",
     ],
     rules: {

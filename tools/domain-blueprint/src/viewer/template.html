@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>domain model</title>
+    <title>__TITLE__</title>
     <style>
       html, body { height: 100%; margin: 0; }
       body { font: 14px system-ui, sans-serif; display: flex; flex-direction: column; }
@@ -10,7 +10,7 @@
         display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
         padding: 8px 12px; border-bottom: 1px solid #ddd; background: #fff; flex: 0 0 auto;
       }
-      header .group { display: flex; gap: 8px; align-items: center; }
+      header .group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       button[aria-pressed="true"] { font-weight: 700; }
       main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; }
       #image { display: block; flex: none; margin: auto; }
@@ -18,14 +18,7 @@
   </head>
   <body>
     <header>
-      <div class="group">
-        <button data-view="domain" aria-pressed="true">ドメイン</button>
-        <button data-view="logical" aria-pressed="false">論理ER</button>
-        <button data-view="physical" aria-pressed="false">物理ER</button>
-        <button data-view="flow" aria-pressed="false">業務フロー</button>
-        <button data-view="nav" aria-pressed="false">画面遷移</button>
-        <button data-view="api" aria-pressed="false">APIフロー</button>
-      </div>
+      <div class="group" id="views"></div>
       <div class="group">
         <button id="zoom-out">−</button>
         <span id="zoom-value">-</span>
@@ -37,17 +30,12 @@
       <img id="image" alt="" />
     </main>
     <script>
+      const VIEWS = /*__VIEWS__*/;
+      const DEFAULT_VIEW = /*__DEFAULT__*/;
       const main = document.getElementById("main");
       const image = document.getElementById("image");
       const value = document.getElementById("zoom-value");
-      const SOURCES = {
-        domain: "generated/domain-model.svg",
-        logical: "generated/logical.svg",
-        physical: "generated/physical.svg",
-        flow: "generated/flow.svg",
-        nav: "generated/nav.svg",
-        api: "generated/api.svg",
-      };
+      const viewsEl = document.getElementById("views");
       const MIN = 0.1;
       const MAX = 3;
       const PAD = 16;
@@ -70,22 +58,28 @@
         const y = (main.clientHeight - PAD) / image.naturalHeight;
         setScale(Math.min(1, x, y));
       };
+      const setPressed = (key) => {
+        viewsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === key)));
+      };
       const show = (view) => {
         userZoomed = false;
-        image.src = SOURCES[view] + "?v=" + Date.now();
+        setPressed(view);
+        image.src = VIEWS[view].src + "?v=" + Date.now();
         image.alt = view;
       };
+
+      Object.keys(VIEWS).forEach((key) => {
+        const button = document.createElement("button");
+        button.dataset.view = key;
+        button.textContent = VIEWS[key].label;
+        button.onclick = () => show(key);
+        viewsEl.appendChild(button);
+      });
 
       image.addEventListener("load", () => {
         requestAnimationFrame(fit);
       });
       new ResizeObserver(fit).observe(main);
-      document.querySelectorAll("button[data-view]").forEach((b) => {
-        b.onclick = () => {
-          document.querySelectorAll("button[data-view]").forEach((x) => x.setAttribute("aria-pressed", x === b));
-          show(b.dataset.view);
-        };
-      });
       document.getElementById("zoom-in").onclick = () => {
         userZoomed = true;
         setScale(scale * 1.2);
@@ -109,7 +103,7 @@
         { passive: false },
       );
 
-      show("domain");
+      show(DEFAULT_VIEW);
     </script>
   </body>
 </html>

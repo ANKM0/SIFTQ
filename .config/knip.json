@@ -3,6 +3,7 @@
   "entry": ["src/index.tsx"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["d2"],
   "rules": {
     "dependencies": "off",
     "exports": "error",

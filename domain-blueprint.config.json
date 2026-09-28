@@ -1,0 +1,30 @@
+{
+  "title": "domain model",
+  "model": "docs/requirements/assets/domain-model/domain-model.json",
+  "schema": "docs/requirements/assets/domain-model/domain-model.schema.json",
+  "outDir": "docs/requirements/assets/domain-model/generated",
+  "views": [
+    { "key": "domain-model", "label": "ドメイン", "kind": "static" },
+    { "key": "logical", "label": "論理ER", "kind": "logical" },
+    { "key": "physical", "label": "物理ER", "kind": "physical", "layout": "dagre" },
+    { "key": "flow", "label": "業務フロー", "kind": "flow" },
+    { "key": "nav", "label": "画面遷移", "kind": "nav" },
+    { "key": "api", "label": "APIフロー", "kind": "api", "layout": "elk" }
+  ],
+  "typeMap": { "string": "TEXT", "boolean": "INTEGER", "number": "INTEGER", "datetime": "TEXT" },
+  "api": {
+    "pathPrefix": "/api/",
+    "crudVerbs": ["create", "update", "delete", "remove", "get", "list", "fetch", "save", "edit", "new"]
+  },
+  "i18n": {
+    "legend": "凡例",
+    "initial": "初期表示",
+    "reference": "参照",
+    "unusedTitle": "画面未使用（契約API）",
+    "entity": "エンティティ",
+    "referenceLegend": "論理参照（実コールなし）",
+    "unusedLegend": "画面未使用",
+    "entityLegend": "エンティティ（ドメイン）"
+  },
+  "adapters": ["scripts/domain-model/siftq-adapter.ts"]
+}
