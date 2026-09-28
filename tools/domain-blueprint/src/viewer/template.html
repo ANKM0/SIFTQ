@@ -12,8 +12,9 @@
       }
       header .group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       button[aria-pressed="true"] { font-weight: 700; }
-      main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; }
-      #image { display: block; flex: none; margin: auto; }
+      main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; cursor: grab; touch-action: none; }
+      main.panning { cursor: grabbing; }
+      #image { display: block; flex: none; margin: auto; user-select: none; -webkit-user-drag: none; }
     </style>
   </head>
   <body>
@@ -66,6 +67,8 @@
         setPressed(view);
         image.src = VIEWS[view].src + "?v=" + Date.now();
         image.alt = view;
+        main.scrollTop = 0;
+        main.scrollLeft = 0;
       };
 
       Object.keys(VIEWS).forEach((key) => {
@@ -102,6 +105,36 @@
         },
         { passive: false },
       );
+
+      let panning = false;
+      let panStartX = 0;
+      let panStartY = 0;
+      let panStartLeft = 0;
+      let panStartTop = 0;
+      main.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        panning = true;
+        main.setPointerCapture(e.pointerId);
+        main.classList.add("panning");
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartLeft = main.scrollLeft;
+        panStartTop = main.scrollTop;
+      });
+      main.addEventListener("pointermove", (e) => {
+        if (!panning) return;
+        main.scrollLeft = panStartLeft - (e.clientX - panStartX);
+        main.scrollTop = panStartTop - (e.clientY - panStartY);
+      });
+      const endPan = (e) => {
+        if (!panning) return;
+        panning = false;
+        main.classList.remove("panning");
+        if (main.hasPointerCapture(e.pointerId)) main.releasePointerCapture(e.pointerId);
+      };
+      main.addEventListener("pointerup", endPan);
+      main.addEventListener("pointercancel", endPan);
+      main.addEventListener("dragstart", (e) => e.preventDefault());
 
       show(DEFAULT_VIEW);
     </script>
