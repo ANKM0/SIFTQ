@@ -4,7 +4,7 @@
   "schema": "../docs/requirements/assets/domain-model/domain-model.schema.json",
   "outDir": "../docs/requirements/assets/domain-model/generated",
   "views": [
-    { "key": "domain-model", "label": "ドメイン", "kind": "static" },
+    { "key": "domain-model", "label": "ドメイン", "kind": "static", "source": "../docs/requirements/assets/domain-model/domain-model.d2", "layout": "elk" },
     { "key": "logical", "label": "論理ER", "kind": "logical" },
     { "key": "physical", "label": "物理ER", "kind": "physical", "layout": "dagre" },
     { "key": "flow", "label": "業務フロー", "kind": "flow" },

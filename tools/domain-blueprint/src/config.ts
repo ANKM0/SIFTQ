@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import type { I18n, RenderKind } from "./render.ts";
 
-export type View = { key: string; label: string; kind: RenderKind; layout?: "elk" | "dagre" };
+export type View = { key: string; label: string; kind: RenderKind; layout?: "elk" | "dagre"; source?: string };
 
 export type BlueprintConfig = {
   title: string;

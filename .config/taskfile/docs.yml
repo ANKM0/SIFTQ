@@ -4,7 +4,6 @@ tasks:
   domain:svg:
     desc: Validate the domain model and generate its diagrams (domain / logical / physical / flow / nav / api call map).
     cmds:
-      - d2 --layout=elk --pad 10 docs/requirements/assets/domain-model/domain-model.d2 docs/requirements/assets/domain-model/generated/domain-model.svg
       - bun tools/domain-blueprint/src/cli.ts build --config .config/domain-blueprint.json
 
   domain:viewer:
