@@ -1,0 +1,20 @@
+{
+  "title": "domain blueprint",
+  "model": "model.json",
+  "schema": "model.schema.json",
+  "outDir": "generated",
+  "views": [
+    { "key": "logical", "label": "Logical ER", "kind": "logical" },
+    { "key": "physical", "label": "Physical ER", "kind": "physical", "layout": "dagre" },
+    { "key": "flow", "label": "Flow", "kind": "flow" },
+    { "key": "nav", "label": "Screens", "kind": "nav" },
+    { "key": "api", "label": "API", "kind": "api", "layout": "elk" }
+  ],
+  "typeMap": { "string": "TEXT", "boolean": "INTEGER", "number": "INTEGER", "datetime": "TEXT" },
+  "api": {
+    "pathPrefix": "/api/",
+    "crudVerbs": ["create", "update", "delete", "remove", "get", "list", "fetch", "save", "edit", "new"]
+  },
+  "i18n": {},
+  "adapters": []
+}
