@@ -1,8 +1,8 @@
 {
   "title": "domain model",
-  "model": "docs/requirements/assets/domain-model/domain-model.json",
-  "schema": "docs/requirements/assets/domain-model/domain-model.schema.json",
-  "outDir": "docs/requirements/assets/domain-model/generated",
+  "model": "../docs/requirements/assets/domain-model/domain-model.json",
+  "schema": "../docs/requirements/assets/domain-model/domain-model.schema.json",
+  "outDir": "../docs/requirements/assets/domain-model/generated",
   "views": [
     { "key": "domain-model", "label": "ドメイン", "kind": "static" },
     { "key": "logical", "label": "論理ER", "kind": "logical" },
@@ -26,5 +26,5 @@
     "unusedLegend": "画面未使用",
     "entityLegend": "エンティティ（ドメイン）"
   },
-  "adapters": ["scripts/domain-model/siftq-adapter.ts"]
+  "adapters": ["../scripts/domain-model/siftq-adapter.ts"]
 }

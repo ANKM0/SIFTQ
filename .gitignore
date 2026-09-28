@@ -6,7 +6,6 @@
 !/bun.lock
 !/opencode.json
 !/package.json
-!/domain-blueprint.config.json
 !/pyproject.toml
 !/tsconfig.json
 !/uv.lock
