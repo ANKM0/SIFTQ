@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 import { runAdapters } from "./adapters.ts";
 import { check } from "./check.ts";
-import { loadConfig, resolveConfigPath, type ResolvedConfig } from "./config.ts";
+import { loadConfig, resolveConfigPath, type ResolvedConfig, type View } from "./config.ts";
 import type { Model } from "./model.ts";
 import { patchSvgDimensions } from "./patch-svg.ts";
 import { renderD2 } from "./render.ts";
@@ -77,22 +77,29 @@ async function generate(config: ResolvedConfig): Promise<void> {
   console.log(`wrote ${writeViewer(config)}`);
 }
 
+function compileD2(config: ResolvedConfig, view: View, input: string): void {
+  const outDir = resolveConfigPath(config, config.outDir);
+  const output = join(outDir, `${view.key}.svg`);
+  const args = ["--pad", "10"];
+  if (view.layout !== undefined) args.push(`--layout=${view.layout}`);
+  args.push(input, output);
+  const result = spawnSync("d2", args, { stdio: "inherit" });
+  if (result.error) {
+    console.error(`failed to run d2 (is it installed?): ${result.error.message}`);
+    process.exit(1);
+  }
+  if (result.status !== 0) process.exit(result.status ?? 1);
+  patchSvgDimensions(output);
+}
+
 function compile(config: ResolvedConfig): void {
   const outDir = resolveConfigPath(config, config.outDir);
   for (const view of config.views) {
-    if (view.kind === "static") continue;
-    const input = join(outDir, `${view.key}.d2`);
-    const output = join(outDir, `${view.key}.svg`);
-    const args = ["--pad", "10"];
-    if (view.layout !== undefined) args.push(`--layout=${view.layout}`);
-    args.push(input, output);
-    const result = spawnSync("d2", args, { stdio: "inherit" });
-    if (result.error) {
-      console.error(`failed to run d2 (is it installed?): ${result.error.message}`);
-      process.exit(1);
+    if (view.kind === "static") {
+      if (view.source !== undefined) compileD2(config, view, resolveConfigPath(config, view.source));
+      continue;
     }
-    if (result.status !== 0) process.exit(result.status ?? 1);
-    patchSvgDimensions(output);
+    compileD2(config, view, join(outDir, `${view.key}.d2`));
   }
 }
 
