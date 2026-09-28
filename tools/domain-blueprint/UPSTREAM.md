@@ -3,8 +3,8 @@
 This directory is a pinned copy of the reusable tool from
 <https://github.com/ANKM0/domain-blueprint>.
 
-- ref: `v0.1.2`
-- commit: `8105c8b889f1be88110c5213df419f1f9f2a29de`
+- ref: `v0.2.0`
+- commit: `2932fc6e70a52240093bb13839c1270bb2424d21`
 - vendored: `src/`, `template/` (the `skills/domain-blueprint/` contents)
 
 Do not edit these files in place. To update, copy the same paths from the upstream

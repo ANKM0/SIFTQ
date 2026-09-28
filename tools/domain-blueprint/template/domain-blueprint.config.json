@@ -4,6 +4,7 @@
   "schema": "model.schema.json",
   "outDir": "generated",
   "views": [
+    { "key": "domain", "label": "Domain", "kind": "static", "source": "domain.d2", "layout": "elk" },
     { "key": "logical", "label": "Logical ER", "kind": "logical" },
     { "key": "physical", "label": "Physical ER", "kind": "physical", "layout": "dagre" },
     { "key": "flow", "label": "Flow", "kind": "flow" },
