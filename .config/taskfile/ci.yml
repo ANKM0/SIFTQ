@@ -138,7 +138,7 @@ tasks:
   ci:domain:
     desc: Validate the domain model (schema and cross-checks).
     cmds:
-      - bun tools/domain-blueprint/src/cli.ts generate --config domain-blueprint.config.json
+      - bun tools/domain-blueprint/src/cli.ts generate --config .config/domain-blueprint.json
 
   ci:llm-eval:
     desc: Run the LLM evaluation smoke suite.

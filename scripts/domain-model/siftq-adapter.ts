@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 type Domain = { kind: string; logical?: string; values?: (string | number)[] };
 type Attribute = { domain: string; pk?: boolean; rules?: string[] };
@@ -10,7 +11,7 @@ export type Model = {
   entities: Record<string, Entity>;
   api?: Record<string, ApiOperation>;
 };
-type AdapterContext = { model: Model; config: { configDir: string } };
+type AdapterContext = { model: Model };
 type AdapterResult = { errors?: string[]; warnings?: string[] };
 
 type Migrations = Record<string, Record<string, string>>;
@@ -164,8 +165,8 @@ function readApiRoutes(dir: string): string[] {
   return [...routes].sort();
 }
 
-export const adapter = ({ model, config }: AdapterContext): AdapterResult => {
-  const root = config.configDir;
+export const adapter = ({ model }: AdapterContext): AdapterResult => {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
   const rules = checkInvariantRules(model, readInvariantIds(join(root, "docs/requirements/domain.md")), readInvariantTestIds(join(root, "tests")));
   return {
     errors: [...(rules.errors ?? []), ...checkMigrations(model, readMigrations(join(root, "migrations"))), ...checkApiRoutes(model, readApiRoutes(join(root, "src/routes")))],

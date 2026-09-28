@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "docs:flow:svg": "mmdc -i docs/contributing/assets/development-flow.mmd -o docs/contributing/assets/development-flow.svg",
     "docs:app-architecture:svg": "mmdc -p docs/contributing/assets/app-architecture-puppeteer.json -c docs/contributing/assets/app-architecture-mermaid.json -i docs/contributing/assets/app-architecture.mmd -o docs/contributing/assets/app-architecture.svg",
-    "docs:domain:svg": "bun tools/domain-blueprint/src/cli.ts build --config domain-blueprint.config.json"
+    "docs:domain:svg": "bun tools/domain-blueprint/src/cli.ts build --config .config/domain-blueprint.json"
   },
   "dependencies": {
     "hono": "^4.13.4"

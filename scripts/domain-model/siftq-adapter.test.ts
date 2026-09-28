@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import { adapter, checkApiRoutes, checkMigrations, parseMigrations, type Model } from "./siftq-adapter";
 
@@ -9,8 +8,7 @@ const realModel: Model = JSON.parse(
 
 describe("siftq adapter", () => {
   it("passes on the current domain model", () => {
-    const root = fileURLToPath(new URL("../../", import.meta.url));
-    const result = adapter({ model: realModel, config: { configDir: root } });
+    const result = adapter({ model: realModel });
     expect(result.errors).toEqual([]);
   });
 
