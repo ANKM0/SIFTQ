@@ -10,17 +10,33 @@
         display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
         padding: 8px 12px; border-bottom: 1px solid #ddd; background: #fff; flex: 0 0 auto;
       }
+      [hidden] { display: none !important; }
       header .group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      header input[type="search"] { padding: 4px 8px; }
+      .graph-title { font-weight: 700; }
+      .graph-search-label { color: #495057; }
       button[aria-pressed="true"] { font-weight: 700; }
-      main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; cursor: grab; touch-action: none; }
+      main { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; background: #fafafa; display: flex; cursor: grab; touch-action: none; position: relative; }
       main.panning { cursor: grabbing; }
+      main.graph-mode { cursor: default; padding: 0; }
       #image { display: block; flex: none; margin: auto; user-select: none; -webkit-user-drag: none; }
+      #graph { position: absolute; inset: 0; display: none; }
+      #graph.active { display: block; }
+      .legend { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
     </style>
   </head>
   <body>
     <header>
       <div class="group" id="views"></div>
-      <div class="group">
+      <div class="group graph-controls" id="graph-controls" hidden>
+        <span class="graph-title" id="graph-title"></span>
+        <label class="graph-search-label" for="graph-search">Search</label>
+        <input id="graph-search" type="search" placeholder="label" />
+        <button id="graph-fit">fit</button>
+        <label class="legend" id="graph-legend"></label>
+      </div>
+      <div class="group image-controls" id="image-controls">
         <button id="zoom-out">−</button>
         <span id="zoom-value">-</span>
         <button id="zoom-in">＋</button>
@@ -29,7 +45,9 @@
     </header>
     <main id="main">
       <img id="image" alt="" />
+      <div id="graph"></div>
     </main>
+    <script src="vis-network.min.js"></script>
     <script>
       const VIEWS = /*__VIEWS__*/;
       const DEFAULT_VIEW = /*__DEFAULT__*/;
@@ -37,11 +55,27 @@
       const image = document.getElementById("image");
       const value = document.getElementById("zoom-value");
       const viewsEl = document.getElementById("views");
+      const graphEl = document.getElementById("graph");
+      const graphControls = document.getElementById("graph-controls");
+      const imageControls = document.getElementById("image-controls");
+      const graphLegend = document.getElementById("graph-legend");
+      const graphSearch = document.getElementById("graph-search");
+      const graphTitle = document.getElementById("graph-title");
+      const baseTitle = document.title;
       const MIN = 0.1;
       const MAX = 3;
       const PAD = 16;
       let scale = 1;
       let userZoomed = false;
+      let currentType = "image";
+      let network = null;
+      let graphNodes = null;
+      let graphEdges = null;
+      let adjNodes = new Map();
+      let adjEdges = new Map();
+      let searchMatches = [];
+      const dimmedNodes = new Set();
+      const dimmedEdges = new Set();
 
       const clamp = (v) => Math.min(MAX, Math.max(MIN, v));
       const apply = () => {
@@ -62,13 +96,135 @@
       const setPressed = (key) => {
         viewsEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === key)));
       };
+
+      const AREA_GROUPS = (legend) => {
+        const groups = { client: { color: { background: "#dee2e6", border: "#868e96" } }, api: { color: { background: "#e8f0ff", border: "#495057" } }, entity: { color: { background: "#b2f2bb", border: "#212529" }, shape: "database" } };
+        for (const [area, color] of Object.entries(legend.areaColors)) {
+          groups[`area_${area}`] = { color: { background: color, border: "#495057" } };
+        }
+        return groups;
+      };
+
+      const graphOptions = (legend) => ({
+        nodes: { shape: "box", font: { size: 12 }, margin: 6, borderWidth: 1, widthConstraint: { maximum: 140 } },
+        edges: { arrows: { to: { enabled: true, scaleFactor: 0.5 } }, width: 1, smooth: { enabled: true, type: "cubicBezier", forceDirection: "vertical", roundness: 0.2 } },
+        groups: AREA_GROUPS(legend),
+        // Free layout: the 3-band positions come from the graph JSON, physics stays off so
+        // nodes can be dragged in any direction.
+        physics: { enabled: false },
+        interaction: { hover: true, tooltipDelay: 120, keyboard: false },
+        layout: { improvedLayout: false, hierarchical: { enabled: false } },
+      });
+
+      const applyDim = (keepNodes, keepEdges) => {
+        const nodeUpdates = [];
+        for (const node of graphNodes.get()) {
+          const shouldDim = !keepNodes.has(node.id);
+          if (shouldDim === dimmedNodes.has(node.id)) continue;
+          if (shouldDim) dimmedNodes.add(node.id); else dimmedNodes.delete(node.id);
+          nodeUpdates.push({ id: node.id, color: shouldDim ? { background: "#f1f3f5", border: "#ced4da" } : undefined, font: { color: shouldDim ? "#adb5bd" : "#212529" } });
+        }
+        if (nodeUpdates.length > 0) graphNodes.update(nodeUpdates);
+        const edgeUpdates = [];
+        for (const edge of graphEdges.get()) {
+          const shouldDim = !keepEdges.has(edge.id);
+          if (shouldDim === dimmedEdges.has(edge.id)) continue;
+          if (shouldDim) dimmedEdges.add(edge.id); else dimmedEdges.delete(edge.id);
+          edgeUpdates.push({ id: edge.id, color: shouldDim ? { color: "#e9ecef" } : { color: edge.baseColor } });
+        }
+        if (edgeUpdates.length > 0) graphEdges.update(edgeUpdates);
+      };
+
+      const highlight = (nodeId) => {
+        if (!nodeId) { applyDim(new Set(), new Set()); return; }
+        const keepNodes = new Set(adjNodes.get(nodeId) ?? []);
+        keepNodes.add(nodeId);
+        applyDim(keepNodes, new Set(adjEdges.get(nodeId) ?? []));
+      };
+
+      const buildAdjacency = (data) => {
+        adjNodes = new Map();
+        adjEdges = new Map();
+        for (const node of data.nodes) { adjNodes.set(node.id, new Set([node.id])); adjEdges.set(node.id, new Set()); }
+        for (const edge of data.edges) {
+          adjNodes.get(edge.from)?.add(edge.to);
+          adjNodes.get(edge.to)?.add(edge.from);
+          adjEdges.get(edge.from)?.add(edge.id);
+          adjEdges.get(edge.to)?.add(edge.id);
+        }
+      };
+
+      const runSearch = () => {
+        if (!network) return;
+        const query = graphSearch.value.trim().toLowerCase();
+        if (query === "") { searchMatches = []; highlight(null); return; }
+        const keepNodes = new Set();
+        const keepEdges = new Set();
+        const matched = [];
+        for (const node of graphNodes.get()) {
+          if (!String(node.label).toLowerCase().includes(query)) continue;
+          matched.push(node.id);
+          for (const id of adjNodes.get(node.id) ?? []) keepNodes.add(id);
+          for (const id of adjEdges.get(node.id) ?? []) keepEdges.add(id);
+        }
+        searchMatches = matched;
+        applyDim(keepNodes, keepEdges);
+      };
+
+      const renderLegend = (legend) => {
+        graphLegend.innerHTML = [
+          `<span><span class="swatch" style="background:${legend.edge.write}"></span>write</span>`,
+          `<span><span class="swatch" style="background:${legend.edge.read}"></span>read</span>`,
+          `<span><span class="swatch" style="background:${legend.edge.both}"></span>write+read</span>`,
+        ].join("");
+      };
+
+      const showGraph = async (src) => {
+        if (typeof vis === "undefined") { graphEl.textContent = "failed to load vis-network"; return; }
+        const data = await (await fetch(src + "?v=" + Date.now())).json();
+        const nodes = new vis.DataSet(data.nodes.map((n) => ({ ...n })));
+        const edges = new vis.DataSet(data.edges.map((e) => ({ ...e, baseColor: e.color })));
+        graphNodes = nodes;
+        graphEdges = edges;
+        dimmedNodes.clear();
+        dimmedEdges.clear();
+        buildAdjacency(data);
+        graphEl.innerHTML = "";
+        network = new vis.Network(graphEl, { nodes, edges }, graphOptions(data.legend));
+        network.on("selectNode", (params) => highlight(params.nodes[0] ?? null));
+        network.on("deselectNode", () => highlight(null));
+        network.once("afterDrawing", () => network.fit({ animation: false }));
+        highlight(null); // default: everything gray until a node or search highlights it
+        renderLegend(data.legend);
+      };
+
       const show = (view) => {
+        const def = VIEWS[view];
+        currentType = def.type ?? "image";
         userZoomed = false;
         setPressed(view);
-        image.src = VIEWS[view].src + "?v=" + Date.now();
-        image.alt = view;
-        main.scrollTop = 0;
-        main.scrollLeft = 0;
+        if (currentType === "graph") {
+          image.style.display = "none";
+          graphEl.classList.add("active");
+          graphControls.hidden = false;
+          imageControls.hidden = true;
+          main.classList.add("graph-mode");
+          graphTitle.textContent = def.label;
+          document.title = `${def.label} — ${baseTitle}`;
+          if (network) network.redraw();
+          else showGraph(def.src);
+        } else {
+          document.title = baseTitle;
+          graphEl.classList.remove("active");
+          graphControls.hidden = true;
+          imageControls.hidden = false;
+          main.classList.remove("graph-mode");
+          image.style.display = "block";
+          image.src = def.src + "?v=" + Date.now();
+          image.alt = view;
+          main.scrollTop = 0;
+          main.scrollLeft = 0;
+        }
       };
 
       Object.keys(VIEWS).forEach((key) => {
@@ -79,25 +235,15 @@
         viewsEl.appendChild(button);
       });
 
-      image.addEventListener("load", () => {
-        requestAnimationFrame(fit);
-      });
+      image.addEventListener("load", () => requestAnimationFrame(fit));
       new ResizeObserver(fit).observe(main);
-      document.getElementById("zoom-in").onclick = () => {
-        userZoomed = true;
-        setScale(scale * 1.2);
-      };
-      document.getElementById("zoom-out").onclick = () => {
-        userZoomed = true;
-        setScale(scale / 1.2);
-      };
-      document.getElementById("zoom-fit").onclick = () => {
-        userZoomed = false;
-        fit();
-      };
+      document.getElementById("zoom-in").onclick = () => { userZoomed = true; setScale(scale * 1.2); };
+      document.getElementById("zoom-out").onclick = () => { userZoomed = true; setScale(scale / 1.2); };
+      document.getElementById("zoom-fit").onclick = () => { userZoomed = false; fit(); };
       main.addEventListener(
         "wheel",
         (e) => {
+          if (currentType === "graph") return;
           if (!e.ctrlKey && !e.metaKey) return;
           e.preventDefault();
           userZoomed = true;
@@ -106,13 +252,35 @@
         { passive: false },
       );
 
+      document.getElementById("graph-fit").onclick = () => { if (network) network.fit({ animation: false }); };
+      graphSearch.addEventListener("input", runSearch);
+      graphSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (network && searchMatches.length > 0) network.fit({ nodes: searchMatches, animation: false });
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          graphSearch.value = "";
+          runSearch();
+          graphSearch.blur();
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (currentType !== "graph") return;
+        if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
+          e.preventDefault();
+          graphSearch.focus();
+          graphSearch.select();
+        }
+      });
+
       let panning = false;
       let panStartX = 0;
       let panStartY = 0;
       let panStartLeft = 0;
       let panStartTop = 0;
       main.addEventListener("pointerdown", (e) => {
-        if (e.button !== 0) return;
+        if (currentType === "graph" || e.button !== 0) return;
         panning = true;
         main.setPointerCapture(e.pointerId);
         main.classList.add("panning");

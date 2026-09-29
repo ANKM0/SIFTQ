@@ -202,7 +202,7 @@ export function apiMapD2(model: Model, i18n: I18n = DEFAULT_I18N): string {
   ].join("\n");
 }
 
-export type RenderKind = "logical" | "physical" | "flow" | "nav" | "api" | "static";
+export type RenderKind = "logical" | "physical" | "flow" | "nav" | "api" | "graph" | "static";
 
 export function renderD2(
   model: Model,
@@ -222,6 +222,8 @@ export function renderD2(
       return navD2(model);
     case "api":
       return apiMapD2(model, i18n);
+    case "graph":
+      return "";
     case "static":
       return "";
   }

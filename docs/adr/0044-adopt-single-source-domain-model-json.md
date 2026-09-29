@@ -1,5 +1,7 @@
 # ADR 0043: Adopt single-source domain model JSON with generated diagrams
 
+> Status: Partially superseded by [ADR 0070](0070-generate-domain-model-from-code-graph-and-presentation.md).
+
 ## 決定
 <!-- 決定事項、採用した内容とその理由を記載 -->
 

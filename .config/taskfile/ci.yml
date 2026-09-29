@@ -136,8 +136,9 @@ tasks:
       - uv run python scripts/ci/check_docs.py
 
   ci:domain:
-    desc: Validate the domain model (schema and cross-checks).
+    desc: Validate the domain model and that it is in sync with the code (schema, cross-checks, extractors).
     cmds:
+      - bun tools/domain-blueprint/src/cli.ts sync --config .config/domain-blueprint.json --check
       - bun tools/domain-blueprint/src/cli.ts generate --config .config/domain-blueprint.json
 
   ci:llm-eval:

@@ -1,0 +1,578 @@
+{
+  "api": {
+    "html_login_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/login",
+      "operation": "load",
+      "success": 200
+    },
+    "html_login": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/login",
+      "operation": "login",
+      "success": 302,
+      "errors": [
+        {
+          "status": 401
+        },
+        {
+          "status": 503
+        }
+      ]
+    },
+    "html_logout": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/logout",
+      "operation": "logout",
+      "success": 302
+    },
+    "ideas_list": {
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/ideas",
+      "operation": "list",
+      "success": 200,
+      "entity": "ideas",
+      "errors": [
+        {
+          "status": 500
+        }
+      ]
+    },
+    "ideas_create": {
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/ideas",
+      "operation": "create",
+      "success": 201,
+      "entity": "ideas",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_INPUT"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_TITLE"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_DESCRIPTION"
+        }
+      ]
+    },
+    "ideas_reorder": {
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/ideas/reorder",
+      "operation": "reorder",
+      "success": 200,
+      "entity": "ideas",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_INPUT"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_ORDER"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "ideas_patch": {
+      "kind": "api",
+      "method": "PATCH",
+      "path": "/api/ideas/{id}",
+      "operation": "patch",
+      "success": 200,
+      "entity": "ideas",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_INPUT"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_ORDER"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_TITLE"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_DESCRIPTION"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "ideas_delete": {
+      "kind": "api",
+      "method": "DELETE",
+      "path": "/api/ideas/{id}",
+      "operation": "delete",
+      "success": 204,
+      "entity": "ideas",
+      "errors": [
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "images_create": {
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/images",
+      "operation": "create",
+      "success": 201,
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_IMAGE"
+        },
+        {
+          "status": 400,
+          "code": "UNSUPPORTED_IMAGE"
+        },
+        {
+          "status": 400,
+          "code": "IMAGE_TOO_LARGE"
+        },
+        {
+          "status": 500
+        }
+      ]
+    },
+    "images_get": {
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/images/{id}",
+      "operation": "get",
+      "success": 200,
+      "errors": [
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 500
+        }
+      ]
+    },
+    "tasks_list": {
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/tasks",
+      "operation": "list",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 500
+        }
+      ]
+    },
+    "tasks_get": {
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/tasks/{id}",
+      "operation": "get",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 500
+        }
+      ]
+    },
+    "tasks_create": {
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/tasks",
+      "operation": "create",
+      "success": 201,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_TITLE"
+        },
+        {
+          "status": 500
+        }
+      ]
+    },
+    "tasks_bulk_status": {
+      "kind": "api",
+      "method": "PATCH",
+      "path": "/api/tasks/bulk/status",
+      "operation": "bulk-status",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_BULK_INPUT"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_STATUS"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "tasks_bulk_delete": {
+      "kind": "api",
+      "method": "DELETE",
+      "path": "/api/tasks/bulk",
+      "operation": "bulk-delete",
+      "success": 204,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_BULK_INPUT"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "tasks_patch": {
+      "kind": "api",
+      "method": "PATCH",
+      "path": "/api/tasks/{id}",
+      "operation": "patch",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_TITLE"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_DESCRIPTION"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_STATUS"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_AREA"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_WORKING"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_ORDER"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "tasks_delete": {
+      "kind": "api",
+      "method": "DELETE",
+      "path": "/api/tasks/{id}",
+      "operation": "delete",
+      "success": 204,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_ORDER"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "tasks_reorder": {
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/tasks/reorder",
+      "operation": "reorder",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_ORDER"
+        },
+        {
+          "status": 409,
+          "code": "CONFLICT"
+        }
+      ]
+    },
+    "html_matrix_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/matrix",
+      "operation": "load",
+      "success": 200,
+      "entity": "tasks"
+    },
+    "html_ideas_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/ideas",
+      "operation": "load",
+      "success": 200,
+      "entity": "ideas"
+    },
+    "html_ideas_detail": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/ideas/{id}",
+      "operation": "load",
+      "success": 200,
+      "entity": "ideas"
+    },
+    "html_tasks_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/tasks",
+      "operation": "load",
+      "success": 200,
+      "entity": "tasks"
+    },
+    "html_new_task_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/tasks/new",
+      "operation": "load",
+      "success": 200
+    },
+    "html_task_page": {
+      "kind": "html",
+      "method": "GET",
+      "path": "/tasks/{id}",
+      "operation": "load",
+      "success": 200,
+      "entity": "tasks"
+    },
+    "html_tasks_create": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/tasks",
+      "operation": "create",
+      "success": 201,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400
+        },
+        {
+          "status": 500
+        }
+      ]
+    },
+    "html_tasks_update": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/tasks/{id}",
+      "operation": "update",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400
+        },
+        {
+          "status": 409
+        }
+      ]
+    },
+    "html_tasks_status": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/tasks/{id}/status",
+      "operation": "status",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400
+        },
+        {
+          "status": 404
+        },
+        {
+          "status": 409
+        }
+      ]
+    },
+    "html_tasks_area": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/tasks/{id}/area",
+      "operation": "area",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400
+        },
+        {
+          "status": 404
+        },
+        {
+          "status": 409
+        }
+      ]
+    },
+    "html_tasks_working": {
+      "kind": "html",
+      "method": "POST",
+      "path": "/tasks/{id}/working",
+      "operation": "working",
+      "success": 200,
+      "entity": "tasks",
+      "errors": [
+        {
+          "status": 400
+        },
+        {
+          "status": 404
+        },
+        {
+          "status": 409
+        }
+      ]
+    }
+  },
+  "screenCalls": [
+    {
+      "screen": "P08",
+      "trigger": "POST",
+      "view": "screen:P08",
+      "gateway": "idea-scripts.ts",
+      "api": "ideas_reorder"
+    },
+    {
+      "screen": "P08",
+      "trigger": "POST",
+      "view": "screen:P08",
+      "gateway": "idea-scripts.ts",
+      "api": "ideas_patch"
+    },
+    {
+      "screen": "P08",
+      "trigger": "POST",
+      "view": "screen:P08",
+      "gateway": "idea-scripts.ts",
+      "api": "ideas_create"
+    },
+    {
+      "screen": "P08",
+      "trigger": "POST",
+      "view": "screen:P08",
+      "gateway": "idea-scripts.ts",
+      "api": "ideas_delete"
+    },
+    {
+      "screen": "P01",
+      "trigger": "POST",
+      "view": "screen:P01",
+      "gateway": "matrix-scripts.ts",
+      "api": "tasks_reorder"
+    },
+    {
+      "screen": "P01",
+      "trigger": "POST",
+      "view": "screen:P01",
+      "gateway": "matrix-scripts.ts",
+      "api": "tasks_patch"
+    },
+    {
+      "screen": "P01",
+      "trigger": "POST",
+      "view": "screen:P01",
+      "gateway": "matrix-scripts.ts",
+      "api": "tasks_delete"
+    },
+    {
+      "screen": "P03",
+      "trigger": "POST",
+      "view": "screen:P03",
+      "gateway": "task-form-scripts.ts",
+      "api": "images_create"
+    },
+    {
+      "screen": "P04",
+      "trigger": "POST",
+      "view": "screen:P04",
+      "gateway": "task-form-scripts.ts",
+      "api": "images_create"
+    },
+    {
+      "screen": "P02",
+      "trigger": "POST",
+      "view": "screen:P02",
+      "gateway": "task-list-scripts.ts",
+      "api": "tasks_bulk_delete"
+    },
+    {
+      "screen": "P02",
+      "trigger": "POST",
+      "view": "screen:P02",
+      "gateway": "task-list-scripts.ts",
+      "api": "tasks_bulk_status"
+    }
+  ]
+}

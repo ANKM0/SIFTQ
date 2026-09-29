@@ -9,7 +9,8 @@
     { "key": "physical", "label": "物理ER", "kind": "physical", "layout": "dagre" },
     { "key": "flow", "label": "業務フロー", "kind": "flow" },
     { "key": "nav", "label": "画面遷移", "kind": "nav" },
-    { "key": "api", "label": "APIフロー", "kind": "api", "layout": "elk" }
+    { "key": "api", "label": "APIフロー", "kind": "api", "layout": "elk" },
+    { "key": "api-graph", "label": "APIグラフ", "kind": "graph" }
   ],
   "typeMap": { "string": "TEXT", "boolean": "INTEGER", "number": "INTEGER", "datetime": "TEXT" },
   "api": {
@@ -26,5 +27,8 @@
     "unusedLegend": "画面未使用",
     "entityLegend": "エンティティ（ドメイン）"
   },
-  "adapters": ["../scripts/domain-model/siftq-adapter.ts"]
+  "adapters": ["../scripts/domain-model/siftq-adapter.ts"],
+  "extractors": ["bun ../scripts/domain-model/extract.ts"],
+  "auto": "../docs/requirements/assets/domain-model/graph.auto.json",
+  "presentation": "../docs/requirements/assets/domain-model/presentation.json"
 }
