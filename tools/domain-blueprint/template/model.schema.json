@@ -50,6 +50,10 @@
         "^[a-z][a-z0-9_]*$": { "$ref": "#/definitions/apiOperation" }
       },
       "additionalProperties": false
+    },
+    "screenCalls": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/screenCall" }
     }
   },
   "definitions": {
@@ -189,6 +193,18 @@
         "on": { "type": "string", "minLength": 1 },
         "to": { "type": "string", "minLength": 1 },
         "call": { "type": "string", "minLength": 1 }
+      }
+    },
+    "screenCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen", "trigger", "view", "gateway", "api"],
+      "properties": {
+        "screen": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9_]*$" },
+        "trigger": { "enum": ["GET", "POST"] },
+        "view": { "type": "string", "minLength": 1 },
+        "gateway": { "type": "string", "minLength": 1 },
+        "api": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
       }
     },
     "apiError": {
