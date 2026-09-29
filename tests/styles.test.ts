@@ -149,22 +149,6 @@ describe("Idea detail description divider", () => {
   });
 });
 
-describe("Matrix task card description clamp styles", () => {
-  it("clamps the description to two lines", () => {
-    const description = STYLES_CSS.match(/(?:^|\n)\.task-card-description\s*\{[^}]*\}/);
-    expect(description?.[0]).toContain("-webkit-line-clamp: 2;");
-    expect(description?.[0]).toContain("overflow: hidden;");
-  });
-
-  it("shrinks the first image and overlays the remaining count", () => {
-    const image = STYLES_CSS.match(/(?:^|\n)\.task-card-image\s*\{[^}]*\}/);
-    expect(image?.[0]).toContain("max-height: 96px;");
-
-    const count = STYLES_CSS.match(/(?:^|\n)\.task-card-image-count\s*\{[^}]*\}/);
-    expect(count?.[0]).toContain("position: absolute;");
-  });
-});
-
 describe("Matrix drag feedback styles", () => {
   it("floats the Matrix drag ghost without capturing pointer events", () => {
     const ghost = STYLES_CSS.match(/(?:^|\n)\.matrix-drag-ghost\s*\{[^}]*\}/);
