@@ -66,6 +66,26 @@ function ideaFields(form) { return { title: form.querySelector('input[name="titl
 function syncIdeaDescriptionEmpty(editor) {
   if (editor) editor.classList.toggle("idea-detail__description--empty", (editor.textContent || "") === "");
 }
+function ideaDescriptionFragment(description) {
+  var fragment = document.createDocumentFragment();
+  var pattern = new RegExp("/api/images/[0-9A-Za-z_-]+", "g");
+  var cursor = 0;
+  var match;
+  while ((match = pattern.exec(description)) !== null) {
+    if (match.index > cursor) fragment.appendChild(document.createTextNode(description.slice(cursor, match.index)));
+    var image = document.createElement("img"); image.className = "description-image"; image.src = match[0]; image.alt = ""; fragment.appendChild(image);
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < description.length) fragment.appendChild(document.createTextNode(description.slice(cursor)));
+  return fragment;
+}
+function renderIdeaDescription(element, description) {
+  element.setAttribute("data-description", description);
+  element.textContent = "";
+  element.classList.toggle("idea-card__description--empty", description === "");
+  if (description === "") { element.textContent = "No description yet."; return; }
+  element.appendChild(ideaDescriptionFragment(description));
+}
 function updateIdeaPinButton(form) {
   var button = form.querySelector("[data-idea-pin]");
   if (button) { button.setAttribute("aria-pressed", ideaFormPinned(form) ? "true" : "false"); button.setAttribute("aria-label", ideaFormPinned(form) ? "Unpin idea" : "Pin idea"); }
@@ -140,7 +160,7 @@ function syncIdeaCard(form) {
   var title = card.querySelector("h2");
   var description = card.querySelector(".idea-card__description");
   if (title && fields.title) title.textContent = fields.title.value;
-  if (description && fields.description) { description.textContent = fields.description.value || "No description yet."; description.classList.toggle("idea-card__description--empty", !fields.description.value); }
+  if (description && fields.description) renderIdeaDescription(description, fields.description.value);
   updateIdeaCardPin(card, ideaFormPinned(form));
   updateIdeaGroups();
 }
@@ -190,7 +210,7 @@ function createIdeaCard(idea) {
   pin.setAttribute("class", "idea-card__pin"); pin.setAttribute("role", "img"); pin.setAttribute("aria-label", idea.pinned ? "Pinned" : "Not pinned"); pin.setAttribute("viewBox", "0 0 24 24");
   var path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", "M16 12V4h1V2H7v2h1v8l-2 2v2h5.8v6h2.4v-6H20v-2z"); pin.appendChild(path); link.appendChild(pin);
   var title = document.createElement("h2"); title.textContent = idea.title; link.appendChild(title);
-  var description = document.createElement("p"); description.className = idea.description ? "idea-card__description" : "idea-card__description idea-card__description--empty"; description.textContent = idea.description || "No description yet."; link.appendChild(description);
+  var description = document.createElement("p"); description.className = "idea-card__description"; renderIdeaDescription(description, idea.description); link.appendChild(description);
   card.appendChild(link);
   var footer = document.createElement("footer"); footer.className = "idea-card__footer";
   var more = document.createElement("button"); more.type = "button"; more.className = "idea-card__more"; more.setAttribute("aria-label", "More options for " + idea.title); var dots = document.createElement("span"); dots.setAttribute("aria-hidden", "true"); more.appendChild(dots); footer.appendChild(more); card.appendChild(footer);
@@ -236,7 +256,7 @@ function openIdeaModal(card) {
   var modalForm = document.querySelector("[data-idea-modal] form[data-idea-form]");
   if (!modalForm) return;
   modalForm.setAttribute("data-idea-id", ideaCardId(card)); modalForm.setAttribute("data-idea-order", card.getAttribute("data-idea-order") || ""); modalForm.setAttribute("data-idea-pinned", card.getAttribute("data-pinned") === "true" ? "true" : "false");
-  var fields = ideaFields(modalForm); var title = card.querySelector("h2"); var description = card.querySelector(".idea-card__description"); var descriptionEmpty = !description || description.classList.contains("idea-card__description--empty"); var descriptionText = descriptionEmpty ? "" : description.textContent || ""; if (fields.title) fields.title.value = title ? title.textContent || "" : ""; if (fields.description) fields.description.value = descriptionText; var editor = modalForm.querySelector("[data-description-editor]"); if (editor) { editor.textContent = descriptionText; if (typeof linkifyDescriptionEditor === "function") linkifyDescriptionEditor(editor); syncIdeaDescriptionEmpty(editor); } updateIdeaPinButton(modalForm); var dialog = document.querySelector("[data-idea-modal]"); if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+  var fields = ideaFields(modalForm); var title = card.querySelector("h2"); var description = card.querySelector(".idea-card__description"); var descriptionText = description ? description.getAttribute("data-description") || "" : ""; if (fields.title) fields.title.value = title ? title.textContent || "" : ""; if (fields.description) fields.description.value = descriptionText; var editor = modalForm.querySelector("[data-description-editor]"); if (editor) { editor.textContent = descriptionText; if (typeof linkifyDescriptionEditor === "function") linkifyDescriptionEditor(editor); syncIdeaDescriptionEmpty(editor); } updateIdeaPinButton(modalForm); var dialog = document.querySelector("[data-idea-modal]"); if (dialog && typeof dialog.showModal === "function") dialog.showModal();
 }
 function initializeIdeaDetails() {
   document.querySelectorAll("[data-idea-composer]").forEach(function (composer) { if (composer.dataset.ideaComposerInitialized === "true") return; composer.dataset.ideaComposerInitialized = "true"; setIdeaComposerOpen(composer, false); var trigger = composer.querySelector("[data-idea-composer-trigger]"); var close = composer.querySelector("[data-idea-composer-close]"); if (trigger) trigger.addEventListener("click", function () { setIdeaComposerOpen(composer, true); }); if (close) close.addEventListener("click", function () { finishIdeaComposer(composer); }); composer.addEventListener("keydown", function (event) { if (!event.ctrlKey || event.key !== "Enter") return; var target = event.target; if (!target || !target.closest || !target.closest(".ideas-composer__title, .ideas-composer__description")) return; event.preventDefault(); finishIdeaComposer(composer); }); document.addEventListener("click", function (event) { if (composer.getAttribute("data-idea-composer-open") === "true" && !event.target.closest("[data-idea-composer]")) finishIdeaComposer(composer); }); });

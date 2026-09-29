@@ -15,6 +15,8 @@ import { createD1TaskRepository } from "./repository/d1-task-repository";
 import type { TaskRepository } from "./repository/task-repository";
 import { createD1IdeaRepository } from "./repository/d1-idea-repository";
 import type { IdeaRepository } from "./repository/idea-repository";
+import { createD1ImageRepository, createMemoryImageRepository } from "./repository/image-repository";
+import type { ImageRepository } from "./repository/image-repository";
 import { STYLES_CSS } from "./styles";
 import { createMemoryTaskRepository } from "./preview/MemoryTaskRepository";
 import { createMemoryIdeaRepository } from "./preview/MemoryIdeaRepository";
@@ -23,12 +25,14 @@ import { PREVIEW_IDEAS } from "./preview/ideas";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerTaskApiRoutes } from "./routes/task-api";
 import { registerIdeaApiRoutes } from "./routes/idea-api";
+import { registerImageApiRoutes } from "./routes/image-api";
 import { registerTaskScreenRoutes } from "./routes/task-screens";
 import type { AppEnv } from "./app-env";
 
 const app = new Hono<AppEnv>();
 const previewRepository = createMemoryTaskRepository(PREVIEW_TASKS);
 const previewIdeaRepository = createMemoryIdeaRepository(PREVIEW_IDEAS);
+const previewImageRepository = createMemoryImageRepository();
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -97,8 +101,16 @@ function ideaRepository(c: Context<AppEnv>): IdeaRepository {
   throw new Error("idea repository is not configured");
 }
 
+function imageRepository(c: Context<AppEnv>): ImageRepository {
+  if (c.env.PREVIEW_MODE === "true") return previewImageRepository;
+  if (c.env.IMAGE_REPOSITORY) return c.env.IMAGE_REPOSITORY;
+  if (c.env.DB) return createD1ImageRepository(c.env.DB);
+  throw new Error("image repository is not configured");
+}
+
 registerTaskApiRoutes(app, repository);
 registerIdeaApiRoutes(app, ideaRepository);
+registerImageApiRoutes(app, imageRepository);
 registerTaskScreenRoutes(app, repository, ideaRepository);
 
 app.get("/matrix-dnd.js", (c) => {

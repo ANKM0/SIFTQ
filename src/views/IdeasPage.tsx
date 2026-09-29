@@ -1,5 +1,6 @@
 import type { Idea } from "../idea";
 import { sortIdeas } from "../idea";
+import { DescriptionContent } from "../components/DescriptionContent";
 import { IdeaDetailFields } from "./IdeaDetailFields";
 
 type IdeaCardData = Idea & { pinned?: boolean };
@@ -37,8 +38,11 @@ function IdeaCard({ idea }: { idea: IdeaCardData }) {
           <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.8v6h2.4v-6H20v-2z" />
         </svg>
         <h2>{idea.title}</h2>
-        <p class={idea.description === "" ? "idea-card__description idea-card__description--empty" : "idea-card__description"}>
-          {idea.description || "No description yet."}
+        <p
+          class={idea.description === "" ? "idea-card__description idea-card__description--empty" : "idea-card__description"}
+          data-description={idea.description}
+        >
+          {idea.description === "" ? "No description yet." : <DescriptionContent description={idea.description} />}
         </p>
       </a>
       <footer class="idea-card__footer">

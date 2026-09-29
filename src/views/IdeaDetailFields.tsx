@@ -1,4 +1,4 @@
-import { splitDescription } from "../description";
+import { DescriptionContent } from "../components/DescriptionContent";
 
 export function IdeaDetailFields({
   title,
@@ -31,15 +31,7 @@ export function IdeaDetailFields({
         aria-multiline="true"
         aria-label="Idea description"
       >
-        {splitDescription(description).map((segment, index) =>
-          segment.href ? (
-            <a key={index} href={segment.href}>
-              {segment.text}
-            </a>
-          ) : (
-            segment.text
-          ),
-        )}
+        <DescriptionContent description={description} />
       </div>
       <textarea name="description" data-description-value hidden>
         {description}
