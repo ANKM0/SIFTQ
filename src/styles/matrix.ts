@@ -254,48 +254,6 @@ export const MATRIX_CSS = `
   justify-content: space-between;
 }
 
-.task-card-description {
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  color: #3f4854;
-  display: -webkit-box;
-  font-size: 13px;
-  line-height: 1.45;
-  margin-top: 6px;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-
-.task-card-images {
-  align-items: flex-start;
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  position: relative;
-  width: max-content;
-}
-
-.task-card-image {
-  border: 1px solid #8b949e;
-  border-radius: 4px;
-  max-height: 96px;
-  width: auto;
-}
-
-.task-card-image-count {
-  align-items: center;
-  background: rgb(27 31 36 / 78%);
-  border-radius: 999px;
-  bottom: 6px;
-  color: #ffffff;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 1px 8px;
-  position: absolute;
-  right: 6px;
-}
-
 .task-card.dragging {
   border-color: #1f883d;
   box-shadow: 0 0 0 3px #b7e3c3;

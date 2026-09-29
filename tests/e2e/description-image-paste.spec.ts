@@ -70,6 +70,33 @@ async function pasteImage(page: Page, selector: string, base64: string): Promise
   await page.locator(selector).evaluate(dispatchPaste, base64);
 }
 
+function dispatchDrop(element: Element, payload: { encoded: string; name: string; type: string }): boolean {
+  const binary = atob(payload.encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  const file = new File([bytes], payload.name, { type: payload.type });
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+
+  const dragover = new Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperty(dragover, "dataTransfer", { value: transfer });
+  element.dispatchEvent(dragover);
+
+  const drop = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, "dataTransfer", { value: transfer });
+  element.dispatchEvent(drop);
+
+  return dragover.defaultPrevented;
+}
+
+async function dropImage(
+  page: Page,
+  selector: string,
+  payload: { encoded: string; name: string; type: string },
+): Promise<boolean> {
+  return page.locator(selector).evaluate(dispatchDrop, payload);
+}
+
 test("pasting an image into the task description editor saves and renders it", async ({ page }) => {
   await signIn(page);
   const taskId = await createTask(page, `E2E image ${Date.now()}`);
@@ -141,4 +168,49 @@ test("pasting an image into the idea modal saves and reloads it", async ({ page 
   } finally {
     await deleteIdea(page, ideaId);
   }
+});
+
+test("dropping a file with a hidden type into the task editor uploads and renders it", async ({ page }) => {
+  await signIn(page);
+  const taskId = await createTask(page, `E2E drop ${Date.now()}`);
+
+  try {
+    await page.goto(`/tasks/${taskId}?from=tasks`);
+    const editor = page.locator("[data-description-editor]");
+    const accepted = await dropImage(page, "[data-description-editor]", { encoded: PIXEL_PNG, name: "photo.png", type: "" });
+    expect(accepted).toBe(true);
+
+    const image = editor.locator("img.description-image");
+    await expect(image).toHaveCount(1);
+    await expect(image).toHaveAttribute("src", /^\/api\/images\//);
+
+    await page.getByRole("button", { name: "Save" }).click();
+    await page.waitForLoadState("networkidle");
+    await page.goto(`/tasks/${taskId}?from=tasks`);
+    await expect(page.locator("[data-description-editor] img.description-image")).toHaveCount(1);
+    await page.reload();
+    await expect(page.locator("[data-description-editor] img.description-image")).toHaveCount(1);
+  } finally {
+    await deleteTask(page, taskId);
+  }
+});
+
+test("dropping a file with a hidden type into the idea composer renders it on the card", async ({ page }) => {
+  await signIn(page);
+  const title = `E2E drop composer ${Date.now()}`;
+
+  await page.goto("/ideas");
+  await page.locator("[data-idea-composer-trigger]").click();
+  await page.locator(".ideas-composer__title").fill(title);
+  const accepted = await dropImage(page, ".ideas-composer__description", { encoded: PIXEL_PNG, name: "photo.png", type: "" });
+  expect(accepted).toBe(true);
+
+  const description = page.locator(".ideas-composer__description");
+  await expect(description).toHaveValue(/^\/api\/images\/[0-9A-Za-z_-]+$/);
+  await page.locator("[data-idea-composer-close]").click();
+
+  const card = page.locator(".idea-card").filter({ hasText: title });
+  await expect(card.locator("img.description-image")).toHaveCount(1);
+
+  await deleteIdea(page, (await card.getAttribute("data-idea-id")) ?? "");
 });
