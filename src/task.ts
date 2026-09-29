@@ -55,7 +55,7 @@ export type TaskVersionInput = {
 
 export const TASK_BULK_MAX_ITEMS = 50;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 

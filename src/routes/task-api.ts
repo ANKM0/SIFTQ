@@ -6,6 +6,7 @@ import {
   changeTaskWorking,
   createTask,
   err,
+  isRecord,
   isTaskArea,
   isTaskDescriptionValid,
   isTaskStatus,
@@ -27,10 +28,6 @@ function problem<T extends ApiEnv>(c: Context<T>, status: ContentfulStatusCode, 
 
 function bulkProblem<T extends ApiEnv>(c: Context<T>, code: string) {
   return problem(c, code === "NOT_FOUND" ? 404 : 409, code);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 async function readJsonRecord<T extends ApiEnv>(c: Context<T>): Promise<Record<string, unknown> | null> {

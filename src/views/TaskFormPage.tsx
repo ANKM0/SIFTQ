@@ -1,4 +1,4 @@
-import { splitDescription } from "../description";
+import { DescriptionContent } from "../components/DescriptionContent";
 import { TaskMeta } from "../components/TaskMeta";
 import { NewTaskMeta } from "../components/NewTaskMeta";
 import type { NewTaskState } from "../components/NewTaskMeta";
@@ -27,15 +27,7 @@ function DescriptionField({ children }: { children?: string }) {
           role="textbox"
           aria-multiline="true"
         >
-          {splitDescription(description).map((segment, index) =>
-            segment.href ? (
-              <a key={index} href={segment.href}>
-                {segment.text}
-              </a>
-            ) : (
-              segment.text
-            ),
-          )}
+          <DescriptionContent description={description} />
         </div>
       </label>
       <textarea name="description" data-description-value hidden>

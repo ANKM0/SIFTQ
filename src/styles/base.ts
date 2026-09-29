@@ -10,6 +10,13 @@ export const BASE_CSS = `
   box-sizing: border-box;
 }
 
+.description-image {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  border-radius: 4px;
+}
+
 body {
   margin: 0;
 }
