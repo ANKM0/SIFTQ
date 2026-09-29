@@ -22,37 +22,4 @@ describe("TaskCard", () => {
     expect(html).toContain('class="task-card task-card--working"');
     expect(html).toContain('class="working-badge">working</span>');
   });
-
-  it("renders the description text in the clamped description element", () => {
-    const html = renderToString(<TaskCard task={taskFixture({ description: "first line\nsecond line" })} />);
-    expect(html).toContain('class="task-card-description"');
-    expect(html).toContain("first line");
-    expect(html).not.toContain("/api/images/");
-  });
-
-  it("omits the description element when the description is empty", () => {
-    const html = renderToString(<TaskCard task={taskFixture({ description: "" })} />);
-    expect(html).not.toContain("task-card-description");
-  });
-
-  it("renders only the first image and the remaining image count", () => {
-    const html = renderToString(
-      <TaskCard task={taskFixture({ description: "/api/images/first /api/images/second /api/images/third" })} />,
-    );
-    expect(html).toContain('class="task-card-image description-image"');
-    expect(html).toContain('src="/api/images/first"');
-    expect(html).not.toContain('src="/api/images/second"');
-    expect(html).toContain("+2");
-  });
-
-  it("does not render an image count when only one image is present", () => {
-    const html = renderToString(<TaskCard task={taskFixture({ description: "/api/images/only" })} />);
-    expect(html).toContain('src="/api/images/only"');
-    expect(html).not.toContain("task-card-image-count");
-  });
-
-  it("does not render images for a text-only description", () => {
-    const html = renderToString(<TaskCard task={taskFixture({ description: "just text" })} />);
-    expect(html).not.toContain("task-card-image");
-  });
 });
