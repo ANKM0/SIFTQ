@@ -1,0 +1,82 @@
+{
+  "tasks_list": { "errors": [{ "status": 500 }] },
+  "tasks_get": { "errors": [{ "status": 404, "code": "NOT_FOUND" }, { "status": 500 }] },
+  "tasks_create": { "errors": [{ "status": 400, "code": "INVALID_TITLE" }, { "status": 500 }] },
+  "tasks_patch": {
+    "errors": [
+      { "status": 400, "code": "INVALID_TITLE" },
+      { "status": 400, "code": "INVALID_DESCRIPTION" },
+      { "status": 400, "code": "INVALID_STATUS" },
+      { "status": 400, "code": "INVALID_AREA" },
+      { "status": 400, "code": "INVALID_WORKING" },
+      { "status": 400, "code": "INVALID_ORDER" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "tasks_delete": {
+    "errors": [
+      { "status": 400, "code": "INVALID_ORDER" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "tasks_bulk_status": {
+    "errors": [
+      { "status": 400, "code": "INVALID_BULK_INPUT" },
+      { "status": 400, "code": "INVALID_STATUS" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "tasks_bulk_delete": {
+    "errors": [
+      { "status": 400, "code": "INVALID_BULK_INPUT" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "tasks_reorder": { "errors": [{ "status": 400, "code": "INVALID_ORDER" }, { "status": 409, "code": "CONFLICT" }] },
+  "ideas_list": { "errors": [{ "status": 500 }] },
+  "ideas_create": {
+    "errors": [
+      { "status": 400, "code": "INVALID_INPUT" },
+      { "status": 400, "code": "INVALID_TITLE" },
+      { "status": 400, "code": "INVALID_DESCRIPTION" }
+    ]
+  },
+  "ideas_patch": {
+    "errors": [
+      { "status": 400, "code": "INVALID_INPUT" },
+      { "status": 400, "code": "INVALID_ORDER" },
+      { "status": 400, "code": "INVALID_TITLE" },
+      { "status": 400, "code": "INVALID_DESCRIPTION" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "ideas_delete": { "errors": [{ "status": 404, "code": "NOT_FOUND" }, { "status": 409, "code": "CONFLICT" }] },
+  "ideas_reorder": {
+    "errors": [
+      { "status": 400, "code": "INVALID_INPUT" },
+      { "status": 400, "code": "INVALID_ORDER" },
+      { "status": 404, "code": "NOT_FOUND" },
+      { "status": 409, "code": "CONFLICT" }
+    ]
+  },
+  "images_create": {
+    "errors": [
+      { "status": 400, "code": "INVALID_IMAGE" },
+      { "status": 400, "code": "UNSUPPORTED_IMAGE" },
+      { "status": 400, "code": "IMAGE_TOO_LARGE" },
+      { "status": 500 }
+    ]
+  },
+  "images_get": { "errors": [{ "status": 404, "code": "NOT_FOUND" }, { "status": 500 }] },
+  "html_login": { "errors": [{ "status": 401 }, { "status": 503 }] },
+  "html_tasks_create": { "errors": [{ "status": 400 }, { "status": 500 }] },
+  "html_tasks_update": { "errors": [{ "status": 400 }, { "status": 409 }] },
+  "html_tasks_status": { "errors": [{ "status": 400 }, { "status": 404 }, { "status": 409 }] },
+  "html_tasks_area": { "errors": [{ "status": 400 }, { "status": 404 }, { "status": 409 }] },
+  "html_tasks_working": { "errors": [{ "status": 400 }, { "status": 404 }, { "status": 409 }] }
+}

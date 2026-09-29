@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 import { runAdapters } from "./adapters.ts";
 import { check } from "./check.ts";
 import { loadConfig, resolveConfigPath, type ResolvedConfig, type View } from "./config.ts";
+import { checkAuto, readAuto, runExtractors, writeAuto } from "./extract.ts";
+import { graphData, type GraphDecoration } from "./graph.ts";
+import { loadPresentation, mergeModel, writeModel } from "./merge.ts";
 import type { Model } from "./model.ts";
 import { patchSvgDimensions } from "./patch-svg.ts";
 import { renderD2 } from "./render.ts";
@@ -27,13 +30,45 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function hasFlag(args: string[], name: string): boolean {
+  return args.includes(name);
+}
+
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+// Build the model from the code-derived auto graph + the manual presentation.
+function syncModel(config: ResolvedConfig, checkOnly: boolean): void {
+  const configured = config.extractors.length > 0 || existsSync(resolveConfigPath(config, config.presentation)) || existsSync(resolveConfigPath(config, config.auto));
+  if (!configured) return;
+
+  let auto = readAuto(config) ?? {};
+  if (config.extractors.length > 0) {
+    auto = runExtractors(config);
+    if (checkOnly) checkAuto(config, auto);
+    else writeAuto(config, auto);
+  }
+
+  const model = mergeModel(auto, loadPresentation(config));
+  if (checkOnly) {
+    const path = resolveConfigPath(config, config.model);
+    const current = existsSync(path) ? readJson(path) : undefined;
+    if (JSON.stringify(current) !== JSON.stringify(model)) {
+      console.error(`${config.model} is stale; run the sync command`);
+      process.exit(1);
+    }
+    return;
+  }
+  console.log(`wrote ${writeModel(config, model)}`);
+}
+
 function writeViewer(config: ResolvedConfig): string {
-  const views: Record<string, { label: string; src: string }> = {};
-  for (const view of config.views) views[view.key] = { label: view.label, src: `${view.key}.svg` };
+  const views: Record<string, { label: string; src: string; type: string }> = {};
+  for (const view of config.views) {
+    const type = view.kind === "graph" ? "graph" : "image";
+    views[view.key] = { label: view.label, src: `${view.key}.${type === "graph" ? "json" : "svg"}`, type };
+  }
   const template = readFileSync(new URL("./viewer/template.html", import.meta.url), "utf8");
   const html = template
     .replace("__TITLE__", config.title)
@@ -68,11 +103,21 @@ async function generate(config: ResolvedConfig): Promise<void> {
 
   const outDir = resolveConfigPath(config, config.outDir);
   mkdirSync(outDir, { recursive: true });
+  const presentation = loadPresentation(config);
+  const decoration = (presentation as { graph?: GraphDecoration }).graph;
   for (const view of config.views) {
+    if (view.kind === "graph") {
+      writeFileSync(join(outDir, `${view.key}.json`), `${JSON.stringify(graphData(model, decoration), null, 2)}\n`);
+      console.log(`wrote ${view.key}.json`);
+      continue;
+    }
     if (view.kind === "static") continue;
     const d2 = renderD2(model, view.kind, { typeMap: config.typeMap, i18n: config.i18n });
     writeFileSync(join(outDir, `${view.key}.d2`), d2);
     console.log(`wrote ${view.key}.d2`);
+  }
+  if (config.views.some((view) => view.kind === "graph")) {
+    copyFileSync(new URL("./viewer/vis-network.min.js", import.meta.url), join(outDir, "vis-network.min.js"));
   }
   console.log(`wrote ${writeViewer(config)}`);
 }
@@ -95,6 +140,7 @@ function compileD2(config: ResolvedConfig, view: View, input: string): void {
 function compile(config: ResolvedConfig): void {
   const outDir = resolveConfigPath(config, config.outDir);
   for (const view of config.views) {
+    if (view.kind === "graph") continue;
     if (view.kind === "static") {
       if (view.source !== undefined) compileD2(config, view, resolveConfigPath(config, view.source));
       continue;
@@ -138,10 +184,15 @@ async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
   switch (command) {
     case "generate":
+      syncModel(requireConfig(args), false);
       await generate(requireConfig(args));
+      return;
+    case "sync":
+      syncModel(requireConfig(args), hasFlag(args, "--check"));
       return;
     case "build": {
       const config = requireConfig(args);
+      syncModel(config, hasFlag(args, "--check"));
       await generate(config);
       compile(config);
       patch(config);
@@ -164,7 +215,7 @@ async function main(argv: string[]): Promise<void> {
       return;
     }
     default:
-      console.error("usage: blueprint <generate|build|patch|serve|init> [--config <path>]");
+      console.error("usage: blueprint <generate|sync|build|patch|serve|init> [--config <path>] [--check]");
       process.exit(2);
   }
 }

@@ -14,6 +14,11 @@ export type BlueprintConfig = {
   api: { pathPrefix?: string; crudVerbs?: string[] };
   i18n: Partial<I18n>;
   adapters: string[];
+  // Code-driven pipeline: extractors produce the auto graph, which is merged with the
+  // manual presentation to build the model that the views render.
+  extractors: string[];
+  auto: string;
+  presentation: string;
 };
 
 export type ResolvedConfig = BlueprintConfig & { configDir: string; configPath: string };
@@ -39,6 +44,9 @@ export function loadConfig(configPath: string): ResolvedConfig {
     api: raw.api ?? {},
     i18n: raw.i18n ?? {},
     adapters: raw.adapters ?? [],
+    extractors: raw.extractors ?? [],
+    auto: raw.auto ?? "generated/graph.auto.json",
+    presentation: raw.presentation ?? "presentation.json",
     configDir: dirname(absolute),
     configPath: absolute,
   };

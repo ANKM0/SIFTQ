@@ -47,7 +47,7 @@
 | [ADR 0041: Git の untracked ファイルを deny-by-default の path allowlist で管理する](0041-adopt-git-path-allowlist.md) | Accepted. | Git の untracked ファイルは path allowlist で明示的に許可し、生成物・作業状態・秘密情報は既定で拒否する。 |
 | [ADR 0042: タスク編集draftをブラウザlocalStorageに保存する](0042-adopt-local-storage-task-edit-drafts.md) | Superseded by ADR 0050. | 未保存のtitle / descriptionはブラウザのlocalStorageに一時draftとして保存し、D1はtaskの正本として維持していた。 |
 | [ADR 0043: taqt loop を単一構造へ変更する](0043-unify-taqt-loop-execution-policy.md) | Partially superseded by ADR 0067. | taqt loop を `implement → verification → checker` の単一構造に統一し、limit 検知は human へエスカレーションする。 |
-| [ADR 0044: Adopt single-source domain model JSON with generated diagrams](0044-adopt-single-source-domain-model-json.md) | Accepted. | ドメイン/データモデルの正本を `domain-model.json` に一本化し、D2 で図を生成する。`concept.d2` は廃止。 |
+| [ADR 0044: Adopt single-source domain model JSON with generated diagrams](0044-adopt-single-source-domain-model-json.md) | Partially superseded by ADR 0070. | ドメイン/データモデルの正本を `domain-model.json` に一本化し、D2 で図を生成する。`concept.d2` は廃止。 |
 | [ADR 0045: Place logical-to-physical mapping in the generator](0045-place-logical-to-physical-mapping-in-generator.md) | Accepted. | 論理→物理の mapping は生成器のコードに置き、`migrations` を物理の正本として一致検証する。 |
 | [ADR 0046: Track invariants with domain.md IDs and test names](0046-track-invariants-with-domain-md-ids-and-tests.md) | Accepted. | 不変条件は `domain.md` の `INV-TM-xxx` を正本とし、JSON は参照、テスト名に対応づけて検証する。 |
 | [ADR 0047: Manage release version with git tags](0047-manage-release-version-with-git-tags.md) | Accepted. | バージョンの正本を git タグとし、`package.json` の `version` を削除する。リリースは release commit を作らず SHA にタグする。 |
@@ -73,6 +73,7 @@
 | [ADR 0067: design step と design_notes を廃止する](0067-remove-design-step-and-design-notes.md) | Accepted. | design step と design_notes を廃止し、design artifact の生成と表示を削除する。 |
 | [ADR 0068: taqt loop の簡略化と検証・再試行方針を定める](0068-simplify-taqt-loop-and-verification-policy.md) | Accepted. | checker / post_review を廃止し、e2e 粒度・一時失敗の再試行・工程別モデル・検証対象の選択と並列実行を定める。 |
 | [ADR 0069: セッションを age で暗号化して公開リポジトリへバックアップする](0069-encrypt-session-backup-with-age.md) | Accepted. | セッションを zstd + age で暗号化して公開リポジトリへ保存し、秘密鍵はリポジトリ外に置いて手動のバックアップ・復元タスクを用意する。 |
+| [ADR 0070: ドメインモデルをコード由来の自動グラフと表現層から生成する](0070-generate-domain-model-from-code-graph-and-presentation.md) | Accepted. | ドメインモデルをコードから抽出する自動部分と人が編集する表現部分に分け、マージ結果を正本として生成する。 |
 
 ## 検証待ち
 

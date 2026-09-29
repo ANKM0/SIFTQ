@@ -5,7 +5,7 @@ description: Change the SIFTQ domain and data model. Use when adding or changing
 
 # Domain Model
 
-ドメイン / データモデルの変更手順。技術・設計方針は ADR、ドメインの決定と不変条件は `domain.md` が正本。`domain-model.json` が唯一の編集可能ソースで、生成物は手編集しない。
+ドメイン / データモデルの変更手順。技術・設計方針は ADR、ドメインの決定と不変条件は `domain.md` が正本。手で編集するのは `presentation.json`（表現・業務フロー）と `api-meta.json`（api のエラー）。`domain-model.json` は `presentation.json` とコードから抽出した `graph.auto.json` をマージした生成物で、手編集しない。
 
 ## Flow
 
@@ -18,8 +18,9 @@ description: Change the SIFTQ domain and data model. Use when adding or changing
 ### 2. JSON（論理データモデル）
 
 - `domain-model.schema.json` を先に更新する（探索中は `additionalProperties` を緩めてよい）。
-- `domain-model.json` を更新する（`domains` / `entities` / `relations` / `transitions` / `rules` / `flows` / `screens` / `navigation`）。`db` は持たず論理型は `domains`、論理 → 物理 mapping は生成器のコード。
-- `task docs:domain:svg` で検証 → `logical` / `physical` / `flow` / `nav` を生成し、`task docs:domain:viewer` で preview HTML を確認する。
+- `presentation.json` を更新する（`domains` / `entities` / `relations` / `flows` / `screens` / `navigation`）。
+- `api` はコードのルートから自動抽出する。`api-meta.json` にエラーなどコードから導けない情報を置く。抽出器は `scripts/domain-model/extract.ts`。
+- `task docs:domain:svg` で同期・検証 → `logical` / `physical` / `flow` / `nav` / `api` / `api-graph` を生成し、`task docs:domain:viewer` で preview HTML を確認する。`api-graph` は対話的な API グラフ（要 serve）。
 
 ### 3. 物理実装
 
@@ -31,3 +32,4 @@ description: Change the SIFTQ domain and data model. Use when adding or changing
 ## 完了条件
 
 - `task docs:domain:svg` / `ci:domain` が error 0。warning は未参照 entity のみ許容する。
+- `ci:domain` の sync 検査が差分 0（コードとモデルが同期している）。

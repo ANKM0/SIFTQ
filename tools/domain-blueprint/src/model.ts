@@ -18,6 +18,7 @@ export type Step = {
 export type Flow = { name: string; actor?: string; steps: Step[] };
 export type Screen = { name: string; entities: string[]; onLoad?: string; references?: string[]; actions?: string[] };
 export type NavigationItem = { from: string; on: string; to: string; call?: string };
+export type ScreenCall = { screen: string; trigger: "GET" | "POST"; view: string; gateway: string; api: string };
 export type ApiError = { status: number; code?: string };
 export type ApiOperation = {
   kind: string;
@@ -25,8 +26,27 @@ export type ApiOperation = {
   path: string;
   operation: string;
   entity?: string;
+  entities?: string[];
+  references?: string[];
+  consumer?: string;
+  external?: boolean;
   success: number;
   errors?: ApiError[];
+};
+export type PersistedColumn = {
+  attribute: string;
+  type: string;
+  logicalType: string;
+  nullable: boolean;
+  primaryKey: boolean;
+  unique: boolean;
+  references?: string;
+  onDelete?: string;
+};
+export type Persistence = {
+  source: string;
+  alembicHead?: string;
+  tables: Record<string, { name: string; columns: Record<string, PersistedColumn>; uniqueGroups?: string[][] }>;
 };
 export type Model = {
   domains: Record<string, Domain>;
@@ -35,7 +55,9 @@ export type Model = {
   flows?: Record<string, Flow>;
   screens?: Record<string, Screen>;
   navigation?: NavigationItem[];
+  screenCalls?: ScreenCall[];
   api?: Record<string, ApiOperation>;
+  persistence?: Persistence;
 };
 
 export type ValidateFn = (model: unknown, schema: object) => string[];

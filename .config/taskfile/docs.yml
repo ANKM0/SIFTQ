@@ -2,12 +2,12 @@ version: "3"
 
 tasks:
   domain:svg:
-    desc: Validate the domain model and generate its diagrams (domain / logical / physical / flow / nav / api call map).
+    desc: Validate the domain model and generate its diagrams (domain / logical / physical / flow / nav / api call map / api graph).
     cmds:
       - bun tools/domain-blueprint/src/cli.ts build --config .config/domain-blueprint.json
 
   domain:viewer:
-    desc: Generate the domain diagrams and report the viewer entry point.
+    desc: Generate the domain diagrams and serve the viewer locally.
     cmds:
       - task: domain:svg
-      - echo "Open docs/requirements/assets/domain-model/generated/viewer.html"
+      - bun tools/domain-blueprint/src/cli.ts serve --config .config/domain-blueprint.json
