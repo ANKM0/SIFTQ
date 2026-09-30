@@ -49,6 +49,14 @@ CI e2e（run `36707506856`、**キャッシュ cold**）:
 - **wall はテスト 1/4 にはならない**。shard 1 の内訳: setup 約 18s（`bun install` 3.9s＋`playwright install`/migration 11.2s）＋ test 19.1s。この run は node_modules と Playwright のキャッシュが両方 miss した cold 実行。
 - `ci:test:e2e:setup` は cache-aware（`node_modules/.bun-lock-hash` 一致で `bun install` スキップ、Chromium バイナリ有無で `playwright install` スキップ）。warm では setup が数秒まで落ちる。
 
+CI e2e（run `36709763780`、**キャッシュ warm**、setup スキップ有効）:
+
+- job: 1m12s / 41s / 49s / 50s（wall は最大 shard）
+- test: 38.6s / 12.7s / 20.0s / 19.3s
+- cache-aware setup は機能（ログに "Frontend dependencies already up to date." / "Playwright Chromium already installed."）。shard 1 の test 38.6s は cold run の同条件 19.1s に対し外れ値で、同時実行ジョブの競合による変動が大きい。
+- まとめ: setup 固定費は削減できたが、**wall の支配要因は runner のばらつきと shard 間の duration 不均衡**。さらなる安定化にはテスト duration ベースの配分（shard 数調整）か、重い spec の `workers>1` 化（データ分離）が要る。
+
+
 
 ## 使い方
 
