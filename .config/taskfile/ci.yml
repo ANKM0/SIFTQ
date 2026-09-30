@@ -25,6 +25,7 @@ tasks:
       - task: ci:docs
       - task: ci:domain
       - task: ci:typecheck
+      - task: ci:e2e:checks
       - task: ci:test
       - task: ci:build
       - task: ci:duplicate
@@ -54,6 +55,7 @@ tasks:
       - ci:docs
       - ci:domain
       - ci:typecheck
+      - ci:e2e:checks
       - ci:test:unit
 
   ci:extended:
@@ -219,9 +221,9 @@ tasks:
       - vp lint .
 
   ci:lint:python:
-    desc: Run ruff on scripts/ci with the safe pyflakes rule set.
+    desc: Run ruff on scripts/ci and scripts/e2e with the safe pyflakes rule set.
     cmds:
-      - uv run ruff check scripts/ci --select E4,E7,E9,F
+      - uv run ruff check scripts/ci scripts/e2e --select E4,E7,E9,F
 
   ci:test:
     desc: Run Vitest and Playwright E2E.
@@ -249,8 +251,19 @@ tasks:
         fi
         vp test run --changed --passWithNoTests
 
+  ci:e2e:checks:
+    desc: Enforce E2E conventions and test the E2E tooling.
+    cmds:
+      - uv run python scripts/ci/check_e2e_conventions.py
+      - uv run python -m pytest .taqt/tests/test_check_e2e_conventions.py .taqt/tests/test_e2e_report.py .taqt/tests/test_e2e_budget.py
+
+  ci:e2e:budget:
+    desc: Check the measured E2E duration against the budget ratchet.
+    cmds:
+      - uv run python scripts/ci/check_e2e_budget.py --budget-file eval/e2e-budget.json --report-file tmp/e2e/report.json
+
   ci:test:e2e:
-    desc: Run Playwright E2E.
+    desc: Run Playwright E2E (pass --shard=i/N to shard).
     cmds:
       - task: ci:test:e2e:setup
       - |
@@ -258,13 +271,30 @@ tasks:
           echo "Skipping Playwright E2E: setup did not complete."
           exit 0
         fi
-        vp run test:e2e
+        vp exec playwright test -c .config/playwright.config.ts --pass-with-no-tests {{.CLI_ARGS}}
+
+  ci:test:e2e:measure:
+    desc: Run Playwright E2E with a JSON report and print timing.
+    cmds:
+      - task: ci:test:e2e:setup
+      - |
+        if [ ! -f tmp/.e2e-ready ]; then
+          echo "Skipping Playwright E2E measurement: setup did not complete."
+          exit 0
+        fi
+        mkdir -p tmp/e2e
+        status=0
+        PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/tmp/e2e/report.json" \
+          vp exec playwright test -c .config/playwright.config.ts --pass-with-no-tests --reporter=json \
+          || status=$?
+        uv run python scripts/e2e/summarize.py tmp/e2e/report.json || true
+        exit "$status"
 
   ci:test:e2e:setup:
-    desc: Install Playwright browsers and apply local D1 migrations.
+    desc: Prepare cached dependencies, the Playwright browser, and local D1 for E2E.
     cmds:
-      - task: setup:frontend:ci
       - |
+        set -eu
         marker="tmp/.e2e-ready"
         mkdir -p "$(dirname "$marker")"
         rm -f "$marker"
@@ -276,8 +306,22 @@ tasks:
           echo "Skipping Playwright E2E: no test files found."
           exit 0
         fi
-        vp exec playwright install --only-shell chromium
-        set -eu
+
+        lock_hash="$(sha256sum bun.lock | awk '{ print $1 }')"
+        if [ -f node_modules/.bun-lock-hash ] && [ "$(cat node_modules/.bun-lock-hash)" = "$lock_hash" ]; then
+          echo "Frontend dependencies already up to date."
+        else
+          bun install --frozen-lockfile
+          mkdir -p node_modules
+          printf '%s' "$lock_hash" > node_modules/.bun-lock-hash
+        fi
+
+        if find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f -print -quit 2>/dev/null | grep -q .; then
+          echo "Playwright Chromium already installed."
+        else
+          vp exec playwright install --only-shell chromium
+        fi
+
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
           echo "Playwright Chromium executable was not installed into ${PLAYWRIGHT_BROWSERS_PATH}." >&2

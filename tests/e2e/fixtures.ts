@@ -8,6 +8,8 @@ const HTMX_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
 
 const cachePath = fileURLToPath(new URL("../../tmp/e2e-htmx.min.js", import.meta.url));
 
+export const authStatePath = fileURLToPath(new URL("../../tmp/e2e/auth.json", import.meta.url));
+
 let htmxSource: Promise<string> | undefined;
 
 async function loadHtmx(): Promise<string> {

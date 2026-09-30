@@ -1,14 +1,10 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
-const password = atob("dGVzdC1wYXNzd29yZA==");
-
 const MAX_HEIGHT_PX = 672;
 
 async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.goto("/ideas");
   await expect(page).toHaveURL(/\/ideas$/);
 }
 

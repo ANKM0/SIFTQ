@@ -1,0 +1,48 @@
+name: E2E Nightly
+
+on:
+  schedule:
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_CACHE_DIR: /tmp/uv-cache
+
+jobs:
+  e2e-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
+        with:
+          playwright: "true"
+
+      - name: Measure E2E duration
+        run: task -t .config/Taskfile.yml ci:test:e2e:measure
+
+      - name: Check E2E budget
+        run: task -t .config/Taskfile.yml ci:e2e:budget
+
+  e2e-flaky:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up CI tools
+        uses: ./.github/actions/setup-ci
+        with:
+          playwright: "true"
+
+      - name: Repeat E2E to detect flakiness
+        run: task -t .config/Taskfile.yml ci:test:e2e -- --repeat-each=3

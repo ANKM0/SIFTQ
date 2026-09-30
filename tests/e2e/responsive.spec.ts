@@ -1,11 +1,8 @@
 import { expect, installHtmxRoute, test } from "./fixtures";
 
-const password = atob("dGVzdC1wYXNzd29yZA==");
-
 async function signIn(page: import("@playwright/test").Page) {
-  await page.goto("/login");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.goto("/ideas");
+  await expect(page).toHaveURL(/\/ideas$/);
 }
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
