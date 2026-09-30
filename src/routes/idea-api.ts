@@ -1,11 +1,13 @@
 import type { Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { err, ok } from "../task";
 import {
+  applyIdeaPatch,
   isIdeaDescriptionValid,
   isIdeaRecord,
   isIdeaOrderValid,
   isIdeaTitleValid,
+  nextIdeaOrder,
+  parseIdeaPatch,
   type Idea,
 } from "../idea";
 import type { AppEnv } from "../app-env";
@@ -45,17 +47,6 @@ async function findIdea(c: Context<AppEnv>, repository: Repository, id: string):
   return result.value === undefined ? { ok: false, error: { code: "NOT_FOUND" } } : { ok: true, value: result.value };
 }
 
-function patchIdea(body: Record<string, unknown>, idea: Idea) {
-  const title = typeof body["title"] === "string" ? body["title"].trim() : idea.title;
-  const description = typeof body["description"] === "string" ? body["description"] : idea.description;
-  const pinned = typeof body["pinned"] === "boolean" ? body["pinned"] : idea.pinned;
-  const order = body["order"] === undefined ? idea.order : readOrder(body["order"]);
-  if (order === null) return err<Idea, { code: "INVALID_ORDER" }>({ code: "INVALID_ORDER" });
-  if (!isIdeaTitleValid(title)) return err<Idea, { code: "INVALID_TITLE" }>({ code: "INVALID_TITLE" });
-  if (!isIdeaDescriptionValid(description)) return err<Idea, { code: "INVALID_DESCRIPTION" }>({ code: "INVALID_DESCRIPTION" });
-  return ok<Idea, never>({ ...idea, title, description, pinned, order });
-}
-
 export function registerIdeaApiRoutes(app: Hono<AppEnv>, repository: Repository) {
   app.get("/api/ideas", async (c) => {
     const result = await repository(c).list(OWNER_ID);
@@ -73,9 +64,7 @@ export function registerIdeaApiRoutes(app: Hono<AppEnv>, repository: Repository)
     const current = await repository(c).list(OWNER_ID);
     if (!current.ok) return problem(c, 500, current.error.code);
     const pinned = body["pinned"] === true;
-    const order = current.value
-      .filter((idea) => idea.pinned === pinned)
-      .reduce((maximum, idea) => Math.max(maximum, idea.order), 0) + 1;
+    const order = nextIdeaOrder(current.value, pinned);
     const idea: Idea = { id: crypto.randomUUID(), owner_id: OWNER_ID, title, description, order, pinned };
     const inserted = await repository(c).insert(idea);
     if (!inserted.ok) return problem(c, errorStatus(inserted.error.code), inserted.error.code);
@@ -103,9 +92,9 @@ export function registerIdeaApiRoutes(app: Hono<AppEnv>, repository: Repository)
     if (body === null) return problem(c, 400, "INVALID_INPUT");
     const found = await findIdea(c, repository, c.req.param("id"));
     if (!found.ok) return problem(c, errorStatus(found.error.code), found.error.code);
-    const patched = patchIdea(body, found.value);
-    if (!patched.ok) return problem(c, 400, patched.error.code);
-    const updated = await repository(c).update(patched.value);
+    const parsed = parseIdeaPatch(body);
+    if (!parsed.ok) return problem(c, errorStatus(parsed.error.code), parsed.error.code);
+    const updated = await repository(c).update(applyIdeaPatch(found.value, parsed.value));
     if (!updated.ok) return problem(c, errorStatus(updated.error.code), updated.error.code);
     return c.json(updated.value);
   });

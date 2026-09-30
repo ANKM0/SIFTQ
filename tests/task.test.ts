@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   TASK_TITLE_MAX_CODE_POINTS,
   TASK_DESCRIPTION_MAX_CODE_POINTS,
+  applyTaskPatch,
   changeTaskArea,
   changeTaskStatus,
   changeTaskWorking,
@@ -13,7 +14,9 @@ import {
   isTaskTitleValid,
   isTaskDescriptionValid,
   moveTask,
+  parseTaskPatch,
   parseTaskVersionInputs,
+  selectMovedTasks,
   titleCodePointLength,
 } from "../src/task";
 import {
@@ -242,6 +245,57 @@ describe("task move", () => {
 
     expect(moveTask(tasks, "missing", 1, 0).ok).toBe(false);
     expect(moveTask(tasks, "task-1", 1, -1).ok).toBe(false);
+  });
+});
+
+describe("task patch", () => {
+  it("parses provided fields and trims the title", () => {
+    expect(parseTaskPatch({ title: "  Buy milk  ", status: "done" })).toEqual({
+      ok: true,
+      value: { title: "Buy milk", status: "done" },
+    });
+  });
+
+  it("rejects invalid enum and working values", () => {
+    expect(parseTaskPatch({ status: "unknown" })).toEqual({
+      ok: false,
+      error: { code: "INVALID_STATUS" },
+    });
+    expect(parseTaskPatch({ area: 5 })).toEqual({ ok: false, error: { code: "INVALID_AREA" } });
+    expect(parseTaskPatch({ working: "yes" })).toEqual({
+      ok: false,
+      error: { code: "INVALID_WORKING" },
+    });
+  });
+
+  it("ignores non-string title and description values", () => {
+    expect(parseTaskPatch({ title: 1, description: null })).toEqual({ ok: true, value: {} });
+  });
+
+  it("applies a patch without touching other fields", () => {
+    const task = taskFixture({ id: "task-1", title: "before", status: "do", area: 1 });
+
+    expect(applyTaskPatch(task, { status: "done", area: 3 })).toMatchObject({
+      id: "task-1",
+      title: "before",
+      status: "done",
+      area: 3,
+    });
+  });
+});
+
+describe("selectMovedTasks", () => {
+  it("returns only tasks whose area or order changed", () => {
+    const before = [
+      taskFixture({ id: "a", area: 1, order: 0 }),
+      taskFixture({ id: "b", area: 1, order: 1 }),
+    ];
+    const after = [
+      taskFixture({ id: "a", area: 2, order: 0 }),
+      taskFixture({ id: "b", area: 1, order: 1 }),
+    ];
+
+    expect(selectMovedTasks(before, after).map((task) => task.id)).toEqual(["a"]);
   });
 });
 

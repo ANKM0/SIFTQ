@@ -7,7 +7,7 @@ from checker import repository_root, source_files
 
 ALLOWLIST_PATH = "scripts/ci/architecture_allowlist.json"
 ALLOWED_EXTERNAL = {"hono", "@cloudflare/workers-types"}
-DOMAIN_PATH = "src/task.ts"
+DOMAIN_PATHS = {"src/task.ts", "src/idea.ts"}
 REPOSITORY_ADAPTER_PATHS = {
     "src/task-repository.ts",
     "src/preview/MemoryTaskRepository.ts",
@@ -45,16 +45,16 @@ def package_name(specifier: str) -> str:
 
 
 def find_domain_violations(text: str, relative_path: str) -> list[str]:
-    if relative_path not in {DOMAIN_PATH, *REPOSITORY_ADAPTER_PATHS}:
+    if relative_path not in DOMAIN_PATHS | REPOSITORY_ADAPTER_PATHS:
         return []
 
+    is_domain = relative_path in DOMAIN_PATHS
     violations: list[str] = []
     for index, line in enumerate(text.splitlines(), start=1):
-        if relative_path == DOMAIN_PATH and DOMAIN_CLASS_RE.search(line):
-            violations.append(f"{relative_path}:{index}: domain class usage")
-        if relative_path in REPOSITORY_ADAPTER_PATHS and DOMAIN_CLASS_RE.search(line):
-            violations.append(f"{relative_path}:{index}: repository adapter class usage")
-        if relative_path != DOMAIN_PATH:
+        if DOMAIN_CLASS_RE.search(line):
+            label = "domain class usage" if is_domain else "repository adapter class usage"
+            violations.append(f"{relative_path}:{index}: {label}")
+        if not is_domain:
             continue
         for name, pattern in DOMAIN_SIDE_EFFECT_APIS:
             if pattern.search(line):
@@ -79,7 +79,7 @@ def find_violations(
                     )
                 continue
             package = package_name(specifier)
-            if relative_path == DOMAIN_PATH and package in DOMAIN_SIDE_EFFECT_IMPORTS:
+            if relative_path in DOMAIN_PATHS and package in DOMAIN_SIDE_EFFECT_IMPORTS:
                 violations.append(
                     f"{relative_path}:{index}: domain side-effect import ({specifier})"
                 )
