@@ -172,6 +172,54 @@ export function changeTaskWorking(task: Task, working: boolean): Result<Task, Do
   return ok({ ...task, working });
 }
 
+export type TaskPatch = {
+  title?: string;
+  description?: string;
+  status?: TaskStatus;
+  area?: TaskArea;
+  working?: boolean;
+};
+
+export function parseTaskPatch(body: Record<string, unknown>): Result<TaskPatch, DomainError> {
+  const patch: TaskPatch = {};
+
+  if (typeof body["title"] === "string") {
+    const title = body["title"].trim();
+    if (!isTaskTitleValid(title)) return err({ code: "INVALID_TITLE" });
+    patch.title = title;
+  }
+  if (typeof body["description"] === "string") {
+    if (!isTaskDescriptionValid(body["description"])) return err({ code: "INVALID_DESCRIPTION" });
+    patch.description = body["description"];
+  }
+  if ("status" in body) {
+    if (!isTaskStatus(body["status"])) return err({ code: "INVALID_STATUS" });
+    patch.status = body["status"];
+  }
+  if ("area" in body) {
+    if (!isTaskArea(body["area"])) return err({ code: "INVALID_AREA" });
+    patch.area = body["area"];
+  }
+  if ("working" in body) {
+    if (typeof body["working"] !== "boolean") return err({ code: "INVALID_WORKING" });
+    patch.working = body["working"];
+  }
+
+  return ok(patch);
+}
+
+export function applyTaskPatch(task: Task, patch: TaskPatch): Task {
+  return { ...task, ...patch };
+}
+
+export function selectMovedTasks(before: readonly Task[], after: readonly Task[]): Task[] {
+  const previous = new Map(before.map((task) => [task.id, task]));
+  return after.filter((task) => {
+    const origin = previous.get(task.id);
+    return origin !== undefined && (origin.area !== task.area || origin.order !== task.order);
+  });
+}
+
 export function moveTask(
   tasks: readonly Task[],
   id: string,

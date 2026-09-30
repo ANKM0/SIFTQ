@@ -1,19 +1,16 @@
 import type { Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
-  changeTaskArea,
-  changeTaskStatus,
-  changeTaskWorking,
+  applyTaskPatch,
   createTask,
-  err,
   isRecord,
   isTaskArea,
-  isTaskDescriptionValid,
   isTaskStatus,
-  isTaskTitleValid,
   moveTask,
   ok,
+  parseTaskPatch,
   parseTaskVersionInputs,
+  selectMovedTasks,
 } from "../task";
 import type { DomainError, Result, Task } from "../task";
 import type { TaskRepository } from "../repository/task-repository";
@@ -69,40 +66,8 @@ async function findApiTask<T extends ApiEnv>(repository: Repository<T>, c: Conte
 }
 
 function applyPatch(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  const withTitle = applyTitleAndDescription(body, task);
-  if (!withTitle.ok) return withTitle;
-  const withStatus = applyStatus(body, withTitle.value);
-  if (!withStatus.ok) return withStatus;
-  const withArea = applyArea(body, withStatus.value);
-  if (!withArea.ok) return withArea;
-  return applyWorking(body, withArea.value);
-}
-
-function applyTitleAndDescription(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (typeof body["title"] !== "string" && typeof body["description"] !== "string") return ok(task);
-  const title = typeof body["title"] === "string" ? body["title"].trim() : task.title;
-  const description = typeof body["description"] === "string" ? body["description"] : task.description;
-  if (!isTaskTitleValid(title)) return err({ code: "INVALID_TITLE" });
-  if (!isTaskDescriptionValid(description)) return err({ code: "INVALID_DESCRIPTION" });
-  return ok({ ...task, title, description });
-}
-
-function applyStatus(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("status" in body)) return ok(task);
-  if (!isTaskStatus(body["status"])) return err({ code: "INVALID_STATUS" });
-  return changeTaskStatus(task, body["status"]);
-}
-
-function applyArea(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("area" in body)) return ok(task);
-  if (!isTaskArea(body["area"])) return err({ code: "INVALID_AREA" });
-  return changeTaskArea(task, body["area"]);
-}
-
-function applyWorking(body: Record<string, unknown>, task: Task): Result<Task, DomainError> {
-  if (!("working" in body)) return ok(task);
-  if (typeof body["working"] !== "boolean") return err({ code: "INVALID_WORKING" });
-  return changeTaskWorking(task, body["working"]);
+  const parsed = parseTaskPatch(body);
+  return parsed.ok ? ok(applyTaskPatch(task, parsed.value)) : parsed;
 }
 
 function registerTaskCollectionRoutes<T extends ApiEnv>(app: Hono<T>, repository: Repository<T>) {
@@ -123,7 +88,6 @@ function registerTaskCollectionRoutes<T extends ApiEnv>(app: Hono<T>, repository
     const body = await c.req.json<Record<string, unknown>>();
     const title = typeof body["title"] === "string" ? body["title"].trim() : "";
     const description = typeof body["description"] === "string" ? body["description"] : "";
-    if (!isTaskTitleValid(title)) return problem(c, 400, "INVALID_TITLE");
     const created = createTaskAtBoundary({ title, description });
     if (!created.ok) return problem(c, 400, created.error.code);
     const inserted = await repository(c).insert(created.value);
@@ -204,10 +168,7 @@ function registerTaskReorderRoute<T extends ApiEnv>(app: Hono<T>, repository: Re
     if (!listed.ok) return problem(c, 500, listed.error.code);
     const moved = moveTask(listed.value, id, area, order);
     if (!moved.ok) return problem(c, 400, moved.error.code);
-    const changed = moved.value.filter((task) => {
-      const before = listed.value.find((candidate) => candidate.id === task.id);
-      return before !== undefined && (before.area !== task.area || before.order !== task.order);
-    });
+    const changed = selectMovedTasks(listed.value, moved.value);
     const changedWithVersion = changed.map((task) => (task.id === id ? { ...task, version } : task));
     const result = await repository(c).move(changedWithVersion);
     if (!result.ok) return problem(c, 409, result.error.code);

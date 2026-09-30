@@ -81,6 +81,33 @@ def test_rejects_repository_adapter_classes() -> None:
     ]
 
 
+def test_rejects_class_in_idea_domain() -> None:
+    text = "export class Idea {}\n"
+    assert architecture.find_violations(text, "src/idea.ts", set()) == [
+        "src/idea.ts:1: domain class usage"
+    ]
+
+
+def test_rejects_idea_domain_side_effect_apis() -> None:
+    text = "const now = new Date();\nconst id = crypto.randomUUID();\n"
+    assert architecture.find_violations(text, "src/idea.ts", set()) == [
+        "src/idea.ts:1: domain side-effect API (Date)",
+        "src/idea.ts:2: domain side-effect API (crypto)",
+    ]
+
+
+def test_rejects_idea_domain_side_effect_import() -> None:
+    text = 'import crypto from "node:crypto";\n'
+    assert architecture.find_violations(text, "src/idea.ts", set()) == [
+        "src/idea.ts:1: domain side-effect import (node:crypto)"
+    ]
+
+
+def test_allows_relative_import_between_domain_modules() -> None:
+    text = 'import { ok } from "./task";\n'
+    assert architecture.find_violations(text, "src/idea.ts", set()) == []
+
+
 def test_allows_side_effect_apis_outside_domain() -> None:
     text = "const now = new Date();\nconst response = fetch('/tasks');\n"
     assert architecture.find_violations(text, "src/index.tsx", set()) == []
