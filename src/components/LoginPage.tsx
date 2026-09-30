@@ -1,5 +1,5 @@
 import type { JSX } from "hono/jsx/jsx-runtime";
-import { BRAND_NAME } from "../brand";
+import { BRAND_NAME, FAVICON_HREF } from "../brand";
 
 export function safeNextPath(next: string | undefined): string {
   if (next !== undefined && next.startsWith("/") && !next.startsWith("//")) return next;
@@ -19,6 +19,7 @@ export function LoginPage({
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{BRAND_NAME}</title>
+        <link rel="icon" type="image/svg+xml" href={FAVICON_HREF} />
         <link rel="stylesheet" href="/styles.css" />
       </head>
       <body>

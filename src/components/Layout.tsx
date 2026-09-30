@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import type { JSX } from "hono/jsx/jsx-runtime";
-import { BRAND_NAME } from "../brand";
+import { BRAND_NAME, FAVICON_HREF } from "../brand";
 
 const HTMX_SCRIPT = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js";
 
@@ -13,6 +13,7 @@ export const Layout: FC<{ active: "ideas" | "matrix" | "tasks"; children?: JSX.E
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>{BRAND_NAME}</title>
+      <link rel="icon" type="image/svg+xml" href={FAVICON_HREF} />
       <link rel="stylesheet" href="/styles.css" />
       <script src={HTMX_SCRIPT} defer></script>
       <script src="/htmx-conflict.js" defer></script>
