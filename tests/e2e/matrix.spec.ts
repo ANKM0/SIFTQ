@@ -1,15 +1,9 @@
 import type { Page } from "@playwright/test";
-import { e2eBaseUrl, expect, installHtmxRoute, test } from "./fixtures";
-
-const password = atob("dGVzdC1wYXNzd29yZA==");
+import { authStatePath, e2eBaseUrl, expect, installHtmxRoute, test } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
 
 async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/ideas$/);
   await page.goto("/matrix");
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: "Matrix" })).toBeVisible();
@@ -92,12 +86,12 @@ async function gotoListPage(page: Page, status: string) {
   const target = `/tasks?status=${status}`;
   // A save navigation can still be settling when the list assertion starts.
   // Wait before starting the next navigation to avoid Playwright cancelling it.
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("load");
   try {
-    await page.goto(target, { waitUntil: "networkidle" });
+    await page.goto(target, { waitUntil: "load" });
   } catch {
-    await page.waitForLoadState("networkidle");
-    await page.goto(target, { waitUntil: "networkidle" });
+    await page.waitForLoadState("load");
+    await page.goto(target, { waitUntil: "load" });
   }
 }
 
@@ -574,7 +568,7 @@ test("deletes a task detail draft after a successful Save", async ({ page }) => 
 });
 
 test("clears only the current browser profile drafts on logout", async ({ browser }) => {
-  const currentContext = await browser.newContext({ baseURL: e2eBaseUrl });
+  const currentContext = await browser.newContext({ baseURL: e2eBaseUrl, storageState: authStatePath });
   const otherContext = await browser.newContext({ baseURL: e2eBaseUrl });
   const currentPage = await currentContext.newPage();
   const otherPage = await otherContext.newPage();

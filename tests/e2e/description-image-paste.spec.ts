@@ -1,15 +1,20 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
-const password = atob("dGVzdC1wYXNzd29yZA==");
 const PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL((url) => url.pathname === "/ideas");
+  await page.goto("/ideas");
+  await expect(page).toHaveURL(/\/ideas$/);
+}
+
+async function saveTask(page: Page): Promise<void> {
+  const saved = page.waitForResponse(
+    (response) => response.request().method() === "POST" && /^\/tasks\/[^/]+$/.test(new URL(response.url()).pathname),
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  await saved;
 }
 
 async function createTask(page: Page, title: string): Promise<string> {
@@ -113,8 +118,7 @@ test("pasting an image into the task description editor saves and renders it", a
     const token = await page.locator("textarea[data-description-value]").inputValue();
     expect(token).toMatch(/^\/api\/images\/[0-9A-Za-z_-]+$/);
 
-    await page.getByRole("button", { name: "Save" }).click();
-    await page.waitForLoadState("networkidle");
+    await saveTask(page);
     await page.goto(`/tasks/${taskId}?from=tasks`);
 
     await expect(page.locator("[data-description-editor] img.description-image")).toHaveCount(1);
@@ -184,8 +188,7 @@ test("dropping a file with a hidden type into the task editor uploads and render
     await expect(image).toHaveCount(1);
     await expect(image).toHaveAttribute("src", /^\/api\/images\//);
 
-    await page.getByRole("button", { name: "Save" }).click();
-    await page.waitForLoadState("networkidle");
+    await saveTask(page);
     await page.goto(`/tasks/${taskId}?from=tasks`);
     await expect(page.locator("[data-description-editor] img.description-image")).toHaveCount(1);
     await page.reload();
