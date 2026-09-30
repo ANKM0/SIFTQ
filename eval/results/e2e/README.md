@@ -28,15 +28,27 @@
 
 ## 結果（2026-09-30）
 
+ローカル単一ランナー（wall time）:
+
 | 段階 | 総時間 | tests | 内容 |
 | --- | --- | --- | --- |
 | baseline | 76.3s | 88 | `workers: 1`、全ログイン、`matrix.spec.ts` 直列 51 |
 | Phase 1 | 50.7s | 89 | storageState でログイン 1 回化、`networkidle` 廃止 |
 | Phase 2 | 53.9s | 89 | `matrix.spec.ts` を 4 ファイルへ分割、serial 解除 |
-| Phase 3 | 22 tests / 14.1s（shard 4/4） | 89 | CI を 4 shard の matrix 化 |
 
-- 単一ランナーは 76.3s → 50.7s（**-33.6%**）。CI は 4 shard 並列で最大 shard が全体の約 1/4 に収まる。
-- shard 別テスト数: 24 / 21 / 22 / 21（chromium 88 件）＋ setup 各 shard 1 件。合計 89 で重複/欠落なし。
+- 単一ランナーは 76.3s → 約 51–54s（**約 -30%**）。Phase 2/3 は単一実行の wall を変えない（並列化は CI の効果）。
+
+CI e2e（run `36707506856`、**キャッシュ cold**）:
+
+| | 変更前 | 変更後 |
+| --- | --- | --- |
+| e2e wall | 1m52s（単一ジョブ） | 約 61s（4 shard 並列、最大 shard 1m1s） |
+| shard 別 job | — | 54s / 57s / 61s / 59s |
+
+- shard 別 test 数: 24 / 21 / 22 / 21（chromium 88）＋ setup 各 shard 1 = 89、重複/欠落なし。
+- **wall はテスト 1/4 にはならない**。shard 1 の内訳: setup 約 18s（`bun install` 3.9s＋`playwright install`/migration 11.2s）＋ test 19.1s。この run は node_modules と Playwright のキャッシュが両方 miss した cold 実行。
+- `ci:test:e2e:setup` は cache-aware（`node_modules/.bun-lock-hash` 一致で `bun install` スキップ、Chromium バイナリ有無で `playwright install` スキップ）。warm では setup が数秒まで落ちる。
+
 
 ## 使い方
 

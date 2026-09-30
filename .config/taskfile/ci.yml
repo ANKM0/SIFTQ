@@ -291,10 +291,10 @@ tasks:
         exit "$status"
 
   ci:test:e2e:setup:
-    desc: Install Playwright browsers and apply local D1 migrations.
+    desc: Prepare cached dependencies, the Playwright browser, and local D1 for E2E.
     cmds:
-      - task: setup:frontend:ci
       - |
+        set -eu
         marker="tmp/.e2e-ready"
         mkdir -p "$(dirname "$marker")"
         rm -f "$marker"
@@ -306,8 +306,22 @@ tasks:
           echo "Skipping Playwright E2E: no test files found."
           exit 0
         fi
-        vp exec playwright install --only-shell chromium
-        set -eu
+
+        lock_hash="$(sha256sum bun.lock | awk '{ print $1 }')"
+        if [ -f node_modules/.bun-lock-hash ] && [ "$(cat node_modules/.bun-lock-hash)" = "$lock_hash" ]; then
+          echo "Frontend dependencies already up to date."
+        else
+          bun install --frozen-lockfile
+          mkdir -p node_modules
+          printf '%s' "$lock_hash" > node_modules/.bun-lock-hash
+        fi
+
+        if find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f -print -quit 2>/dev/null | grep -q .; then
+          echo "Playwright Chromium already installed."
+        else
+          vp exec playwright install --only-shell chromium
+        fi
+
         browser="$(find "${PLAYWRIGHT_BROWSERS_PATH}" -path '*chrome-headless-shell' -type f | head -n 1)"
         if [ -z "${browser}" ]; then
           echo "Playwright Chromium executable was not installed into ${PLAYWRIGHT_BROWSERS_PATH}." >&2
