@@ -1,0 +1,28 @@
+{
+  "name": "e2e-baseline",
+  "date": "2026-09-30",
+  "commit": "a672aad",
+  "environment": "local (chrome-headless-shell), workers: 1, retries: 0",
+  "source": "task -t .config/Taskfile.yml ci:test:e2e:measure",
+  "total_ms": 76296,
+  "tests": {
+    "total": 88,
+    "passed": 88,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 0
+  },
+  "files": [
+    { "file": "matrix.spec.ts", "tests": 51, "duration_ms": 51627, "failed": 0 },
+    { "file": "description-image-paste.spec.ts", "tests": 5, "duration_ms": 5935, "failed": 0 },
+    { "file": "tasks-pagination.spec.ts", "tests": 4, "duration_ms": 3445, "failed": 0 },
+    { "file": "task-detail-status-after-edit.spec.ts", "tests": 4, "duration_ms": 3045, "failed": 0 },
+    { "file": "ideas-create.spec.ts", "tests": 7, "duration_ms": 2900, "failed": 0 },
+    { "file": "ideas-description-url.spec.ts", "tests": 5, "duration_ms": 1945, "failed": 0 },
+    { "file": "task-list-bulk.spec.ts", "tests": 3, "duration_ms": 1278, "failed": 0 },
+    { "file": "ideas-detail-modal-close-outside.spec.ts", "tests": 3, "duration_ms": 1230, "failed": 0 },
+    { "file": "responsive.spec.ts", "tests": 1, "duration_ms": 1199, "failed": 0 },
+    { "file": "ideas-height-cap.spec.ts", "tests": 3, "duration_ms": 1033, "failed": 0 },
+    { "file": "ideas-detail-modal-scroll.spec.ts", "tests": 2, "duration_ms": 582, "failed": 0 }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "serial": [
+    "tests/e2e/matrix.spec.ts",
+    "tests/e2e/tasks-pagination.spec.ts"
+  ],
+  "networkidle": [
+    "tests/e2e/description-image-paste.spec.ts",
+    "tests/e2e/matrix.spec.ts",
+    "tests/e2e/tasks-pagination.spec.ts"
+  ],
+  "ui_login": [
+    "tests/e2e/description-image-paste.spec.ts",
+    "tests/e2e/ideas-create.spec.ts",
+    "tests/e2e/ideas-description-url.spec.ts",
+    "tests/e2e/ideas-detail-modal-close-outside.spec.ts",
+    "tests/e2e/ideas-detail-modal-scroll.spec.ts",
+    "tests/e2e/ideas-height-cap.spec.ts",
+    "tests/e2e/matrix.spec.ts",
+    "tests/e2e/responsive.spec.ts",
+    "tests/e2e/task-detail-status-after-edit.spec.ts",
+    "tests/e2e/task-list-bulk.spec.ts",
+    "tests/e2e/tasks-pagination.spec.ts"
+  ],
+  "large_files": [
+    "tests/e2e/matrix.spec.ts"
+  ],
+  "config": [
+    ".config/playwright.config.ts"
+  ]
+}
