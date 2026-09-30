@@ -258,7 +258,7 @@ tasks:
       - uv run python -m pytest .taqt/tests/test_check_e2e_conventions.py .taqt/tests/test_e2e_report.py
 
   ci:test:e2e:
-    desc: Run Playwright E2E.
+    desc: Run Playwright E2E (pass --shard=i/N to shard).
     cmds:
       - task: ci:test:e2e:setup
       - |
@@ -266,7 +266,7 @@ tasks:
           echo "Skipping Playwright E2E: setup did not complete."
           exit 0
         fi
-        vp run test:e2e
+        vp exec playwright test -c .config/playwright.config.ts --pass-with-no-tests {{.CLI_ARGS}}
 
   ci:test:e2e:measure:
     desc: Run Playwright E2E with a JSON report and print timing.

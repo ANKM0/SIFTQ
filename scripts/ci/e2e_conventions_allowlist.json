@@ -1,12 +1,7 @@
 {
-  "serial": [
-    "tests/e2e/matrix.spec.ts",
-    "tests/e2e/tasks-pagination.spec.ts"
-  ],
+  "serial": [],
   "networkidle": [],
   "ui_login": [],
-  "large_files": [
-    "tests/e2e/matrix.spec.ts"
-  ],
+  "large_files": [],
   "config": []
 }

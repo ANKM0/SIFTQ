@@ -1,8 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
-test.describe.configure({ mode: "serial" });
-
 async function signIn(page: Page) {
   await page.goto("/ideas");
   await expect(page).toHaveURL(/\/ideas$/);
