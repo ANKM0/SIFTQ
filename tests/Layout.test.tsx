@@ -12,6 +12,13 @@ describe("Layout", () => {
     expect(html).toContain('src="/task-form-shortcut.js"');
   });
 
+  it("declares an inline SVG favicon", () => {
+    const html = renderToString(<Layout active="matrix"><span>content</span></Layout>);
+    expect(html).toContain('rel="icon"');
+    expect(html).toContain('type="image/svg+xml"');
+    expect(html).toContain('href="data:image/svg+xml,');
+  });
+
   it("orders the primary nav as Ideas, Matrix, Tasks", () => {
     for (const active of ["ideas", "matrix", "tasks"] as const) {
       const html = renderToString(<Layout active={active}><span>content</span></Layout>);

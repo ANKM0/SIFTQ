@@ -16,6 +16,14 @@ describe("LoginPage", () => {
 
     expect(html).toContain("Incorrect password");
   });
+
+  it("declares an inline SVG favicon", () => {
+    const html = renderToString(<LoginPage />);
+
+    expect(html).toContain('rel="icon"');
+    expect(html).toContain('type="image/svg+xml"');
+    expect(html).toContain('href="data:image/svg+xml,');
+  });
 });
 
 describe("safeNextPath", () => {
