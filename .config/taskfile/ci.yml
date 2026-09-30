@@ -255,7 +255,12 @@ tasks:
     desc: Enforce E2E conventions and test the E2E tooling.
     cmds:
       - uv run python scripts/ci/check_e2e_conventions.py
-      - uv run python -m pytest .taqt/tests/test_check_e2e_conventions.py .taqt/tests/test_e2e_report.py
+      - uv run python -m pytest .taqt/tests/test_check_e2e_conventions.py .taqt/tests/test_e2e_report.py .taqt/tests/test_e2e_budget.py
+
+  ci:e2e:budget:
+    desc: Check the measured E2E duration against the budget ratchet.
+    cmds:
+      - uv run python scripts/ci/check_e2e_budget.py --budget-file eval/e2e-budget.json --report-file tmp/e2e/report.json
 
   ci:test:e2e:
     desc: Run Playwright E2E (pass --shard=i/N to shard).

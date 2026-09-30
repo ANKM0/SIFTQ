@@ -23,12 +23,26 @@
 - **4-a 規約チェック** `scripts/ci/check_e2e_conventions.py`（`ci:e2e:checks` / `ci:fast:checks`）。
   - `networkidle` の再導入、UI パスワードログイン、`mode: "serial"`、spec の肥大化、config の `trace`/`retries`・`fullyParallel`/`workers` 矛盾を検知。
   - 既存の違反は `scripts/ci/e2e_conventions_allowlist.json` で猶予。**修正したら allowlist から削除する**（削除しても検知は変わらないため、残骸は定期的に掃除する）。
-- **4-b 時間バジェット ratchet** `scripts/ci/check_e2e_budget.py`＋`eval/e2e-budget.json`（Phase 4、nightly）。
-- **4-c flaky 観測** nightly で `--repeat-each=3`（Phase 4）。
+- **4-b 時間バジェット ratchet** `scripts/ci/check_e2e_budget.py`＋`eval/e2e-budget.json`（`ci:e2e:budget`、nightly）。既定は `warn_only`。安定後に外して fail 化する。
+- **4-c flaky 観測** `.github/workflows/e2e-nightly.yml` で `--repeat-each=3`。
+
+## 結果（2026-09-30）
+
+| 段階 | 総時間 | tests | 内容 |
+| --- | --- | --- | --- |
+| baseline | 76.3s | 88 | `workers: 1`、全ログイン、`matrix.spec.ts` 直列 51 |
+| Phase 1 | 50.7s | 89 | storageState でログイン 1 回化、`networkidle` 廃止 |
+| Phase 2 | 53.9s | 89 | `matrix.spec.ts` を 4 ファイルへ分割、serial 解除 |
+| Phase 3 | 22 tests / 14.1s（shard 4/4） | 89 | CI を 4 shard の matrix 化 |
+
+- 単一ランナーは 76.3s → 50.7s（**-33.6%**）。CI は 4 shard 並列で最大 shard が全体の約 1/4 に収まる。
+- shard 別テスト数: 24 / 21 / 22 / 21（chromium 88 件）＋ setup 各 shard 1 件。合計 89 で重複/欠落なし。
 
 ## 使い方
 
 ```sh
-task -t .config/Taskfile.yml ci:test:e2e:measure   # 計測してサマリ表示
-task -t .config/Taskfile.yml ci:e2e:checks         # 規約チェック + ツールのテスト
+task -t .config/Taskfile.yml ci:test:e2e:measure           # 計測してサマリ表示
+task -t .config/Taskfile.yml ci:e2e:checks                 # 規約チェック + ツールのテスト
+task -t .config/Taskfile.yml ci:e2e:budget                 # 直近の計測を予算と比較
+task -t .config/Taskfile.yml ci:test:e2e -- --shard=1/4    # shard 実行
 ```

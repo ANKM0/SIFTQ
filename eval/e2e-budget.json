@@ -1,0 +1,5 @@
+{
+  "total_ms": 60000,
+  "warn_only": true,
+  "note": "full single-worker run; sharded CI is faster. Remove warn_only once stable."
+}
