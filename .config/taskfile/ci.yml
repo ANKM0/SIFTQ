@@ -12,6 +12,7 @@ tasks:
       - task: setup:python
       - task: setup:frontend:ci
       - task: ci:markdown
+      - task: ci:prose
       - task: ci:lint:task-refs
       - task: ci:lint:codex-task-perms
       - task: ci:lint
@@ -42,6 +43,7 @@ tasks:
     desc: Run independent fast checks in parallel.
     deps:
       - ci:markdown
+      - ci:prose
       - ci:lint:task-refs
       - ci:lint:codex-task-perms
       - ci:lint
@@ -80,6 +82,16 @@ tasks:
     desc: Check Markdown formatting.
     cmds:
       - uv run python scripts/ci/check_markdown.py
+
+  ci:prose:
+    desc: Reject Markdown with yomiyasu "error" findings.
+    cmds:
+      - uv run python scripts/ci/check_prose.py
+
+  prose:lint:
+    desc: Run the vendored yomiyasu linter in strict mode on the given paths.
+    cmds:
+      - uv run python .agents/skills/yomiyasu/scripts/yomiyasu_lint.py --strict {{.CLI_ARGS}}
 
   ci:security:
     desc: Reject vulnerable dependencies and dangerous code patterns.
