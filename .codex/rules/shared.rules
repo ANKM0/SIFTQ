@@ -118,6 +118,8 @@ prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:extended"], decis
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:extended:checks"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:commit-messages"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:markdown"], decision="allow")
+prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:prose"], decision="allow")
+prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "prose:lint"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:lint:task-refs"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:lint:codex-task-perms"], decision="allow")
 prefix_rule(pattern=["task", "-t", ".config/Taskfile.yml", "ci:typecheck"], decision="allow")
