@@ -100,14 +100,14 @@ def test_build_plan_prefers_pr_files_over_base_diff(monkeypatch) -> None:
     assert plan.mode == "release-only"
 
 
-def test_build_plan_detects_wrangler_change_from_pr_without_base(monkeypatch) -> None:
+def test_build_plan_detects_cf_config_from_pr_without_base(monkeypatch) -> None:
     def fake_command(*args: str) -> str:
         if args[:3] == ("git", "rev-parse", "HEAD^{commit}"):
             return "commit"
         if args[:2] == ("git", "describe"):
             return "v0.5.2"
         if args == ("gh", "pr", "view", "12", "--json", "files"):
-            return json.dumps({"files": [{"path": ".config/wrangler.jsonc"}]})
+            return json.dumps({"files": [{"path": "cloudflare.config.ts"}]})
         raise AssertionError(args)
 
     monkeypatch.setattr(release_deploy, "command", fake_command)
@@ -118,37 +118,23 @@ def test_build_plan_detects_wrangler_change_from_pr_without_base(monkeypatch) ->
     assert plan.mode == "release+deploy"
 
 
-WRANGLER_BEFORE = json.dumps(
-    {
-        "$schema": "node_modules/wrangler/config-schema.json",
-        "main": "src/index.tsx",
-        "d1_databases": [{"binding": "DB", "migrations_dir": "migrations"}],
-    }
+CF_CONFIG = (
+    "import { bindings, defineConfig } from \"cf/config\";\n"
+    "export default defineConfig({ worker: { name: \"app\", compatibilityDate: \"2025-06-01\", env: {\n"
+    "  DB: bindings.d1({ name: \"siftq\", id: \"20ca1496-cadc-4b40-9265-1d59d55d5b82\" }),\n"
+    "} } });\n"
 )
-WRANGLER_AFTER_RELOCATION = json.dumps(
-    {
-        "$schema": "../node_modules/wrangler/config-schema.json",
-        "main": "../src/index.tsx",
-        "d1_databases": [{"binding": "DB", "migrations_dir": "../migrations"}],
-    }
-)
-WRANGLER_AFTER_BINDING_CHANGE = json.dumps(
-    {
-        "$schema": "../node_modules/wrangler/config-schema.json",
-        "main": "../src/index.tsx",
-        "d1_databases": [{"binding": "DB", "migrations_dir": "../migrations", "database_name": "renamed"}],
-    }
-)
+CF_CONFIG_AFTER = CF_CONFIG.replace("2025-06-01", "2026-01-01")
 
 
-def _wrangler_command(contents: dict[str, str]):
+def _cf_command(contents: dict[str, str]):
     def fake_command(*args: str) -> str:
         if args[:2] == ("git", "rev-parse"):
             return "commit"
         if args[:2] == ("git", "describe"):
             return "v0.5.2"
         if args[:3] == ("git", "diff", "--name-only"):
-            return ".config/wrangler.jsonc\nwrangler.jsonc"
+            return "cloudflare.config.ts\nwrangler.config.ts"
         if args[:2] == ("git", "show"):
             key = args[2]
             if key in contents:
@@ -159,21 +145,14 @@ def _wrangler_command(contents: dict[str, str]):
     return fake_command
 
 
-def test_effective_wrangler_normalizes_relocated_paths() -> None:
-    before = release_deploy.effective_wrangler("wrangler.jsonc", json.loads(WRANGLER_BEFORE))
-    after = release_deploy.effective_wrangler(".config/wrangler.jsonc", json.loads(WRANGLER_AFTER_RELOCATION))
-
-    assert before == after
-
-
-def test_build_plan_ignores_wrangler_config_relocation(monkeypatch) -> None:
+def test_build_plan_ignores_unchanged_cf_config(monkeypatch) -> None:
     monkeypatch.setattr(
         release_deploy,
         "command",
-        _wrangler_command(
+        _cf_command(
             {
-                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
-                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_RELOCATION,
+                "v0.5.2:cloudflare.config.ts": CF_CONFIG,
+                "commit:cloudflare.config.ts": CF_CONFIG,
             }
         ),
     )
@@ -184,14 +163,14 @@ def test_build_plan_ignores_wrangler_config_relocation(monkeypatch) -> None:
     assert plan.mode == "release-only"
 
 
-def test_build_plan_detects_wrangler_config_change(monkeypatch) -> None:
+def test_build_plan_detects_cf_config_change(monkeypatch) -> None:
     monkeypatch.setattr(
         release_deploy,
         "command",
-        _wrangler_command(
+        _cf_command(
             {
-                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
-                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_BINDING_CHANGE,
+                "v0.5.2:cloudflare.config.ts": CF_CONFIG,
+                "commit:cloudflare.config.ts": CF_CONFIG_AFTER,
             }
         ),
     )
@@ -202,7 +181,20 @@ def test_build_plan_detects_wrangler_config_change(monkeypatch) -> None:
     assert plan.mode == "release+deploy"
 
 
-def test_build_plan_uses_base_for_wrangler_comparison_with_pr(monkeypatch) -> None:
+def test_d1_database_id_reads_cloudflare_config(tmp_path) -> None:
+    (tmp_path / "cloudflare.config.ts").write_text(CF_CONFIG, encoding="utf-8")
+
+    assert release_deploy.d1_database_id(tmp_path / "cloudflare.config.ts") == "20ca1496-cadc-4b40-9265-1d59d55d5b82"
+
+
+def test_d1_database_id_rejects_missing_id(tmp_path) -> None:
+    (tmp_path / "cloudflare.config.ts").write_text("export default {};\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        release_deploy.d1_database_id(tmp_path / "cloudflare.config.ts")
+
+
+def test_build_plan_uses_base_for_cf_config_comparison_with_pr(monkeypatch) -> None:
     def fake_command(*args: str) -> str:
         if args[:2] == ("git", "rev-parse"):
             return "commit"
@@ -212,8 +204,8 @@ def test_build_plan_uses_base_for_wrangler_comparison_with_pr(monkeypatch) -> No
             return json.dumps({"files": [{"path": "docs/readme.md"}]})
         if args[:2] == ("git", "show"):
             contents = {
-                "v0.5.2:wrangler.jsonc": WRANGLER_BEFORE,
-                "commit:.config/wrangler.jsonc": WRANGLER_AFTER_BINDING_CHANGE,
+                "v0.5.2:cloudflare.config.ts": CF_CONFIG,
+                "commit:cloudflare.config.ts": CF_CONFIG_AFTER,
             }
             if args[2] not in contents:
                 raise subprocess.CalledProcessError(128, args)
@@ -252,16 +244,10 @@ def test_plan_cli_accepts_repeated_pr_without_version(monkeypatch, capsys) -> No
 
 
 def _prepare_deploy(monkeypatch, tmp_path, *, migration_fails: bool = False) -> list[list[str]]:
-    (tmp_path / ".config").mkdir()
-    (tmp_path / ".config" / "wrangler.jsonc").write_text(
-        json.dumps(
-            {
-                "d1_databases": [
-                    {"binding": "DB", "database_name": "siftq", "migrations_dir": "migrations"}
-                ]
-            }
-        ),
-        encoding="utf-8",
+    (tmp_path / "cloudflare.config.ts").write_text(CF_CONFIG, encoding="utf-8")
+    (tmp_path / "tmp").mkdir()
+    (tmp_path / "tmp" / "cloudflare-secrets.env").write_text(
+        "AUTH_PASSWORD=preview\nSESSION_SECRET=preview\n", encoding="utf-8"
     )
     monkeypatch.chdir(tmp_path)
 
@@ -294,8 +280,8 @@ def test_deploy_checks_configured_d1_binding_before_worker(monkeypatch, tmp_path
 
     assert release_deploy.main() == 0
     assert calls == [
-        ["bun", "x", "wrangler", "d1", "migrations", "list", "siftq", "--remote", "-c", ".config/wrangler.jsonc"],
-        ["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"],
+        ["bun", "x", "cf", "d1", "migrations", "list", "20ca1496-cadc-4b40-9265-1d59d55d5b82", "--dir", "migrations"],
+        ["bun", "x", "cf", "deploy", "--secrets-file", "tmp/cloudflare-secrets.env"],
     ]
 
 
@@ -306,5 +292,26 @@ def test_deploy_does_not_deploy_when_migration_check_fails(monkeypatch, tmp_path
         release_deploy.main()
 
     assert calls == [
-        ["bun", "x", "wrangler", "d1", "migrations", "list", "siftq", "--remote", "-c", ".config/wrangler.jsonc"]
+        ["bun", "x", "cf", "d1", "migrations", "list", "20ca1496-cadc-4b40-9265-1d59d55d5b82", "--dir", "migrations"]
     ]
+
+
+def test_deploy_requires_secrets_file(monkeypatch, tmp_path) -> None:
+    (tmp_path / "cloudflare.config.ts").write_text(CF_CONFIG, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    def fake_command(*args: str) -> str:
+        if args == ("git", "status", "--porcelain"):
+            return ""
+        if args in {
+            ("git", "rev-parse", "v0.5.3^{commit}"),
+            ("git", "rev-parse", "HEAD"),
+        }:
+            return "commit"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_deploy, "command", fake_command)
+    monkeypatch.setattr(sys, "argv", ["release_deploy.py", "deploy", "--tag", "v0.5.3", "--execute"])
+
+    with pytest.raises(SystemExit):
+        release_deploy.main()

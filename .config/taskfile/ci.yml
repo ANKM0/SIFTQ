@@ -351,7 +351,7 @@ tasks:
           exit 0
         fi
 
-        bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to tmp/wrangler/state
+        bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to .wrangler/state
         touch "$marker"
 
   ci:build:
@@ -362,7 +362,7 @@ tasks:
           echo "Skipping Worker build: src/index.tsx does not exist yet."
           exit 0
         fi
-        vp exec wrangler deploy --dry-run -c .config/wrangler.jsonc
+        bun x cf deploy --dry-run
 
   ci:duplicate:
     desc: Reject duplicated production TypeScript code.

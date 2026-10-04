@@ -4,9 +4,11 @@
   "type": "module",
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "dev": "wrangler dev -c .config/wrangler.jsonc --persist-to tmp/wrangler/state",
-    "preview:mock": "wrangler dev -c .config/wrangler.jsonc --persist-to tmp/wrangler/state --var PREVIEW_MODE:true --var AUTH_PASSWORD:preview --var SESSION_SECRET:preview-session-secret",
-    "build": "tsc -p tsconfig.json && wrangler deploy --dry-run -c .config/wrangler.jsonc",
+    "dev": "cf dev",
+    "preview:mock": "PREVIEW_MODE=true AUTH_PASSWORD=preview SESSION_SECRET=preview-session-secret cf dev",
+    "build": "tsc -p tsconfig.json && cf deploy --dry-run",
+    "deploy": "cf deploy",
+    "typegen": "cf workers types",
     "lint": "vp lint .",
     "test": "vp test run --passWithNoTests",
     "test:e2e": "playwright test -c .config/playwright.config.ts --pass-with-no-tests",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260822.1",
+    "cf": "1.0.0-beta.12",
     "@mermaid-js/mermaid-cli": "^11.16.0",
     "@types/node": "^26.2.0",
     "@playwright/test": "^1.61.1",
@@ -33,7 +36,7 @@
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
     "vite-plus": "0.3.0",
     "vitest": "4.1.11",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.147.0"
   },
   "overrides": {
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
