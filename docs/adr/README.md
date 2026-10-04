@@ -30,7 +30,7 @@
 | [ADR 0024: Map errors to standard HTTP status codes](0024-map-errors-to-standard-http-status-codes.md) | Accepted. | エラーは標準 HTTP status にマップし、詳細は body の code で表現する。 |
 | [ADR 0025: Define HTML and JSON error handling behavior](0025-define-html-and-json-error-handling-behavior.md) | Superseded by ADR 0062, 0063. | エラー表現と内部情報・認証エラーの扱いを分割した。 |
 | [ADR 0026: Define task data model](0026-define-task-data-model.md) | Accepted. | task の識別子・所有者・時刻・順序と D1 の型を定める。 |
-| [ADR 0027: Adopt D1 SQL migration management](0027-adopt-d1-sql-migration-management.md) | Accepted. | Cloudflare 公式 SQL migration + Wrangler で schema を管理する。 |
+| [ADR 0027: Adopt D1 SQL migration management](0027-adopt-d1-sql-migration-management.md) | Superseded by ADR 0071. | Cloudflare 公式 SQL migration + Wrangler で schema を管理していた。 |
 | [ADR 0028: Adopt common UI state and feedback rules](0028-adopt-common-ui-state-and-feedback-rules.md) | Accepted. | 全画面の 4 状態と通知の表示時間・閉じ方を定める。 |
 | [ADR 0029: Adopt Result type in domain and usecase](0029-adopt-result-type-in-domain-usecase.md) | Accepted. | domain / usecase は期待される失敗を inline union の `Result<T, E>` で返す。 |
 | [ADR 0030: Adopt static component catalog](0030-adopt-static-component-catalog.md) | Accepted. | Hono JSX component を static HTML catalog 化し、Review 済み component を再利用する。 |
@@ -74,6 +74,7 @@
 | [ADR 0068: taqt loop の簡略化と検証・再試行方針を定める](0068-simplify-taqt-loop-and-verification-policy.md) | Accepted. | checker / post_review を廃止し、e2e 粒度・一時失敗の再試行・工程別モデル・検証対象の選択と並列実行を定める。 |
 | [ADR 0069: セッションを age で暗号化して公開リポジトリへバックアップする](0069-encrypt-session-backup-with-age.md) | Accepted. | セッションを zstd + age で暗号化して公開リポジトリへ保存し、秘密鍵はリポジトリ外に置いて手動のバックアップ・復元タスクを用意する。 |
 | [ADR 0070: ドメインモデルをコード由来の自動グラフと表現層から生成する](0070-generate-domain-model-from-code-graph-and-presentation.md) | Accepted. | ドメインモデルをコードから抽出する自動部分と人が編集する表現部分に分け、マージ結果を正本として生成する。 |
+| [ADR 0071: Cloudflare 操作 CLI に統合 CLI を採用する](0071-adopt-cloudflare-unified-cli.md) | Accepted. | Cloudflare 操作の主 CLI を統合 CLI とし、ローカル D1 migration は Wrangler を併用する。 |
 
 ## 検証待ち
 
@@ -92,3 +93,4 @@
 | V-068-003 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 一時失敗の再試行で human 直行が減るか | 一時失敗 run の再試行後の終端が human 直行より減る | 一時失敗 run が蓄積している | 再試行で human 直行が減る | 暫定 | 失敗種別や provider の変更時 |
 | V-068-004 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 工程ごとのモデル指定で closure が改善するか | モデル別に repetition 3 以上で closure を比較する | モデル別の完走結果が揃っている | 強いモデルで closure が改善 | 暫定 | モデルまたは工程構成の変更時 |
 | V-068-005 | [ADR 0068](0068-simplify-taqt-loop-and-verification-policy.md) | 変更範囲による検証選択と並列実行で費用が下がるか | 同一変更の before / after で検証時間とコストを比較する | before / after が取得できる | 費用が非悪化し escaped が 0 | 暫定 | 検証基盤または並列度の変更時 |
+| V-071-002 | [ADR 0071](0071-adopt-cloudflare-unified-cli.md) | 統合 CLI の採用で Cloudflare 操作の入口が一つに揃うか | 主要操作が統合 CLI で完結する | 各操作が統合 CLI で実行できる | 主要操作が統合 CLI で完結する | 暫定 | 主要操作の追加・変更時 |

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import posixpath
 import re
 import subprocess
 from dataclasses import asdict, dataclass
@@ -9,7 +8,8 @@ from pathlib import Path
 
 VERSION_PATTERN = re.compile(r"^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 WORKER_PREFIXES = ("src/", "migrations/")
-WRANGLER_CONFIGS = (".config/wrangler.jsonc", "wrangler.jsonc")
+CF_CONFIGS = ("cloudflare.config.ts", "wrangler.config.ts")
+D1_ID_PATTERN = re.compile(r'bindings\.d1\(\{[^}]*?id:\s*"([0-9a-fA-F-]{36})"', re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -71,41 +71,28 @@ def next_versions(latest: str | None) -> tuple[str | None, str | None]:
     return f"v{major}.{minor}.{patch + 1}", f"v{major}.{minor + 1}.0"
 
 
-def parse_jsonc(text: str) -> dict:
+def file_at(ref: str, path: str) -> str | None:
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        stripped = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-        stripped = re.sub(r"(?m)//.*$", "", stripped)
-        return json.loads(stripped)
+        return command("git", "show", f"{ref}:{path}")
+    except subprocess.CalledProcessError:
+        return None
 
 
-def effective_wrangler(path: str, payload: dict) -> dict:
-    result = json.loads(json.dumps(payload))
-    result.pop("$schema", None)
-    base = posixpath.dirname(path)
-    if "main" in result:
-        result["main"] = posixpath.normpath(posixpath.join(base, result["main"]))
-    for database in result.get("d1_databases") or []:
-        if isinstance(database, dict) and "migrations_dir" in database:
-            database["migrations_dir"] = posixpath.normpath(posixpath.join(base, database["migrations_dir"]))
-    return result
-
-
-def wrangler_config_at(ref: str) -> dict | None:
-    for path in WRANGLER_CONFIGS:
-        try:
-            text = command("git", "show", f"{ref}:{path}")
-        except subprocess.CalledProcessError:
-            continue
-        return effective_wrangler(path, parse_jsonc(text))
-    return None
+def cf_config_at(ref: str) -> tuple[str | None, ...]:
+    return tuple(file_at(ref, path) for path in CF_CONFIGS)
 
 
 def worker_config_changed(base: str | None, ref: str) -> bool:
     if base is None:
         return False
-    return wrangler_config_at(base) != wrangler_config_at(ref)
+    return cf_config_at(base) != cf_config_at(ref)
+
+
+def d1_database_id(path: Path = Path("cloudflare.config.ts")) -> str:
+    match = D1_ID_PATTERN.search(path.read_text(encoding="utf-8"))
+    if match is None:
+        raise ValueError("D1 database id not found in cloudflare.config.ts")
+    return match.group(1)
 
 
 def build_plan(version: str | None, ref: str, base: str | None, prs: list[str] | None = None) -> ReleasePlan:
@@ -116,7 +103,7 @@ def build_plan(version: str | None, ref: str, base: str | None, prs: list[str] |
     worker_change = (
         any(path.startswith(WORKER_PREFIXES) or path == "bun.lock" for path in paths)
         or worker_config_changed(base, resolved_ref)
-        or (base is None and any(path in WRANGLER_CONFIGS for path in paths))
+        or (base is None and any(path in CF_CONFIGS for path in paths))
     )
     tag = latest_tag()
     next_patch, next_minor = next_versions(tag)
@@ -132,18 +119,6 @@ def build_plan(version: str | None, ref: str, base: str | None, prs: list[str] |
         migrations=migrations,
         mode="release+deploy" if worker_change else "release-only",
     )
-
-
-def d1_database_name(path: Path = Path(".config/wrangler.jsonc")) -> str:
-    payload = parse_jsonc(path.read_text(encoding="utf-8"))
-    databases = payload.get("d1_databases") or []
-    for entry in databases:
-        if entry.get("binding") == "DB" and entry.get("database_name"):
-            return str(entry["database_name"])
-    for entry in databases:
-        if entry.get("database_name"):
-            return str(entry["database_name"])
-    raise ValueError("D1 database_name not found in .config/wrangler.jsonc")
 
 
 def require_execute(args: argparse.Namespace) -> None:
@@ -170,6 +145,7 @@ def main() -> int:
     release.add_argument("--execute", action="store_true")
     deploy = subparsers.add_parser("deploy")
     deploy.add_argument("--tag", required=True)
+    deploy.add_argument("--secrets-file", default="tmp/cloudflare-secrets.env")
     deploy.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     try:
@@ -197,11 +173,14 @@ def main() -> int:
             tagged = command("git", "rev-parse", f"{args.tag}^{{commit}}")
             if tagged != command("git", "rev-parse", "HEAD"):
                 raise ValueError("checked-out HEAD must equal the deployment tag")
+            secrets_file = Path(args.secrets_file)
+            if not secrets_file.is_file():
+                raise ValueError(f"secrets file not found: {secrets_file}; run 'task deploy:secrets' first")
             subprocess.run(
-                ["bun", "x", "wrangler", "d1", "migrations", "list", d1_database_name(Path(".config/wrangler.jsonc")), "--remote", "-c", ".config/wrangler.jsonc"],
+                ["bun", "x", "cf", "d1", "migrations", "list", d1_database_id(), "--dir", "migrations"],
                 check=True,
             )
-            subprocess.run(["bun", "x", "wrangler", "deploy", "-c", ".config/wrangler.jsonc"], check=True)
+            subprocess.run(["bun", "x", "cf", "deploy", "--secrets-file", str(secrets_file)], check=True)
     except (ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
     return 0

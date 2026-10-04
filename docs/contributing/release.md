@@ -33,7 +33,7 @@ Release はリポジトリ変更の配布単位であり、Cloudflare Workers �
 ## Task コマンド
 
 - `task release:plan -- [--version vX.Y.Z] [--ref <sha>] [--base <tag>] [--pr <N>]...` は候補を読み取り専用で分類する。
-  - `--pr` は繰り返し指定でき、指定 PR の変更ファイル（`gh pr view <N> --json files`）を union して分類対象にする。`--base` 併用時も分類は PR の変更ファイル、wrangler 設定比較は `--base` を使う。
+  - `--pr` は繰り返し指定でき、指定 PR の変更ファイル（`gh pr view <N> --json files`）を union して分類対象にする。`--base` 併用時も分類は PR の変更ファイル、config 比較は `--base` を使う。
   - `--version` を省略しても最新タグと次 patch/minor 候補を表示する。
 - `task release:create -- --version vX.Y.Z --ref HEAD --execute` は clean worktree の HEAD を注釈付きタグとして push する。
 - Worker デプロイは、タグを checkout した worktree で `task deploy:release -- --tag vX.Y.Z --execute` を実行する。

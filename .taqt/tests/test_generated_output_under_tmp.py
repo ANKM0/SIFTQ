@@ -1,9 +1,10 @@
-"""Tests for ADR 0049: generated artifacts live under `tmp/` (Issue #465).
+"""Tests for ADR 0049/0065: generated artifacts live under `tmp/`.
 
 Committed tool config stays in `.config/`; virtualenvs, caches, test output, and
-local Wrangler state must be redirected into the git-ignored `tmp/` directory.
+local Wrangler state should be redirected into the git-ignored `tmp/` directory.
 `graphify-out/` stays at the repository root because `graphify install` bakes the
-literal path into its skills and hooks.
+literal path into its skills and hooks. `.wrangler/` stays at the repository
+root because `cf dev` uses it for local state and does not accept `--persist-to`.
 """
 
 from pathlib import Path
@@ -38,14 +39,16 @@ def test_playwright_output_dir_is_under_tmp() -> None:
     assert "tmp/test-results" in config
 
 
-def test_wrangler_persist_to_is_under_tmp() -> None:
+def test_local_dev_uses_cf_and_tool_fixed_wrangler_state() -> None:
     package = (REPOSITORY_ROOT / "package.json").read_text(encoding="utf-8")
-    assert "--persist-to tmp/wrangler/state" in package
+    assert '"dev": "cf dev"' in package
+    assert "--persist-to" not in package
     assert ".config/.wrangler/state" not in package
 
 
 def test_gitignore_keeps_graphify_out_and_drops_config_caches() -> None:
     gitignore = (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "graphify-out/" in gitignore
+    assert ".wrangler/" in gitignore
     assert ".config/.venv/" not in gitignore
     assert ".config/.ruff_cache/" not in gitignore

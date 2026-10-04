@@ -1,5 +1,7 @@
 # ADR 0027: Adopt D1 SQL migration management
 
+> Status: Superseded by [ADR 0071](0071-adopt-cloudflare-unified-cli.md).
+
 ## 決定
 
 - D1 の schema 変更は Cloudflare 公式の SQL migration + Wrangler で管理する。

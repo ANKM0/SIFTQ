@@ -10,6 +10,8 @@
 !/tsconfig.json
 !/uv.lock
 !/vite.config.ts
+!/cloudflare.config.ts
+!/wrangler.config.ts
 !/.config/
 !/.config/**
 /.config/.wrangler/

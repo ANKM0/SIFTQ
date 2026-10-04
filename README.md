@@ -18,8 +18,8 @@ task -t .config/Taskfile.yml setup:aqua-links
 ```
 
 `env.sh` also redirects generated output into `tmp/`: the Python virtual
-environment (`.venv`), Ruff/pytest caches, Playwright results, and Wrangler
-local state. The Taskfile applies the same values for `task`-run commands. In
+environment (`.venv`), Ruff/pytest caches, and Playwright results. The Taskfile
+applies the same values for `task`-run commands. In
 non-interactive shells and CI, source the same file explicitly to get
 `AQUA_CONFIG` and `AQUA_POLICY_CONFIG`:
 
@@ -58,7 +58,7 @@ setup` command. It will install Bun and Vite+ if they are missing.
 
 ## Development
 
-Start the Worker development server with Wrangler:
+Start the Worker development server with cf:
 
 ```bash
 . ./.config/env.sh
@@ -76,8 +76,13 @@ Open `http://127.0.0.1:8787` and sign in with password `preview`.
 Apply the local D1 migrations:
 
 ```bash
-bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to tmp/wrangler/state
+bun x wrangler d1 migrations apply siftq --local -c .config/wrangler.jsonc --persist-to .wrangler/state
 ```
+
+Local D1 migration stays on Wrangler: `cf d1 migrations apply --local` does not
+exit in the current cf beta. `cf dev` reads local state from `.wrangler/state`
+and does not accept `--persist-to`, so apply migrations there. cf itself uses
+Wrangler as its bundler.
 
 Run the unit tests:
 

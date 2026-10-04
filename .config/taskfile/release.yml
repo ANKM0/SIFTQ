@@ -24,10 +24,17 @@ tasks:
   deploy:
     desc: Deploy the Worker to Cloudflare.
     cmds:
-      - bun x wrangler deploy -c .config/wrangler.jsonc
+      - |
+        set -eu
+        secrets_file="${SECRETS_FILE:-tmp/cloudflare-secrets.env}"
+        if [ ! -f "$secrets_file" ]; then
+          echo "Missing $secrets_file. Run 'task deploy:secrets' first or set SECRETS_FILE." >&2
+          exit 1
+        fi
+        bun x cf deploy --secrets-file "$secrets_file"
 
   deploy:secrets:
-    desc: Set Worker auth secrets on Cloudflare.
+    desc: Write Worker auth secrets to a local file for cf deploy.
     cmds:
       - |
         set -eu
@@ -41,5 +48,10 @@ tasks:
           printf 'SESSION_SECRET: '
           IFS= read -r secret
         fi
-        printf '%s' "$password" | bun x wrangler secret put AUTH_PASSWORD -c .config/wrangler.jsonc
-        printf '%s' "$secret" | bun x wrangler secret put SESSION_SECRET -c .config/wrangler.jsonc
+        mkdir -p tmp
+        umask 077
+        {
+          printf 'AUTH_PASSWORD=%s\n' "$password"
+          printf 'SESSION_SECRET=%s\n' "$secret"
+        } > tmp/cloudflare-secrets.env
+        echo "Wrote secrets to tmp/cloudflare-secrets.env"

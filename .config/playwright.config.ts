@@ -22,9 +22,13 @@ export default defineConfig({
     viewport: { width: 1440, height: 960 },
   },
   webServer: {
-    command: `bun run dev --local --ip 127.0.0.1 --port ${e2ePort} --var AUTH_PASSWORD:${e2ePassword} --var SESSION_SECRET:${e2eSecret}`,
+    command: `bun run dev --host 127.0.0.1 --port ${e2ePort}`,
     port: e2ePort,
     reuseExistingServer: !process.env["CI"],
+    env: {
+      AUTH_PASSWORD: e2ePassword,
+      SESSION_SECRET: e2eSecret,
+    },
   },
   projects: [
     {
